@@ -597,6 +597,8 @@ When you see these in a task, read the corresponding annex first:
 | "invoke-macro", "MacroExpansionStep", "MacroIndex", "macro lint", "MACRO0" | `docs/annex-macros.md` |
 | "screening-ops", "screening.full", "macro search overrides", "macro audit" | `docs/annex-macros.md` |
 | "SequenceValidator", "CompoundSignals", "FixpointExpansion", "macro DAG" | `docs/annex-macros.md` |
+| "PACK001", "workspace bleed", "mode-tags", "workspace_accepts_mode_tag", "fail closed" | `docs/annex-macros.md` |
+| "new workspace", "add workspace", "WorkspaceKind", "workspace checklist" | `docs/annex-macros.md` |
 | "constraint cascade" | `docs/annex-domain-features.md` |
 | "contract", "deal", "billing", "rate card", "subscription" | `docs/annex-domain-features.md` |
 | "client group", "alias", "anchor", "resolver" | `docs/annex-domain-features.md` |

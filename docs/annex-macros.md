@@ -363,6 +363,11 @@ PACK001 error: macro 'screening.full' [mode-tags: kyc, onboarding] in pack
 **Fix:** Either remove the macro from the pack, or add the appropriate mode-tag to the macro
 if it legitimately belongs in that workspace context.
 
+**Fail-closed on unknown workspaces:** If a new `WorkspaceKind` is added to the Rust enum and
+used in a pack but NOT added to the compatibility table, PACK001 rejects **every** macro in
+that pack for the unknown workspace. This forces the table to be updated before any macros
+can ship in the new workspace. See [Adding a Workspace](#adding-a-workspace) below.
+
 ---
 
 ## Adding a Macro
@@ -420,6 +425,94 @@ my-domain.my-macro:
   unlocks:
     - my-domain.next-step
 ```
+
+---
+
+## Adding a Workspace
+
+When a new `WorkspaceKind` is added (e.g., `Compliance`), the macro system requires updates
+at multiple layers. PACK001 enforces this — if any step is skipped, the lint fails.
+
+### Checklist
+
+1. **Add the enum variant** to `WorkspaceKind` in `rust/src/repl/types_v2.rs`
+   - Add `label()`, `description()`, registry metadata (constellation family, subject kind)
+   - Serde serialization uses `snake_case` (e.g., `Compliance` → `"compliance"`)
+
+2. **Update PACK001 compatibility table** in `rust/xtask/src/main.rs`
+   - Add a row to `workspace_accepts_any_mode_tag()`:
+     ```rust
+     "compliance" => &["compliance", "onboarding"],
+     ```
+   - Choose mode-tags that describe what operations make sense in this workspace
+   - If you skip this step, PACK001 **fails closed** — every macro in every pack that
+     serves this workspace will be flagged as an error
+
+3. **Create or update a pack** in `rust/config/packs/`
+   - Add the new workspace to the pack's `workspaces` list
+   - Add macros to `allowed_verbs` — only macros whose mode-tags include a tag
+     accepted by the new workspace
+   - Run `cargo x verbs lint-macros` to verify zero PACK001 errors
+
+4. **Create constellation map** in `rust/config/sem_os_seeds/constellation_maps/`
+   - Define slots with primitive verbs that macros in this workspace expand to
+   - Assign to a constellation family
+
+5. **Create or assign mode-tag** for macros that will serve this workspace
+   - New macros: set `mode-tags` to include the new workspace's accepted tags
+   - Existing macros: add the tag if the macro legitimately operates in the new context
+   - Do NOT add mode-tags to macros that don't belong — PACK001 exists to prevent this
+
+6. **Wire into orchestrator** in `rust/src/repl/orchestrator_v2.rs`
+   - Add workspace selection routing (ScopeGate fork or WorkspaceSelection handler)
+
+7. **Verify the full chain:**
+   ```bash
+   cargo x verbs lint-macros          # PACK001 — zero errors
+   cargo x pre-commit                 # Format + clippy + unit tests
+   cargo x verbs compile              # Sync verb registry
+   ```
+
+### What PACK001 Fail-Closed Looks Like
+
+If you add `WorkspaceKind::Compliance` and wire it into the `kyc-case` pack but forget
+step 2 (updating the compatibility table):
+
+```
+PACK001 error: macro 'case.open' [mode-tags: kyc, onboarding] in pack 'kyc-case'
+  is exposed to workspace 'compliance' which accepts none of those tags
+PACK001 error: macro 'screening.full' [mode-tags: kyc, onboarding] in pack 'kyc-case'
+  is exposed to workspace 'compliance' which accepts none of those tags
+... (every macro in the pack fails)
+```
+
+The fix: add `"compliance" => &["compliance", "kyc", "onboarding"]` to the table in
+`workspace_accepts_any_mode_tag()`. Then re-run lint — only macros with incompatible
+mode-tags will remain flagged (real bleed, not false positives).
+
+### Architecture: Three-Layer Isolation
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 1: Constellation Slots                                │
+│   Primitive verbs gated by entity state (when: empty/filled)│
+│   Defines WHAT operations are valid on WHICH entities       │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 2: Pack allowed_verbs                                 │
+│   Workspace-scoped whitelist of macros + verbs              │
+│   Defines WHICH macros operators can see in WHICH workspace │
+├─────────────────────────────────────────────────────────────┤
+│ Layer 3: PACK001 Lint                                       │
+│   Mode-tag ↔ workspace compatibility check                  │
+│   Ensures pack wiring is INTENTIONAL, not accidental        │
+│   Fail-closed: unknown workspace → reject all macros        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Each layer catches a different class of error:
+- **Constellation** prevents executing a verb when the entity isn't in the right state
+- **Pack** prevents offering a verb/macro in the wrong workspace
+- **PACK001** prevents accidentally wiring a macro into a workspace where it doesn't belong
 
 ---
 
