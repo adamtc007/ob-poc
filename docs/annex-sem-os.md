@@ -738,3 +738,27 @@ All user input now routes through `ReplOrchestratorV2.process()` with mandatory 
 **Session persistence:** `persist_session_checkpoint()` runs after every `process()` call. Trace entries (`TraceOp::Input`, `VerbExecuted`, `StateTransition`) flushed to `session_traces` table. Full audit trail.
 
 **Dead code removed:** `cbu_session_routes.rs` (-917), `agent_dsl_routes.rs` (-2,437), `agent_learning_routes.rs` (-952), `vnext-repl` gates (-101), legacy fallback (-73). Total: -4,480 lines.
+
+---
+
+## Governance & Attribute Macros
+
+The SemOS Maintenance workspace uses operator macros for multi-step governance workflows. Full macro system documentation is in `docs/annex-macros.md`.
+
+**Governance macros** (in `rust/config/verb_schemas/macros/governance.yaml`):
+
+| Macro | Steps | Purpose |
+|-------|-------|---------|
+| `governance.bootstrap-attribute-registry` | 3 | Bridge ungoverned → SemOS + sync SRDEFs + check gaps |
+| `governance.define-service-dictionary` | 4 | Check gaps + sync + rollup + gaps |
+| `governance.full-publish-pipeline` | 5 | Precheck + validate + dry-run + plan + publish |
+| `governance.reconcile-registry` | 3 | Bridge + sync + recompute stale derived values |
+
+**Attribute macros** (in `rust/config/verb_schemas/macros/attribute.yaml`):
+
+| Macro | Steps | Purpose |
+|-------|-------|---------|
+| `attribute.seed-domain` | 1 | Generate attribute.define calls for a verb domain |
+| `attribute.seed-derived` | 1 | Generate attribute.define-derived calls for a derivation domain |
+
+All 6 macros are wired into the `semos-maintenance` pack (`allowed_verbs`) and available only in the `sem_os_maintenance` workspace. Mode tags: `stewardship` / `governance`.

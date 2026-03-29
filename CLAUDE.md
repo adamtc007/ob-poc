@@ -1,10 +1,11 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-03-28
+> **Last reviewed:** 2026-03-29
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*)
 > **Verbs:** 1,442 canonical verbs, 24,075 intent patterns (DB-sourced)
+> **Macros:** 93 operator macros (20 YAML files, 16 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
 > **Latest schema addition:** `rust/migrations/20260329_phrase_bank_materialization.sql`
 > **Workspaces:** 7 (CBU, KYC, Deal, OnBoarding, ProductMaintenance, InstrumentMatrix, SemOsMaintenance)
@@ -516,7 +517,8 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 | Semantic OS, SemReg, context resolution, ABAC, stewardship, governed authoring, CCIR, verb surface, scanner | `docs/annex-sem-os.md` |
 | BPMN-Lite service, fiber VM, race semantics, gRPC, orchestration, bpmn_integration | `docs/annex-bpmn-lite.md` |
 | V2 REPL, packs, scoring, preconditions, context stack, golden corpus, replay tuner | `docs/annex-repl-v2.md` |
-| Contracts, deals, billing, client groups, documents, entity linking, macros, inspector, lexicon, lookup, playbooks, transactional execution | `docs/annex-domain-features.md` |
+| Macros: operator vocabulary, expansion engine, MacroIndex, lint, composite macros, state DAG, pack mapping | `docs/annex-macros.md` |
+| Contracts, deals, billing, client groups, documents, entity linking, inspector, lexicon, lookup, playbooks, transactional execution | `docs/annex-domain-features.md` |
 | React frontend details, Zed extension, LSP, ob-agentic onboarding pipeline | `docs/annex-frontend-and-tools.md` |
 
 **Pre-existing annexes (unchanged):**
@@ -590,7 +592,11 @@ When you see these in a task, read the corresponding annex first:
 | "VerbSearchIntentMatcher", "IntentMatcher", "3-pronged" | `docs/annex-repl-v2.md` |
 | "compile_invocation", "CompiledRunbook", "RunbookStore", "execute_runbook" | `docs/annex-repl-v2.md` |
 | "FocusMode", "DecisionLog", "ExclusionSet" | `docs/annex-repl-v2.md` |
-| "macro", "operator vocabulary", "structure.setup", "constraint cascade" | `docs/annex-domain-features.md` |
+| "macro", "operator vocabulary", "structure.setup", "MacroSchema", "expands-to" | `docs/annex-macros.md` |
+| "invoke-macro", "MacroExpansionStep", "MacroIndex", "macro lint", "MACRO0" | `docs/annex-macros.md` |
+| "screening-ops", "screening.full", "macro search overrides", "macro audit" | `docs/annex-macros.md` |
+| "SequenceValidator", "CompoundSignals", "FixpointExpansion", "macro DAG" | `docs/annex-macros.md` |
+| "constraint cascade" | `docs/annex-domain-features.md` |
 | "contract", "deal", "billing", "rate card", "subscription" | `docs/annex-domain-features.md` |
 | "client group", "alias", "anchor", "resolver" | `docs/annex-domain-features.md` |
 | "entity linking", "mention extraction", "EntityLinkingService" | `docs/annex-domain-features.md` |
