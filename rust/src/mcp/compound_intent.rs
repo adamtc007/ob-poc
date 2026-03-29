@@ -485,6 +485,10 @@ pub fn extract_action_stem(utterance: &str) -> Option<String> {
         ("distribute", "distribute"),
         ("transfer", "transfer"),
         ("waive", "waive"),
+        ("chase", "solicit"),
+        ("chase up", "solicit"),
+        ("follow up", "solicit"),
+        ("remind", "solicit"),
     ];
 
     for (phrase, stem) in STEM_MAP {
