@@ -1305,7 +1305,13 @@ impl HybridVerbSearcher {
             if !allowed.is_empty() && allowed.len() <= 100 {
                 let verb_fqns: Vec<String> = allowed.iter().cloned().collect();
                 return self
-                    .search_patterns_constrained(verb_service, &query_embedding, limit, &verb_fqns, effective_fallback_threshold)
+                    .search_patterns_constrained(
+                        verb_service,
+                        &query_embedding,
+                        limit,
+                        &verb_fqns,
+                        effective_fallback_threshold,
+                    )
                     .await;
             }
         }
@@ -1437,7 +1443,13 @@ impl HybridVerbSearcher {
             if !allowed.is_empty() && allowed.len() <= 100 {
                 let verb_fqns: Vec<String> = allowed.iter().cloned().collect();
                 let constrained_results = self
-                    .search_patterns_constrained(verb_service, query_embedding, limit, &verb_fqns, fallback_threshold)
+                    .search_patterns_constrained(
+                        verb_service,
+                        query_embedding,
+                        limit,
+                        &verb_fqns,
+                        fallback_threshold,
+                    )
                     .await?;
 
                 let has_good_result = constrained_results
@@ -1462,7 +1474,13 @@ impl HybridVerbSearcher {
         // Strategy 2: Domain-scoped search (if ECIR identified a domain)
         if let Some(domain) = ecir_domain {
             let scoped_results = self
-                .search_patterns_directly_scoped(verb_service, query_embedding, limit, Some(domain), fallback_threshold)
+                .search_patterns_directly_scoped(
+                    verb_service,
+                    query_embedding,
+                    limit,
+                    Some(domain),
+                    fallback_threshold,
+                )
                 .await?;
 
             let has_good_result = scoped_results
@@ -1484,8 +1502,14 @@ impl HybridVerbSearcher {
         }
 
         // Strategy 3: Full-space search (fallback)
-        self.search_patterns_directly_scoped(verb_service, query_embedding, limit, None, fallback_threshold)
-            .await
+        self.search_patterns_directly_scoped(
+            verb_service,
+            query_embedding,
+            limit,
+            None,
+            fallback_threshold,
+        )
+        .await
     }
 
     /// Search patterns constrained to a specific set of verb FQNs.

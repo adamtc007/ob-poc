@@ -428,7 +428,9 @@ async fn prepare_turn_context(
         fail_policy,
         entity_state: grounded_entity_state.as_deref(),
         has_group_scope,
-        is_infrastructure_scope: ctx.scope.as_ref()
+        is_infrastructure_scope: ctx
+            .scope
+            .as_ref()
             .and_then(|s| s.client_group_id)
             .is_some_and(|id| id == uuid::Uuid::nil()),
         composite_state: composite_state.as_ref(),
@@ -1585,7 +1587,9 @@ pub async fn legacy_handle_utterance(
         fail_policy,
         entity_state: None, // Lifecycle filtering deferred to Phase 3
         has_group_scope: has_group_scope_2,
-        is_infrastructure_scope: ctx.scope.as_ref()
+        is_infrastructure_scope: ctx
+            .scope
+            .as_ref()
             .and_then(|s| s.client_group_id)
             .is_some_and(|id| id == uuid::Uuid::nil()),
         composite_state: None, // TODO: load from group composite when available

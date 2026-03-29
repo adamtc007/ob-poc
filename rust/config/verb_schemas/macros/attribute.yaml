@@ -19,7 +19,7 @@ attribute.seed-domain:
         description: "Verb domain to seed"
     optional: {}
   prereqs: []
-  expands_to:
+  expands-to:
     - verb: attribute.list
       args:
         domain: "${arg.domain}"
@@ -45,7 +45,7 @@ attribute.seed-derived:
         description: "Derivation domain to seed"
     optional: {}
   prereqs: []
-  expands_to:
+  expands-to:
     - verb: attribute.list
       args:
         domain: "${arg.domain}"

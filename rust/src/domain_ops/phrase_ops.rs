@@ -108,8 +108,6 @@ pub struct CrossWorkspaceConflict {
     pub workspace: Option<String>,
 }
 
-
-
 /// Result from phrase proposal creation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhraseProposalResult {
@@ -328,7 +326,12 @@ async fn run_collision_check(
 fn risk_tier_for_verb(verb_fqn: &str) -> &'static str {
     let lower = verb_fqn.to_lowercase();
     let critical_keywords = [
-        "approve", "reject", "terminate", "delete", "close", "certify",
+        "approve",
+        "reject",
+        "terminate",
+        "delete",
+        "close",
+        "certify",
     ];
     let standard_keywords = ["read", "list", "get", "show", "describe", "search"];
 
@@ -814,8 +817,7 @@ impl CustomOperation for PhraseProposeOp {
 
         // 5. Compute deterministic object_id and create SemOS snapshot
         let semantic_id = format!("phrase:{}:{}", target_verb, phrase);
-        let object_id =
-            crate::sem_reg::ids::object_id_for(ObjectType::PhraseMapping, &semantic_id);
+        let object_id = crate::sem_reg::ids::object_id_for(ObjectType::PhraseMapping, &semantic_id);
 
         let mut tx = pool.begin().await?;
         let meta = next_phrase_meta(
@@ -1006,15 +1008,12 @@ impl CustomOperation for PhraseBatchProposeOp {
             let meta = next_phrase_meta(
                 None,
                 object_id,
-                ctx.audit_user
-                    .as_deref()
-                    .unwrap_or("phrase.batch-propose"),
+                ctx.audit_user.as_deref().unwrap_or("phrase.batch-propose"),
                 ChangeType::NonBreaking,
                 Some("Auto-generated from session trace miss patterns".to_string()),
                 SnapshotStatus::Active,
             );
-            let snapshot_id =
-                publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+            let snapshot_id = publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
             tx.commit().await?;
 
             let proposal = PhraseProposalResult {
@@ -1040,8 +1039,14 @@ impl CustomOperation for PhraseBatchProposeOp {
                     _ => 3,
                 }
             };
-            let a_tier = a.get("risk_tier").and_then(|v| v.as_str()).unwrap_or("elevated");
-            let b_tier = b.get("risk_tier").and_then(|v| v.as_str()).unwrap_or("elevated");
+            let a_tier = a
+                .get("risk_tier")
+                .and_then(|v| v.as_str())
+                .unwrap_or("elevated");
+            let b_tier = b
+                .get("risk_tier")
+                .and_then(|v| v.as_str())
+                .unwrap_or("elevated");
             let tier_cmp = tier_order(a_tier).cmp(&tier_order(b_tier));
             if tier_cmp != std::cmp::Ordering::Equal {
                 return tier_cmp;
@@ -1133,42 +1138,44 @@ impl CustomOperation for PhraseReviewProposalsOp {
 
         let proposals: Vec<serde_json::Value> = rows
             .into_iter()
-            .map(|(snapshot_id, definition, created_by, ver_major, ver_minor)| {
-                let phrase = definition
-                    .get("phrase")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let verb_fqn = definition
-                    .get("verb_fqn")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let workspace = definition
-                    .get("workspace")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let state = definition
-                    .get("state")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("proposed")
-                    .to_string();
-                let collision_report = definition.get("collision_report").cloned();
-                let evidence = definition.get("evidence").cloned();
+            .map(
+                |(snapshot_id, definition, created_by, ver_major, ver_minor)| {
+                    let phrase = definition
+                        .get("phrase")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let verb_fqn = definition
+                        .get("verb_fqn")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let workspace = definition
+                        .get("workspace")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let state = definition
+                        .get("state")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("proposed")
+                        .to_string();
+                    let collision_report = definition.get("collision_report").cloned();
+                    let evidence = definition.get("evidence").cloned();
 
-                serde_json::to_value(PhraseProposalSummary {
-                    snapshot_id,
-                    phrase,
-                    verb_fqn,
-                    workspace,
-                    state,
-                    created_by,
-                    version: format!("{}.{}", ver_major, ver_minor),
-                    collision_report,
-                    evidence,
-                })
-                .unwrap_or_default()
-            })
+                    serde_json::to_value(PhraseProposalSummary {
+                        snapshot_id,
+                        phrase,
+                        verb_fqn,
+                        workspace,
+                        state,
+                        created_by,
+                        version: format!("{}.{}", ver_major, ver_minor),
+                        collision_report,
+                        evidence,
+                    })
+                    .unwrap_or_default()
+                },
+            )
             .collect();
 
         Ok(ExecutionResult::RecordSet(proposals))
@@ -1223,12 +1230,7 @@ impl CustomOperation for PhraseApproveOp {
         // 1. Look up the proposal snapshot
         let proposal = SnapshotStore::get_by_id(pool, proposal_id)
             .await?
-            .ok_or_else(|| {
-                anyhow!(
-                    "Phrase proposal snapshot {} not found",
-                    proposal_id
-                )
-            })?;
+            .ok_or_else(|| anyhow!("Phrase proposal snapshot {} not found", proposal_id))?;
 
         // Verify it's a phrase_mapping
         if proposal.object_type != ObjectType::PhraseMapping {

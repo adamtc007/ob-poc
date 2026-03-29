@@ -5074,7 +5074,9 @@ impl ReplOrchestratorV2 {
                 // Entity ambiguity is informational — don't block verb matching.
                 // Macros and deterministic phrase matches resolve without entity context.
                 // Only halt if no verb match is found downstream.
-                tracing::debug!("Phase2 gate: ambiguous_entity detected, deferring to verb matching");
+                tracing::debug!(
+                    "Phase2 gate: ambiguous_entity detected, deferring to verb matching"
+                );
                 return None;
             }
             "no_entity_found" => {

@@ -375,8 +375,14 @@ mod tests {
         let embedder = Embedder::new().expect("Failed to load embedder");
 
         let cases = [
-            ("check attribute gaps", "check attribute gaps for service resources"),
-            ("bootstrap attribute registry", "bootstrap attribute registry"),
+            (
+                "check attribute gaps",
+                "check attribute gaps for service resources",
+            ),
+            (
+                "bootstrap attribute registry",
+                "bootstrap attribute registry",
+            ),
             ("reconcile semos", "reconcile the registry"),
             ("bridge attributes", "bridge ungoverned attributes to semos"),
             ("load the cbu", "session.load-cbu"),
@@ -390,16 +396,25 @@ mod tests {
             assert!(
                 sim > 0.40,
                 "Query '{}' should have > 0.40 similarity with target '{}', got {}",
-                query, target, sim
+                query,
+                target,
+                sim
             );
         }
 
         // Determinism: same input twice must produce identical embeddings
-        let t1 = embedder.embed_target("check attribute gaps for service resources").unwrap();
-        let t2 = embedder.embed_target("check attribute gaps for service resources").unwrap();
+        let t1 = embedder
+            .embed_target("check attribute gaps for service resources")
+            .unwrap();
+        let t2 = embedder
+            .embed_target("check attribute gaps for service resources")
+            .unwrap();
         let det_sim = cosine_sim(&t1, &t2);
         eprintln!("determinism (target-target same text): {:.6}", det_sim);
-        assert!((det_sim - 1.0).abs() < 0.0001, "Same text must produce identical embeddings");
+        assert!(
+            (det_sim - 1.0).abs() < 0.0001,
+            "Same text must produce identical embeddings"
+        );
 
         // Print first 5 values for comparison with DB
         eprintln!("first 5 target values: {:?}", &t1[..5]);

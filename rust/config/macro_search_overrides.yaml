@@ -10,7 +10,7 @@
 #       - "phrase two"
 
 # =========================================================================
-# SCREENING MACROS — bridge old verb names to macro FQNs
+# SCREENING MACROS — party-level (ad-hoc, pre-workstream)
 # =========================================================================
 
 screening.pep-check:
@@ -50,6 +50,30 @@ screening.full:
     - "run all checks"
     - "screen this entity completely"
     - "comprehensive screening"
+
+# =========================================================================
+# SCREENING OPS MACROS — workstream-level (KYC case context)
+# =========================================================================
+
+screening-ops.run:
+  aliases:
+    - "run workstream screening"
+    - "screen workstream"
+    - "workstream screening"
+
+screening-ops.review-hit:
+  aliases:
+    - "review screening hit"
+    - "adjudicate hit"
+    - "review match"
+    - "false positive"
+    - "true match"
+
+screening-ops.bulk-refresh:
+  aliases:
+    - "refresh screening"
+    - "bulk refresh"
+    - "re-screen all"
 
 # =========================================================================
 # KYC WORKFLOW MACROS

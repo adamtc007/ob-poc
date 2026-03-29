@@ -111,6 +111,7 @@ SemOS Maintenance workspace (2026-03-28):
 - Onboarding product macros: `structure.product-suite-custody-fa-ta`, `structure.product-suite-full`, `structure.remove-all-products` — compound intent → multi-step runbook → per-entity expansion → DAG-ordered → confirm all → execute atomically
 - Macro priority: ScenarioIndex (1.05) > MacroIndex (1.04) > exact phrase (1.0) — macros always win over single verbs when both match (safer, atomic, complete)
 - Per-entity macro expansion: runbook compiler replicates macro steps per CBU UUID in scope
+- Macro audit (2026-03-29): fixed `expands_to` → `expands-to` YAML key in `attribute.seed-*` macros (serde kebab-case deserialization bug); removed 8 KYC-domain macros from `book-setup` pack (screening, case, kyc-workflow macros leaked into CBU/InstrumentMatrix workspaces); added search overrides for `screening-ops.*` workstream-level macros; two screening families coexist: `screening.*` (party-level ad-hoc) and `screening-ops.*` (workstream-level KYC)
 - `cargo clippy` clean across entire codebase
 
 ---

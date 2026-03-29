@@ -508,8 +508,10 @@ pub enum GovernanceLevel {
 |------|---------|---------|
 | `rust/config/noun_index.yaml` | 120+ domain nouns with action→verb mappings | ECIR database |
 | `rust/config/scenario_index.yaml` | 16 journey scenarios | Tier -2A routes |
-| `rust/config/verb_schemas/macros/screening.yaml` | 4 screening macros | Tier -2B candidates |
+| `rust/config/verb_schemas/macros/screening.yaml` | 4 party-level screening macros (ad-hoc, pre-workstream) | Tier -2B candidates |
+| `rust/config/verb_schemas/macros/screening-ops.yaml` | 3 workstream-level screening macros (KYC case context) | Tier -2B candidates |
 | `rust/config/verb_schemas/macros/kyc-workflow.yaml` | 3 KYC workflow macros | Tier -2B candidates |
+| `rust/config/macro_search_overrides.yaml` | Search aliases for macros (screening, structure, party, KYC) | MacroIndex overrides |
 
 ---
 

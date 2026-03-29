@@ -1144,9 +1144,7 @@ async fn materialize_to_store(
         .get("name")
         .and_then(|v| v.as_str())
         .unwrap_or(semantic_id);
-    let domain = definition
-        .get("domain")
-        .and_then(|v| v.as_str());
+    let domain = definition.get("domain").and_then(|v| v.as_str());
     let data_type = definition
         .get("data_type")
         .and_then(|v| v.as_str())
@@ -1155,9 +1153,7 @@ async fn materialize_to_store(
         .get("evidence_grade")
         .and_then(|v| v.as_str())
         .unwrap_or("none");
-    let category = definition
-        .get("category")
-        .and_then(|v| v.as_str());
+    let category = definition.get("category").and_then(|v| v.as_str());
     let validation_rules = definition.get("validation_rules").cloned();
     let applicability = definition.get("applicability").cloned();
 
@@ -1426,8 +1422,7 @@ impl CustomOperation for AttributeDefineGovernedOp {
         let applicability = parse_json_arg(verb_call, "applicability")?;
 
         // ── Step 1: Generate deterministic UUID (used as both registry uuid and SemOS object_id) ──
-        let object_id =
-            crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, &semantic_id);
+        let object_id = crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, &semantic_id);
 
         // ── Step 2: Build the full AttributeDef body with ALL fields populated ──
         let body = build_attribute_def_body(
@@ -1559,8 +1554,7 @@ impl CustomOperation for AttributeDefineDerivedOp {
         let freshness_seconds = optional_int_arg(verb_call, "freshness-seconds");
 
         // ── Step 1: Generate deterministic UUIDs ──
-        let object_id =
-            crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, &semantic_id);
+        let object_id = crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, &semantic_id);
         let derivation_object_id =
             crate::sem_reg::ids::object_id_for(ObjectType::DerivationSpec, &semantic_id);
 
@@ -1574,8 +1568,8 @@ impl CustomOperation for AttributeDefineDerivedOp {
             evidence_grade,
             true,
             Some(category),
-            None, // no validation_rules for derived
-            None, // no applicability for derived
+            None,                      // no validation_rules for derived
+            None,                      // no applicability for derived
             Some(semantic_id.clone()), // derivation_spec_fqn
         )?;
         let derivation_body = build_derivation_spec_body(
@@ -2124,7 +2118,17 @@ impl CustomOperation for AttributeBridgeToSemosOp {
         let limit = optional_int_arg(verb_call, "limit").unwrap_or(100);
 
         // Find store attributes without SemOS snapshots
-        let rows: Vec<(String, Uuid, String, String, String, Option<String>, Option<serde_json::Value>, Option<serde_json::Value>, String)> = sqlx::query_as(
+        let rows: Vec<(
+            String,
+            Uuid,
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<serde_json::Value>,
+            Option<serde_json::Value>,
+            String,
+        )> = sqlx::query_as(
             r#"
             SELECT id, uuid, display_name, category, value_type, domain,
                    validation_rules, applicability, evidence_grade
@@ -2142,13 +2146,28 @@ impl CustomOperation for AttributeBridgeToSemosOp {
         let mut failed = 0u64;
         let total = rows.len();
 
-        for (semantic_id, _uuid, display_name, category, value_type, domain, validation_rules, applicability, evidence_grade_str) in &rows {
+        for (
+            semantic_id,
+            _uuid,
+            display_name,
+            category,
+            value_type,
+            domain,
+            validation_rules,
+            applicability,
+            evidence_grade_str,
+        ) in &rows
+        {
             let evidence_grade = evidence_grade_str
                 .parse::<EvidenceGrade>()
                 .unwrap_or(EvidenceGrade::None);
-            let domain_str = domain
-                .clone()
-                .unwrap_or_else(|| semantic_id.split('.').next().unwrap_or("attribute").to_string());
+            let domain_str = domain.clone().unwrap_or_else(|| {
+                semantic_id
+                    .split('.')
+                    .next()
+                    .unwrap_or("attribute")
+                    .to_string()
+            });
 
             let body = build_attribute_def_body(
                 semantic_id,
@@ -2180,7 +2199,9 @@ impl CustomOperation for AttributeBridgeToSemosOp {
                 None,
                 ObjectType::AttributeDef,
                 object_id,
-                ctx.audit_user.as_deref().unwrap_or("attribute.bridge-to-semos"),
+                ctx.audit_user
+                    .as_deref()
+                    .unwrap_or("attribute.bridge-to-semos"),
                 ChangeType::Created,
                 None,
                 SnapshotStatus::Active,

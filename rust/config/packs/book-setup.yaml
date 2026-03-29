@@ -44,10 +44,6 @@ allowed_verbs:
   - structure.product-suite-full
   - structure.remove-all-products
   # Structure/onboarding macros
-  - case.list
-  - case.open
-  - kyc.collect-documents
-  - kyc.full-review
   - mandate.create
   - mandate.list
   - mandate.add-product
@@ -64,10 +60,6 @@ allowed_verbs:
   - party.search
   - party.set-address
   - party.update
-  - screening.full
-  - screening.media-check
-  - screening.pep-check
-  - screening.sanctions-check
   - struct.hedge.cross-border
   - struct.ie.aif.icav
   - struct.ie.hedge.icav
