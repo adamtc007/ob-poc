@@ -875,6 +875,7 @@ impl ScenarioIndex {
             "structure_type" => signals.structure_nouns.first().map(|s| s.as_str()),
             "query_direction" => signals.query_direction.as_deref(),
             "relationship_type" => signals.relationship_type.as_deref(),
+            "action_stem" => signals.action_stem.as_deref(),
             _ => None,
         }
     }

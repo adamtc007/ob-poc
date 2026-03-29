@@ -270,6 +270,9 @@ pub struct CompoundSignals {
     /// Canonical vehicle type derived from structure nouns (e.g., "sicav", "oeic", "etf").
     /// Used for two-axis macro selection, not for scoring.
     pub vehicle_type: Option<String>,
+    /// Action stem extracted from the utterance (e.g., "create", "list", "update").
+    /// Used as a pre-filter to narrow candidate verbs within the active workspace.
+    pub action_stem: Option<String>,
     /// Query direction for ownership/control queries (upward/downward/full).
     pub query_direction: Option<String>,
     /// Relationship type for ownership/control queries (ownership/control/all).
@@ -379,7 +382,10 @@ pub fn extract_compound_signals(utterance: &str) -> CompoundSignals {
         }
     }
 
-    // 7. Query direction extraction (ownership/control queries)
+    // 7. Action stem extraction
+    signals.action_stem = extract_action_stem(&lower);
+
+    // 8. Query direction extraction (ownership/control queries)
     signals.query_direction = extract_query_direction(&lower);
 
     // 8. Relationship type extraction (ownership vs control)
@@ -395,6 +401,98 @@ pub fn extract_compound_signals(utterance: &str) -> CompoundSignals {
     };
 
     signals
+}
+
+/// Extract the action stem from an utterance.
+///
+/// Maps natural language verbs to canonical DSL action stems. The stem
+/// matches the first segment of verb FQNs: `domain.{stem}-topic`.
+/// Used as a pre-filter to narrow candidate verbs within the active workspace.
+///
+/// Returns `None` if no recognizable action stem is found (falls through
+/// to embedding search).
+pub fn extract_action_stem(utterance: &str) -> Option<String> {
+    // Ordered: multi-word phrases first, then single words.
+    // Each entry is (user_phrase, canonical_stem).
+    const STEM_MAP: &[(&str, &str)] = &[
+        // Multi-word (check first)
+        ("set up", "create"),
+        ("sign off", "approve"),
+        ("close out", "close"),
+        ("kick off", "create"),
+        ("spin up", "create"),
+        ("open a", "create"),
+        ("open the", "read"),
+        ("look up", "find"),
+        ("pull up", "read"),
+        ("mark as", "mark"),
+        ("run a", "run"),
+        ("run the", "run"),
+        // Single-word stems (exact DSL stems)
+        ("create", "create"),
+        ("list", "list"),
+        ("show", "list"),
+        ("display", "list"),
+        ("read", "read"),
+        ("get", "get"),
+        ("view", "read"),
+        ("update", "update"),
+        ("modify", "update"),
+        ("change", "update"),
+        ("edit", "update"),
+        ("delete", "delete"),
+        ("remove", "remove"),
+        ("add", "add"),
+        ("assign", "assign"),
+        ("set", "set"),
+        ("trace", "trace"),
+        ("find", "find"),
+        ("search", "search"),
+        ("check", "check"),
+        ("verify", "verify"),
+        ("validate", "validate"),
+        ("run", "run"),
+        ("compute", "compute"),
+        ("calculate", "compute"),
+        ("import", "import"),
+        ("export", "export"),
+        ("load", "load"),
+        ("record", "record"),
+        ("mark", "mark"),
+        ("link", "link"),
+        ("unlink", "remove"),
+        ("approve", "approve"),
+        ("reject", "reject"),
+        ("close", "close"),
+        ("open", "create"),
+        ("start", "create"),
+        ("begin", "create"),
+        ("activate", "activate"),
+        ("deactivate", "deactivate"),
+        ("suspend", "suspend"),
+        ("resume", "activate"),
+        ("define", "define"),
+        ("configure", "set"),
+        ("ensure", "ensure"),
+        ("resolve", "resolve"),
+        ("escalate", "escalate"),
+        ("solicit", "solicit"),
+        ("request", "solicit"),
+        ("submit", "submit"),
+        ("fetch", "fetch"),
+        ("sync", "sync"),
+        ("reconcile", "reconcile"),
+        ("distribute", "distribute"),
+        ("transfer", "transfer"),
+        ("waive", "waive"),
+    ];
+
+    for (phrase, stem) in STEM_MAP {
+        if contains_phrase(utterance, phrase) {
+            return Some(stem.to_string());
+        }
+    }
+    None
 }
 
 /// Extract query direction for ownership/control queries.
@@ -866,5 +964,53 @@ mod tests {
         let s = extract_compound_signals("show me the complete ownership structure");
         assert_eq!(s.query_direction.as_deref(), Some("full"));
         assert_eq!(s.relationship_type.as_deref(), Some("ownership"));
+    }
+
+    // --- Action stem extraction ---
+
+    #[test]
+    fn test_action_stem_create() {
+        assert_eq!(extract_action_stem("create a fund"), Some("create".into()));
+        assert_eq!(extract_action_stem("set up a new CBU"), Some("create".into()));
+        assert_eq!(extract_action_stem("open a KYC case"), Some("create".into()));
+        assert_eq!(extract_action_stem("spin up a new entity"), Some("create".into()));
+    }
+
+    #[test]
+    fn test_action_stem_list() {
+        assert_eq!(extract_action_stem("list all owners"), Some("list".into()));
+        assert_eq!(extract_action_stem("show me the shareholders"), Some("list".into()));
+        assert_eq!(extract_action_stem("display the requirements"), Some("list".into()));
+    }
+
+    #[test]
+    fn test_action_stem_update() {
+        assert_eq!(extract_action_stem("update the entity address"), Some("update".into()));
+        assert_eq!(extract_action_stem("modify the trading profile"), Some("update".into()));
+        assert_eq!(extract_action_stem("change the risk rating"), Some("update".into()));
+    }
+
+    #[test]
+    fn test_action_stem_trace() {
+        assert_eq!(extract_action_stem("trace the ownership chain"), Some("trace".into()));
+    }
+
+    #[test]
+    fn test_action_stem_none() {
+        // Practitioner slang without clear action stem
+        assert_eq!(extract_action_stem("chase the passport"), None);
+        assert_eq!(extract_action_stem("ISDA terms for counterparty"), None);
+    }
+
+    #[test]
+    fn test_action_stem_in_compound_signals() {
+        let s = extract_compound_signals("create a new fund in Luxembourg");
+        assert_eq!(s.action_stem.as_deref(), Some("create"));
+
+        let s = extract_compound_signals("list outstanding KYC requirements");
+        assert_eq!(s.action_stem.as_deref(), Some("list"));
+
+        let s = extract_compound_signals("trace the ownership chain");
+        assert_eq!(s.action_stem.as_deref(), Some("trace"));
     }
 }

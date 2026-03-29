@@ -1273,6 +1273,31 @@ impl HybridVerbSearcher {
             }
         }
 
+        // ── Action stem boost ──────────────────────────────────────────────────
+        // When an action stem is detected (e.g., "create" from "create a fund"),
+        // boost embedding results whose verb FQN contains that stem as the action
+        // segment (after the domain dot). This is a soft preference, not a filter.
+        if let Some(ref stem) = compound_signals.action_stem {
+            let boost = 0.05_f32;
+            let mut boosted_count = 0u32;
+            for result in &mut results {
+                // Check if verb FQN's action part starts with the stem.
+                // E.g., stem "create" matches "cbu.create", "entity.create-placeholder"
+                let action_part = result.verb.split('.').last().unwrap_or("");
+                if action_part == stem.as_str() || action_part.starts_with(&format!("{}-", stem)) {
+                    result.score += boost;
+                    boosted_count += 1;
+                }
+            }
+            if boosted_count > 0 {
+                tracing::debug!(
+                    stem = %stem,
+                    boosted = boosted_count,
+                    "Action stem: boosted matching verbs"
+                );
+            }
+        }
+
         // Dedupe by verb, sort by score descending, truncate (Issue J/D fix)
         let mut results = normalize_candidates(results, limit);
 
