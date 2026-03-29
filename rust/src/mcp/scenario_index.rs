@@ -296,8 +296,14 @@ impl ScenarioIndex {
             let (score, matched_signals, gates) =
                 self.score_scenario(scenario, &signals, macro_index);
 
-            // Gate G3: minimum score
-            if score < MIN_SCORE {
+            // Gate G3: minimum score — bypassed when the utterance exactly
+            // matches a phrases_any entry (exact phrase match IS the evidence)
+            let has_exact_phrase_match = scenario
+                .signals
+                .phrases_any
+                .iter()
+                .any(|p| p.to_lowercase() == utterance.to_lowercase());
+            if score < MIN_SCORE && !has_exact_phrase_match {
                 continue;
             }
 

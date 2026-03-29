@@ -661,10 +661,10 @@ impl HybridVerbSearcher {
         }
 
         // ── Tier -2A: ScenarioIndex journey-level resolution ─────────────────
-        // Only fires when compound signals are present (gate G1). Evaluates
-        // utterance against scenario definitions with scoring ledger + hard gates.
+        // Fires when compound signals are present OR always (scenarios with
+        // `any_of: [phrase_match]` gates handle their own phrase matching).
         // Score 0.97 — higher than MacroIndex (0.96) and ECIR (0.95).
-        if has_compound {
+        {
             if let Some(ref scenario_idx) = self.scenario_index {
                 let outcome = scenario_idx.resolve(
                     &normalized,

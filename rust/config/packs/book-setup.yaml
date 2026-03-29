@@ -32,10 +32,17 @@ workspaces:
 allowed_verbs:
   - cbu.create
   - cbu.assign-product
+  - cbu.add-product
+  - cbu.remove-product
   - cbu.assign-role
+  - cbu.list-subscriptions
   - session.load-galaxy
   - trading-profile.create
   - entity.create
+  # Product suite macros
+  - structure.product-suite-custody-fa-ta
+  - structure.product-suite-full
+  - structure.remove-all-products
 
 forbidden_verbs:
   - cbu.delete
