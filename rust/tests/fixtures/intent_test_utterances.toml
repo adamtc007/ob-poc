@@ -3658,3 +3658,155 @@ expected_tier = "macro_index"
 expected_route_target = "attribute.seed-derived"
 workspace = "sem_os_maintenance"
 ecir_path = "fallthrough"
+
+# ============================================================================
+# CONTEXTUAL QUERY TESTS (ADR 043 Phase 2)
+# These utterances bypass verb search and route to NarrationEngine.
+# They don't resolve to a specific verb — they return constellation state.
+# For intent_hit_rate, we mark them with expected_verb = "narration.query"
+# (a virtual verb) and category = "contextual_query".
+# ============================================================================
+
+[[test]]
+utterance = "what's next"
+expected_verb = "semantic.get-state"
+alt_verbs = ["readiness.compute", "lifecycle.check-readiness", "narration.query"]
+category = "contextual_query"
+difficulty = "easy"
+workspace = "cbu"
+notes = "Contextual — should route to NarrationEngine when constellation is hydrated"
+
+[[test]]
+utterance = "what's missing"
+expected_verb = "document.missing-for-entity"
+alt_verbs = ["requirement.unsatisfied", "narration.query"]
+category = "contextual_query"
+difficulty = "easy"
+workspace = "kyc"
+notes = "Contextual — disambiguation between document gaps and general progress"
+
+[[test]]
+utterance = "where are we"
+expected_verb = "semantic.get-state"
+alt_verbs = ["readiness.compute", "narration.query"]
+category = "contextual_query"
+difficulty = "easy"
+workspace = "cbu"
+notes = "Contextual progress query"
+
+[[test]]
+utterance = "show me the progress"
+expected_verb = "semantic.get-state"
+alt_verbs = ["readiness.compute", "narration.query"]
+category = "contextual_query"
+difficulty = "easy"
+workspace = "cbu"
+notes = "Contextual progress query"
+
+[[test]]
+utterance = "any blockers"
+expected_verb = "semantic.get-state"
+alt_verbs = ["readiness.compute", "tollgate.get-decision-readiness", "narration.query"]
+category = "contextual_query"
+difficulty = "easy"
+workspace = "kyc"
+notes = "Contextual blocker query"
+
+[[test]]
+utterance = "what do I need to do next"
+expected_verb = "semantic.get-state"
+alt_verbs = ["readiness.compute", "narration.query"]
+category = "contextual_query"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Contextual next-step query"
+
+[[test]]
+utterance = "what's outstanding on this case"
+expected_verb = "kyc-case.state"
+alt_verbs = ["requirement.unsatisfied", "narration.query"]
+category = "contextual_query"
+difficulty = "medium"
+workspace = "kyc"
+notes = "Case-scoped progress query"
+
+[[test]]
+utterance = "are we done"
+expected_verb = "readiness.compute"
+alt_verbs = ["semantic.get-state", "narration.query"]
+category = "contextual_query"
+difficulty = "easy"
+workspace = "cbu"
+notes = "Completion check"
+
+[[test]]
+utterance = "next steps"
+expected_verb = "semantic.get-state"
+alt_verbs = ["readiness.compute", "narration.query"]
+category = "contextual_query"
+difficulty = "easy"
+workspace = "cbu"
+notes = "Contextual next-step query"
+
+[[test]]
+utterance = "remaining steps"
+expected_verb = "semantic.get-state"
+alt_verbs = ["readiness.compute", "narration.query"]
+category = "contextual_query"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Contextual remaining work query"
+
+[[test]]
+utterance = "show gaps"
+expected_verb = "semantic.get-state"
+alt_verbs = ["ownership.analyze-gaps", "matrix-overlay.unified-gaps", "narration.query"]
+category = "contextual_query"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Contextual gap analysis query"
+
+[[test]]
+utterance = "status update"
+expected_verb = "semantic.get-state"
+alt_verbs = ["kyc-case.state", "narration.query"]
+category = "contextual_query"
+difficulty = "easy"
+workspace = "cbu"
+notes = "Contextual status query"
+
+[[test]]
+utterance = "what's left to do"
+expected_verb = "semantic.get-state"
+alt_verbs = ["readiness.compute", "requirement.unsatisfied", "narration.query"]
+category = "contextual_query"
+difficulty = "easy"
+workspace = "cbu"
+notes = "Contextual remaining work query"
+
+[[test]]
+utterance = "how far along are we"
+expected_verb = "semantic.get-state"
+alt_verbs = ["readiness.compute", "narration.query"]
+category = "contextual_query"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Contextual progress query"
+
+[[test]]
+utterance = "progress report"
+expected_verb = "semantic.get-state"
+alt_verbs = ["readiness.compute", "narration.query"]
+category = "contextual_query"
+difficulty = "easy"
+workspace = "cbu"
+notes = "Contextual summary query"
+
+[[test]]
+utterance = "what's still needed"
+expected_verb = "semantic.get-state"
+alt_verbs = ["requirement.unsatisfied", "narration.query"]
+category = "contextual_query"
+difficulty = "medium"
+workspace = "cbu"
+notes = "Contextual remaining work query"

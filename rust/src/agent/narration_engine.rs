@@ -62,6 +62,81 @@ pub fn compute_narration(
     }
 }
 
+/// Check if an utterance is a contextual query that should bypass verb search
+/// and route directly to the NarrationEngine.
+///
+/// These are "where are we" / "what's next" questions that the constellation
+/// can answer deterministically without embedding search.
+pub fn is_contextual_query(utterance: &str) -> bool {
+    let normalized = utterance.trim().to_lowercase();
+    CONTEXTUAL_PATTERNS.iter().any(|p| normalized.contains(p))
+}
+
+/// Contextual query patterns — short fixed phrases that signal the operator
+/// wants a progress/gap report, not a verb execution.
+const CONTEXTUAL_PATTERNS: &[&str] = &[
+    "what's left",
+    "whats left",
+    "what's missing",
+    "whats missing",
+    "what's remaining",
+    "what's next",
+    "whats next",
+    "what do i need to do",
+    "what needs to be done",
+    "where are we",
+    "show progress",
+    "show me progress",
+    "how far along",
+    "what's outstanding",
+    "whats outstanding",
+    "what's still needed",
+    "are we done",
+    "is everything complete",
+    "what's blocking",
+    "any blockers",
+    "show gaps",
+    "what gaps",
+    "status update",
+    "progress report",
+    "progress summary",
+    "what haven't we done",
+    "remaining steps",
+    "next steps",
+];
+
+/// Compute a Full narration for an on-demand contextual query.
+///
+/// Unlike `compute_narration()` (which is post-execution with delta),
+/// this produces a snapshot view: current gaps, blockers, progress,
+/// and suggested next steps — no delta since nothing changed.
+pub fn query_narration(post_slots: &[HydratedSlot], constellation_label: &str) -> NarrationPayload {
+    let (required_gaps, optional_gaps) = compute_gaps(post_slots);
+    let suggested_next = compute_suggested_next(&required_gaps, &optional_gaps);
+    let blockers = compute_blockers(post_slots);
+
+    let total = count_fillable_slots(post_slots);
+    let filled = total - required_gaps.len() - optional_gaps.len();
+    let progress = if total > 0 {
+        Some(format!(
+            "{} of {} slots filled for {}",
+            filled, total, constellation_label
+        ))
+    } else {
+        None
+    };
+
+    NarrationPayload {
+        progress,
+        delta: Vec::new(), // No delta — this is a snapshot query
+        required_gaps,
+        optional_gaps,
+        suggested_next,
+        blockers,
+        verbosity: NarrationVerbosity::Full,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Slot snapshot (pre-execution state capture)
 // ---------------------------------------------------------------------------
@@ -585,5 +660,76 @@ mod tests {
         let result = compute_narration(&[], &slots, "cbu.create", 1, true, "Test");
         assert_eq!(result.blockers.len(), 1);
         assert_eq!(result.blockers[0].blocked_verb, "case.open");
+    }
+
+    // ── Contextual query tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_contextual_query_detection() {
+        assert!(is_contextual_query("what's next"));
+        assert!(is_contextual_query("What's next?"));
+        assert!(is_contextual_query("whats left"));
+        assert!(is_contextual_query("show me progress"));
+        assert!(is_contextual_query("where are we"));
+        assert!(is_contextual_query("any blockers?"));
+        assert!(is_contextual_query("next steps please"));
+        assert!(is_contextual_query("  What's Missing  "));
+    }
+
+    #[test]
+    fn test_non_contextual_queries() {
+        assert!(!is_contextual_query("assign the depositary"));
+        assert!(!is_contextual_query("create a fund"));
+        assert!(!is_contextual_query("open a KYC case"));
+        assert!(!is_contextual_query("hello"));
+        assert!(!is_contextual_query(""));
+    }
+
+    #[test]
+    fn test_query_narration_all_filled() {
+        let slots = vec![make_slot(
+            "depositary",
+            "filled",
+            HydratedCardinality::Mandatory,
+            vec![],
+            vec![],
+        )];
+        let result = query_narration(&slots, "Lux UCITS SICAV Alpha");
+        assert_eq!(result.verbosity, NarrationVerbosity::Full);
+        assert!(result.required_gaps.is_empty());
+        assert!(result.delta.is_empty()); // No delta for queries
+        assert!(result.progress.unwrap().contains("1 of 1"));
+    }
+
+    #[test]
+    fn test_query_narration_with_gaps() {
+        let slots = vec![
+            make_slot(
+                "depositary",
+                "filled",
+                HydratedCardinality::Mandatory,
+                vec![],
+                vec![],
+            ),
+            make_slot(
+                "management_company",
+                "empty",
+                HydratedCardinality::Mandatory,
+                vec!["cbu.assign-role"],
+                vec![],
+            ),
+            make_slot(
+                "auditor",
+                "empty",
+                HydratedCardinality::Optional,
+                vec!["cbu.assign-role"],
+                vec![],
+            ),
+        ];
+        let result = query_narration(&slots, "Test Fund");
+        assert_eq!(result.required_gaps.len(), 1);
+        assert_eq!(result.optional_gaps.len(), 1);
+        assert_eq!(result.required_gaps[0].slot_label, "Management Company");
+        assert!(result.progress.unwrap().contains("1 of 3"));
     }
 }

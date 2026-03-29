@@ -1239,6 +1239,15 @@ impl ReplOrchestratorV2 {
                     return response;
                 }
 
+                // Phase N: Contextual query intercept (ADR 043 Phase 2).
+                // "what's next", "what's missing", "where are we" bypass verb search
+                // and return narration directly from constellation state.
+                if crate::agent::narration_engine::is_contextual_query(&content) {
+                    if let Some(narration_resp) = self.handle_contextual_query(session, &content) {
+                        return narration_resp;
+                    }
+                }
+
                 // Check if there are still required questions to answer.
                 if let Some(question) = self.next_required_question(session) {
                     // Record the answer to the previous question (if any).
@@ -2583,6 +2592,87 @@ impl ReplOrchestratorV2 {
             narration_hot_verbs,
             ..Default::default()
         }
+    }
+
+    /// Handle a contextual query ("what's next", "what's missing", etc.)
+    /// by returning narration from the constellation state without verb execution.
+    ///
+    /// Returns `None` if no hydrated constellation is available (falls through
+    /// to normal verb matching).
+    fn handle_contextual_query(
+        &self,
+        session: &mut ReplSessionV2,
+        content: &str,
+    ) -> Option<ReplResponseV2> {
+        let frame = session.workspace_stack.last()?;
+        let hydrated = frame.hydrated_state.as_ref()?;
+        let constellation = hydrated.hydrated_constellation.as_ref()?;
+        let label = constellation
+            .description
+            .as_deref()
+            .unwrap_or(&constellation.constellation);
+
+        let narration =
+            crate::agent::narration_engine::query_narration(&constellation.slots, label);
+
+        // Build a human-readable message from the narration.
+        let mut msg = String::new();
+        if let Some(ref progress) = narration.progress {
+            msg.push_str(progress);
+            msg.push('\n');
+        }
+        if !narration.required_gaps.is_empty() {
+            msg.push_str("\nRequired:\n");
+            for gap in &narration.required_gaps {
+                msg.push_str(&format!(
+                    "  - {} ({})\n",
+                    gap.slot_label, gap.suggested_utterance
+                ));
+            }
+        }
+        if !narration.optional_gaps.is_empty() {
+            msg.push_str("\nOptional:\n");
+            for gap in &narration.optional_gaps {
+                msg.push_str(&format!("  - {}\n", gap.slot_label));
+            }
+        }
+        if !narration.blockers.is_empty() {
+            msg.push_str("\nBlockers:\n");
+            for b in &narration.blockers {
+                msg.push_str(&format!("  - {} — {}\n", b.blocked_verb, b.reason));
+            }
+        }
+        if narration.required_gaps.is_empty() && narration.optional_gaps.is_empty() {
+            msg.push_str("\nAll slots filled — ready to proceed.");
+        }
+
+        // Store hot verbs for boost signal.
+        if let Some(frame) = session.workspace_stack.last_mut() {
+            frame.narration_hot_verbs = narration
+                .suggested_next
+                .iter()
+                .map(|s| s.verb_fqn.clone())
+                .collect();
+        }
+
+        tracing::info!(
+            session_id = %session.id,
+            query = %content,
+            required_gaps = narration.required_gaps.len(),
+            optional_gaps = narration.optional_gaps.len(),
+            "Contextual query routed to NarrationEngine"
+        );
+
+        Some(ReplResponseV2 {
+            state: session.state.clone(),
+            kind: ReplResponseKindV2::Info {
+                detail: msg.trim().to_string(),
+            },
+            message: msg.trim().to_string(),
+            runbook_summary: None,
+            step_count: session.runbook.entries.len(),
+            session_feedback: Some(session.build_session_feedback(false)),
+        })
     }
 
     /// Build a `ContextStack` from the current session state for pack-scoped matching.
