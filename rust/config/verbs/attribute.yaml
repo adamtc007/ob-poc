@@ -28,6 +28,8 @@ domains:
           - "define governed attribute"
           - "register attribute in SemOS"
           - "define attribute for"
+          - "create an attribute"
+          - "add attribute definition"
         behavior: plugin
         handler: attribute_define_governed
         args:

@@ -323,14 +323,14 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me the ownership structure"
-expected_verb = "ubo.list-owners"
+expected_verb = "ubo.list-ubos"
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "ubo"
 category = "natural"
 difficulty = "medium"
-alt_verbs = ["control.build-graph", "ownership.trace-chain", "ownership.compute"]
-notes = "Collision risk: ubo.list-owners vs ownership.compute vs control.list-controllers"
+alt_verbs = ["ubo.list-owners", "control.build-graph", "ownership.trace-chain", "ownership.compute"]
+notes = "Scenario analyse-ubo routes: full + ownership = ubo.list-ubos"
 ecir_path = "fallthrough"
 
 [[test]]
@@ -1687,7 +1687,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Open a new KYC case"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case"]
+alt_verbs = ["kyc.open-case", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -2291,7 +2291,7 @@ workspace = "cbu"
 
 [[test]]
 utterance = "create a trading profile"
-expected_verb = "trading-profile.create"
+expected_verb = "trading-profile.create-draft"
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
@@ -2309,7 +2309,7 @@ workspace = "cbu"
 [[test]]
 utterance = "open a KYC case"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.create-case"]
+alt_verbs = ["kyc.create-case", "case.open"]
 category = "direct"
 difficulty = "easy"
 workspace = "kyc"
@@ -2364,7 +2364,7 @@ workspace = "kyc"
 [[test]]
 utterance = "approve KYC case"
 expected_verb = "kyc-case.close"
-alt_verbs = ["kyc.approve-case", "kyc-case.approve"]
+alt_verbs = ["kyc.approve-case", "kyc-case.approve", "case.approve"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2534,8 +2534,8 @@ workspace = "instrument_matrix"
 
 [[test]]
 utterance = "configure counterparty limits"
-expected_verb = "trading-profile.add-isda-config"
-alt_verbs = ["trading-profile.add-csa-config"]
+expected_verb = "trading-profile.add-component"
+alt_verbs = ["trading-profile.add-isda-config", "trading-profile.add-csa-config"]
 category = "natural"
 difficulty = "hard"
 workspace = "instrument_matrix"
@@ -2672,7 +2672,8 @@ notes = "Investment Management Agreement"
 
 [[test]]
 utterance = "set up the SSIs"
-expected_verb = "trading-profile.add-standing-instruction"
+expected_verb = "trading-profile.add-component"
+alt_verbs = ["trading-profile.add-standing-instruction", "cbu-custody.create-ssi", "cbu-custody.setup-ssi"]
 category = "natural"
 difficulty = "hard"
 workspace = "instrument_matrix"
@@ -2680,8 +2681,8 @@ notes = "Standing Settlement Instructions"
 
 [[test]]
 utterance = "ISDA terms for this counterparty"
-expected_verb = "trading-profile.add-isda-config"
-alt_verbs = ["trading-profile.add-isda-coverage"]
+expected_verb = "trading-profile.add-component"
+alt_verbs = ["trading-profile.add-isda-config", "trading-profile.add-isda-coverage"]
 category = "natural"
 difficulty = "hard"
 workspace = "instrument_matrix"

@@ -52,6 +52,8 @@ domains:
           - "create a Cayman discretionary trust"
           - "register a new discretionary trust"
           - "add discretionary trust entity"
+          - "add a legal entity"
+          - "register a new entity"
           # Trust sub-type phrases — charitable
           - "create a charitable trust"
           - "set up a charitable trust"

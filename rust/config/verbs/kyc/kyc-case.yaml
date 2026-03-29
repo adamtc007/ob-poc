@@ -31,6 +31,9 @@ domains:
           - "KYC check"
           - "run KYC check"
           - "start KYC"
+          - "open a new KYC case"
+          - "I need a new case"
+          - "set up a KYC case"
         metadata:
           tier: intent
           source_of_truth: workflow
