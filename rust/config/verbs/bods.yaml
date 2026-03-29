@@ -242,6 +242,8 @@ domains:
         - "pull the BODS data for this LEI"
         - "BODS data for this LEI"
         - "get BODS for this LEI"
+        - "pull BODS data for this LEI"
+        - "get BODS data for LEI"
         behavior: plugin
         args:
         - name: lei

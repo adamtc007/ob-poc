@@ -2892,12 +2892,12 @@ notes = "Capital action"
 
 [[test]]
 utterance = "dividend distribution"
-expected_verb = "capital.distribute"
-alt_verbs = ["capital.distribute-dividend", "capital.distribute-dividends"]
+expected_verb = "movement.distribution"
+alt_verbs = ["capital.distribute", "capital.distribute-dividend"]
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
-notes = "Capital distribution"
+notes = "Capital distribution — maps to movement.distribution (capital.distribute does not exist)"
 
 # ============================================================================
 # MACRO COVERAGE — Missing macros (added 2026-03-29)
@@ -3640,8 +3640,8 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Seed attributes for a domain"
-expected_verb = "attribute.list"
-alt_verbs = ["attribute.seed-domain"]
+expected_verb = "attribute.seed-domain"
+alt_verbs = ["attribute.list"]
 category = "macro_match"
 difficulty = "hard"
 expected_tier = "macro_index"

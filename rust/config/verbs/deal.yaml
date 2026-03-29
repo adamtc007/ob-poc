@@ -52,6 +52,9 @@ domains:
           - "start a deal"
           - "create a new deal"
           - "open a deal"
+          - "commercial deal for"
+          - "new commercial deal"
+          - "start a commercial deal for"
         args:
           - name: deal-name
             type: string

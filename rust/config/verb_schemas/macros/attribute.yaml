@@ -1,5 +1,10 @@
 attribute.seed-domain:
   kind: macro
+  aliases:
+    - "seed attributes for a domain"
+    - "seed attributes for domain"
+    - "seed attribute domain"
+    - "generate attributes for domain"
   ui:
     label: "Seed Attribute Domain"
     description: "Generate governed attribute.define calls for a verb domain"

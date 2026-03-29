@@ -394,6 +394,9 @@ domains:
         - list outstanding requirements
         - outstanding KYC requirements
         - unsatisfied requirements
+        - list outstanding KYC requirements
+        - outstanding requirements for KYC
+        - what KYC requirements are outstanding
         metadata:
           tier: intent
           source_of_truth: operational

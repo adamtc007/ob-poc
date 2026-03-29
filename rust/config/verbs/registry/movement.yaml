@@ -464,6 +464,10 @@ domains:
         - "how do I record a distribution"
         - "issue capital return to investors"
         - "enter fund distribution payment"
+        - "dividend distribution"
+        - "distribute dividends"
+        - "pay dividends"
+        - "capital distribution"
         behavior: crud
         crud:
           operation: upsert

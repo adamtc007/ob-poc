@@ -30,6 +30,10 @@ domains:
           - "define attribute for"
           - "create an attribute"
           - "add attribute definition"
+          - "define a new attribute for"
+          - "define attribute for KYC"
+          - "new attribute for risk"
+          - "define a new attribute for KYC risk"
         behavior: plugin
         handler: attribute_define_governed
         args:

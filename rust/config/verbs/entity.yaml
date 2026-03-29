@@ -54,6 +54,9 @@ domains:
           - "add discretionary trust entity"
           - "add a legal entity"
           - "register a new entity"
+          - "create a legal entity for"
+          - "new legal entity"
+          - "create entity for client"
           # Trust sub-type phrases — charitable
           - "create a charitable trust"
           - "set up a charitable trust"

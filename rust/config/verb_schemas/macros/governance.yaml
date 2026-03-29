@@ -9,6 +9,12 @@
 governance.bootstrap-attribute-registry:
   kind: macro
 
+  aliases:
+    - "bootstrap attribute registry"
+    - "bootstrap the attribute registry"
+    - "initialise attribute registry"
+    - "seed the registry"
+
   ui:
     label: "Bootstrap Attribute Registry"
     description: "Bridge ungoverned attributes into SemOS, sync service resource definitions, and check for gaps"
@@ -53,6 +59,12 @@ governance.bootstrap-attribute-registry:
 governance.define-service-dictionary:
   kind: macro
 
+  aliases:
+    - "define service dictionary"
+    - "define the service resource dictionary"
+    - "service resource dictionary"
+    - "build service dictionary"
+
   ui:
     label: "Define Service Resource Dictionary"
     description: "Check SRDEF attribute gaps, define missing attributes, re-sync, and verify coverage"
@@ -94,6 +106,12 @@ governance.define-service-dictionary:
 
 governance.full-publish-pipeline:
   kind: macro
+
+  aliases:
+    - "full publish pipeline"
+    - "run the full publish pipeline"
+    - "publish pipeline"
+    - "run full publish"
 
   ui:
     label: "Full Publish Pipeline"
@@ -141,6 +159,12 @@ governance.full-publish-pipeline:
 
 governance.reconcile-registry:
   kind: macro
+
+  aliases:
+    - "reconcile registry"
+    - "reconcile the registry"
+    - "registry reconciliation"
+    - "run registry reconciliation"
 
   ui:
     label: "Reconcile Registry"
