@@ -107,7 +107,10 @@ SemOS Maintenance workspace (2026-03-28):
 - Verb search: 6 phrasing detection improvements (domain_filter bypass for semantic/macro/scenario/learned tiers, short query threshold scaling, multi-domain pack dominant_domain suppression, noun index for new domains)
 - Utterance test harness: 271 test cases across all 7 workspaces, per-workspace hit rate reporting
 - Hit rates: 62.4% first-attempt, 84.5% two-attempt (all workspaces above 30%)
-- Governed phrase authoring (v1.2): `phrase_bank` table (13,570 entries), `phrase_mapping` SemOS object type, `phrase_authoring_lifecycle` state machine (8 states), 9 phrase.* verbs (observe-misses, coverage-report, check-collisions, propose, batch-propose, review-proposals, approve, reject, defer), AI proposal pipeline with 5-signal confidence scoring + risk-tiered approval routing
+- Governed phrase authoring (v1.2): `phrase_bank` table (13,570 entries), `phrase_mapping` SemOS object type, `phrase_authoring_lifecycle` state machine (8 states), 9 phrase.* verbs, AI proposal pipeline with 5-signal confidence scoring + risk-tiered approval routing
+- Onboarding product macros: `structure.product-suite-custody-fa-ta`, `structure.product-suite-full`, `structure.remove-all-products` — compound intent → multi-step runbook → per-entity expansion → DAG-ordered → confirm all → execute atomically
+- Macro priority: ScenarioIndex (1.05) > MacroIndex (1.04) > exact phrase (1.0) — macros always win over single verbs when both match (safer, atomic, complete)
+- Per-entity macro expansion: runbook compiler replicates macro steps per CBU UUID in scope
 - `cargo clippy` clean across entire codebase
 
 ---

@@ -138,6 +138,18 @@ SemOS Maintenance workspace + session lifecycle (2026-03-28):
 - 235 workspace-tagged utterance test cases across all 7 workspaces with per-workspace hit rate reporting
 - Results: 62.4% first-attempt, 84.5% two-attempt, all workspaces above 30%, zero regressions
 
+### Constellation-Scoped Macros + Per-Entity Expansion (2026-03-29)
+
+Macros are constellation-scoped shorthand for multi-step state transitions. They live alongside node-level verbs in the constellation DAG, with macros prioritised over single verbs when both match.
+
+- Onboarding product macros: `structure.product-suite-custody-fa-ta` (Custody → Fund Accounting → Transfer Agency, DAG-ordered), `structure.product-suite-full` (5 products), `structure.remove-all-products`
+- Macro priority: ScenarioIndex (1.05) > MacroIndex (1.04) > exact phrase (1.0) — macros always win, they're safer (atomic, confirm-all, rollback-safe)
+- Per-entity expansion: when session has multiple CBUs in scope, macro steps are replicated per CBU UUID with `:cbu-id` bound. 3 macro steps × 5 CBUs = 15 runbook entries, DAG-ordered (intra-CBU dependencies maintained, cross-CBU parallel)
+- ScenarioIndex fires unconditionally (not gated by `has_compound`), with G3 score bypass for exact `phrases_any` matches
+- Tier -2A/-2B results bypass CCIR `allowed_verbs` — macro routes are deterministic, pack's allowed_verbs is the correct gate
+- Entity ambiguity gate deferred — macros resolve without entity context
+- Spec: `docs/todo/GOVERNED_PHRASE_AUTHORING_v1.0.md` (v1.2) — ADR 041
+
 ### Governed Phrase Authoring (2026-03-28)
 
 SemOS-governed phrase feedback loop — AI observes session utterance misses, proposes context-grounded phrase additions, validates against the phrase bank for collisions, and submits through SemOS governance for human review.

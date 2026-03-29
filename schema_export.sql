@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fBSdEBeJCrqgqDKhPnGndkl6WAANsDpCZCr0yu9mSMOHHwDMU73drsTsVCnHvgM
+\restrict KYdhMnWrTvzesX3RSTE5JXzEQVV6aEKOo0GslcXayAZByJvfYYJZ2LmdLZMIeeK
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -36568,5 +36568,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fBSdEBeJCrqgqDKhPnGndkl6WAANsDpCZCr0yu9mSMOHHwDMU73drsTsVCnHvgM
+\unrestrict KYdhMnWrTvzesX3RSTE5JXzEQVV6aEKOo0GslcXayAZByJvfYYJZ2LmdLZMIeeK
 
