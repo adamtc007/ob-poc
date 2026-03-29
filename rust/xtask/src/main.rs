@@ -2881,7 +2881,7 @@ fn workspace_accepts_any_mode_tag(workspace: &str, tags: &[String]) -> bool {
         "product_maintenance" => &["product", "trading"],
         "instrument_matrix" => &["trading", "structure"],
         "sem_os_maintenance" => &["stewardship", "governance"],
-        _ => return true, // Unknown workspace — don't block
+        _ => return false, // Unknown workspace — fail closed, force table update
     };
     tags.iter().any(|tag| accepted.contains(&tag.as_str()))
 }
