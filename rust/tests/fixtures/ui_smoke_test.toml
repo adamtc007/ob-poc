@@ -187,6 +187,127 @@ expect = [
 ]
 
 # =============================================================================
+# Narration Panel — Contextual Queries (ADR 043)
+# =============================================================================
+
+[[tests]]
+id = "narration-whats-next"
+description = "Typing 'what's next' in InPack returns narration with progress and gaps"
+depends_on = "journey-book-setup-click"
+actions = [
+    { type = "type", text = "what's next" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "slots filled" },
+    { type = "no_console_errors" },
+]
+
+[[tests]]
+id = "narration-whats-missing"
+description = "Typing 'what's missing' returns gap analysis"
+depends_on = "journey-book-setup-click"
+actions = [
+    { type = "type", text = "what's missing" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "Required" },
+    { type = "no_console_errors" },
+]
+
+[[tests]]
+id = "narration-where-are-we"
+description = "Typing 'where are we' returns progress summary"
+depends_on = "journey-book-setup-click"
+actions = [
+    { type = "type", text = "where are we" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "of" },
+    { type = "no_console_errors" },
+]
+
+[[tests]]
+id = "narration-any-blockers"
+description = "Typing 'any blockers' returns blocker information"
+depends_on = "journey-book-setup-click"
+actions = [
+    { type = "type", text = "any blockers" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "no_console_errors" },
+]
+
+[[tests]]
+id = "narration-show-progress"
+description = "Typing 'show progress' returns full narration"
+depends_on = "journey-book-setup-click"
+actions = [
+    { type = "type", text = "show progress" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "text_present", text = "slots filled" },
+    { type = "no_console_errors" },
+]
+
+[[tests]]
+id = "narration-next-steps"
+description = "Typing 'next steps' returns suggested actions"
+depends_on = "journey-book-setup-click"
+actions = [
+    { type = "type", text = "next steps" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "no_console_errors" },
+]
+
+# =============================================================================
+# Narration Panel — Workspace Transition (ADR 043 Phase 3)
+# =============================================================================
+
+[[tests]]
+id = "narration-workspace-transition"
+description = "When all required slots filled, narration suggests next workspace"
+depends_on = "journey-book-setup-click"
+notes = "Requires executing enough verbs to fill all required slots first"
+actions = [
+    { type = "type", text = "where are we" },
+    { type = "press_key", key = "Enter" },
+    { type = "wait", ms = 5000 },
+]
+expect = [
+    { type = "no_console_errors" },
+]
+
+# =============================================================================
+# Narration Panel — Utterance Matching via NarrationPanel Buttons
+# =============================================================================
+
+[[tests]]
+id = "narration-suggested-verb-click"
+description = "Clicking a suggested utterance button in NarrationPanel sends the utterance"
+depends_on = "narration-whats-next"
+notes = "Verifies the narration → boost signal → verb resolution loop"
+actions = [
+    { type = "wait", ms = 2000 },
+    { type = "screenshot", name = "narration-panel-buttons" },
+]
+expect = [
+    { type = "no_console_errors" },
+]
+
+# =============================================================================
 # Demo Animation Sequences
 # =============================================================================
 
@@ -210,4 +331,29 @@ steps = [
     { action = "type", text = "LU", pause_after = 1000 },
     { action = "press_key", key = "Enter", pause_after = 4000 },
     { action = "screenshot", name = "05-sentence-playback" },
+]
+
+[[demos]]
+id = "narration-contextual-queries"
+description = "Demonstrate contextual query routing and narration panel"
+speed = "human"
+steps = [
+    { action = "navigate", url = "http://localhost:3000" },
+    { action = "click", target = "New session", pause_after = 2000 },
+    { action = "type", text = "Allianz", pause_after = 1000 },
+    { action = "press_key", key = "Enter", pause_after = 4000 },
+    { action = "click_button", label = "CBU", pause_after = 3000 },
+    { action = "click_button", label = "CBU Maintenance", pause_after = 3000 },
+    { action = "type", text = "what's next", pause_after = 1000 },
+    { action = "press_key", key = "Enter", pause_after = 5000 },
+    { action = "screenshot", name = "narration-01-whats-next" },
+    { action = "type", text = "what's missing", pause_after = 1000 },
+    { action = "press_key", key = "Enter", pause_after = 5000 },
+    { action = "screenshot", name = "narration-02-whats-missing" },
+    { action = "type", text = "where are we", pause_after = 1000 },
+    { action = "press_key", key = "Enter", pause_after = 5000 },
+    { action = "screenshot", name = "narration-03-where-are-we" },
+    { action = "type", text = "show progress", pause_after = 1000 },
+    { action = "press_key", key = "Enter", pause_after = 5000 },
+    { action = "screenshot", name = "narration-04-show-progress" },
 ]
