@@ -2881,3 +2881,763 @@ category = "natural"
 difficulty = "medium"
 workspace = "cbu"
 notes = "Capital distribution"
+
+# ============================================================================
+# MACRO COVERAGE — Missing macros (added 2026-03-29)
+# Each macro in the system should have at least one utterance test case.
+# ============================================================================
+
+# ── Structure macros (missing jurisdictions) ─────────────────────────────
+
+[[test]]
+utterance = "Set up a UK unit trust"
+expected_verb = "struct.uk.authorised.aut"
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "struct.uk.authorised.aut"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Create a UK contractual scheme"
+expected_verb = "struct.uk.authorised.acs"
+alt_verbs = ["cbu.create"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "struct.uk.authorised.acs"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Set up a UK long-term asset fund"
+expected_verb = "struct.uk.authorised.ltaf"
+alt_verbs = ["cbu.create"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "struct.uk.authorised.ltaf"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Create a UK manager LLP"
+expected_verb = "struct.uk.manager.llp"
+alt_verbs = ["cbu.create"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "struct.uk.manager.llp"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Set up a UK private equity LP"
+expected_verb = "struct.uk.private-equity.lp"
+alt_verbs = ["cbu.create"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "struct.uk.private-equity.lp"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Create a US closed-end fund"
+expected_verb = "struct.us.40act.closed-end"
+alt_verbs = ["cbu.create"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "struct.us.40act.closed-end"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Set up a US ETF"
+expected_verb = "struct.us.etf.40act"
+alt_verbs = ["cbu.create"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "struct.us.etf.40act"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Create a Delaware LP private fund"
+expected_verb = "struct.us.private-fund.delaware-lp"
+alt_verbs = ["cbu.create"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "struct.us.private-fund.delaware-lp"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Set up an Irish AIF ICAV"
+expected_verb = "struct.ie.aif.icav"
+alt_verbs = ["cbu.create"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "struct.ie.aif.icav"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Create an Irish hedge fund ICAV"
+expected_verb = "struct.ie.hedge.icav"
+alt_verbs = ["cbu.create"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "struct.ie.hedge.icav"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+# ── Structure generic macros ─────────────────────────────────────────────
+
+[[test]]
+utterance = "List all structures"
+expected_verb = "cbu.list"
+alt_verbs = ["structure.list"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "structure.list"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Select a structure to work on"
+expected_verb = "structure.select"
+alt_verbs = ["session.set-structure"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "structure.select"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Show roles for this structure"
+expected_verb = "cbu.parties"
+alt_verbs = ["structure.roles"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "structure.roles"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Assign a role to the structure"
+expected_verb = "cbu.assign-role"
+alt_verbs = ["structure.assign-role"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "structure.assign-role"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+# ── Product suite macros ─────────────────────────────────────────────────
+
+[[test]]
+utterance = "Add standard product suite custody FA TA"
+expected_verb = "structure.product-suite-custody-fa-ta"
+alt_verbs = ["cbu.add-product"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "structure.product-suite-custody-fa-ta"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Add the full product suite"
+expected_verb = "structure.product-suite-full"
+alt_verbs = ["cbu.add-product"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "structure.product-suite-full"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Remove all products from the CBU"
+expected_verb = "structure.remove-all-products"
+alt_verbs = ["cbu.remove-product"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "structure.remove-all-products"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+# ── Case macros ──────────────────────────────────────────────────────────
+
+[[test]]
+utterance = "Add a party to the case"
+expected_verb = "entity-workstream.create"
+alt_verbs = ["case.add-party"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "case.add-party"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Request a document from the party"
+expected_verb = "document.solicit"
+alt_verbs = ["case.solicit-document"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "case.solicit-document"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Submit the case for review"
+expected_verb = "kyc-case.update-status"
+alt_verbs = ["case.submit"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "case.submit"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Approve the KYC case"
+expected_verb = "kyc-case.update-status"
+alt_verbs = ["case.approve"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "case.approve"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Reject the case"
+expected_verb = "kyc-case.update-status"
+alt_verbs = ["case.reject"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "case.reject"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Request more information on the case"
+expected_verb = "kyc-case.update-status"
+alt_verbs = ["case.request-info"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "case.request-info"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "List KYC cases"
+expected_verb = "kyc-case.list-by-cbu"
+alt_verbs = ["case.list", "kyc-case.list"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "case.list"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Select a case to work on"
+expected_verb = "case.select"
+alt_verbs = ["session.set-case"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "case.select"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+# ── KYC workstream macros ────────────────────────────────────────────────
+
+[[test]]
+utterance = "Add a workstream for the party"
+expected_verb = "entity-workstream.create"
+alt_verbs = ["kyc-workstream.add"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "kyc-workstream.add"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Update workstream status"
+expected_verb = "entity-workstream.update-status"
+alt_verbs = ["kyc-workstream.update-status"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "kyc-workstream.update-status"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Close the workstream"
+expected_verb = "entity-workstream.complete"
+alt_verbs = ["kyc-workstream.close"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "kyc-workstream.close"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+# ── Screening-ops macros (workstream-level) ──────────────────────────────
+
+[[test]]
+utterance = "Run workstream screening"
+expected_verb = "screening.run"
+alt_verbs = ["screening-ops.run"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "screening-ops.run"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Review the screening hit"
+expected_verb = "screening.review-hit"
+alt_verbs = ["screening-ops.review-hit"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "screening-ops.review-hit"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Bulk refresh all screenings"
+expected_verb = "screening.bulk-refresh"
+alt_verbs = ["screening-ops.bulk-refresh"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "screening-ops.bulk-refresh"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+# ── UBO macros (missing: expire) ─────────────────────────────────────────
+
+[[test]]
+utterance = "Expire the beneficial ownership allegation"
+expected_verb = "ubo.registry.expire"
+alt_verbs = ["ubo.expire"]
+category = "macro_match"
+difficulty = "hard"
+expected_tier = "macro_index"
+expected_route_target = "ubo.expire"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+# ── Evidence macros ──────────────────────────────────────────────────────
+
+[[test]]
+utterance = "Require evidence for the ownership allegation"
+expected_verb = "evidence.create-requirement"
+alt_verbs = ["evidence.require"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "evidence.require"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Link a document to the evidence requirement"
+expected_verb = "evidence.attach-document"
+alt_verbs = ["evidence.link"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "evidence.link"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Verify the evidence"
+expected_verb = "evidence.mark-verified"
+alt_verbs = ["evidence.verify"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "evidence.verify"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Reject the evidence item"
+expected_verb = "evidence.mark-rejected"
+alt_verbs = ["evidence.reject"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "evidence.reject"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Waive the evidence requirement"
+expected_verb = "evidence.mark-waived"
+alt_verbs = ["evidence.waive"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "evidence.waive"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+# ── Document request macros ──────────────────────────────────────────────
+
+[[test]]
+utterance = "Create a document request for the workstream"
+expected_verb = "document.create-request"
+alt_verbs = ["doc-request.create"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "doc-request.create"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Send the document request"
+expected_verb = "document.mark-requested"
+alt_verbs = ["doc-request.send"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "doc-request.send"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Record a document response"
+expected_verb = "document.receive-request"
+alt_verbs = ["doc-request.respond"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "doc-request.respond"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Verify the document request"
+expected_verb = "document.verify-request"
+alt_verbs = ["doc-request.verify"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "doc-request.verify"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Reject the submitted document"
+expected_verb = "document.reject-request"
+alt_verbs = ["doc-request.reject"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "doc-request.reject"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+# ── Red flag macros ──────────────────────────────────────────────────────
+
+[[test]]
+utterance = "Raise a risk flag"
+expected_verb = "red-flag.raise"
+alt_verbs = ["red-flag.raise"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "red-flag.raise"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Resolve the risk flag"
+expected_verb = "red-flag.close"
+alt_verbs = ["red-flag.resolve", "red-flag.mitigate"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "red-flag.resolve"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Escalate the risk flag"
+expected_verb = "red-flag.set-blocking"
+alt_verbs = ["red-flag.escalate"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "red-flag.escalate"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+# ── Tollgate macros ──────────────────────────────────────────────────────
+
+[[test]]
+utterance = "Evaluate the approval gate"
+expected_verb = "tollgate.evaluate"
+alt_verbs = ["tollgate.evaluate"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "tollgate.evaluate"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Override the tollgate decision"
+expected_verb = "tollgate.override"
+alt_verbs = ["tollgate.override"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "tollgate.override"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+# ── Party macros (missing) ───────────────────────────────────────────────
+
+[[test]]
+utterance = "Add a new person"
+expected_verb = "entity.create"
+alt_verbs = ["party.add-person"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "party.add-person"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Add a company"
+expected_verb = "entity.create"
+alt_verbs = ["party.add-company"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "party.add-company"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "View party details"
+expected_verb = "entity.read"
+alt_verbs = ["party.details"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "party.details"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Update the party information"
+expected_verb = "entity.update"
+alt_verbs = ["party.update"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "party.update"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "List all parties"
+expected_verb = "entity.list"
+alt_verbs = ["party.list"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "party.list"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Add an identifier to the party"
+expected_verb = "identifier.attach"
+alt_verbs = ["party.assign-identifier"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "party.assign-identifier"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Set the party address"
+expected_verb = "entity.update"
+alt_verbs = ["party.set-address"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "party.set-address"
+workspace = "kyc"
+ecir_path = "fallthrough"
+
+# ── Mandate macros (missing) ─────────────────────────────────────────────
+
+[[test]]
+utterance = "Add a product to the mandate"
+expected_verb = "trading-profile.add-component"
+alt_verbs = ["mandate.add-product"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "mandate.add-product"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Set permitted instruments for the mandate"
+expected_verb = "trading-profile.add-component"
+alt_verbs = ["mandate.set-instruments"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "mandate.set-instruments"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Set permitted markets for the mandate"
+expected_verb = "trading-profile.add-component"
+alt_verbs = ["mandate.set-markets"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "mandate.set-markets"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "List mandates for this structure"
+expected_verb = "trading-profile.list-versions"
+alt_verbs = ["mandate.list"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "mandate.list"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Select a mandate"
+expected_verb = "mandate.select"
+alt_verbs = ["session.set-mandate"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "mandate.select"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Show mandate details"
+expected_verb = "trading-profile.read"
+alt_verbs = ["mandate.details"]
+category = "macro_match"
+difficulty = "easy"
+expected_tier = "macro_index"
+expected_route_target = "mandate.details"
+workspace = "cbu"
+ecir_path = "fallthrough"
+
+# ── Governance macros ────────────────────────────────────────────────────
+
+[[test]]
+utterance = "Bootstrap the attribute registry"
+expected_verb = "governance.bootstrap-attribute-registry"
+alt_verbs = ["attribute.bridge-to-semos"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "governance.bootstrap-attribute-registry"
+workspace = "sem_os_maintenance"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Define the service resource dictionary"
+expected_verb = "governance.define-service-dictionary"
+alt_verbs = ["service-resource.check-attribute-gaps"]
+category = "macro_match"
+difficulty = "hard"
+expected_tier = "macro_index"
+expected_route_target = "governance.define-service-dictionary"
+workspace = "sem_os_maintenance"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Run the full publish pipeline"
+expected_verb = "governance.full-publish-pipeline"
+alt_verbs = ["governance.publish"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "governance.full-publish-pipeline"
+workspace = "sem_os_maintenance"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Reconcile the registry"
+expected_verb = "governance.reconcile-registry"
+alt_verbs = ["attribute.bridge-to-semos"]
+category = "macro_match"
+difficulty = "medium"
+expected_tier = "macro_index"
+expected_route_target = "governance.reconcile-registry"
+workspace = "sem_os_maintenance"
+ecir_path = "fallthrough"
+
+# ── Attribute seed macros ────────────────────────────────────────────────
+
+[[test]]
+utterance = "Seed attributes for a domain"
+expected_verb = "attribute.list"
+alt_verbs = ["attribute.seed-domain"]
+category = "macro_match"
+difficulty = "hard"
+expected_tier = "macro_index"
+expected_route_target = "attribute.seed-domain"
+workspace = "sem_os_maintenance"
+ecir_path = "fallthrough"
+
+[[test]]
+utterance = "Seed derived attributes"
+expected_verb = "attribute.list"
+alt_verbs = ["attribute.seed-derived"]
+category = "macro_match"
+difficulty = "hard"
+expected_tier = "macro_index"
+expected_route_target = "attribute.seed-derived"
+workspace = "sem_os_maintenance"
+ecir_path = "fallthrough"
