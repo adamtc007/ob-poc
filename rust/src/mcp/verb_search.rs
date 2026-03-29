@@ -679,9 +679,11 @@ impl HybridVerbSearcher {
                             ResolvedRoute::NeedsSelection { .. } => None,
                         };
                         if let Some(fqn) = route_fqn {
-                            // Scenarios are compound intents — domain_filter should not suppress them
+                            // Scenarios are compound intents — bypass CCIR allowed_verbs
+                            // check. Macro routes are deterministic phrase matches, not
+                            // fuzzy search results. The pack's allowed_verbs (checked
+                            // downstream by pack scoring) is the correct gate.
                             if self.matches_entity_kind(&fqn, entity_kind)
-                                && allowed_verbs.is_none_or(|av| av.contains(&fqn))
                                 && !seen_verbs.contains(&fqn)
                             {
                                 tracing::info!(
@@ -693,9 +695,12 @@ impl HybridVerbSearcher {
                                     "ScenarioIndex: matched journey scenario"
                                 );
                                 seen_verbs.insert(fqn.clone());
+                                // Macros score above exact phrase matches (1.0) because
+                                // they capture compound intent — safer, atomic, complete.
+                                // Constellation-scoped macros are the preferred path.
                                 results.push(VerbSearchResult {
                                     verb: fqn,
-                                    score: 0.97,
+                                    score: 1.05,
                                     source: VerbSearchSource::ScenarioIndex,
                                     matched_phrase: m.title.clone(),
                                     description: Some(m.title.clone()),
@@ -786,7 +791,7 @@ impl HybridVerbSearcher {
                         let macro_fqn_clone = m.fqn.clone();
                         results.push(VerbSearchResult {
                             verb: m.fqn,
-                            score: 0.96,
+                            score: 1.04,
                             source: VerbSearchSource::MacroIndex,
                             matched_phrase: entry.map(|e| e.label.clone()).unwrap_or_default(),
                             description: entry.map(|e| e.description.clone()),
@@ -819,7 +824,7 @@ impl HybridVerbSearcher {
                             let macro_fqn_clone = m.fqn.clone();
                             results.push(VerbSearchResult {
                                 verb: m.fqn,
-                                score: 0.96,
+                                score: 1.04,
                                 source: VerbSearchSource::MacroIndex,
                                 matched_phrase: entry.map(|e| e.label.clone()).unwrap_or_default(),
                                 description: entry.map(|e| e.description.clone()),

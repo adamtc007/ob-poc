@@ -5070,7 +5070,13 @@ impl ReplOrchestratorV2 {
             "sem_os_unavailable" => {
                 "Semantic OS context is unavailable, so verb resolution is blocked."
             }
-            "ambiguous_entity" => "I found multiple matching entities. Please be more specific.",
+            "ambiguous_entity" => {
+                // Entity ambiguity is informational — don't block verb matching.
+                // Macros and deterministic phrase matches resolve without entity context.
+                // Only halt if no verb match is found downstream.
+                tracing::debug!("Phase2 gate: ambiguous_entity detected, deferring to verb matching");
+                return None;
+            }
             "no_entity_found" => {
                 "I could not resolve the referenced entity. Please provide more details."
             }
