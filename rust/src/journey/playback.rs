@@ -37,7 +37,6 @@ impl PackPlayback {
         if let Some(ref template) = pack.pack_summary_template {
             let mut summary = template.clone();
             for (key, value) in answers {
-                let placeholder = format!("{{{}}}", key);
                 let value_str = match value {
                     serde_json::Value::String(s) => s.clone(),
                     serde_json::Value::Array(arr) => arr
@@ -50,7 +49,21 @@ impl PackPlayback {
                         .join(", "),
                     other => other.to_string(),
                 };
-                summary = summary.replace(&placeholder, &value_str);
+                // Support both placeholder formats:
+                // {{answers.key}} (Handlebars-style from YAML) and {key} (legacy)
+                summary = summary.replace(&format!("{{{{answers.{}}}}}", key), &value_str);
+                summary = summary.replace(&format!("{{{}}}", key), &value_str);
+            }
+            // Handle {{answers.X.length}} for array counts
+            for (key, value) in answers {
+                let len = match value {
+                    serde_json::Value::Array(arr) => arr.len().to_string(),
+                    serde_json::Value::String(s) => {
+                        s.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).count().to_string()
+                    }
+                    _ => "0".to_string(),
+                };
+                summary = summary.replace(&format!("{{{{answers.{}.length}}}}", key), &len);
             }
             summary = summary.replace("{step_count}", &runbook.entries.len().to_string());
             return summary;
