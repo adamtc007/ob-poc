@@ -36,7 +36,7 @@ transitions:
     verbs: [cbu.create, cbu.create-from-client-group, cbu.ensure]
   - from: cbus_identified
     to: onboarding
-    verbs: [kyc-case.create, kyc.open-case]
+    verbs: [kyc-case.create]
   - from: onboarding
     to: active
     verbs: [kyc-case.close]

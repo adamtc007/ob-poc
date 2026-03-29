@@ -393,7 +393,7 @@ deal.list:
   target_types: []
   crud_type: read
 
-deal.read-record:
+deal.read:
   pref_label: "read deal record"
   alt_labels:
     - "show deal"
@@ -407,7 +407,7 @@ deal.read-record:
   target_types: []
   crud_type: read
 
-deal.search-records:
+deal.search:
   pref_label: "search deal records"
   alt_labels:
     - "find deal"

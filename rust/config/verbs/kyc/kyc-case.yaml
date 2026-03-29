@@ -580,7 +580,7 @@ domains:
               - DISCOVERY
         returns:
           type: affected
-      state:
+      get-state:
         description: Get full case state with workstreams and embedded awaiting requests
         invocation_phrases:
           - "case state"

@@ -23,7 +23,7 @@ pub enum ExecutionRoute {
 /// Configuration for a workflow-enabled verb.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowBinding {
-    /// Fully-qualified verb name (e.g., "kyc.open-case").
+    /// Fully-qualified verb name (e.g., "kyc-case.create").
     pub verb_fqn: String,
     /// Execution route for this verb.
     pub route: ExecutionRoute,

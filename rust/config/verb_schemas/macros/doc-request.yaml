@@ -173,7 +173,7 @@ doc-request.respond:
       key: docs.requested
 
   expands-to:
-    - verb: document.receive-request
+    - verb: document.mark-received
       args:
         request-id: "${arg.request_id}"
         document-id: "${arg.document_ref}"

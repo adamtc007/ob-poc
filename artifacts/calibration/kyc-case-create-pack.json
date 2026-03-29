@@ -3,35 +3,35 @@
     "text": "open a new KYC case for this entity",
     "calibration_mode": "positive",
     "negative_type": null,
-    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create", "kyc.open-case"] },
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create"] },
     "generation_rationale": "Direct KYC case creation."
   },
   {
     "text": "start a KYC review",
     "calibration_mode": "positive",
     "negative_type": null,
-    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create", "kyc.open-case", "kyc.full-review"] },
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create", "kyc.full-review"] },
     "generation_rationale": "Start review = create case."
   },
   {
     "text": "initiate due diligence on this client",
     "calibration_mode": "positive",
     "negative_type": null,
-    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create", "kyc.open-case"] },
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create"] },
     "generation_rationale": "Due diligence initiation = KYC case creation."
   },
   {
     "text": "we need to KYC this counterparty",
     "calibration_mode": "positive",
     "negative_type": null,
-    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create", "kyc.open-case"] },
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create"] },
     "generation_rationale": "KYC as a verb — common in practice."
   },
   {
     "text": "begin the onboarding compliance checks",
     "calibration_mode": "positive",
     "negative_type": null,
-    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create", "kyc.open-case", "screening.full"] },
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create", "screening.full"] },
     "generation_rationale": "Compliance checks = KYC workflow start."
   },
   {
@@ -52,7 +52,7 @@
     "text": "open a case and do full screening",
     "calibration_mode": "boundary",
     "negative_type": null,
-    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create", "kyc.open-case", "screening.full"] },
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["kyc-case.create", "screening.full"] },
     "generation_rationale": "Compound intent — case + screening. Boundary because could go to sequence or single verb."
   },
   {

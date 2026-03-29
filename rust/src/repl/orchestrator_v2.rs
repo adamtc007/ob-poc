@@ -5849,7 +5849,7 @@ templates:
   - template_id: basic-onboarding
     when_to_use: "Standard onboarding handoff"
     steps:
-      - verb: deal.read-record
+      - verb: deal.read
         args:
           deal-id: "{answers.deal_id}"
       - verb: cbu.read

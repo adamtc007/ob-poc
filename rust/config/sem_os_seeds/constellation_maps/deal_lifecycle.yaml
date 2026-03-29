@@ -10,9 +10,9 @@ slots:
     state_machine: deal_lifecycle
     verbs:
       create: { verb: deal.create, when: empty }
-      read: { verb: deal.read-record, when: filled }
+      read: { verb: deal.read, when: filled }
       list: { verb: deal.list, when: [empty, filled] }
-      search: { verb: deal.search-records, when: [empty, filled] }
+      search: { verb: deal.search, when: [empty, filled] }
       summary: { verb: deal.read-summary, when: filled }
       timeline: { verb: deal.read-timeline, when: filled }
       list_documents: { verb: deal.list-documents, when: filled }
@@ -22,7 +22,7 @@ slots:
       list_rate_card_lines: { verb: deal.list-rate-card-lines, when: filled }
       list_rate_card_history:
         { verb: deal.list-rate-card-history, when: filled }
-      update: { verb: deal.update-record, when: filled }
+      update: { verb: deal.update, when: filled }
       update_status: { verb: deal.update-status, when: filled }
       add_document: { verb: deal.add-document, when: filled }
       update_document_status:
@@ -51,7 +51,7 @@ slots:
     state_machine: kyc_case_lifecycle
     verbs:
       read: { verb: kyc-case.read, when: filled }
-      state: { verb: kyc-case.state, when: filled }
+      state: { verb: kyc-case.get-state, when: filled }
   kyc_case:
     type: case
     table: cases
@@ -63,7 +63,7 @@ slots:
     verbs:
       create: { verb: kyc-case.create, when: empty }
       read: { verb: kyc-case.read, when: filled }
-      state: { verb: kyc-case.state, when: filled }
+      state: { verb: kyc-case.get-state, when: filled }
       update_status: { verb: kyc-case.update-status, when: filled }
       close: { verb: kyc-case.close, when: filled }
   cbu:

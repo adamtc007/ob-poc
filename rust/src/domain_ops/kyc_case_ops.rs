@@ -319,7 +319,7 @@ mod tests {
     fn test_kyc_case_state_op_metadata() {
         let op = KycCaseStateOp;
         assert_eq!(op.domain(), "kyc-case");
-        assert_eq!(op.verb(), "state");
+        assert_eq!(op.verb(), "get-state");
     }
 
     #[test]
@@ -710,7 +710,7 @@ impl CustomOperation for KycCaseStateOp {
     }
 
     fn verb(&self) -> &'static str {
-        "state"
+        "get-state"
     }
 
     fn rationale(&self) -> &'static str {

@@ -351,13 +351,13 @@ expected_polarity = "read"
 expected_domain_concept = "ubo"
 category = "natural"
 difficulty = "hard"
-alt_verbs = ["ownership.who-controls", "control.list-controllers", "control.identify-ubos", "control.compute-controllers", "control.build-graph"]
+alt_verbs = ["ownership.find-controller", "control.list-controllers", "control.identify-ubos", "control.compute-controllers", "control.build-graph"]
 notes = "Major collision point between ubo/ownership/control domains"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a control relationship -- board appointment"
-expected_verb = "ubo.add-control"
+expected_verb = "control.add"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "ubo"
@@ -368,7 +368,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "calculate the UBOs for this CBU"
-expected_verb = "ubo.calculate"
+expected_verb = "ubo.compute-chains"
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "ubo"
@@ -387,6 +387,7 @@ difficulty = "medium"
 alt_verbs = ["ownership.trace-chain"]
 ecir_path = "fallthrough"
 
+# ownership.trace-chain is the canonical verb now; control.trace-chain removed
 [[test]]
 utterance = "this person died last month"
 expected_verb = "ubo.mark-deceased"
@@ -661,7 +662,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what's the status of the deal?"
-expected_verb = "deal.read-record"
+expected_verb = "deal.read"
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "deal"
@@ -837,20 +838,20 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who ultimately controls this entity?"
-expected_verb = "ownership.who-controls"
+expected_verb = "ownership.find-controller"
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "ownership"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["control.build-graph", "control.compute-controllers", "control.identify-ubos", "ubo.list-ubos", "control.list-controllers"]
-notes = "Collision: ownership.who-controls vs ubo.list-ubos vs control.list-controllers"
+notes = "Collision: ownership.find-controller vs ubo.list-ubos vs control.list-controllers"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "reconcile the ownership percentages"
 expected_verb = "ownership.reconcile"
-alt_verbs = ["control.reconcile-ownership"]
+alt_verbs = ["ownership.reconcile"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "ownership"
@@ -1100,7 +1101,7 @@ expected_polarity = "write"
 expected_domain_concept = "client-group"
 category = "adversarial"
 difficulty = "hard"
-alt_verbs = ["ubo.add-ownership", "ubo.add-control"]
+alt_verbs = ["ubo.add-ownership", "control.add"]
 notes = "Extremely vague -- relationship could be ownership, control, or group"
 ecir_path = "fallthrough"
 
@@ -1112,7 +1113,7 @@ expected_polarity = "write"
 expected_domain_concept = "document"
 category = "adversarial"
 difficulty = "expert"
-alt_verbs = ["entity.verify", "control.reconcile-ownership", "cbu.verify-evidence"]
+alt_verbs = ["entity.verify", "ownership.reconcile", "cbu.verify-evidence"]
 notes = "'it' = anaphoric reference requiring session context"
 ecir_path = "fallthrough"
 
@@ -1216,7 +1217,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "compute the 25% threshold test"
-expected_verb = "ubo.calculate"
+expected_verb = "ubo.compute-chains"
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "ubo"
@@ -1687,14 +1688,14 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Open a new KYC case"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case", "case.open"]
+alt_verbs = ["kyc-case.create", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
-expected_route_target = "kyc.open-case"
+expected_route_target = "kyc-case.create"
 ecir_path = "fallthrough"
 
 [[test]]
@@ -1885,7 +1886,7 @@ ecir_path = "narrow"
 [[test]]
 utterance = "Check KYC case status"
 expected_verb = "kyc-case.read"
-alt_verbs = ["kyc-case.state", "kyc-case.update-status"]
+alt_verbs = ["kyc-case.get-state", "kyc-case.update-status"]
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "kyc"
@@ -1904,7 +1905,7 @@ ecir_path = "narrow"
 [[test]]
 utterance = "Run the full KYC onboarding process with screening and documents"
 expected_verb = "screening.full"
-alt_verbs = ["kyc.open-case", "kyc-case.create", "kyc.full-review", "case.open"]
+alt_verbs = ["kyc-case.create", "kyc.full-review", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1919,7 +1920,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Complete the KYC process including case screening and document collection"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case", "kyc-case.close", "screening.full", "kyc.full-review", "case.open"]
+alt_verbs = ["kyc-case.create", "kyc-case.close", "screening.full", "kyc.full-review", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1934,7 +1935,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Do the full KYC onboarding for this client"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case", "kyc-agreement.create", "kyc.full-review", "case.open"]
+alt_verbs = ["kyc-case.create", "kyc-agreement.create", "kyc.full-review", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1949,7 +1950,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Open a KYC case and run full screening"
 expected_verb = "screening.full"
-alt_verbs = ["kyc.open-case", "kyc-case.create"]
+alt_verbs = ["kyc-case.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1964,7 +1965,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Create a new KYC case with screening for this party"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case", "screening.full"]
+alt_verbs = ["kyc-case.create", "screening.full"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1979,7 +1980,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Open a case and collect the KYC documents"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case", "kyc.collect-documents", "case.open"]
+alt_verbs = ["kyc-case.create", "kyc.collect-documents", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1994,7 +1995,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Set up a new case and request identity documents"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case", "kyc.collect-documents", "case.open"]
+alt_verbs = ["kyc-case.create", "kyc.collect-documents", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -2138,7 +2139,7 @@ workspace = "deal"
 
 [[test]]
 utterance = "show deal status"
-expected_verb = "deal.read-record"
+expected_verb = "deal.read"
 alt_verbs = ["deal.list"]
 category = "natural"
 difficulty = "easy"
@@ -2348,7 +2349,7 @@ workspace = "kyc"
 [[test]]
 utterance = "discover UBO structure"
 expected_verb = "ubo.discover"
-alt_verbs = ["ubo.compute-chains", "ubo.calculate"]
+alt_verbs = ["ubo.compute-chains"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2371,7 +2372,7 @@ workspace = "kyc"
 
 [[test]]
 utterance = "list outstanding KYC requirements"
-expected_verb = "requirement.unsatisfied"
+expected_verb = "requirement.list-outstanding"
 alt_verbs = ["requirement.list"]
 category = "natural"
 difficulty = "hard"
@@ -2582,7 +2583,7 @@ notes = "Practitioner slang for fund creation"
 [[test]]
 utterance = "who owns this thing?"
 expected_verb = "ubo.list-ubos"
-alt_verbs = ["ubo.discover", "ownership.list-owners", "ownership.who-controls"]
+alt_verbs = ["ubo.discover", "ownership.list-owners", "ownership.find-controller"]
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"
@@ -2692,7 +2693,7 @@ notes = "ISDA Master Agreement configuration"
 
 [[test]]
 utterance = "what's still outstanding?"
-expected_verb = "requirement.unsatisfied"
+expected_verb = "requirement.list-outstanding"
 alt_verbs = ["attributes.gaps"]
 category = "natural"
 difficulty = "hard"
@@ -2711,7 +2712,7 @@ notes = "Question form for case assignment"
 [[test]]
 utterance = "what documents do we need?"
 expected_verb = "document.missing-for-entity"
-alt_verbs = ["requirement.unsatisfied", "document.compute-requirements"]
+alt_verbs = ["requirement.list-outstanding", "document.compute-requirements"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2892,12 +2893,12 @@ notes = "Capital action"
 
 [[test]]
 utterance = "dividend distribution"
-expected_verb = "movement.distribution"
+expected_verb = "movement.distribute"
 alt_verbs = ["capital.distribute", "capital.distribute-dividend"]
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
-notes = "Capital distribution — maps to movement.distribution (capital.distribute does not exist)"
+notes = "Capital distribution — maps to movement.distribute (capital.distribute does not exist)"
 
 # ============================================================================
 # MACRO COVERAGE — Missing macros (added 2026-03-29)
@@ -3353,7 +3354,7 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Record a document response"
-expected_verb = "document.receive-request"
+expected_verb = "document.mark-received"
 alt_verbs = ["doc-request.respond"]
 category = "macro_match"
 difficulty = "medium"
@@ -3680,7 +3681,7 @@ notes = "Contextual — routes to NarrationEngine when constellation is hydrated
 [[test]]
 utterance = "what's missing"
 expected_verb = "narration.query"
-alt_verbs = ["document.missing-for-entity", "semantic.missing-entities", "requirement.unsatisfied"]
+alt_verbs = ["document.missing-for-entity", "semantic.missing-entities", "requirement.list-outstanding"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "kyc"
@@ -3725,7 +3726,7 @@ notes = "Contextual next-step query"
 [[test]]
 utterance = "what's outstanding on this case"
 expected_verb = "narration.query"
-alt_verbs = ["kyc-case.state", "requirement.unsatisfied"]
+alt_verbs = ["kyc-case.get-state", "requirement.list-outstanding"]
 category = "contextual_query"
 difficulty = "medium"
 workspace = "kyc"
@@ -3770,7 +3771,7 @@ notes = "Contextual gap analysis query"
 [[test]]
 utterance = "status update"
 expected_verb = "narration.query"
-alt_verbs = ["semantic.get-state", "kyc-case.update-status", "kyc-case.state"]
+alt_verbs = ["semantic.get-state", "kyc-case.update-status", "kyc-case.get-state"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "cbu"
@@ -3806,7 +3807,7 @@ notes = "Contextual summary query"
 [[test]]
 utterance = "what's still needed"
 expected_verb = "narration.query"
-alt_verbs = ["semantic.get-state", "requirement.unsatisfied"]
+alt_verbs = ["semantic.get-state", "requirement.list-outstanding"]
 category = "contextual_query"
 difficulty = "medium"
 workspace = "cbu"

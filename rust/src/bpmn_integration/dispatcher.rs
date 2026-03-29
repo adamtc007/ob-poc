@@ -464,8 +464,8 @@ mod tests {
     #[test]
     fn test_extract_verb_fqn_simple() {
         assert_eq!(
-            WorkflowDispatcher::extract_verb_fqn("(kyc.open-case :entity-id \"abc\")"),
-            Some("kyc.open-case".to_string())
+            WorkflowDispatcher::extract_verb_fqn("(kyc-case.create :entity-id \"abc\")"),
+            Some("kyc-case.create".to_string())
         );
     }
 
@@ -501,7 +501,7 @@ mod tests {
 
     #[test]
     fn test_extract_arg_value_quoted() {
-        let dsl = r#"(kyc.open-case :case-id "abc-123" :entity-id "def-456")"#;
+        let dsl = r#"(kyc-case.create :case-id "abc-123" :entity-id "def-456")"#;
         assert_eq!(
             WorkflowDispatcher::extract_arg_value(dsl, "case_id"),
             Some("abc-123".to_string())
@@ -514,7 +514,7 @@ mod tests {
 
     #[test]
     fn test_extract_arg_value_unquoted() {
-        let dsl = "(kyc.open-case :case-id abc-123 :status open)";
+        let dsl = "(kyc-case.create :case-id abc-123 :status open)";
         assert_eq!(
             WorkflowDispatcher::extract_arg_value(dsl, "case_id"),
             Some("abc-123".to_string())
@@ -543,13 +543,13 @@ mod tests {
 
     #[test]
     fn test_extract_arg_value_missing() {
-        let dsl = r#"(kyc.open-case :entity-id "abc")"#;
+        let dsl = r#"(kyc-case.create :entity-id "abc")"#;
         assert_eq!(WorkflowDispatcher::extract_arg_value(dsl, "case_id"), None);
     }
 
     #[test]
     fn test_extract_arg_value_at_end() {
-        let dsl = r#"(kyc.open-case :case-id "final-value")"#;
+        let dsl = r#"(kyc-case.create :case-id "final-value")"#;
         assert_eq!(
             WorkflowDispatcher::extract_arg_value(dsl, "case_id"),
             Some("final-value".to_string())

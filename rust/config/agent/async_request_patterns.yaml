@@ -6,7 +6,7 @@
 #
 # Key Principle: Domain Coherence
 # - Requests appear in workstream.awaiting arrays
-# - ONE state model (kyc-case.state), NOT separate "case" + "requests"
+# - ONE state model (kyc-case.get-state), NOT separate "case" + "requests"
 # - Agent checks state → sees awaiting → decides action
 
 version: "1.0"
@@ -74,7 +74,7 @@ fire_and_forget_verbs:
       (document.request :workstream-id @ws-john :doc-type "PASSPORT"
                         :due-days 14 :message "Please provide passport copy")
     result: "Request created, workstream blocked until fulfilled"
-    next_action: "Check kyc-case.state later to see if fulfilled"
+    next_action: "Check kyc-case.get-state later to see if fulfilled"
 
   request.create:
     description: "Create any type of outstanding request"
@@ -134,7 +134,7 @@ auto_fulfillment:
 # STATE VISIBILITY
 # ==========================================================================
 state_queries:
-  kyc-case.state:
+  kyc-case.get-state:
     description: "Primary state query - returns case with embedded awaiting requests"
     structure: |
       {
@@ -267,7 +267,7 @@ example_workflows:
 
       - note: "Agent moves on, checks state later"
 
-      - verb: "kyc-case.state"
+      - verb: "kyc-case.get-state"
         params: ":case-id @case"
         check: "See awaiting array in workstream"
 
@@ -276,7 +276,7 @@ example_workflows:
   handling_overdue:
     description: "Handle overdue request"
     steps:
-      - verb: "kyc-case.state"
+      - verb: "kyc-case.get-state"
         check: "attention array shows overdue items"
 
       - condition: "days_overdue > 7"

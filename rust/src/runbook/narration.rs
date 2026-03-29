@@ -202,7 +202,7 @@ mod tests {
                         output_field: "created_cbu_id".into(),
                     },
                     verb: VerbRef {
-                        verb_fqn: "kyc.open-case".into(),
+                        verb_fqn: "kyc-case.create".into(),
                         display_name: "Open KYC Case".into(),
                     },
                     sentence: "Open a KYC case".into(),
@@ -271,7 +271,7 @@ mod tests {
             },
             StepResult {
                 step_seq: 1,
-                verb_fqn: "kyc.open-case".into(),
+                verb_fqn: "kyc-case.create".into(),
                 status: PlanStepStatus::Failed,
                 output: None,
                 error: Some("precondition failed".into()),
@@ -290,7 +290,7 @@ mod tests {
         let plan = test_plan();
         let result = StepResult {
             step_seq: 1,
-            verb_fqn: "kyc.open-case".into(),
+            verb_fqn: "kyc-case.create".into(),
             status: PlanStepStatus::Succeeded,
             output: None,
             error: None,

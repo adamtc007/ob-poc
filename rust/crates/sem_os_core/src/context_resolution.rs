@@ -301,7 +301,7 @@ pub struct VerbCandidate {
     pub verb_snapshot_id: Uuid,
     /// Object ID of the VerbContract.
     pub verb_id: Uuid,
-    /// Fully qualified name (e.g. "kyc.open-case").
+    /// Fully qualified name (e.g. "kyc-case.create").
     pub fqn: String,
     /// Human-readable description.
     pub description: String,
@@ -1859,14 +1859,14 @@ mod tests {
                     taxonomy_fqn: "domain.kyc".into(),
                     node_fqn: "domain.kyc.ubo".into(),
                     target_type: "verb_contract".into(),
-                    target_fqn: "kyc.open-case".into(),
+                    target_fqn: "kyc-case.create".into(),
                     membership_kind: "direct".into(),
                 },
                 TaxonomyMembership {
                     taxonomy_fqn: "risk.high".into(),
                     node_fqn: "risk.high.pep".into(),
                     target_type: "verb_contract".into(),
-                    target_fqn: "kyc.open-case".into(),
+                    target_fqn: "kyc-case.create".into(),
                     membership_kind: "direct".into(),
                 },
                 TaxonomyMembership {
@@ -1879,7 +1879,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(memberships.taxonomy_overlap_count("kyc.open-case"), 2);
+        assert_eq!(memberships.taxonomy_overlap_count("kyc-case.create"), 2);
         assert_eq!(
             memberships.taxonomy_overlap_count("trading.create-profile"),
             0

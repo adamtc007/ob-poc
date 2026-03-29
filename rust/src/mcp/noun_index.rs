@@ -749,7 +749,7 @@ impl NounIndex {
             ("start" | "open" | "begin", "kyc-case") => Some(("kyc-case.create", "kyc-case")),
             // Ownership: "who" questions + ownership/control/ubo
             ("who", "ownership" | "control" | "ubo") => {
-                Some(("ownership.who-controls", "ownership"))
+                Some(("ownership.find-controller", "ownership"))
             }
             _ => None,
         };
@@ -1465,7 +1465,7 @@ nouns:
             assert!(resolution.is_some());
             assert_eq!(
                 resolution.unwrap().candidates,
-                vec!["ownership.who-controls"]
+                vec!["ownership.find-controller"]
             );
         }
     }

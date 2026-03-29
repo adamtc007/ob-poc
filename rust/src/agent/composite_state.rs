@@ -209,7 +209,7 @@ impl GroupCompositeState {
                 reason: format!("{cbus_without_case} CBU(s) need KYC case"),
             });
             self.next_likely_verbs.push(ScoredVerbHint {
-                verb_fqn: "kyc.open-case".into(),
+                verb_fqn: "kyc-case.create".into(),
                 boost: 0.12,
                 reason: format!("{cbus_without_case} CBU(s) need KYC case"),
             });
@@ -261,7 +261,7 @@ impl GroupCompositeState {
                 reason: "Onboarding complete — status check likely".into(),
             });
             self.next_likely_verbs.push(ScoredVerbHint {
-                verb_fqn: "deal.read-record".into(),
+                verb_fqn: "deal.read".into(),
                 boost: 0.06,
                 reason: "Onboarding complete — deal review likely".into(),
             });

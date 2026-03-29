@@ -162,7 +162,7 @@ actions:
 
   UBO_IDENTIFICATION:
     - action: calculate_ubo
-      verb: ubo.calculate
+      verb: ubo.compute-chains
       description: Calculate beneficial owners
 
     - action: register_ubo

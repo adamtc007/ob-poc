@@ -137,7 +137,7 @@ stages:
       - entity-workstream.update-status
       - entity-workstream.complete
       - document.create-request
-      - document.receive-request
+      - document.mark-received
       - document.verify-request
       - screening.run
       - screening.complete

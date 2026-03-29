@@ -318,7 +318,7 @@ pub fn pack_verb_sentence_templates() -> HashMap<String, Vec<String>> {
 
     // -- KYC verbs --
     m.insert(
-        "kyc.open-case".to_string(),
+        "kyc-case.create".to_string(),
         vec![
             "Open KYC case for {entity-name}".to_string(),
             "Start KYC review for {entity-name}".to_string(),
@@ -652,7 +652,7 @@ mod tests {
             "trading-profile.add-counterparty",
             "trading-profile.add-instrument",
             "entity.ensure-or-create",
-            "kyc.open-case",
+            "kyc-case.create",
             "kyc.request-docs",
             "kyc.review-gate",
             "deal.request-onboarding",

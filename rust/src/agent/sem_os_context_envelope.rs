@@ -455,7 +455,7 @@ mod tests {
 
     #[test]
     fn test_fingerprint_format() {
-        let set: HashSet<String> = ["kyc.open-case"].iter().map(|s| s.to_string()).collect();
+        let set: HashSet<String> = ["kyc-case.create"].iter().map(|s| s.to_string()).collect();
         let fp = AllowedVerbSetFingerprint::compute(&set);
         assert!(fp.0.starts_with("v1:"), "Fingerprint must be versioned");
         // v1: + 64 hex chars
@@ -490,8 +490,8 @@ mod tests {
     fn test_is_allowed() {
         let mut env = SemOsContextEnvelope::unavailable();
         env.unavailable = false;
-        env.allowed_verbs.insert("kyc.open-case".into());
-        assert!(env.is_allowed("kyc.open-case"));
+        env.allowed_verbs.insert("kyc-case.create".into());
+        assert!(env.is_allowed("kyc-case.create"));
         assert!(!env.is_allowed("cbu.create"));
     }
 
@@ -650,17 +650,17 @@ mod tests {
 
     #[test]
     fn test_toctou_still_allowed() {
-        let original = make_envelope_with_verbs(&["cbu.create", "kyc.open-case"]);
-        let fresh = make_envelope_with_verbs(&["cbu.create", "kyc.open-case"]);
+        let original = make_envelope_with_verbs(&["cbu.create", "kyc-case.create"]);
+        let fresh = make_envelope_with_verbs(&["cbu.create", "kyc-case.create"]);
         let result = original.toctou_recheck(&fresh, "cbu.create");
         assert!(matches!(result, Some(TocTouResult::StillAllowed)));
     }
 
     #[test]
     fn test_toctou_drifted_but_still_allowed() {
-        let original = make_envelope_with_verbs(&["cbu.create", "kyc.open-case"]);
+        let original = make_envelope_with_verbs(&["cbu.create", "kyc-case.create"]);
         // Fresh has an extra verb (fingerprint different) but selected verb still present
-        let fresh = make_envelope_with_verbs(&["cbu.create", "kyc.open-case", "entity.create"]);
+        let fresh = make_envelope_with_verbs(&["cbu.create", "kyc-case.create", "entity.create"]);
         let result = original.toctou_recheck(&fresh, "cbu.create");
         assert!(matches!(
             result,
@@ -670,9 +670,9 @@ mod tests {
 
     #[test]
     fn test_toctou_denied() {
-        let original = make_envelope_with_verbs(&["cbu.create", "kyc.open-case"]);
+        let original = make_envelope_with_verbs(&["cbu.create", "kyc-case.create"]);
         // Fresh no longer has cbu.create
-        let fresh = make_envelope_with_verbs(&["kyc.open-case"]);
+        let fresh = make_envelope_with_verbs(&["kyc-case.create"]);
         let result = original.toctou_recheck(&fresh, "cbu.create");
         match result {
             Some(TocTouResult::Denied {

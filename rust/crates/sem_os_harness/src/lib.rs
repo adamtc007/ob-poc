@@ -127,7 +127,7 @@ fn make_view_seed(fqn: &str, domain: &str, name: &str, entity_type: &str) -> Vie
 
 fn build_test_seed_bundle() -> SeedBundle {
     let verb_contracts = vec![
-        make_verb_contract_seed("kyc.open-case", "kyc", "Open a KYC case"),
+        make_verb_contract_seed("kyc-case.create", "kyc", "Open a KYC case"),
         make_verb_contract_seed("kyc.resolve-ubo", "kyc", "Resolve UBO structure"),
         make_verb_contract_seed("cbu.create", "cbu", "Create a CBU"),
     ];

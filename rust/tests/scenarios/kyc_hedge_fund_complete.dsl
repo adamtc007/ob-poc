@@ -112,8 +112,8 @@
   :as @doc-shareholders)
 
 ;; Mark documents as received
-(document.receive-request :request-id @doc-req-cert :document-id @doc-cert)
-(document.receive-request :request-id @doc-req-shareholders :document-id @doc-shareholders)
+(document.mark-received :request-id @doc-req-cert :document-id @doc-cert)
+(document.mark-received :request-id @doc-req-shareholders :document-id @doc-shareholders)
 
 ;; Verify the document requests
 (document.verify-request :request-id @doc-req-cert :verification-notes "Certificate valid, company active")

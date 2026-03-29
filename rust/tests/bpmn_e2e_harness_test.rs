@@ -235,7 +235,7 @@ fn build_kyc_config() -> WorkflowConfigIndex {
     let config = WorkflowConfig {
         workflows: vec![
             WorkflowBinding {
-                verb_fqn: "kyc.open-case".to_string(),
+                verb_fqn: "kyc-case.create".to_string(),
                 route: ExecutionRoute::Orchestrated,
                 process_key: Some("kyc-open-case".to_string()),
                 task_bindings: vec![
@@ -310,7 +310,7 @@ async fn e2e_01_dispatcher_parks_on_orchestrated_verb() {
     // Execute an orchestrated verb
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-001\")",
+            "(kyc-case.create :entity-id \"test-entity-001\")",
             entry_id,
             runbook_id,
         )
@@ -370,7 +370,7 @@ async fn e2e_02_job_worker_processes_service_tasks() {
     // Start the process
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-002\")",
+            "(kyc-case.create :entity-id \"test-entity-002\")",
             entry_id,
             runbook_id,
         )
@@ -423,7 +423,7 @@ async fn e2e_03_full_happy_path_choreography() {
     // 1. Start process via dispatcher
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-003\")",
+            "(kyc-case.create :entity-id \"test-entity-003\")",
             entry_id,
             runbook_id,
         )
@@ -569,8 +569,8 @@ async fn e2e_04_runbook_park_and_resume() {
         sequence: 1,
         sentence: "Open KYC case for test entity".to_string(),
         labels: Default::default(),
-        verb: "kyc.open-case".to_string(),
-        dsl: "(kyc.open-case :entity-id \"test-entity-004\")".to_string(),
+        verb: "kyc-case.create".to_string(),
+        dsl: "(kyc-case.create :entity-id \"test-entity-004\")".to_string(),
         args: Default::default(),
         slot_provenance: SlotProvenance {
             slots: Default::default(),
@@ -703,7 +703,7 @@ async fn e2e_05_job_worker_background_loop() {
     // Start process
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-005\")",
+            "(kyc-case.create :entity-id \"test-entity-005\")",
             entry_id,
             runbook_id,
         )
@@ -773,7 +773,7 @@ async fn e2e_06_cancellation_resolves_parked_token() {
     // Start process
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-006\")",
+            "(kyc-case.create :entity-id \"test-entity-006\")",
             entry_id,
             runbook_id,
         )
@@ -848,7 +848,7 @@ async fn e2e_07_job_failure_marks_frame() {
     // Start process
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-007\")",
+            "(kyc-case.create :entity-id \"test-entity-007\")",
             entry_id,
             runbook_id,
         )
@@ -912,8 +912,8 @@ async fn e2e_08_signal_relay_bounces_to_orchestrator() {
             sequence: 1,
             sentence: "Open KYC case for test entity".to_string(),
             labels: Default::default(),
-            verb: "kyc.open-case".to_string(),
-            dsl: "(kyc.open-case :entity-id \"test-entity-008\")".to_string(),
+            verb: "kyc-case.create".to_string(),
+            dsl: "(kyc-case.create :entity-id \"test-entity-008\")".to_string(),
             args: Default::default(),
             slot_provenance: SlotProvenance {
                 slots: Default::default(),
@@ -1119,8 +1119,8 @@ async fn e2e_09_cancellation_bounces_to_orchestrator() {
             sequence: 1,
             sentence: "Open KYC case for test entity".to_string(),
             labels: Default::default(),
-            verb: "kyc.open-case".to_string(),
-            dsl: "(kyc.open-case :entity-id \"test-entity-009\")".to_string(),
+            verb: "kyc-case.create".to_string(),
+            dsl: "(kyc-case.create :entity-id \"test-entity-009\")".to_string(),
             args: Default::default(),
             slot_provenance: SlotProvenance {
                 slots: Default::default(),
@@ -1302,7 +1302,7 @@ async fn e2e_10_idempotency_dual_dedupe() {
     // 1. Start process.
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-010\")",
+            "(kyc-case.create :entity-id \"test-entity-010\")",
             entry_id,
             runbook_id,
         )
@@ -1387,7 +1387,7 @@ async fn e2e_11_payload_integrity_corrupt_hash_rejected() {
     // 1. Start process.
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-011\")",
+            "(kyc-case.create :entity-id \"test-entity-011\")",
             entry_id,
             runbook_id,
         )
@@ -1499,7 +1499,7 @@ async fn e2e_12_direct_vs_orchestrated_equivalence() {
     let entry_id_orch = Uuid::new_v4();
     let orch_outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-012\")",
+            "(kyc-case.create :entity-id \"test-entity-012\")",
             entry_id_orch,
             runbook_id,
         )
@@ -1578,7 +1578,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
     // Build config with max_retries: 1 so first failure → DLQ.
     let dlq_config = WorkflowConfig {
         workflows: vec![WorkflowBinding {
-            verb_fqn: "kyc.open-case".to_string(),
+            verb_fqn: "kyc-case.create".to_string(),
             route: ExecutionRoute::Orchestrated,
             process_key: Some("kyc-open-case".to_string()),
             task_bindings: vec![
@@ -1640,7 +1640,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
     // 1. Start process.
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-013\")",
+            "(kyc-case.create :entity-id \"test-entity-013\")",
             entry_id,
             runbook_id,
         )
@@ -1720,7 +1720,7 @@ async fn e2e_14_event_bridge_reconnect_dedup() {
     // 1. Start process.
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-014\")",
+            "(kyc-case.create :entity-id \"test-entity-014\")",
             entry_id,
             runbook_id,
         )
@@ -1828,7 +1828,7 @@ async fn e2e_15_crash_recovery_event_log_replay() {
     // 1. Start process.
     let outcome = dispatcher
         .execute_v2(
-            "(kyc.open-case :entity-id \"test-entity-015\")",
+            "(kyc-case.create :entity-id \"test-entity-015\")",
             entry_id,
             runbook_id,
         )

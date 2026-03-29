@@ -252,7 +252,7 @@ impl CustomOperation for OwnershipControlPositionsOp {
     }
 
     fn verb(&self) -> &'static str {
-        "control-positions"
+        "list-control-positions"
     }
 
     fn rationale(&self) -> &'static str {
@@ -333,7 +333,7 @@ impl CustomOperation for OwnershipWhoControlsOp {
     }
 
     fn verb(&self) -> &'static str {
-        "who-controls"
+        "find-controller"
     }
 
     fn rationale(&self) -> &'static str {

@@ -293,7 +293,7 @@ domains:
           movement_type: transfer_out
 
       # PE/VC specific movement types
-      commitment:
+      record-commitment:
         description: Record LP commitment to PE/VC fund (total amount investor commits to invest)
         metadata:
           tier: intent
@@ -446,7 +446,7 @@ domains:
         set_values:
           movement_type: capital_call
 
-      distribution:
+      distribute:
         description: Record distribution to LP (return of capital or profit)
         metadata:
           tier: intent
@@ -540,7 +540,7 @@ domains:
         set_values:
           movement_type: distribution
 
-      recallable-distribution:
+      distribute-recallable:
         description: Record a recallable distribution (can be called back by GP)
         metadata:
           tier: intent

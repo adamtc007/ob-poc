@@ -12,13 +12,13 @@
 
 workflows:
   # KYC Open Case — first orchestrated workflow
-  - verb_fqn: kyc.open-case
+  - verb_fqn: kyc-case.create
     route: orchestrated
     process_key: kyc-open-case
     correlation_field: case_id
     task_bindings:
       - task_type: create_case_record
-        verb_fqn: kyc.create-case
+        verb_fqn: kyc-case.create
         timeout_ms: 30000
         max_retries: 3
 

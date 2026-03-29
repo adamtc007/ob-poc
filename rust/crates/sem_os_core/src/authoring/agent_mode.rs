@@ -205,7 +205,7 @@ mod tests {
         assert!(mode.is_verb_allowed("authoring.publish-batch"));
         // Business verbs allowed
         assert!(mode.is_verb_allowed("cbu.create"));
-        assert!(mode.is_verb_allowed("kyc.open-case"));
+        assert!(mode.is_verb_allowed("kyc-case.create"));
     }
 
     #[test]

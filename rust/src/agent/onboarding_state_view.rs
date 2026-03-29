@@ -179,7 +179,7 @@ fn build_kyc_case_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
     let forward = filter_hints(
         &c.next_likely_verbs,
-        &["kyc-case.create", "kyc.open-case"],
+        &["kyc-case.create"],
         VerbDirection::Forward,
     );
 
@@ -382,7 +382,7 @@ fn build_approval_layer(c: &GroupCompositeState) -> OnboardingLayer {
         &[
             "deal.request-onboarding",
             "kyc-case.read",
-            "deal.read-record",
+            "deal.read",
         ],
         VerbDirection::Query,
     );
@@ -657,7 +657,7 @@ fn verb_fqn_to_label(fqn: &str) -> String {
         "control.build-graph" => "Build Control Graph".into(),
         "cbu.ensure" => "Confirm CBU".into(),
         "cbu.create" => "Create CBU".into(),
-        "kyc-case.create" | "kyc.open-case" => "Open KYC Case".into(),
+        "kyc-case.create" => "Open KYC Case".into(),
         "kyc-case.reopen" => "Reopen Case".into(),
         "kyc-case.update-status" => "Update Case Status".into(),
         "screening.run" => "Run Screening".into(),
@@ -667,7 +667,7 @@ fn verb_fqn_to_label(fqn: &str) -> String {
         "document.solicit-set" => "Request Document Set".into(),
         "deal.request-onboarding" => "Request Onboarding Handoff".into(),
         "kyc-case.read" => "Check Case Status".into(),
-        "deal.read-record" => "Review Deal".into(),
+        "deal.read" => "Review Deal".into(),
         _ => {
             let parts: Vec<&str> = fqn.splitn(2, '.').collect();
             if parts.len() == 2 {
@@ -695,7 +695,7 @@ fn verb_fqn_to_utterance(fqn: &str) -> String {
         "control.build-graph" => "Build the control graph".into(),
         "cbu.ensure" => "ensure CBU exists".into(),
         "cbu.create" => "Create a new CBU".into(),
-        "kyc-case.create" | "kyc.open-case" => "Open a new KYC case".into(),
+        "kyc-case.create" => "Open a new KYC case".into(),
         "kyc-case.reopen" => "Reopen the case for review".into(),
         "screening.run" => "Run screening".into(),
         "screening.sanctions" => "Run a sanctions check".into(),
@@ -704,7 +704,7 @@ fn verb_fqn_to_utterance(fqn: &str) -> String {
         "document.solicit-set" => "Request the full document set".into(),
         "deal.request-onboarding" => "request onboarding for this deal".into(),
         "kyc-case.read" => "Check the KYC case status".into(),
-        "deal.read-record" => "Review the deal record".into(),
+        "deal.read" => "Review the deal record".into(),
         _ => fqn.replace(['.', '-'], " "),
     }
 }

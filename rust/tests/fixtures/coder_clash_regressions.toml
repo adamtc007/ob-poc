@@ -1,6 +1,6 @@
 [[case]]
 verb_a = "deal.list-active-rate-cards"
-verb_b = "deal.read-record"
+verb_b = "deal.read"
 expected_kind = "ActionDifferentiable"
 notes = "deal detail read vs active rate-card read share deal-id but differ by action"
 

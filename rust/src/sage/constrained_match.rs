@@ -902,7 +902,7 @@ pub async fn resolve_constrained_hybrid(
         || utterance_lower.contains("add a role");
     let entity_creation_ok = !has_entity_create_intent || !top.verb.starts_with("cbu.assign-role");
     let investor_lookup_ok = !has_investor_intent || top.verb != "cbu.parties";
-    let circular_ownership_ok = !has_circular_ownership || !top.verb.starts_with("ubo.calculate");
+    let circular_ownership_ok = !has_circular_ownership || !top.verb.starts_with("ubo.compute-chains");
     let generic_screening_ok = !has_generic_screening_check || top.verb == "screening.sanctions";
     let ownership_domain_ok = !has_ownership_intent
         || top.verb.starts_with("ubo.")
@@ -1030,7 +1030,7 @@ mod tests {
                 vec!["entity", "update", "modify"],
             ),
             (
-                "deal.update-record",
+                "deal.update",
                 "deal",
                 vec!["deal", "update", "record"],
             ),

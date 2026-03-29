@@ -37,7 +37,7 @@ Commercial origination hub linking sales → contracting → KYC → onboarding 
 | Verb | Purpose |
 |------|---------|
 | `deal.create` | Create sales opportunity → deal_id |
-| `deal.read-record` | Fetch deal record |
+| `deal.read` | Fetch deal record |
 | `deal.list` | List deals optionally by status |
 | `deal.update-status` | State machine transitions |
 | `deal.initiate-kyc-clearance` | Transition to KYC phase (requires approved KYC case) |

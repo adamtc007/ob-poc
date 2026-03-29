@@ -117,7 +117,7 @@ cases:
     bootstrap:
       - "Allianz Global Investors"
     utterance: "open a KYC case for this client"
-    expected_verb: "kyc.open-case"
+    expected_verb: "kyc-case.create"
 
   - name: kyc_case_status
     domain: kyc

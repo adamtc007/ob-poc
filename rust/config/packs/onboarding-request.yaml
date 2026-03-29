@@ -31,7 +31,7 @@ workspaces:
   - on_boarding
 
 allowed_verbs:
-  - deal.read-record
+  - deal.read
   - deal.list-contracts
   - deal.list-products
   - deal.request-onboarding
@@ -85,7 +85,7 @@ templates:
   - template_id: standard-onboarding-handoff
     when_to_use: "Default deal handoff into onboarding for one existing CBU and one product"
     steps:
-      - verb: deal.read-record
+      - verb: deal.read
         args:
           deal-id: "{answers.deal_id}"
 

@@ -363,7 +363,7 @@ domains:
         returns:
           type: affected
 
-      receive-request:
+      mark-received:
         description: Record receipt against a document request.
         metadata:
           tier: intent
@@ -393,7 +393,7 @@ domains:
           set_values:
             status: RECEIVED
             received_at: now()
-        emits_event: document.receive-requestd
+        emits_event: document.mark-receivedd
         args:
           - name: request-id
             type: uuid

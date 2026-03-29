@@ -176,7 +176,7 @@ domains:
       # Control Position Queries
       # --------------------------------------------------------------------------
 
-      control-positions:
+      list-control-positions:
         description: Get control positions for an issuer (who controls what %)
         invocation_phrases:
           - "who has control"
@@ -241,7 +241,7 @@ domains:
             - name: board_seats
               type: integer
 
-      who-controls:
+      find-controller:
         description: Find who controls an issuer (>50% voting or board majority)
         invocation_phrases:
           - "find controller"

@@ -81,7 +81,7 @@ slots:
       list_by_issuer: { verb: capital.list-by-issuer, when: filled }
       list_shareholders: { verb: capital.list-shareholders, when: filled }
       get_ownership_chain: { verb: capital.get-ownership-chain, when: filled }
-      define_share_class: { verb: capital.define-share-class, when: [empty, filled] }
+      define_share_class: { verb: capital.share-class.create, when: [empty, filled] }
       share_class_create: { verb: capital.share-class.create, when: [empty, filled] }
       share_class_list: { verb: capital.share-class.list, when: filled }
       share_class_get_supply: { verb: capital.share-class.get-supply, when: filled }

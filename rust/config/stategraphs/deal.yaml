@@ -21,7 +21,7 @@ edges:
   - edge_id: deal.read
     from_node: deal.entry
     to_node: deal.active
-    verb_ids: ["deal.list", "deal.read-record"]
+    verb_ids: ["deal.list", "deal.read"]
     edge_type: conditional
   - edge_id: deal.progress
     from_node: deal.active

@@ -17,7 +17,7 @@
     "text": "calculate the UBO percentages",
     "calibration_mode": "positive",
     "negative_type": null,
-    "expected_outcome": { "type": "resolves_to_one_of", "value": ["ubo.calculate", "ownership.compute"] },
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["ubo.compute-chains", "ownership.compute"] },
     "generation_rationale": "UBO percentage computation."
   },
   {

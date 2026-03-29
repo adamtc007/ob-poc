@@ -31,7 +31,7 @@ workspaces:
 
 allowed_verbs:
   - deal.create
-  - deal.read-record
+  - deal.read
   - deal.list-contracts
   - deal.assign-rate-card
   - deal.activate

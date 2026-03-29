@@ -510,7 +510,7 @@ mod tests {
             seq: 1,
             verb_id: Uuid::new_v4(),
             verb_snapshot_id: Uuid::new_v4(),
-            verb_fqn: "kyc.open-case".into(),
+            verb_fqn: "kyc-case.create".into(),
             params: serde_json::json!({}),
             expected_postconditions: vec!["case_opened".into()],
             fallback_steps: vec![],

@@ -169,12 +169,12 @@ nouns:
     noun_keys:
       - ubo
     action_verbs:
-      create: [ubo.add-ownership, ubo.add-control, ubo.add-trust-role]
-      search: [ubo.calculate, ubo.trace-chains, ubo.compute-chains]
+      create: [ubo.add-ownership, control.add, ubo.add-trust-role]
+      search: [ubo.compute-chains, ubo.trace-chains]
       list:
-        [ubo.list-owners, ubo.list-owned, ubo.list-ubos, ubo.list-by-subject]
+        [ubo.list-owners, ubo.list-owned, ubo.list-ubos, ubo.list-owners-of]
       delete: [ubo.end-relationship, ubo.delete-relationship]
-      compute: [ubo.calculate, ubo.compute-chains]
+      compute: [ubo.compute-chains]
 
   kyc-case:
     aliases:
@@ -191,7 +191,7 @@ nouns:
       - kyc_case
     action_verbs:
       create: [kyc-case.create]
-      list: [kyc-case.list-by-cbu, kyc-case.read, kyc-case.state]
+      list: [kyc-case.list-by-cbu, kyc-case.read, kyc-case.get-state]
       update:
         [
           kyc-case.close,
@@ -259,8 +259,8 @@ nouns:
         [
           control.analyze,
           control.identify-ubos,
-          control.trace-chain,
-          control.reconcile-ownership,
+          ownership.trace-chain,
+          ownership.reconcile,
           control.compute-controllers,
         ]
 
@@ -323,10 +323,10 @@ nouns:
           deal.list-documents,
           deal.list-onboarding-requests,
         ]
-      get: [deal.read-record, deal.read-summary, deal.read-timeline, deal.get, deal.timeline, deal.summary]
+      get: [deal.read, deal.read-summary, deal.read-timeline, deal.get, deal.timeline, deal.summary]
       update:
         [
-          deal.update-record,
+          deal.update,
           deal.update-status,
           deal.request-onboarding,
           deal.request-onboarding-batch,
@@ -335,7 +335,7 @@ nouns:
       approve: [deal.update-status]
       submit: [deal.update-status]
       propose: [deal.propose-rate-card]
-      search: [deal.search-records, deal.search]
+      search: [deal.search]
       delete: [deal.cancel]
 
   contract:
@@ -812,7 +812,7 @@ nouns:
     noun_keys:
       - ownership
     action_verbs:
-      search: [ownership.trace-chain, ubo.trace-chains, control.trace-chain]
+      search: [ownership.trace-chain, ubo.trace-chains]
 
   # =========================================================================
   # LIFECYCLE / MONITORING

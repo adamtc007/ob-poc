@@ -211,7 +211,7 @@ mod tests {
         WorkflowConfig {
             workflows: vec![
                 WorkflowBinding {
-                    verb_fqn: "kyc.open-case".to_string(),
+                    verb_fqn: "kyc-case.create".to_string(),
                     route: ExecutionRoute::Orchestrated,
                     process_key: Some("kyc-open-case".to_string()),
                     task_bindings: vec![
@@ -245,7 +245,7 @@ mod tests {
     fn test_route_for_orchestrated_verb() {
         let index = WorkflowConfigIndex::from_config(&sample_config());
         assert_eq!(
-            index.route_for_verb("kyc.open-case"),
+            index.route_for_verb("kyc-case.create"),
             ExecutionRoute::Orchestrated
         );
     }
@@ -272,7 +272,7 @@ mod tests {
         let (workflow_fqn, tb) = index
             .binding_for_task_type("create_case_record")
             .expect("should find task binding");
-        assert_eq!(workflow_fqn, "kyc.open-case");
+        assert_eq!(workflow_fqn, "kyc-case.create");
         assert_eq!(tb.verb_fqn, "kyc.create-case");
         assert_eq!(tb.timeout_ms, Some(30_000));
     }
@@ -297,7 +297,7 @@ mod tests {
         let index = WorkflowConfigIndex::from_config(&sample_config());
         let orch = index.orchestrated_workflows();
         assert_eq!(orch.len(), 1);
-        assert_eq!(orch[0].verb_fqn, "kyc.open-case");
+        assert_eq!(orch[0].verb_fqn, "kyc-case.create");
     }
 
     #[test]
@@ -306,7 +306,7 @@ mod tests {
         let yaml = serde_yaml::to_string(&config).unwrap();
         let parsed: WorkflowConfig = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(parsed.workflows.len(), 2);
-        assert_eq!(parsed.workflows[0].verb_fqn, "kyc.open-case");
+        assert_eq!(parsed.workflows[0].verb_fqn, "kyc-case.create");
     }
 
     // =========================================================================
@@ -369,7 +369,7 @@ mod tests {
         use dsl_core::config::types::{DurableConfig, DurableRuntime};
         use std::collections::BTreeMap;
 
-        // Pre-register kyc.open-case via workflows.yaml
+        // Pre-register kyc-case.create via workflows.yaml
         let mut index = WorkflowConfigIndex::from_config(&sample_config());
 
         // Verify existing binding
@@ -388,7 +388,7 @@ mod tests {
             escalation: None,
         };
 
-        index.register_from_durable_config("kyc.open-case", &durable);
+        index.register_from_durable_config("kyc-case.create", &durable);
 
         // Original binding should be preserved (not overwritten)
         let (_, tb_after) = index

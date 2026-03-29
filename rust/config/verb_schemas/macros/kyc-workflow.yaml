@@ -157,7 +157,7 @@ kyc.check-readiness:
     - verb: document.missing-for-entity
       args:
         entity-id: "${arg.party}"
-    - verb: requirement.unsatisfied
+    - verb: requirement.list-outstanding
       args:
         entity-id: "${arg.party}"
 

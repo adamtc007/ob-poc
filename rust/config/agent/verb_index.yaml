@@ -737,7 +737,7 @@ categories:
       - document.extract
       - document.extract-to-observations
       - document.create-request
-      - document.receive-request
+      - document.mark-received
       - document.verify-request
       - rfi.generate
       - rfi.check-completion
@@ -1048,7 +1048,7 @@ workflow_phases:
     verbs:
       - document.create-request
       - document.catalog
-      - document.receive-request
+      - document.mark-received
       - document.verify-request
       - rfi.generate
       - rfi.check-completion

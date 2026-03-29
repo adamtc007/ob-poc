@@ -571,11 +571,11 @@ domains:
       deal.create:
         reads: [client_group]
         writes: [deals]
-      deal.read-record:
+      deal.read:
         reads: [deals]
       deal.list:
         reads: [deals]
-      deal.update-record:
+      deal.update:
         reads: [deals]
         writes: [deals]
       deal.update-status:
@@ -1176,7 +1176,7 @@ domains:
       document.mark-requested:
         reads: [doc_requests]
         writes: [doc_requests, outreach_requests, case_events]
-      document.receive-request:
+      document.mark-received:
         reads: [doc_requests, document_catalog]
         writes: [doc_requests, case_events]
       document.verify-request:
@@ -1802,7 +1802,7 @@ domains:
     description: "Document requirement tracking — governed requirement state and completeness checks"
     tables: {}
     verb_data_footprint:
-      requirement.unsatisfied:
+      requirement.list-outstanding:
         reads: [cbu_unified_attr_requirements, cbu_attr_values, cbu_evidence]
 
   # ---------------------------------------------------------------------------

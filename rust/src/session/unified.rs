@@ -2997,14 +2997,14 @@ mod tests {
             "Create Acme".to_string(),
         );
         let _id2 = session.add_dsl(
-            "(kyc.open-case :entity \"Acme\")".to_string(),
+            "(kyc-case.create :entity \"Acme\")".to_string(),
             "Open KYC".to_string(),
         );
 
         // Both are Draft — runnable_dsl returns both
         let dsl = session.run_sheet.runnable_dsl().unwrap();
         assert!(dsl.contains("entity.create"));
-        assert!(dsl.contains("kyc.open-case"));
+        assert!(dsl.contains("kyc-case.create"));
 
         // Mark first as executed
         session.mark_executed(id1, vec![]);
@@ -3015,12 +3015,12 @@ mod tests {
             !dsl2.contains("entity.create"),
             "Executed entry should be excluded"
         );
-        assert!(dsl2.contains("kyc.open-case"));
+        assert!(dsl2.contains("kyc-case.create"));
 
         // combined_dsl still returns both
         let combined = session.run_sheet.combined_dsl().unwrap();
         assert!(combined.contains("entity.create"));
-        assert!(combined.contains("kyc.open-case"));
+        assert!(combined.contains("kyc-case.create"));
     }
 
     #[test]
@@ -3044,7 +3044,7 @@ mod tests {
             "Create Acme".to_string(),
         );
         let id2 = session.add_dsl(
-            "(kyc.open-case :entity \"Acme\")".to_string(),
+            "(kyc-case.create :entity \"Acme\")".to_string(),
             "Open KYC".to_string(),
         );
 

@@ -756,7 +756,7 @@ pub enum GraphQueryOperation {
 ///
 /// Example YAML:
 /// ```yaml
-/// kyc.open-case:
+/// kyc-case.create:
 ///   behavior: durable
 ///   durable:
 ///     runtime: bpmn-lite

@@ -337,7 +337,7 @@ fn test_sentence_templates_for_pack_verbs() {
         ("session.load-galaxy", vec![("apex-name", "Allianz")]),
         ("session.load-cbu", vec![("cbu-name", "Allianz Lux")]),
         (
-            "kyc.open-case",
+            "kyc-case.create",
             vec![("entity-ref", "Allianz SE"), ("case-type", "new")],
         ),
         (

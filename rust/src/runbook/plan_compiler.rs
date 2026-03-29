@@ -297,7 +297,7 @@ mod tests {
     fn compile_three_workspace_plan() {
         let inputs = vec![
             make_input(WorkspaceKind::Cbu, vec![("cbu.create", "Create CBU")]),
-            make_input(WorkspaceKind::Kyc, vec![("kyc.open-case", "Open KYC Case")]),
+            make_input(WorkspaceKind::Kyc, vec![("kyc-case.create", "Open KYC Case")]),
             make_input(WorkspaceKind::Deal, vec![("deal.create", "Create Deal")]),
         ];
         let plan = compile_runbook_plan(Uuid::nil(), &inputs, vec![]).unwrap();
@@ -311,7 +311,7 @@ mod tests {
     fn dag_ordering_has_dependencies() {
         let inputs = vec![
             make_input(WorkspaceKind::Cbu, vec![("cbu.create", "Create CBU")]),
-            make_input(WorkspaceKind::Kyc, vec![("kyc.open-case", "Open KYC Case")]),
+            make_input(WorkspaceKind::Kyc, vec![("kyc-case.create", "Open KYC Case")]),
         ];
         let plan = compile_runbook_plan(Uuid::nil(), &inputs, vec![]).unwrap();
         // Step 1 depends on step 0
@@ -395,7 +395,7 @@ mod tests {
                     graph_edge_count: None,
                     graph_nodes: vec![],
                     graph_edges: vec![],
-                    available_verbs: vec!["kyc.open-case".into()],
+                    available_verbs: vec!["kyc-case.create".into()],
                     blocked_verbs: vec![],
                     children: vec![],
                 },
@@ -407,6 +407,6 @@ mod tests {
         assert_eq!(slots.len(), 1);
         assert_eq!(slots[0].slot_name, "kyc");
         assert!(slots[0].blocking);
-        assert_eq!(slots[0].advancing_verbs, vec!["kyc.open-case"]);
+        assert_eq!(slots[0].advancing_verbs, vec!["kyc-case.create"]);
     }
 }

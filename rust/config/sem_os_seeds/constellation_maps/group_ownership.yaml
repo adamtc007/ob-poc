@@ -98,7 +98,7 @@ slots:
     verbs:
       discover: { verb: ubo.discover, when: empty }
       allege: { verb: ubo.allege, when: [empty, filled] }
-      calculate: { verb: ubo.calculate, when: [empty, filled] }
+      calculate: { verb: ubo.compute-chains, when: [empty, filled] }
       compute_chains: { verb: ubo.compute-chains, when: [empty, filled] }
       trace_chains: { verb: ubo.trace-chains, when: filled }
       verify: { verb: ubo.verify, when: filled }
@@ -111,7 +111,7 @@ slots:
       list_owners: { verb: ubo.list-owners, when: filled }
       add_ownership: { verb: ubo.add-ownership, when: filled }
       update_ownership: { verb: ubo.update-ownership, when: filled }
-      add_control: { verb: ubo.add-control, when: filled }
+      add_control: { verb: control.add, when: filled }
       transfer_control: { verb: ubo.transfer-control, when: filled }
       add_trust_role: { verb: ubo.add-trust-role, when: filled }
       delete_relationship: { verb: ubo.delete-relationship, when: filled }
@@ -153,10 +153,10 @@ slots:
       analyze: { verb: control.analyze, when: filled }
       list_controllers: { verb: control.list-controllers, when: filled }
       list_controlled: { verb: control.list-controlled, when: filled }
-      trace_chain: { verb: control.trace-chain, when: filled }
+      trace_chain: { verb: ownership.trace-chain, when: filled }
       compute_controllers: { verb: control.compute-controllers, when: filled }
       identify_ubos: { verb: control.identify-ubos, when: filled }
-      reconcile_ownership: { verb: control.reconcile-ownership, when: filled }
+      reconcile_ownership: { verb: ownership.reconcile, when: filled }
       set_board_controller: { verb: control.set-board-controller, when: filled }
       show_board_controller:
         { verb: control.show-board-controller, when: filled }
@@ -170,8 +170,8 @@ slots:
         { verb: control.import-psc-register, when: [empty, filled] }
       ownership_compute: { verb: ownership.compute, when: filled }
       ownership_control_positions:
-        { verb: ownership.control-positions, when: filled }
-      ownership_who_controls: { verb: ownership.who-controls, when: filled }
+        { verb: ownership.list-control-positions, when: filled }
+      ownership_find_controller: { verb: ownership.find-controller, when: filled }
       ownership_analyze_gaps: { verb: ownership.analyze-gaps, when: filled }
       ownership_reconcile: { verb: ownership.reconcile, when: filled }
       ownership_reconcile_findings:
@@ -201,7 +201,7 @@ slots:
     state_machine: kyc_case_lifecycle
     verbs:
       read: { verb: kyc-case.read, when: filled }
-      state: { verb: kyc-case.state, when: filled }
+      state: { verb: kyc-case.get-state, when: filled }
       update_status: { verb: kyc-case.update-status, when: filled }
       close: { verb: kyc-case.close, when: filled }
   cbu_identification:

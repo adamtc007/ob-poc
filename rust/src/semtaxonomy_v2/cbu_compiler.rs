@@ -241,8 +241,8 @@ impl super::compiler::BindingResolver for CbuBindingResolver {
             | "entity.update"
             | "deal.create"
             | "deal.list"
-            | "deal.read-record"
-            | "deal.update-record"
+            | "deal.read"
+            | "deal.update"
             | "deal.update-status"
             | "contract.create"
             | "contract.list"
@@ -525,7 +525,7 @@ fn resolve_deal_verb(step: &SemanticStep) -> Result<&'static str> {
             {
                 Ok("deal.list")
             } else {
-                Ok("deal.read-record")
+                Ok("deal.read")
             }
         }
         "update" => {
@@ -534,7 +534,7 @@ fn resolve_deal_verb(step: &SemanticStep) -> Result<&'static str> {
             {
                 Ok("deal.update-status")
             } else {
-                Ok("deal.update-record")
+                Ok("deal.update")
             }
         }
         other => Err(anyhow!(
@@ -788,7 +788,7 @@ fn ensure_primary_binding(
 ) -> Result<()> {
     let required_binding = match verb {
         "entity.read" | "entity.update" => Some(("entity-id", "entity")),
-        "deal.read-record" | "deal.update-record" | "deal.update-status" => {
+        "deal.read" | "deal.update" | "deal.update-status" => {
             Some(("deal-id", "deal"))
         }
         "contract.get" | "contract.update" | "contract.terminate" => {

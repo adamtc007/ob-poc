@@ -239,7 +239,7 @@ mod tests {
                         output_field: "created_cbu_id".into(),
                     },
                     verb: VerbRef {
-                        verb_fqn: "kyc.open-case".into(),
+                        verb_fqn: "kyc-case.create".into(),
                         display_name: "Open KYC Case".into(),
                     },
                     sentence: "Open a KYC case".into(),

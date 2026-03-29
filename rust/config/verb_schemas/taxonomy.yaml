@@ -269,7 +269,7 @@ domains:
         label: Case Management
         description: Create and manage KYC cases
         verbs:
-          - kyc.open-case
+          - kyc-case.create
           - kyc.update-case
           - kyc.close-case
           - kyc.assign-case

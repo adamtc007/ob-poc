@@ -3425,18 +3425,18 @@ mod tests {
         trace.dominant_entity = Some("Allianz".into());
         #[cfg(feature = "database")]
         {
-            trace.sem_reg_verb_filter = Some(vec!["kyc.open-case".into()]);
+            trace.sem_reg_verb_filter = Some(vec!["kyc-case.create".into()]);
         }
-        trace.verb_candidates_pre_filter = vec![("kyc.open-case".into(), 0.95)];
-        trace.verb_candidates_post_filter = vec![("kyc.open-case".into(), 0.95)];
-        trace.final_verb = Some("kyc.open-case".into());
+        trace.verb_candidates_pre_filter = vec![("kyc-case.create".into(), 0.95)];
+        trace.verb_candidates_post_filter = vec![("kyc-case.create".into(), 0.95)];
+        trace.final_verb = Some("kyc-case.create".into());
         trace.final_confidence = 0.95;
-        trace.dsl_generated = Some("(kyc.open-case)".into());
+        trace.dsl_generated = Some("(kyc-case.create)".into());
         trace.dsl_hash = Some("abc123".into());
         trace.dsl_source = Some("chat".into());
 
         let json = serde_json::to_string(&trace).unwrap();
-        assert!(json.contains("kyc.open-case"));
+        assert!(json.contains("kyc-case.create"));
         assert!(json.contains("chat"));
     }
 
@@ -3464,7 +3464,7 @@ mod tests {
         {
             trace.sem_reg_verb_filter = Some(vec![]);
         }
-        trace.verb_candidates_pre_filter = vec![("kyc.open-case".into(), 0.9)];
+        trace.verb_candidates_pre_filter = vec![("kyc-case.create".into(), 0.9)];
         trace.sem_reg_denied_all = true;
         trace.blocked_reason = Some("SemReg denied all verb candidates (strict mode)".into());
 
@@ -3703,7 +3703,7 @@ mod tests {
     fn test_data_management_candidate_policy_prefers_structure_verbs() {
         let candidates = vec![
             VerbSearchResult {
-                verb: "deal.read-record".into(),
+                verb: "deal.read".into(),
                 score: 0.99,
                 source: crate::mcp::verb_search::VerbSearchSource::PatternEmbedding,
                 matched_phrase: "show me deal record".into(),
@@ -4611,7 +4611,7 @@ mod tests {
     fn test_ast_verb_extraction_from_dsl() {
         // Verify that parse_program + VerbCall::full_name() correctly extracts verbs
         use dsl_core::ast::Statement;
-        let dsl = "(entity.create :name \"Acme\")\n(kyc.open-case :entity \"Acme\")";
+        let dsl = "(entity.create :name \"Acme\")\n(kyc-case.create :entity \"Acme\")";
         let program = parse_program(dsl).expect("valid DSL");
         let verbs: Vec<String> = program
             .statements
@@ -4626,7 +4626,7 @@ mod tests {
             .collect();
         assert_eq!(verbs.len(), 2);
         assert_eq!(verbs[0], "entity.create");
-        assert_eq!(verbs[1], "kyc.open-case");
+        assert_eq!(verbs[1], "kyc-case.create");
     }
 
     #[test]
@@ -4685,10 +4685,10 @@ mod tests {
     fn test_trace_selection_source_semreg() {
         let mut trace = default_trace();
         trace.selection_source = "semreg".into();
-        trace.forced_verb = Some("kyc.open-case".into());
+        trace.forced_verb = Some("kyc-case.create".into());
         let json = serde_json::to_string(&trace).unwrap();
         assert!(json.contains(r#""selection_source":"semreg""#));
-        assert!(json.contains(r#""forced_verb":"kyc.open-case""#));
+        assert!(json.contains(r#""forced_verb":"kyc-case.create""#));
     }
 
     #[test]
@@ -4766,7 +4766,7 @@ mod tests {
     fn test_phase4_guard_blocks_resolution_outside_phase2_legal_set() {
         use std::collections::HashSet;
 
-        let legal = HashSet::from(["kyc.open-case".to_string()]);
+        let legal = HashSet::from(["kyc-case.create".to_string()]);
         let evaluation = crate::traceability::Phase2Evaluation {
             artifacts: crate::traceability::Phase2Service::compose(None, None),
             halt_reason_code: None,

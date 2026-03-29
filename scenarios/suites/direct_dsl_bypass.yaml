@@ -25,7 +25,7 @@ scenarios:
       - user: "dsl:(entity.create :name \"Test\")"
         expect:
           outcome: "DirectDslNotAllowed"
-      - user: "dsl:(kyc.open-case :entity \"Acme\")"
+      - user: "dsl:(kyc-case.create :entity \"Acme\")"
         expect:
           outcome: "DirectDslNotAllowed"
       - user: "dsl:(session.load-galaxy :apex-name \"Allianz\")"

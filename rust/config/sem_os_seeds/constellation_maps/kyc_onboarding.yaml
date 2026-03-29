@@ -30,7 +30,7 @@ slots:
     state_machine: kyc_case_lifecycle
     verbs:
       read: { verb: kyc-case.read, when: filled }
-      state: { verb: kyc-case.state, when: filled }
+      state: { verb: kyc-case.get-state, when: filled }
   kyc_case:
     type: case
     table: cases
@@ -41,10 +41,10 @@ slots:
     state_machine: kyc_case_lifecycle
     verbs:
       create: { verb: kyc-case.create, when: empty }
-      open: { verb: kyc.open-case, when: empty }
+      open: { verb: kyc-case.create, when: empty }
       read: { verb: kyc-case.read, when: filled }
       list_by_cbu: { verb: kyc-case.list-by-cbu, when: filled }
-      state: { verb: kyc-case.state, when: filled }
+      state: { verb: kyc-case.get-state, when: filled }
       assign: { verb: kyc-case.assign, when: filled }
       update_status: { verb: kyc-case.update-status, when: filled }
       set_risk: { verb: kyc-case.set-risk-rating, when: filled }
@@ -189,10 +189,10 @@ slots:
           when: [documents_requested, evidence_collected, verified],
         }
       req_list: requirement.list
-      req_for_entity: requirement.for-entity
+      req_for_entity: requirement.list-for-entity
       req_unsatisfied:
         {
-          verb: requirement.unsatisfied,
+          verb: requirement.list-outstanding,
           when: [documents_requested, screening_complete, evidence_collected],
         }
       req_waive: { verb: requirement.waive, when: [documents_requested] }

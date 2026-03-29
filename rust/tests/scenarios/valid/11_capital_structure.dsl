@@ -41,7 +41,7 @@
     :as @angel)
 
 ;; Define share classes
-(capital.define-share-class
+(capital.share-class.create
     :cbu-id @cbu
     :issuer-entity-id @company
     :name "Ordinary Shares"
@@ -51,7 +51,7 @@
     :par-value 0.01
     :as @ordinary)
 
-(capital.define-share-class
+(capital.share-class.create
     :cbu-id @cbu
     :issuer-entity-id @company
     :name "A Preference Shares"

@@ -313,7 +313,7 @@ domains:
         returns:
           type: record
 
-      for-entity:
+      list-for-entity:
         description: List all requirements for an entity
         behavior: crud
         invocation_phrases:
@@ -350,7 +350,7 @@ domains:
         returns:
           type: record_set
 
-      for-workflow:
+      list-for-workflow:
         description: List all requirements for a workflow instance
         behavior: crud
         invocation_phrases:
@@ -377,7 +377,7 @@ domains:
         returns:
           type: record_set
 
-      unsatisfied:
+      list-outstanding:
         description: List unsatisfied requirements for a workflow
         behavior: plugin
         invocation_phrases:
@@ -422,7 +422,7 @@ domains:
             last_rejection_code: string
             last_rejection_reason: string
 
-      with-status:
+      list-with-status:
         description: Get requirements with latest version status (joined view)
         behavior: crud
         invocation_phrases:

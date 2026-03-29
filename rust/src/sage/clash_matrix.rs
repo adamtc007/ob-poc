@@ -284,7 +284,7 @@ mod tests {
         let index = VerbMetadataIndex::from_test_map(
             [
                 sample_meta("deal.list", &["deal", "list"], &["client-id"]),
-                sample_meta("deal.search-records", &["deal", "search"], &["query"]),
+                sample_meta("deal.search", &["deal", "search"], &["query"]),
                 sample_meta("deal.report", &["deal", "report"], &["client-id"]),
             ]
             .into_iter()

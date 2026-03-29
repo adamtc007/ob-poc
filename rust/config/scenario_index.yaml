@@ -201,7 +201,7 @@ scenarios:
         - value: ownership
           verb_fqn: ubo.trace-chains
         - value: control
-          verb_fqn: control.trace-chain
+          verb_fqn: ownership.trace-chain
         - value: all
           verb_fqn: ubo.trace-chains
     explain:

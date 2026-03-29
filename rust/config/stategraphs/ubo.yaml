@@ -27,6 +27,6 @@ edges:
   - edge_id: ubo.advance
     from_node: ubo.incomplete
     to_node: ubo.incomplete
-    verb_ids: ["ubo.add-ownership", "ubo.update-ownership", "ubo.add-control", "ubo.add-trust-role"]
+    verb_ids: ["ubo.add-ownership", "ubo.update-ownership", "control.add", "ubo.add-trust-role"]
     edge_type: advance
 gates: []

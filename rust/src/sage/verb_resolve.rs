@@ -863,7 +863,7 @@ mod tests {
                 "List deals with optional filters",
             ),
             sample_meta(
-                "deal.search-records",
+                "deal.search",
                 IntentPolarity::Read,
                 vec![ObservationPlane::Instance],
                 &["search", "deal"],

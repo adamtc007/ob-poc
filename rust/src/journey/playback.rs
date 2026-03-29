@@ -193,9 +193,9 @@ pack_summary_template: "Onboarding {client} in {jurisdiction} with {step_count} 
             "(trading-profile.create)".to_string(),
         ));
         rb.add_entry(RunbookEntry::new(
-            "kyc.open-case".to_string(),
+            "kyc-case.create".to_string(),
             "Open KYC case".to_string(),
-            "(kyc.open-case)".to_string(),
+            "(kyc-case.create)".to_string(),
         ));
         rb
     }
@@ -212,7 +212,7 @@ pack_summary_template: "Onboarding {client} in {jurisdiction} with {step_count} 
         assert_eq!(chapters[1].chapter, "Trading");
         assert_eq!(chapters[1].steps.len(), 1); // trading-profile.create
         assert_eq!(chapters[2].chapter, "KYC");
-        assert_eq!(chapters[2].steps.len(), 1); // kyc.open-case
+        assert_eq!(chapters[2].steps.len(), 1); // kyc-case.create
     }
 
     #[test]

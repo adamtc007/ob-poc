@@ -4,7 +4,7 @@
 //! the workflow task queue (Migration 049).
 //!
 //! - `requirement.create-set` - Create multiple requirements in batch
-//! - `requirement.unsatisfied` - List unsatisfied requirements for workflow
+//! - `requirement.list-outstanding` - List unsatisfied requirements for workflow
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -154,7 +154,7 @@ impl CustomOperation for RequirementUnsatisfiedOp {
         "requirement"
     }
     fn verb(&self) -> &'static str {
-        "unsatisfied"
+        "list-outstanding"
     }
     fn rationale(&self) -> &'static str {
         "Complex query for workflow progress tracking"

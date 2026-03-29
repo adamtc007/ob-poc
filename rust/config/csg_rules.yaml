@@ -101,7 +101,7 @@ warnings:
     name: low_ubo_threshold
     description: "UBO threshold below standard"
     when:
-      verb: ubo.calculate
+      verb: ubo.compute-chains
       arg: threshold
       less_than: 25
     message: "UBO threshold {value}% is below standard 25%. Verify regulatory requirements."

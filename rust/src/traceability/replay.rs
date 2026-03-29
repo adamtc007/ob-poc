@@ -54,11 +54,11 @@ pub struct TraceReplayComparison {
 /// use ob_poc::traceability::{compute_replay_narrowing_diff, NarrowingDrift};
 ///
 /// let original = serde_json::json!({
-///     "phase_3": { "phase4_candidate_set": ["kyc.open-case"] },
+///     "phase_3": { "phase4_candidate_set": ["kyc-case.create"] },
 ///     "phase_4": { "fallback_invoked": false }
 /// });
 /// let replayed = serde_json::json!({
-///     "phase_3": { "phase4_candidate_set": ["kyc.open-case", "deal.create"] },
+///     "phase_3": { "phase4_candidate_set": ["kyc-case.create", "deal.create"] },
 ///     "phase_4": { "fallback_invoked": false }
 /// });
 ///
@@ -110,16 +110,16 @@ pub fn compute_replay_narrowing_diff(
 /// };
 ///
 /// let original = serde_json::json!({
-///     "phase_3": { "phase4_candidate_set": ["kyc.open-case"] },
-///     "phase_4": { "resolved_verb": "kyc.open-case", "fallback_invoked": false }
+///     "phase_3": { "phase4_candidate_set": ["kyc-case.create"] },
+///     "phase_4": { "resolved_verb": "kyc-case.create", "fallback_invoked": false }
 /// });
 /// let replayed = serde_json::json!({
-///     "phase_3": { "phase4_candidate_set": ["kyc.open-case"] },
-///     "phase_4": { "resolved_verb": "kyc.open-case", "fallback_invoked": false }
+///     "phase_3": { "phase4_candidate_set": ["kyc-case.create"] },
+///     "phase_4": { "resolved_verb": "kyc-case.create", "fallback_invoked": false }
 /// });
 /// let diff = compute_replay_narrowing_diff(&original, &replayed);
 /// assert_eq!(
-///     derive_replay_verdict(Some("kyc.open-case"), Some("kyc.open-case"), &diff),
+///     derive_replay_verdict(Some("kyc-case.create"), Some("kyc-case.create"), &diff),
 ///     ReplayVerdict::Unchanged
 /// );
 /// ```
@@ -180,7 +180,7 @@ pub fn derive_replay_verdict(
 ///     outcome: TraceOutcome::ExecutedSuccessfully,
 ///     halt_reason_code: None,
 ///     halt_phase: None,
-///     resolved_verb: Some("kyc.open-case".to_string()),
+///     resolved_verb: Some("kyc-case.create".to_string()),
 ///     plane: None,
 ///     polarity: None,
 ///     execution_shape_kind: None,
@@ -191,7 +191,7 @@ pub fn derive_replay_verdict(
 ///     template_version: None,
 ///     surface_versions: SurfaceVersions::default(),
 ///     trace_payload: serde_json::json!({
-///         "phase_3": { "phase4_candidate_set": ["kyc.open-case"] },
+///         "phase_3": { "phase4_candidate_set": ["kyc-case.create"] },
 ///         "phase_4": { "fallback_invoked": false }
 ///     }),
 /// };
@@ -357,11 +357,11 @@ mod tests {
     #[test]
     fn test_narrowing_diff_detects_weakened_candidate_set() {
         let original = serde_json::json!({
-            "phase_3": { "phase4_candidate_set": ["kyc.open-case"] },
+            "phase_3": { "phase4_candidate_set": ["kyc-case.create"] },
             "phase_4": { "fallback_invoked": false }
         });
         let replayed = serde_json::json!({
-            "phase_3": { "phase4_candidate_set": ["kyc.open-case", "deal.create"] },
+            "phase_3": { "phase4_candidate_set": ["kyc-case.create", "deal.create"] },
             "phase_4": { "fallback_invoked": false }
         });
 
@@ -375,17 +375,17 @@ mod tests {
     #[test]
     fn test_replay_verdict_detects_fallback_regression() {
         let original = serde_json::json!({
-            "phase_3": { "phase4_candidate_set": ["kyc.open-case"] },
+            "phase_3": { "phase4_candidate_set": ["kyc-case.create"] },
             "phase_4": { "fallback_invoked": false }
         });
         let replayed = serde_json::json!({
-            "phase_3": { "phase4_candidate_set": ["kyc.open-case"] },
+            "phase_3": { "phase4_candidate_set": ["kyc-case.create"] },
             "phase_4": { "fallback_invoked": true }
         });
 
         let diff = compute_replay_narrowing_diff(&original, &replayed);
         assert_eq!(
-            derive_replay_verdict(Some("kyc.open-case"), Some("kyc.open-case"), &diff),
+            derive_replay_verdict(Some("kyc-case.create"), Some("kyc-case.create"), &diff),
             ReplayVerdict::FallbackNewlyRequired
         );
     }
@@ -405,7 +405,7 @@ mod tests {
             outcome: TraceOutcome::ExecutedSuccessfully,
             halt_reason_code: None,
             halt_phase: None,
-            resolved_verb: Some("kyc.open-case".to_string()),
+            resolved_verb: Some("kyc-case.create".to_string()),
             plane: None,
             polarity: None,
             execution_shape_kind: None,
@@ -416,7 +416,7 @@ mod tests {
             template_version: None,
             surface_versions: SurfaceVersions::default(),
             trace_payload: serde_json::json!({
-                "phase_3": { "phase4_candidate_set": ["kyc.open-case"] },
+                "phase_3": { "phase4_candidate_set": ["kyc-case.create"] },
                 "phase_4": { "fallback_invoked": false }
             }),
         };
@@ -426,7 +426,7 @@ mod tests {
         assert_eq!(comparison.verdict, ReplayVerdict::Unchanged);
         assert_eq!(
             comparison.original_resolved_verb.as_deref(),
-            Some("kyc.open-case")
+            Some("kyc-case.create")
         );
     }
 
@@ -445,7 +445,7 @@ mod tests {
             outcome: TraceOutcome::ExecutedSuccessfully,
             halt_reason_code: None,
             halt_phase: None,
-            resolved_verb: Some("kyc.open-case".to_string()),
+            resolved_verb: Some("kyc-case.create".to_string()),
             plane: None,
             polarity: None,
             execution_shape_kind: None,
@@ -456,7 +456,7 @@ mod tests {
             template_version: None,
             surface_versions: SurfaceVersions::default(),
             trace_payload: serde_json::json!({
-                "phase_3": { "phase4_candidate_set": ["kyc.open-case"] },
+                "phase_3": { "phase4_candidate_set": ["kyc-case.create"] },
                 "phase_4": { "fallback_invoked": false }
             }),
         };

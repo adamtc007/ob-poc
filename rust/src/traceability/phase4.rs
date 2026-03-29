@@ -52,14 +52,14 @@ impl Phase4Evaluation {
     /// use ob_poc::traceability::Phase4Evaluation;
     ///
     /// let evaluation = Phase4Evaluation::new(
-    ///     Some("kyc.open-case".to_string()),
-    ///     vec!["kyc.open-case".to_string()],
+    ///     Some("kyc-case.create".to_string()),
+    ///     vec!["kyc-case.create".to_string()],
     ///     "exact_match",
     ///     0.9,
     ///     None,
     ///     None,
     /// );
-    /// assert_eq!(evaluation.payload()["resolved_verb"], "kyc.open-case");
+    /// assert_eq!(evaluation.payload()["resolved_verb"], "kyc-case.create");
     /// ```
     pub fn payload(&self) -> serde_json::Value {
         build_phase4_payload(
@@ -148,13 +148,13 @@ impl Phase4Evaluation {
 /// use ob_poc::traceability::build_phase4_payload;
 ///
 /// let payload = build_phase4_payload(
-///     Some("kyc.open-case"),
-///     &["kyc.open-case".to_string()],
+///     Some("kyc-case.create"),
+///     &["kyc-case.create".to_string()],
 ///     "exact_match",
 ///     0.9,
 ///     None,
 /// );
-/// assert_eq!(payload["resolved_verb"], "kyc.open-case");
+/// assert_eq!(payload["resolved_verb"], "kyc-case.create");
 /// ```
 pub fn build_phase4_payload(
     resolved_verb: Option<&str>,
@@ -232,7 +232,7 @@ pub fn build_phase4_unavailable_payload(entrypoint: &str) -> serde_json::Value {
 /// use std::collections::HashSet;
 /// use ob_poc::traceability::enforce_phase4_resolution_within_phase2;
 ///
-/// let legal = HashSet::from(["kyc.open-case".to_string()]);
+/// let legal = HashSet::from(["kyc-case.create".to_string()]);
 /// assert_eq!(
 ///     enforce_phase4_resolution_within_phase2(Some("deal.create"), Some(&legal)),
 ///     Some("phase4_widened_outside_phase2")
@@ -393,14 +393,14 @@ mod tests {
     #[test]
     fn test_phase4_payload_captures_fallback() {
         let payload = build_phase4_payload(
-            Some("kyc.open-case"),
-            &["kyc.open-case".to_string(), "deal.create".to_string()],
+            Some("kyc-case.create"),
+            &["kyc-case.create".to_string(), "deal.create".to_string()],
             "fallback_widened",
             0.82,
             Some("pattern mismatch forced fallback"),
         );
 
-        assert_eq!(payload["resolved_verb"], "kyc.open-case");
+        assert_eq!(payload["resolved_verb"], "kyc-case.create");
         assert_eq!(payload["fallback_invoked"], true);
         assert_eq!(payload["resolution_strategy"], "fallback_widened");
         assert_eq!(payload["resolution_strategy_detail"], "fallback_widened");
@@ -413,8 +413,8 @@ mod tests {
     #[test]
     fn test_phase4_payload_normalizes_llm_resolution() {
         let payload = build_phase4_payload(
-            Some("kyc.open-case"),
-            &["kyc.open-case".to_string()],
+            Some("kyc-case.create"),
+            &["kyc-case.create".to_string()],
             "sage_serve_coder",
             0.91,
             None,
@@ -427,7 +427,7 @@ mod tests {
 
     #[test]
     fn test_phase4_guard_rejects_outside_phase2() {
-        let legal = HashSet::from(["kyc.open-case".to_string()]);
+        let legal = HashSet::from(["kyc-case.create".to_string()]);
         assert_eq!(
             enforce_phase4_resolution_within_phase2(Some("deal.create"), Some(&legal)),
             Some("phase4_widened_outside_phase2")
@@ -446,8 +446,8 @@ mod tests {
     #[test]
     fn test_phase4_evaluation_exposes_fallback_metadata() {
         let evaluation = evaluate_phase4_within_phase2(
-            Some("kyc.open-case".to_string()),
-            vec!["kyc.open-case".to_string()],
+            Some("kyc-case.create".to_string()),
+            vec!["kyc-case.create".to_string()],
             "fallback_widened",
             0.82,
             Some("pattern mismatch forced fallback".to_string()),

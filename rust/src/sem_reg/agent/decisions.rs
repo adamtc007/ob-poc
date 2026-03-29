@@ -302,7 +302,7 @@ mod tests {
             chosen_action: "ubo.discover".into(),
             chosen_action_description: "Discover UBO structure".into(),
             alternatives_considered: vec![AlternativeAction {
-                action: "kyc.open-case".into(),
+                action: "kyc-case.create".into(),
                 reason_rejected: "Case already exists".into(),
                 confidence: Some(0.6),
             }],

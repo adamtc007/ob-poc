@@ -217,7 +217,7 @@ impl CustomOperation for DealSearchOp {
         "deal"
     }
     fn verb(&self) -> &'static str {
-        "search-records"
+        "search"
     }
     fn rationale(&self) -> &'static str {
         "Full-text search across deal name and reference"
@@ -282,7 +282,7 @@ impl CustomOperation for DealUpdateOp {
         "deal"
     }
     fn verb(&self) -> &'static str {
-        "update-record"
+        "update"
     }
     fn rationale(&self) -> &'static str {
         "Updates deal fields and records change event"

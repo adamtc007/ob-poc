@@ -1552,7 +1552,7 @@ mod tests {
                     "current_phase": "pricing",
                     "valid": [
                         {
-                            "verb_id": "deal.read-record",
+                            "verb_id": "deal.read",
                             "description": "Read the deal record",
                             "polarity": "read",
                             "invocation_phrases": ["show the deal"],
@@ -1567,7 +1567,7 @@ mod tests {
                     "verb_id": "deal.propose-rate-card",
                     "description": "Propose a rate card",
                     "unmet_preconditions": ["existing_pricing_context"],
-                    "unblocking_actions": ["deal.read-record"]
+                    "unblocking_actions": ["deal.read"]
                 }
             ]
         });
@@ -1576,7 +1576,7 @@ mod tests {
         assert_eq!(state.lane_positions.len(), 1);
         assert_eq!(state.valid_verbs.len(), 1);
         assert_eq!(state.blocked_verbs.len(), 1);
-        assert_eq!(state.valid_verbs[0].verb_id, "deal.read-record");
+        assert_eq!(state.valid_verbs[0].verb_id, "deal.read");
         assert_eq!(state.blocked_verbs[0].verb_id, "deal.propose-rate-card");
     }
 

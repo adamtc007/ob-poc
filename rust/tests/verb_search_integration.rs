@@ -1115,7 +1115,7 @@ fn kyc_scenarios() -> Vec<TestScenario> {
         TestScenario::matched(
             "ownership chain",
             "show the ownership chain",
-            "control.trace-chain",
+            "ownership.trace-chain",
         )
         .with_category("kyc"),
         TestScenario::matched("create kyc case", "open a kyc case", "kyc-case.create")

@@ -788,8 +788,8 @@ mod tests {
         // Ownership operations
         assert!(registry.has("ownership", "compute"));
         assert!(registry.has("ownership", "snapshot.list"));
-        assert!(registry.has("ownership", "control-positions"));
-        assert!(registry.has("ownership", "who-controls"));
+        assert!(registry.has("ownership", "list-control-positions"));
+        assert!(registry.has("ownership", "find-controller"));
         assert!(registry.has("ownership", "reconcile"));
         assert!(registry.has("ownership", "reconcile.findings"));
         assert!(registry.has("ownership", "analyze-gaps"));

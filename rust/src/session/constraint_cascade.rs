@@ -514,7 +514,7 @@ mod tests {
 
     #[test]
     fn test_verb_available_for_persona_kyc() {
-        assert!(verb_available_for_persona("kyc.open-case", Persona::Kyc));
+        assert!(verb_available_for_persona("kyc-case.create", Persona::Kyc));
         assert!(verb_available_for_persona("entity.create", Persona::Kyc));
         assert!(verb_available_for_persona("ubo.discover", Persona::Kyc));
         assert!(!verb_available_for_persona(
@@ -536,7 +536,7 @@ mod tests {
         ));
         assert!(verb_available_for_persona("custody.link", Persona::Trading));
         assert!(!verb_available_for_persona(
-            "kyc.open-case",
+            "kyc-case.create",
             Persona::Trading
         ));
         assert!(!verb_available_for_persona(
@@ -549,7 +549,7 @@ mod tests {
     fn test_verb_available_for_persona_admin() {
         assert!(verb_available_for_persona("admin.reset", Persona::Admin));
         assert!(verb_available_for_persona("system.config", Persona::Admin));
-        assert!(verb_available_for_persona("kyc.open-case", Persona::Admin));
+        assert!(verb_available_for_persona("kyc-case.create", Persona::Admin));
         assert!(verb_available_for_persona(
             "trading-profile.create",
             Persona::Admin

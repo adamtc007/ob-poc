@@ -208,7 +208,7 @@ mod tests {
                 3,
                 AgentMode::Repl,
                 TraceOp::VerbExecuted {
-                    verb_fqn: "kyc.open-case".into(),
+                    verb_fqn: "kyc-case.create".into(),
                     step_id: Uuid::nil(),
                 },
                 vec![], // skip comparison

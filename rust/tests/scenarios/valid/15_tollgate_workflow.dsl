@@ -67,7 +67,7 @@
     :as @passport)
 
 ;; Define capital structure for reconciliation
-(capital.define-share-class
+(capital.share-class.create
     :cbu-id @cbu
     :issuer-entity-id @company
     :name "Ordinary Shares"

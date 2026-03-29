@@ -4,8 +4,8 @@
 //! - control.analyze - Comprehensive control analysis for any entity type
 //! - control.build-graph - Build full control graph for a CBU
 //! - control.identify-ubos - Identify all UBOs across all control vectors
-//! - control.trace-chain - Trace specific control chain between entities
-//! - control.reconcile-ownership - Reconcile ownership percentages with control
+//! - control.trace-chain - Trace specific control chain between entities (REMOVED: merged into ownership.trace-chain)
+//! - control.reconcile-ownership - Reconcile ownership percentages with control (REMOVED: merged into ownership.reconcile)
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;

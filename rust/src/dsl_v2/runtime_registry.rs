@@ -1413,7 +1413,7 @@ mod tests {
         assert!(registry.contains("kyc", "open-case"));
 
         let verb = registry.get("kyc", "open-case").unwrap();
-        assert_eq!(verb.full_name, "kyc.open-case");
+        assert_eq!(verb.full_name, "kyc-case.create");
 
         // Verify behavior is Durable
         match &verb.behavior {

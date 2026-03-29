@@ -131,7 +131,7 @@ impl Phase3Evaluation {
 ///
 /// let result = Phase3SubsetResult {
 ///     retained_candidates: vec![VerbSearchResult {
-///         verb: "kyc.open-case".to_string(),
+///         verb: "kyc-case.create".to_string(),
 ///         score: 0.9,
 ///         source: VerbSearchSource::LearnedExact,
 ///         matched_phrase: "open case".to_string(),
@@ -141,7 +141,7 @@ impl Phase3Evaluation {
 ///     eliminated_candidates: vec![],
 /// };
 /// let payload = build_phase3_payload(&result, "action_surface");
-/// assert_eq!(payload["phase4_candidate_set"][0], "kyc.open-case");
+/// assert_eq!(payload["phase4_candidate_set"][0], "kyc-case.create");
 /// ```
 pub fn build_phase3_payload(result: &Phase3SubsetResult, filter_name: &str) -> serde_json::Value {
     serde_json::json!({
@@ -224,14 +224,14 @@ pub fn build_phase3_unavailable_payload(entrypoint: &str) -> serde_json::Value {
 /// use ob_poc::traceability::enforce_phase2_legal_subset;
 ///
 /// let candidates = vec![VerbSearchResult {
-///     verb: "kyc.open-case".to_string(),
+///     verb: "kyc-case.create".to_string(),
 ///     score: 0.9,
 ///     source: VerbSearchSource::LearnedExact,
 ///     matched_phrase: "open case".to_string(),
 ///     description: None,
 ///     journey: None,
 /// }];
-/// let legal = HashSet::from(["kyc.open-case".to_string()]);
+/// let legal = HashSet::from(["kyc-case.create".to_string()]);
 /// let result = enforce_phase2_legal_subset(candidates, Some(&legal));
 /// assert_eq!(result.retained_candidates.len(), 1);
 /// ```
@@ -306,7 +306,7 @@ mod tests {
     fn test_phase3_subset_prunes_out_of_ceiling_candidates() {
         let candidates = vec![
             VerbSearchResult {
-                verb: "kyc.open-case".to_string(),
+                verb: "kyc-case.create".to_string(),
                 score: 0.9,
                 source: VerbSearchSource::LearnedExact,
                 matched_phrase: "open case".to_string(),
@@ -322,12 +322,12 @@ mod tests {
                 journey: None,
             },
         ];
-        let legal = HashSet::from(["kyc.open-case".to_string()]);
+        let legal = HashSet::from(["kyc-case.create".to_string()]);
 
         let result = enforce_phase2_legal_subset(candidates, Some(&legal));
 
         assert_eq!(result.retained_candidates.len(), 1);
-        assert_eq!(result.retained_candidates[0].verb, "kyc.open-case");
+        assert_eq!(result.retained_candidates[0].verb, "kyc-case.create");
         assert_eq!(result.eliminated_candidates.len(), 1);
         assert_eq!(result.eliminated_candidates[0].verb, "deal.create");
     }
@@ -336,7 +336,7 @@ mod tests {
     fn test_phase3_payload_records_pruned_candidates() {
         let candidates = vec![
             VerbSearchResult {
-                verb: "kyc.open-case".to_string(),
+                verb: "kyc-case.create".to_string(),
                 score: 0.9,
                 source: VerbSearchSource::LearnedExact,
                 matched_phrase: "open case".to_string(),
@@ -352,11 +352,11 @@ mod tests {
                 journey: None,
             },
         ];
-        let legal = HashSet::from(["kyc.open-case".to_string()]);
+        let legal = HashSet::from(["kyc-case.create".to_string()]);
         let result = enforce_phase2_legal_subset(candidates, Some(&legal));
         let payload = build_phase3_payload(&result, "action_surface");
 
-        assert_eq!(payload["phase4_candidate_set"][0], "kyc.open-case");
+        assert_eq!(payload["phase4_candidate_set"][0], "kyc-case.create");
         assert_eq!(
             payload["eliminated_candidates"][0]["verb_id"],
             "deal.create"
