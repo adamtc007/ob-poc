@@ -44,6 +44,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
         onboarding_state: None,
         runbook_plan: None,
         session_feedback,
+        narration: None,
     };
 
     match resp.kind {

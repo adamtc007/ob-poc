@@ -370,6 +370,13 @@ pub struct ChatResponse {
     /// Populated on every response when routed through the REPL V2 orchestrator.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_feedback: Option<serde_json::Value>,
+
+    /// Proactive narration — goal-directed workflow guidance.
+    /// After state-changing actions, shows progress, gaps, and suggested next steps
+    /// computed from the constellation delta. Silent for read-only queries.
+    /// Design: ADR 043.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub narration: Option<crate::narration::NarrationPayload>,
 }
 
 /// User-facing Sage explanation payload.
