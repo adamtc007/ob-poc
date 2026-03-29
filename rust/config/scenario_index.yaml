@@ -99,6 +99,114 @@ scenarios:
     explain:
       summary: "CBU assembly — jurisdiction + vehicle type select the macro template"
 
+  # ── Ownership / Control Query (verb: analyse-ubo) ──────────────────────
+  # The intent is "discover who owns/controls this entity." The relationship
+  # type (ownership vs control) and query direction (upward/downward/full)
+  # are parameters that select the verb, not different intents.
+  - id: analyse-ubo
+    title: "Ownership & Control Analysis"
+    modes: [kyc, onboarding]
+    requires:
+      any_of: [compound_action, phrase_match]
+    signals:
+      actions: [show, list, find, display, get, who, trace, identify, analyse, analyze]
+      nouns_any:
+        [owner, owners, ownership, ubo, ubos, "beneficial owner",
+         "beneficial owners", controller, controllers, control,
+         shareholder, shareholders, "who owns", "who controls",
+         structure, graph, "ownership structure", chain, chains,
+         subsidiaries, parent, holdings, "control positions"]
+      phrases_any:
+        - "who owns this"
+        - "who are the beneficial owners"
+        - "who controls this"
+        - "show me the ownership structure"
+        - "who are the ubos"
+        - "show ultimate owners"
+        - "list shareholders"
+        - "trace ownership chains"
+        - "trace the chain"
+        - "show control graph"
+        - "what does this entity own"
+        - "show subsidiaries"
+        - "analyze ownership gaps"
+        - "show control positions"
+        - "identify ubos"
+        - "pierce the veil"
+    routes:
+      kind: verb_selector
+      select_on: relationship_type
+      default_verb_fqn: ubo.list-ubos
+      options:
+        - value: ownership
+          sub_select:
+            select_on: query_direction
+            default_verb_fqn: ubo.list-ubos
+            options:
+              - value: upward
+                verb_fqn: ubo.list-owners
+              - value: downward
+                verb_fqn: ubo.list-owned
+              - value: full
+                verb_fqn: ubo.list-ubos
+        - value: control
+          sub_select:
+            select_on: query_direction
+            default_verb_fqn: control.identify-ubos
+            options:
+              - value: upward
+                verb_fqn: control.list-controllers
+              - value: downward
+                verb_fqn: control.list-controlled
+              - value: full
+                verb_fqn: control.identify-ubos
+        - value: all
+          sub_select:
+            select_on: query_direction
+            default_verb_fqn: control.identify-ubos
+            options:
+              - value: upward
+                verb_fqn: control.identify-ubos
+              - value: downward
+                verb_fqn: control.list-controlled
+              - value: full
+                verb_fqn: control.build-graph
+    explain:
+      summary: "Ownership/control analysis — relationship type + direction select the verb"
+
+  # ── Ownership Chain Trace ─────────────────────────────────────────────
+  - id: trace-ownership
+    title: "Trace Ownership/Control Chain"
+    modes: [kyc, onboarding]
+    requires:
+      any_of: [compound_action, phrase_match]
+    signals:
+      actions: [trace, follow, unwind, "pierce the veil", "look through"]
+      nouns_any:
+        [chain, chains, path, "ownership chain", "control chain",
+         veil, nominee, "shell companies", tree]
+      phrases_any:
+        - "trace ownership chains"
+        - "trace the chain"
+        - "follow the ownership chain"
+        - "pierce the veil"
+        - "unwind the structure"
+        - "trace to natural persons"
+        - "trace control chain"
+    routes:
+      kind: verb_selector
+      select_on: relationship_type
+      default_verb_fqn: ubo.trace-chains
+      options:
+        - value: ownership
+          verb_fqn: ubo.trace-chains
+        - value: control
+          verb_fqn: control.trace-chain
+        - value: all
+          verb_fqn: ubo.trace-chains
+    explain:
+      summary: "Trace ownership/control chain — relationship type selects the verb"
+
   # ── Full KYC Screening ─────────────────────────────────────────────────
   - id: full-screening
     title: "Full KYC Screening"

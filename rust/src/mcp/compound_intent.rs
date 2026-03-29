@@ -379,7 +379,13 @@ pub fn extract_compound_signals(utterance: &str) -> CompoundSignals {
         }
     }
 
-    // 7. Derived compound signals
+    // 7. Query direction extraction (ownership/control queries)
+    signals.query_direction = extract_query_direction(&lower);
+
+    // 8. Relationship type extraction (ownership vs control)
+    signals.relationship_type = extract_relationship_type(&lower);
+
+    // 9. Derived compound signals
     signals.has_jurisdiction_structure_pair =
         signals.jurisdiction.is_some() && !signals.structure_nouns.is_empty();
 
@@ -389,6 +395,119 @@ pub fn extract_compound_signals(utterance: &str) -> CompoundSignals {
     };
 
     signals
+}
+
+/// Extract query direction for ownership/control queries.
+///
+/// - "upward" = who owns/controls this entity (tracing to parents/UBOs)
+/// - "downward" = what does this entity own/control (tracing to subsidiaries)
+/// - "full" = complete structure / graph / all relationships
+pub fn extract_query_direction(utterance: &str) -> Option<String> {
+    // Upward patterns: "who owns X", "shareholders", "parent", "UBOs"
+    const UPWARD: &[&str] = &[
+        "who owns",
+        "who controls",
+        "owners of",
+        "shareholders",
+        "parent",
+        "beneficial owner",
+        "beneficial owners",
+        "ubo",
+        "ubos",
+        "list owners",
+        "show owners",
+        "identify ubos",
+        "controllers of",
+        "who has control",
+    ];
+    // Downward patterns: "what does X own", "subsidiaries", "controlled by"
+    const DOWNWARD: &[&str] = &[
+        "what does",
+        "subsidiaries",
+        "children",
+        "owned by",
+        "controlled entities",
+        "list owned",
+        "list controlled",
+        "holdings",
+    ];
+    // Full patterns: "complete structure", "entire graph", "all relationships"
+    const FULL: &[&str] = &[
+        "structure",
+        "graph",
+        "full chain",
+        "complete chain",
+        "entire",
+        "all relationships",
+        "ownership structure",
+        "control structure",
+        "map",
+        "trace chains",
+        "trace all",
+        "gaps",
+        "positions",
+    ];
+
+    // Check longest matches first (full > upward > downward)
+    for p in FULL {
+        if contains_phrase(utterance, p) {
+            return Some("full".to_string());
+        }
+    }
+    for p in UPWARD {
+        if contains_phrase(utterance, p) {
+            return Some("upward".to_string());
+        }
+    }
+    for p in DOWNWARD {
+        if contains_phrase(utterance, p) {
+            return Some("downward".to_string());
+        }
+    }
+    None
+}
+
+/// Extract relationship type for ownership/control queries.
+///
+/// - "ownership" = shareholding, equity, economic interest
+/// - "control" = board, voting, management, PSC
+/// - "all" = both ownership and control vectors
+pub fn extract_relationship_type(utterance: &str) -> Option<String> {
+    const OWNERSHIP: &[&str] = &[
+        "ownership",
+        "shareholder",
+        "shareholders",
+        "shareholding",
+        "equity",
+        "economic interest",
+        "who owns",
+        "owners",
+        "owned",
+        "beneficial owner",
+        "ubo",
+    ];
+    const CONTROL: &[&str] = &[
+        "control",
+        "board",
+        "voting",
+        "management",
+        "psc",
+        "governance",
+        "who controls",
+        "controllers",
+    ];
+    // "all" is the default when both or neither are present — detected by absence
+    // of specific type cues, or explicit "all" / "both" / "complete"
+
+    let has_ownership = OWNERSHIP.iter().any(|p| contains_phrase(utterance, p));
+    let has_control = CONTROL.iter().any(|p| contains_phrase(utterance, p));
+
+    match (has_ownership, has_control) {
+        (true, false) => Some("ownership".to_string()),
+        (false, true) => Some("control".to_string()),
+        (true, true) => Some("all".to_string()),
+        (false, false) => None, // no relationship type signal — selector will use default
+    }
 }
 
 /// Extract canonical vehicle type from an utterance.
@@ -664,5 +783,88 @@ mod tests {
         assert!(s.has_jurisdiction_structure_pair);
         assert!(s.has_multi_noun_workflow);
         assert!(s.strength() >= 6);
+    }
+
+    // --- Query direction extraction ---
+
+    #[test]
+    fn test_query_direction_upward() {
+        assert_eq!(extract_query_direction("who owns this company"), Some("upward".into()));
+        assert_eq!(extract_query_direction("show me the shareholders"), Some("upward".into()));
+        assert_eq!(extract_query_direction("who are the beneficial owners"), Some("upward".into()));
+        assert_eq!(extract_query_direction("identify ubos for this entity"), Some("upward".into()));
+    }
+
+    #[test]
+    fn test_query_direction_downward() {
+        assert_eq!(extract_query_direction("what does Allianz own"), Some("downward".into()));
+        assert_eq!(extract_query_direction("show subsidiaries"), Some("downward".into()));
+        assert_eq!(extract_query_direction("list owned entities"), Some("downward".into()));
+    }
+
+    #[test]
+    fn test_query_direction_full() {
+        assert_eq!(extract_query_direction("show me the ownership structure"), Some("full".into()));
+        assert_eq!(extract_query_direction("build the control graph"), Some("full".into()));
+        assert_eq!(extract_query_direction("trace all chains"), Some("full".into()));
+        assert_eq!(extract_query_direction("analyze ownership gaps"), Some("full".into()));
+    }
+
+    #[test]
+    fn test_query_direction_none() {
+        assert_eq!(extract_query_direction("create a fund"), None);
+        assert_eq!(extract_query_direction("assign depositary"), None);
+    }
+
+    // --- Relationship type extraction ---
+
+    #[test]
+    fn test_relationship_type_ownership() {
+        assert_eq!(extract_relationship_type("who owns this"), Some("ownership".into()));
+        assert_eq!(extract_relationship_type("show shareholding"), Some("ownership".into()));
+    }
+
+    #[test]
+    fn test_relationship_type_control() {
+        assert_eq!(extract_relationship_type("who controls this"), Some("control".into()));
+        assert_eq!(extract_relationship_type("show board members"), Some("control".into()));
+        assert_eq!(extract_relationship_type("list governance controllers"), Some("control".into()));
+    }
+
+    #[test]
+    fn test_relationship_type_both() {
+        assert_eq!(
+            extract_relationship_type("show ownership and control relationships"),
+            Some("all".into())
+        );
+    }
+
+    #[test]
+    fn test_relationship_type_none() {
+        assert_eq!(extract_relationship_type("create a fund"), None);
+        assert_eq!(extract_relationship_type("assign depositary"), None);
+    }
+
+    // --- Combined signals for UBO utterances ---
+
+    #[test]
+    fn test_ubo_utterance_signals() {
+        let s = extract_compound_signals("who are the beneficial owners of this company");
+        assert_eq!(s.query_direction.as_deref(), Some("upward"));
+        assert_eq!(s.relationship_type.as_deref(), Some("ownership"));
+    }
+
+    #[test]
+    fn test_control_query_signals() {
+        let s = extract_compound_signals("who controls this entity through the board");
+        assert_eq!(s.query_direction.as_deref(), Some("upward"));
+        assert_eq!(s.relationship_type.as_deref(), Some("control"));
+    }
+
+    #[test]
+    fn test_full_structure_signals() {
+        let s = extract_compound_signals("show me the complete ownership structure");
+        assert_eq!(s.query_direction.as_deref(), Some("full"));
+        assert_eq!(s.relationship_type.as_deref(), Some("ownership"));
     }
 }
