@@ -797,7 +797,12 @@ mod tests {
         // CBU cards
         assert_eq!(view.cbu_cards.len(), 2);
         assert_eq!(view.cbu_cards[0].progress_pct, 100);
-        assert!(view.cbu_cards[0].next_action.is_none()); // Fund A: done
+        // Fund A: KYC approved → next action is deal handoff
+        assert!(view.cbu_cards[0].next_action.is_some());
+        assert_eq!(
+            view.cbu_cards[0].next_action.as_ref().unwrap().verb_fqn,
+            "deal.request-onboarding"
+        );
         assert!(view.cbu_cards[0].revert_action.is_some()); // Can reopen
         assert_eq!(
             view.cbu_cards[0].revert_action.as_ref().unwrap().verb_fqn,

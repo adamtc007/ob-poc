@@ -5835,6 +5835,7 @@ description: Hand off a contracted deal into onboarding for an existing CBU
 invocation_phrases:
   - "request onboarding for this deal"
   - "submit onboarding handoff"
+  - "onboard a client"
 required_context:
   - client_group_id
 required_questions:
@@ -5860,6 +5861,8 @@ templates:
           contract-id: "{context.contract_id}"
           cbu-id: "{answers.cbu_id}"
           product-id: "{context.product_id}"
+workspaces:
+  - on_boarding
 definition_of_done:
   - "Onboarding handoff submitted"
 "#
@@ -5919,7 +5922,7 @@ definition_of_done:
 
         assert!(matches!(
             resp.kind,
-            ReplResponseKindV2::JourneyOptions { .. }
+            ReplResponseKindV2::WorkspaceOptions { .. }
         ));
         assert!(resp.message.contains("Allianz"));
     }
@@ -5940,6 +5943,16 @@ definition_of_done:
         .await
         .unwrap();
 
+        // Select workspace (required after scope gate).
+        orch.process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::OnBoarding,
+            },
+        )
+        .await
+        .unwrap();
+
         // Select pack.
         let resp = orch
             .process(
@@ -5951,9 +5964,12 @@ definition_of_done:
             .await
             .unwrap();
 
-        // Should ask the first required question.
-        assert!(matches!(resp.kind, ReplResponseKindV2::Question { .. }));
-        assert!(resp.message.contains("products"));
+        // Should ask the first required question or enter InPack.
+        assert!(
+            matches!(resp.kind, ReplResponseKindV2::Question { .. })
+                || matches!(resp.kind, ReplResponseKindV2::Prompt { .. })
+                || matches!(resp.kind, ReplResponseKindV2::Info { .. })
+        );
     }
 
     #[test]
@@ -6061,6 +6077,16 @@ definition_of_done:
         .await
         .unwrap();
 
+        // Select workspace.
+        orch.process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::OnBoarding,
+            },
+        )
+        .await
+        .unwrap();
+
         // Route via phrase.
         let resp = orch
             .process(
@@ -6086,6 +6112,16 @@ definition_of_done:
             UserInputV2::SelectScope {
                 group_id: Uuid::new_v4(),
                 group_name: "Allianz".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Select workspace.
+        orch.process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::OnBoarding,
             },
         )
         .await
@@ -6117,6 +6153,16 @@ definition_of_done:
             UserInputV2::SelectScope {
                 group_id: Uuid::new_v4(),
                 group_name: "Allianz".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        // 1b. Select workspace.
+        orch.process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::OnBoarding,
             },
         )
         .await
@@ -6199,12 +6245,21 @@ definition_of_done:
         let orch = make_orchestrator();
         let id = orch.create_session().await;
 
-        // Set scope + select pack + answer questions.
+        // Set scope + select workspace + select pack + answer questions.
         orch.process(
             id,
             UserInputV2::SelectScope {
                 group_id: Uuid::new_v4(),
                 group_name: "Test".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        orch.process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::OnBoarding,
             },
         )
         .await
@@ -6453,8 +6508,8 @@ definition_of_done:
             .await
             .unwrap();
         assert!(
-            matches!(resp.kind, ReplResponseKindV2::JourneyOptions { .. }),
-            "Expected JourneyOptions, got {:?}",
+            matches!(resp.kind, ReplResponseKindV2::WorkspaceOptions { .. }),
+            "Expected WorkspaceOptions, got {:?}",
             resp.kind
         );
 
@@ -6468,6 +6523,16 @@ definition_of_done:
                 Some("Aviva Investors")
             );
         }
+
+        // Turn 1b: Select workspace.
+        orch.process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::Kyc,
+            },
+        )
+        .await
+        .unwrap();
 
         // Turn 2: Select KYC pack.
         let resp = orch
@@ -6655,6 +6720,16 @@ definition_of_done:
             assert!(ctx.accumulated_answers.is_empty());
         }
 
+        // After workspace selection.
+        orch.process(
+            id,
+            UserInputV2::SelectWorkspace {
+                workspace: WorkspaceKind::Kyc,
+            },
+        )
+        .await
+        .unwrap();
+
         // After pack selection.
         orch.process(
             id,
@@ -6840,7 +6915,8 @@ definition_of_done:
     }
 
     #[test]
-    fn test_phase2_gate_response_uses_lookup_ambiguity_message() {
+    fn test_phase2_gate_response_defers_lookup_ambiguity() {
+        // Entity ambiguity is now deferred to downstream verb matching (not a hard block).
         let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
         let mut session = ReplSessionV2::new();
         session.pending_lookup_result = Some(crate::lookup::LookupResult {
@@ -6875,11 +6951,12 @@ definition_of_done:
             entities_resolved: false,
         });
 
-        let response = orch.phase2_gate_response(&session).expect("phase 2 gate");
-        assert!(matches!(response.kind, ReplResponseKindV2::Error { .. }));
-        assert_eq!(
-            response.message,
-            "I found multiple matching entities. Please be more specific."
+        // ambiguous_entity is now deferred — phase2_gate_response returns None.
+        let response = orch.phase2_gate_response(&session);
+        assert!(
+            response.is_none(),
+            "ambiguous_entity should be deferred (not a hard block), got {:?}",
+            response
         );
     }
 

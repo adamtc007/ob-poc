@@ -179,7 +179,6 @@ domains:
       control-positions:
         description: Get control positions for an issuer (who controls what %)
         invocation_phrases:
-          - "show control positions"
           - "who has control"
           - "display voting percentages"
           - "show control breakdown"
@@ -245,7 +244,6 @@ domains:
       who-controls:
         description: Find who controls an issuer (>50% voting or board majority)
         invocation_phrases:
-          - "who controls this"
           - "find controller"
           - "show controlling entity"
           - "who has majority"
@@ -905,7 +903,6 @@ domains:
       analyze-gaps:
         description: Analyze ownership gaps for an issuer
         invocation_phrases:
-          - "analyze ownership gaps"
           - "find missing ownership"
           - "check for gaps"
           - "identify ownership holes"
@@ -953,8 +950,6 @@ domains:
       trace-chain:
         description: Trace ownership chain from one entity to another
         invocation_phrases:
-          - "trace ownership chain"
-          - "follow ownership path"
           - "trace from entity to entity"
           - "show ownership link"
           - "follow chain between"
@@ -963,10 +958,6 @@ domains:
           - "map ownership route"
           - "trace beneficial ownership chain upward"
           - "show equity stake path between entities"
-          - "trace the chain from Vanguard down to the subfund"
-          - "trace the ownership chain down to the subfund"
-          - "trace the chain down"
-          - "follow the ownership chain from parent to subfund"
         metadata:
           tier: intent
           source_of_truth: entity

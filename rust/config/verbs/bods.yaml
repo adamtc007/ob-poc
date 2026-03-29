@@ -296,7 +296,6 @@ domains:
           side_effects: facts_only
         invocation_phrases:
         - "list ownership statements"
-        - "show ownership chains"
         - "display ownership records"
         - "get ownership data for entity"
         - "show BODS ownership links"

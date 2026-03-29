@@ -188,7 +188,6 @@ domains:
         - "list controlled entities"
         - "what do they control"
         - "show controlled"
-        - "list subsidiaries"
         - "view controlled companies"
         - "what is controlled"
         - "show control targets"
@@ -306,7 +305,6 @@ domains:
         - "map control relationships"
         - "create control structure diagram"
         - "visualize ownership hierarchy"
-        - "show full control network"
         - "construct entity control graph"
         - "build governance graph for structure"
         - "render corporate governance topology"
@@ -372,7 +370,6 @@ domains:
         - "run 4AMLD UBO determination"
         - "determine UBOs for KYC"
         - "run regulatory UBO check"
-        - "identify UBOs for this structure"
         - "run the 25% threshold test across all vectors"
         - "identify who controls this through board or voting"
         metadata:
@@ -430,10 +427,6 @@ domains:
           Trace a specific control chain from one entity to another.
           Returns the path and cumulative control percentage.
         invocation_phrases:
-        - "show ownership chain"
-        - "ownership chain"
-        - "follow ownership"
-        - "trace control chain"
         - "show control chain"
         - "ownership hierarchy"
         - "trace ownership path"

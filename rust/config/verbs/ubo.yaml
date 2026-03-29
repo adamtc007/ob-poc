@@ -510,13 +510,10 @@ domains:
           - "list owners"
           - "show who owns"
           - "view ownership stakes"
-          - "who owns this"
           - "display owners"
-          - "show shareholders"
           - "list beneficial owners"
           - "find all owners"
           - "show me the owners"
-          - "show the ownership chain"
           - "tell me who owns this"
           - "list the owners of this company"
           - "show ownership percentages"
@@ -524,10 +521,7 @@ domains:
           - "list all ownership interests"
           - "who has equity in this entity"
           - "who owns this company"
-          - "pull the ownership structure"
-          - "show me the shareholders"
           - "who's behind this entity"
-          - "trace the ownership"
           - "25% threshold check who qualifies"
         behavior: plugin
         metadata:
@@ -596,14 +590,11 @@ domains:
         description: List UBO candidates for a CBU (natural persons with ≥25% ownership)
         invocation_phrases:
           - "list UBOs"
-          - "show ultimate owners"
           - "find UBO candidates"
-          - "who are the UBOs"
           - "display beneficial owners"
           - "show natural person owners"
           - "list ultimate beneficiaries"
           - "find all UBOs"
-          - "who are the beneficial owners"
           - "show me the ubos"
           - "show the beneficial owners"
           - "list the ultimate beneficial owners"
@@ -726,15 +717,12 @@ domains:
       trace-chains:
         description: Trace all ownership and control chains to natural persons for a CBU or client
         invocation_phrases:
-          - "trace ownership chains"
           - "trace UBO chains"
           - "follow ownership to persons"
-          - "trace to natural persons"
           - "map ownership structure"
           - "trace complete chain"
           - "follow all ownership paths"
           - "trace client ownership"
-          - "pierce the veil"
           - "look through the nominee structure"
           - "nominee structure need to pierce the veil"
           - "pierce through nominee to find UBO"
@@ -743,9 +731,6 @@ domains:
           - "follow the chain to the top"
           - "look through the shell companies"
           - "pull the UBO tree"
-          - "unwind the ownership structure"
-          - "trace the ownership chain"
-          - "trace ownership"
         metadata:
           tier: intent
           source_of_truth: operational
