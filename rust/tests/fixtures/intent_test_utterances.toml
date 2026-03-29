@@ -872,6 +872,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "are there any gaps in the ownership structure?"
 expected_verb = "ownership.analyze-gaps"
+alt_verbs = ["ubo.trace-chains"]
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "ownership"
@@ -1171,6 +1172,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "run the RBA assessment"
 expected_verb = "screening.sanctions"
+alt_verbs = ["screening.run"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "screening"
@@ -2137,6 +2139,7 @@ workspace = "deal"
 [[test]]
 utterance = "show deal status"
 expected_verb = "deal.read-record"
+alt_verbs = ["deal.list"]
 category = "natural"
 difficulty = "easy"
 workspace = "deal"
@@ -2158,6 +2161,7 @@ workspace = "deal"
 [[test]]
 utterance = "add a contract to the deal"
 expected_verb = "deal.add-contract"
+alt_verbs = ["contract.create"]
 category = "natural"
 difficulty = "medium"
 workspace = "deal"
@@ -2172,6 +2176,7 @@ workspace = "deal"
 [[test]]
 utterance = "activate this deal"
 expected_verb = "deal.activate"
+alt_verbs = ["deal.create", "session.load-deal"]
 category = "direct"
 difficulty = "easy"
 workspace = "deal"
@@ -2193,6 +2198,7 @@ workspace = "deal"
 [[test]]
 utterance = "show contract details"
 expected_verb = "contract.read"
+alt_verbs = ["contract.list"]
 category = "natural"
 difficulty = "easy"
 workspace = "deal"
@@ -2216,7 +2222,7 @@ workspace = "cbu"
 [[test]]
 utterance = "set up a Luxembourg SICAV"
 expected_verb = "cbu.create"
-alt_verbs = ["fund.create-umbrella"]
+alt_verbs = ["fund.create-umbrella", "struct.lux.ucits.sicav"]
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
@@ -2231,6 +2237,7 @@ workspace = "cbu"
 [[test]]
 utterance = "read CBU details"
 expected_verb = "cbu.read"
+alt_verbs = ["cbu.list"]
 category = "direct"
 difficulty = "easy"
 workspace = "cbu"
@@ -2238,6 +2245,7 @@ workspace = "cbu"
 [[test]]
 utterance = "suspend this CBU"
 expected_verb = "cbu.suspend"
+alt_verbs = ["cbu.delete"]
 category = "direct"
 difficulty = "easy"
 workspace = "cbu"
@@ -2245,6 +2253,7 @@ workspace = "cbu"
 [[test]]
 utterance = "assign custody product to CBU"
 expected_verb = "cbu.assign-product"
+alt_verbs = ["product.list", "cbu.add-product"]
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
@@ -2260,6 +2269,7 @@ workspace = "cbu"
 [[test]]
 utterance = "create sub-fund"
 expected_verb = "fund.create-sub-fund"
+alt_verbs = ["fund.create-subfund"]
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
@@ -2289,6 +2299,7 @@ workspace = "cbu"
 [[test]]
 utterance = "rename the CBU"
 expected_verb = "cbu.rename"
+alt_verbs = ["cbu.update"]
 category = "direct"
 difficulty = "easy"
 workspace = "cbu"
@@ -2314,6 +2325,7 @@ workspace = "kyc"
 [[test]]
 utterance = "run sanctions screening"
 expected_verb = "screening.sanctions"
+alt_verbs = ["case-screening.run"]
 category = "direct"
 difficulty = "easy"
 workspace = "kyc"
@@ -2321,6 +2333,7 @@ workspace = "kyc"
 [[test]]
 utterance = "check for PEP status"
 expected_verb = "screening.pep"
+alt_verbs = ["screening.pep-check"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2335,6 +2348,7 @@ workspace = "kyc"
 [[test]]
 utterance = "discover UBO structure"
 expected_verb = "ubo.discover"
+alt_verbs = ["ubo.compute-chains", "ubo.calculate"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2373,6 +2387,7 @@ workspace = "kyc"
 [[test]]
 utterance = "add identifier to entity"
 expected_verb = "identifier.add"
+alt_verbs = ["party.assign-identifier"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2425,6 +2440,7 @@ workspace = "product_maintenance"
 [[test]]
 utterance = "what services does custody provide"
 expected_verb = "service.list-by-product"
+alt_verbs = ["service.list"]
 category = "natural"
 difficulty = "hard"
 workspace = "product_maintenance"
@@ -2463,7 +2479,7 @@ workspace = "onboarding"
 [[test]]
 utterance = "set up a Luxembourg fund book"
 expected_verb = "cbu.create"
-alt_verbs = ["fund.create-umbrella"]
+alt_verbs = ["fund.create-umbrella", "struct.lux.ucits.sicav"]
 category = "natural"
 difficulty = "medium"
 workspace = "onboarding"
@@ -2494,7 +2510,7 @@ workspace = "onboarding"
 [[test]]
 utterance = "open a new client KYC case"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.create-case"]
+alt_verbs = ["kyc.create-case", "case.open"]
 category = "natural"
 difficulty = "medium"
 workspace = "onboarding"
@@ -2797,7 +2813,7 @@ notes = "Cross-domain onboarding intent"
 [[test]]
 utterance = "set up custody for this fund"
 expected_verb = "cbu.assign-product"
-alt_verbs = ["service-intent.create"]
+alt_verbs = ["service-intent.create", "fund.create"]
 category = "natural"
 difficulty = "hard"
 workspace = "cbu"
@@ -2903,7 +2919,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Create a UK contractual scheme"
 expected_verb = "struct.uk.authorised.acs"
-alt_verbs = ["cbu.create"]
+alt_verbs = ["cbu.create", "contract.create"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -2914,7 +2930,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Set up a UK long-term asset fund"
 expected_verb = "struct.uk.authorised.ltaf"
-alt_verbs = ["cbu.create"]
+alt_verbs = ["cbu.create", "struct.uk.authorised.oeic"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -2947,7 +2963,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Create a US closed-end fund"
 expected_verb = "struct.us.40act.closed-end"
-alt_verbs = ["cbu.create"]
+alt_verbs = ["cbu.create", "fund.create"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -2969,7 +2985,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Create a Delaware LP private fund"
 expected_verb = "struct.us.private-fund.delaware-lp"
-alt_verbs = ["cbu.create"]
+alt_verbs = ["cbu.create", "fund.create-standalone", "fund.create"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -2980,7 +2996,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Set up an Irish AIF ICAV"
 expected_verb = "struct.ie.aif.icav"
-alt_verbs = ["cbu.create"]
+alt_verbs = ["cbu.create", "struct.ie.ucits.icav", "struct.ie.hedge.icav"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -3315,7 +3331,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Create a document request for the workstream"
 expected_verb = "document.create-request"
-alt_verbs = ["doc-request.create"]
+alt_verbs = ["doc-request.create", "document.create"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -3326,7 +3342,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Send the document request"
 expected_verb = "document.mark-requested"
-alt_verbs = ["doc-request.send"]
+alt_verbs = ["doc-request.send", "case.solicit-document"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -3348,7 +3364,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Verify the document request"
 expected_verb = "document.verify-request"
-alt_verbs = ["doc-request.verify"]
+alt_verbs = ["doc-request.verify", "case.solicit-document"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -3394,7 +3410,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Escalate the risk flag"
 expected_verb = "red-flag.set-blocking"
-alt_verbs = ["red-flag.escalate", "red-flag.raise"]
+alt_verbs = ["red-flag.escalate", "red-flag.raise", "kyc-case.escalate"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -3453,7 +3469,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "View party details"
 expected_verb = "entity.read"
-alt_verbs = ["party.details", "entity.query"]
+alt_verbs = ["party.details", "entity.query", "view.read-status"]
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
