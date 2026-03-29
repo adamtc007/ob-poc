@@ -129,6 +129,18 @@ pub enum ScenarioRouteYaml {
         #[serde(default)]
         then: Vec<String>,
     },
+    /// Route to a verb by selecting based on extracted context (entity type determination).
+    /// Like macro_selector but resolves to a verb FQN — no macro expansion needed.
+    #[serde(rename = "verb_selector")]
+    VerbSelector {
+        /// Primary axis from CompoundSignals (e.g., "relationship_type").
+        select_on: String,
+        /// Map of axis value → verb FQN (or nested sub_select).
+        options: Vec<VerbSelectorOption>,
+        /// Fallback verb when the primary axis is undetected.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        default_verb_fqn: Option<String>,
+    },
 }
 
 /// A single option in a macro_selector route.
@@ -160,6 +172,37 @@ pub struct SubSelector {
 pub struct SubSelectorOption {
     pub value: String,
     pub macro_fqn: String,
+}
+
+/// A single option in a verb_selector route.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSelectorOption {
+    /// The value to match (e.g., "ownership", "upward").
+    pub value: String,
+    /// The verb FQN to route to (leaf option). Optional when `sub_select` is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verb_fqn: Option<String>,
+    /// Nested second-axis selector.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_select: Option<VerbSubSelector>,
+}
+
+/// Nested second-axis selector for verb_selector routes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSubSelector {
+    /// Field from CompoundSignals to select on (e.g., "query_direction").
+    pub select_on: String,
+    /// Fallback verb FQN when the second axis is undetected.
+    pub default_verb_fqn: String,
+    /// Options for the second axis.
+    pub options: Vec<VerbSubSelectorLeaf>,
+}
+
+/// Leaf option in a two-axis verb selector.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSubSelectorLeaf {
+    pub value: String,
+    pub verb_fqn: String,
 }
 
 /// Explain configuration (display metadata).
@@ -205,11 +248,18 @@ pub enum ResolvedRoute {
     Macro { macro_fqn: String },
     /// Sequence of macros to expand in order.
     MacroSequence { macros: Vec<String> },
-    /// Selector needs more context — return options for disambiguation.
+    /// Macro selector needs more context — return options for disambiguation.
     NeedsSelection {
         select_on: String,
         options: Vec<SelectorOption>,
         then: Vec<String>,
+    },
+    /// Resolved to a single verb (no macro expansion).
+    Verb { verb_fqn: String },
+    /// Verb selector needs more context — return options for clarification.
+    NeedsVerbSelection {
+        select_on: String,
+        options: Vec<(String, String)>, // (display_value, verb_fqn) pairs
     },
 }
 
@@ -712,39 +762,121 @@ impl ScenarioIndex {
                     }
                 }
             }
+            ScenarioRouteYaml::VerbSelector {
+                select_on,
+                options,
+                default_verb_fqn,
+            } => {
+                // Try to resolve the primary axis
+                let primary_match = self.resolve_verb_selector_axis(select_on, options, signals);
+
+                match primary_match {
+                    Some(opt) if opt.sub_select.is_some() => {
+                        // Two-axis: resolve the nested sub_select
+                        let sub = opt.sub_select.as_ref().unwrap();
+                        let leaf_fqn = self
+                            .resolve_verb_sub_selector(sub, signals)
+                            .unwrap_or_else(|| sub.default_verb_fqn.clone());
+                        ResolvedRoute::Verb {
+                            verb_fqn: leaf_fqn,
+                        }
+                    }
+                    Some(opt) if opt.verb_fqn.is_some() => {
+                        // Single-axis leaf
+                        ResolvedRoute::Verb {
+                            verb_fqn: opt.verb_fqn.clone().unwrap(),
+                        }
+                    }
+                    _ => {
+                        // Try default fallback
+                        if let Some(ref default) = default_verb_fqn {
+                            ResolvedRoute::Verb {
+                                verb_fqn: default.clone(),
+                            }
+                        } else {
+                            // Can't auto-resolve — return options for clarification
+                            ResolvedRoute::NeedsVerbSelection {
+                                select_on: select_on.clone(),
+                                options: options
+                                    .iter()
+                                    .filter_map(|o| {
+                                        let fqn = o
+                                            .verb_fqn
+                                            .clone()
+                                            .or_else(|| {
+                                                o.sub_select
+                                                    .as_ref()
+                                                    .map(|s| s.default_verb_fqn.clone())
+                                            })?;
+                                        Some((o.value.clone(), fqn))
+                                    })
+                                    .collect(),
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
-    /// Resolve a selector axis against compound signals.
+    /// Resolve a macro_selector axis against compound signals.
     fn resolve_selector_axis<'a>(
         &self,
         select_on: &str,
         options: &'a [SelectorOption],
         signals: &CompoundSignals,
     ) -> Option<&'a SelectorOption> {
-        let value = match select_on {
-            "jurisdiction" => signals.jurisdiction.as_deref(),
-            "vehicle_type" => signals.vehicle_type.as_deref(),
-            "structure_type" => signals.structure_nouns.first().map(|s| s.as_str()),
-            _ => None,
-        };
-        value.and_then(|v| options.iter().find(|o| o.value.eq_ignore_ascii_case(v)))
+        let value = self.signal_value_for_axis(select_on, signals)?;
+        options.iter().find(|o| o.value.eq_ignore_ascii_case(value))
     }
 
-    /// Resolve a nested sub-selector against compound signals.
+    /// Resolve a nested macro sub-selector against compound signals.
     fn resolve_sub_selector(&self, sub: &SubSelector, signals: &CompoundSignals) -> Option<String> {
-        let value = match sub.select_on.as_str() {
-            "vehicle_type" => signals.vehicle_type.as_deref(),
+        let value = self.signal_value_for_axis(&sub.select_on, signals)?;
+        sub.options
+            .iter()
+            .find(|o| o.value.eq_ignore_ascii_case(value))
+            .map(|o| o.macro_fqn.clone())
+    }
+
+    /// Resolve a verb_selector primary axis against compound signals.
+    fn resolve_verb_selector_axis<'a>(
+        &self,
+        select_on: &str,
+        options: &'a [VerbSelectorOption],
+        signals: &CompoundSignals,
+    ) -> Option<&'a VerbSelectorOption> {
+        let value = self.signal_value_for_axis(select_on, signals)?;
+        options.iter().find(|o| o.value.eq_ignore_ascii_case(value))
+    }
+
+    /// Resolve a nested verb sub-selector against compound signals.
+    fn resolve_verb_sub_selector(
+        &self,
+        sub: &VerbSubSelector,
+        signals: &CompoundSignals,
+    ) -> Option<String> {
+        let value = self.signal_value_for_axis(&sub.select_on, signals)?;
+        sub.options
+            .iter()
+            .find(|o| o.value.eq_ignore_ascii_case(value))
+            .map(|o| o.verb_fqn.clone())
+    }
+
+    /// Shared axis value lookup — maps axis name to CompoundSignals field.
+    fn signal_value_for_axis<'a>(
+        &self,
+        axis: &str,
+        signals: &'a CompoundSignals,
+    ) -> Option<&'a str> {
+        match axis {
             "jurisdiction" => signals.jurisdiction.as_deref(),
+            "vehicle_type" => signals.vehicle_type.as_deref(),
             "structure_type" => signals.structure_nouns.first().map(|s| s.as_str()),
+            "query_direction" => signals.query_direction.as_deref(),
+            "relationship_type" => signals.relationship_type.as_deref(),
             _ => None,
-        };
-        value.and_then(|v| {
-            sub.options
-                .iter()
-                .find(|o| o.value.eq_ignore_ascii_case(v))
-                .map(|o| o.macro_fqn.clone())
-        })
+        }
     }
 
     /// Extract target FQN(s) from a scenario route.
@@ -766,6 +898,28 @@ impl ScenarioIndex {
                     }
                 }
                 fqns.extend(then.clone());
+                fqns
+            }
+            ScenarioRouteYaml::VerbSelector {
+                options,
+                default_verb_fqn,
+                ..
+            } => {
+                let mut fqns: Vec<String> = Vec::new();
+                if let Some(ref default) = default_verb_fqn {
+                    fqns.push(default.clone());
+                }
+                for o in options {
+                    if let Some(ref fqn) = o.verb_fqn {
+                        fqns.push(fqn.clone());
+                    }
+                    if let Some(ref sub) = o.sub_select {
+                        fqns.push(sub.default_verb_fqn.clone());
+                        for so in &sub.options {
+                            fqns.push(so.verb_fqn.clone());
+                        }
+                    }
+                }
                 fqns
             }
         }

@@ -2630,6 +2630,43 @@ fn build_journey_pipeline_result(
                 Some(decision),
             )
         }
+        JourneyRoute::Verb { verb_fqn } => {
+            let dsl = format!("({})", verb_fqn);
+            let note = format!(
+                "Tier -2 journey → verb: {}",
+                journey
+                    .scenario_title
+                    .as_deref()
+                    .unwrap_or(verb_fqn.as_str())
+            );
+            (dsl, PipelineOutcome::Ready, vec![note], None, None)
+        }
+        JourneyRoute::NeedsVerbSelection {
+            select_on,
+            options,
+        } => {
+            let note = format!(
+                "Tier -2 journey needs verb selection on '{}': {} options",
+                select_on,
+                options.len()
+            );
+            // Reuse the existing NeedsSelection decision mechanism
+            let decision = build_journey_selection_decision(
+                session_id,
+                utterance,
+                journey,
+                select_on,
+                options,
+                &[],
+            );
+            (
+                String::new(),
+                PipelineOutcome::NeedsClarification,
+                vec![note],
+                None,
+                Some(decision),
+            )
+        }
     };
 
     let result = PipelineResult {

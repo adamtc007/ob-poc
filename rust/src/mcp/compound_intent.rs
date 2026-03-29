@@ -270,6 +270,10 @@ pub struct CompoundSignals {
     /// Canonical vehicle type derived from structure nouns (e.g., "sicav", "oeic", "etf").
     /// Used for two-axis macro selection, not for scoring.
     pub vehicle_type: Option<String>,
+    /// Query direction for ownership/control queries (upward/downward/full).
+    pub query_direction: Option<String>,
+    /// Relationship type for ownership/control queries (ownership/control/all).
+    pub relationship_type: Option<String>,
 }
 
 impl CompoundSignals {

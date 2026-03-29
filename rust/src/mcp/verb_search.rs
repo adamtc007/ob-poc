@@ -103,6 +103,13 @@ pub enum JourneyRoute {
         options: Vec<(String, String)>,
         then: Vec<String>,
     },
+    /// Resolved to a single verb (no macro expansion).
+    Verb { verb_fqn: String },
+    /// Verb selector needs clarification.
+    NeedsVerbSelection {
+        select_on: String,
+        options: Vec<(String, String)>,
+    },
 }
 
 impl From<&ResolvedRoute> for JourneyRoute {
@@ -130,6 +137,16 @@ impl From<&ResolvedRoute> for JourneyRoute {
                     })
                     .collect(),
                 then: then.clone(),
+            },
+            ResolvedRoute::Verb { verb_fqn } => JourneyRoute::Verb {
+                verb_fqn: verb_fqn.clone(),
+            },
+            ResolvedRoute::NeedsVerbSelection {
+                select_on,
+                options,
+            } => JourneyRoute::NeedsVerbSelection {
+                select_on: select_on.clone(),
+                options: options.clone(),
             },
         }
     }
@@ -713,7 +730,9 @@ impl HybridVerbSearcher {
                         let route_fqn = match &m.route {
                             ResolvedRoute::Macro { macro_fqn } => Some(macro_fqn.clone()),
                             ResolvedRoute::MacroSequence { macros } => macros.first().cloned(),
-                            ResolvedRoute::NeedsSelection { .. } => None,
+                            ResolvedRoute::Verb { verb_fqn } => Some(verb_fqn.clone()),
+                            ResolvedRoute::NeedsSelection { .. }
+                            | ResolvedRoute::NeedsVerbSelection { .. } => None,
                         };
                         if let Some(fqn) = route_fqn {
                             // Scenarios are compound intents — bypass CCIR allowed_verbs
@@ -768,7 +787,9 @@ impl HybridVerbSearcher {
                             let route_fqn = match &m.route {
                                 ResolvedRoute::Macro { macro_fqn } => Some(macro_fqn.clone()),
                                 ResolvedRoute::MacroSequence { macros } => macros.first().cloned(),
-                                ResolvedRoute::NeedsSelection { .. } => None,
+                                ResolvedRoute::Verb { verb_fqn } => Some(verb_fqn.clone()),
+                                ResolvedRoute::NeedsSelection { .. }
+                                | ResolvedRoute::NeedsVerbSelection { .. } => None,
                             };
                             if let Some(fqn) = route_fqn {
                                 // Scenarios are compound intents — domain_filter should not suppress them

@@ -1019,7 +1019,11 @@ impl AgentService {
                 .first()
                 .cloned()
                 .unwrap_or_else(|| verb_fqn.to_string()),
-            JourneyRoute::NeedsSelection { .. } => verb_fqn.to_string(),
+            JourneyRoute::NeedsSelection { .. }
+            | JourneyRoute::NeedsVerbSelection { .. } => verb_fqn.to_string(),
+            JourneyRoute::Verb {
+                verb_fqn: ref vfqn,
+            } => vfqn.clone(),
         };
         labels.insert("origin_macro_fqn".to_string(), macro_fqn);
 
