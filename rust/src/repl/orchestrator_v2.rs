@@ -1602,6 +1602,14 @@ impl ReplOrchestratorV2 {
                 }
             },
             UserInputV2::Message { content } => {
+                // Contextual query intercept (ADR 043) — "what's next" etc.
+                if crate::agent::narration_engine::is_contextual_query(&content) {
+                    if let Some(narration_resp) =
+                        self.handle_contextual_query(session, &content)
+                    {
+                        return narration_resp;
+                    }
+                }
                 // Treat as new verb matching — same as InPack message handling.
                 return self.propose_for_input(session, &content).await;
             }
