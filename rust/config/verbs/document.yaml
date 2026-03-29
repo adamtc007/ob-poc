@@ -384,6 +384,9 @@ domains:
           - "acknowledge document submission"
           - "we got the document update the status"
           - "record that the document came in"
+          - "record document response"
+          - "record a document response"
+          - "document response received"
         behavior: crud
         crud:
           operation: update

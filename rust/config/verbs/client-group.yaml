@@ -449,6 +449,7 @@ domains:
           - "find entities matching"
           - "search for entities in this group"
           - "look up entities matching"
+          - "find entities in group"
         metadata:
           tier: intent
           source_of_truth: operational
