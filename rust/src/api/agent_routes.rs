@@ -238,10 +238,12 @@ async fn try_route_through_repl(
                         content: message.clone(),
                     },
                 }
-            } else if trimmed.eq_ignore_ascii_case("confirm")
-                || trimmed.eq_ignore_ascii_case("yes")
-                || trimmed.eq_ignore_ascii_case("go")
-            {
+            } else if matches!(
+                trimmed.to_lowercase().as_str(),
+                "confirm" | "yes" | "go" | "do it" | "run it" | "run"
+                    | "execute" | "proceed" | "make it so" | "ok"
+                    | "yep" | "sure" | "approved" | "lgtm"
+            ) {
                 UserInputV2::Confirm
             } else {
                 UserInputV2::Message {
