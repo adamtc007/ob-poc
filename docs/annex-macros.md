@@ -331,8 +331,37 @@ Two-pass validation: schema-only (Pass 1) + cross-registry (Pass 2).
 | MACRO060-069 | Expansion | `expands-to` required + non-empty; variable references validated; no raw s-expressions |
 | MACRO070-079 | Cross-registry | `unlocks` references must exist; `invoke-macro` targets must exist |
 | MACRO080-089 | UX warnings | Missing `autofill-from` or `picker` on ref-typed args |
+| PACK001 | Workspace bleed | Macro mode-tags must be compatible with every workspace in the pack |
 
-Run: `cargo x verbs lint`
+Run: `cargo x verbs lint-macros`
+
+### PACK001: Workspace-Macro Bleed Detection
+
+For each macro in a pack's `allowed_verbs`, PACK001 checks that the macro's `mode-tags` are
+compatible with **every** workspace the pack serves. If a workspace accepts none of the macro's
+mode-tags, the macro is exposed to operators who have no context for it.
+
+**Workspace-to-mode-tag compatibility table:**
+
+| Workspace | Accepted mode-tags |
+|-----------|--------------------|
+| `cbu` | structure, trading, onboarding |
+| `kyc` | kyc, onboarding |
+| `deal` | deal, onboarding |
+| `on_boarding` | (all) — umbrella workspace |
+| `product_maintenance` | product, trading |
+| `instrument_matrix` | trading, structure |
+| `sem_os_maintenance` | stewardship, governance |
+
+**Example violation:**
+```
+PACK001 error: macro 'screening.full' [mode-tags: kyc, onboarding] in pack
+  'book-setup' is exposed to workspace 'instrument_matrix' which accepts
+  none of those tags
+```
+
+**Fix:** Either remove the macro from the pack, or add the appropriate mode-tag to the macro
+if it legitimately belongs in that workspace context.
 
 ---
 

@@ -2681,6 +2681,24 @@ fn lint_macros(errors_only: bool, verbose: bool) -> Result<()> {
         }
     }
 
+    // ── PACK001: Pack-macro workspace bleed check ──────────────────────
+    let pack_bleed = lint_pack_macro_bleed(&root);
+    for (severity, msg) in &pack_bleed {
+        match severity.as_str() {
+            "error" => {
+                total_errors += 1;
+                println!("  [PACK001] error: {}", msg);
+            }
+            "warn" => {
+                if !errors_only {
+                    total_warnings += 1;
+                    println!("  [PACK001] warn: {}", msg);
+                }
+            }
+            _ => {}
+        }
+    }
+
     println!("\n===========================================");
     println!("  Lint Summary");
     println!("===========================================");
@@ -2700,6 +2718,172 @@ fn lint_macros(errors_only: bool, verbose: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// PACK001: Detect macro-workspace bleed.
+///
+/// For each macro in a pack's `allowed_verbs`, check that the macro's
+/// `mode-tags` are compatible with **every** workspace the pack serves.
+/// If a workspace accepts none of the macro's mode-tags, the macro is
+/// exposed to operators who have no context for it (e.g., screening
+/// macros in the Instrument Matrix workspace).
+///
+/// Returns Vec<(severity, message)>.
+fn lint_pack_macro_bleed(root: &std::path::Path) -> Vec<(String, String)> {
+    let mut diags = Vec::new();
+
+    let packs_dir = root.join("rust/config/packs");
+    let macros_dir = root.join("rust/config/verb_schemas/macros");
+
+    if !packs_dir.exists() || !macros_dir.exists() {
+        return diags;
+    }
+
+    // Load all macro mode-tags from YAML
+    let mut macro_mode_tags: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+
+    if let Ok(entries) = std::fs::read_dir(&macros_dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path
+                .extension()
+                .map(|e| e == "yaml" || e == "yml")
+                .unwrap_or(false)
+            {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(doc) = serde_yaml::from_str::<serde_yaml::Value>(&content) {
+                        if let Some(map) = doc.as_mapping() {
+                            for (k, v) in map {
+                                if let (Some(fqn), Some(spec)) = (k.as_str(), v.as_mapping()) {
+                                    if let Some(routing) =
+                                        spec.get("routing").and_then(|r| r.as_mapping())
+                                    {
+                                        let tags: Vec<String> = routing
+                                            .get("mode-tags")
+                                            .and_then(|t| t.as_sequence())
+                                            .map(|seq| {
+                                                seq.iter()
+                                                    .filter_map(|v| {
+                                                        v.as_str().map(|s| s.to_string())
+                                                    })
+                                                    .collect()
+                                            })
+                                            .unwrap_or_default();
+                                        if !tags.is_empty() {
+                                            macro_mode_tags.insert(fqn.to_string(), tags);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Load all pack manifests
+    if let Ok(entries) = std::fs::read_dir(&packs_dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if !path
+                .extension()
+                .map(|e| e == "yaml" || e == "yml")
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let doc: serde_yaml::Value = match serde_yaml::from_str(&content) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let map = match doc.as_mapping() {
+                Some(m) => m,
+                None => continue,
+            };
+
+            let pack_id = map.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+
+            let workspaces: Vec<String> = map
+                .get("workspaces")
+                .and_then(|v| v.as_sequence())
+                .map(|seq| {
+                    seq.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            if workspaces.is_empty() {
+                continue; // Internal packs (e.g., session-bootstrap)
+            }
+
+            let allowed_verbs: Vec<String> = map
+                .get("allowed_verbs")
+                .and_then(|v| v.as_sequence())
+                .map(|seq| {
+                    seq.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            for verb_or_macro in &allowed_verbs {
+                if let Some(tags) = macro_mode_tags.get(verb_or_macro.as_str()) {
+                    // This is a macro — check workspace compatibility
+                    for ws in &workspaces {
+                        if !workspace_accepts_any_mode_tag(ws, tags) {
+                            diags.push((
+                                "error".to_string(),
+                                format!(
+                                    "macro '{}' [mode-tags: {}] in pack '{}' is exposed to \
+                                     workspace '{}' which accepts none of those tags",
+                                    verb_or_macro,
+                                    tags.join(", "),
+                                    pack_id,
+                                    ws,
+                                ),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    diags
+}
+
+/// Check if a workspace accepts any of the given mode-tags.
+///
+/// Workspace-to-mode-tag compatibility table:
+///
+/// | Workspace            | Accepted mode-tags                              |
+/// |----------------------|--------------------------------------------------|
+/// | cbu                  | structure, trading, onboarding                   |
+/// | kyc                  | kyc, onboarding                                  |
+/// | deal                 | deal, onboarding                                 |
+/// | on_boarding          | (all) — umbrella workspace                       |
+/// | product_maintenance  | product, trading                                 |
+/// | instrument_matrix    | trading, structure                               |
+/// | sem_os_maintenance   | stewardship, governance                          |
+fn workspace_accepts_any_mode_tag(workspace: &str, tags: &[String]) -> bool {
+    let accepted: &[&str] = match workspace {
+        "cbu" => &["structure", "trading", "onboarding"],
+        "kyc" => &["kyc", "onboarding"],
+        "deal" => &["deal", "onboarding"],
+        "on_boarding" => return true, // Umbrella — accepts all mode-tags
+        "product_maintenance" => &["product", "trading"],
+        "instrument_matrix" => &["trading", "structure"],
+        "sem_os_maintenance" => &["stewardship", "governance"],
+        _ => return true, // Unknown workspace — don't block
+    };
+    tags.iter().any(|tag| accepted.contains(&tag.as_str()))
 }
 
 /// Inline YAML lint for when the binary isn't available

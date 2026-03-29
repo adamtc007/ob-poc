@@ -17,7 +17,7 @@ structure.setup:
     target-label: "Structure"
 
   routing:
-    mode-tags: [onboarding, kyc]
+    mode-tags: [onboarding, kyc, structure]
     operator-domain: structure
 
   target:
@@ -86,7 +86,7 @@ structure.assign-role:
     target-label: "Role Assignment"
 
   routing:
-    mode-tags: [onboarding, kyc]
+    mode-tags: [onboarding, kyc, structure]
     operator-domain: structure
 
   target:
@@ -259,7 +259,7 @@ structure.roles:
     target-label: "Roles"
 
   routing:
-    mode-tags: [onboarding, kyc]
+    mode-tags: [onboarding, kyc, structure]
     operator-domain: structure
 
   target:

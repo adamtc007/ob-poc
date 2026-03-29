@@ -113,6 +113,7 @@ SemOS Maintenance workspace (2026-03-28):
 - Macro priority: ScenarioIndex (1.05) > MacroIndex (1.04) > exact phrase (1.0) — macros always win over single verbs when both match (safer, atomic, complete)
 - Per-entity macro expansion: runbook compiler replicates macro steps per CBU UUID in scope
 - Macro audit (2026-03-29): fixed `expands_to` → `expands-to` YAML key in `attribute.seed-*` macros (serde kebab-case deserialization bug); removed 8 KYC-domain macros from `book-setup` pack (screening, case, kyc-workflow macros leaked into CBU/InstrumentMatrix workspaces); added search overrides for `screening-ops.*` workstream-level macros; two screening families coexist: `screening.*` (party-level ad-hoc) and `screening-ops.*` (workstream-level KYC)
+- PACK001 lint rule: workspace-macro bleed detection — checks every macro in a pack's `allowed_verbs` has mode-tags compatible with all pack workspaces; prevents KYC/screening macros from leaking into CBU/InstrumentMatrix contexts; workspace-to-mode-tag compatibility table in `docs/annex-macros.md`
 - `cargo clippy` clean across entire codebase
 
 ---

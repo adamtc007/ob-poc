@@ -17,7 +17,7 @@ party.add:
     target-label: "Party"
 
   routing:
-    mode-tags: [onboarding, kyc]
+    mode-tags: [onboarding, kyc, structure]
     operator-domain: party
 
   target:
@@ -91,7 +91,7 @@ party.add-person:
     target-label: "Person"
 
   routing:
-    mode-tags: [onboarding, kyc]
+    mode-tags: [onboarding, kyc, structure]
     operator-domain: party
 
   target:
@@ -143,7 +143,7 @@ party.add-company:
     target-label: "Company"
 
   routing:
-    mode-tags: [onboarding, kyc]
+    mode-tags: [onboarding, kyc, structure]
     operator-domain: party
 
   target:
@@ -310,7 +310,7 @@ party.update:
     target-label: "Party"
 
   routing:
-    mode-tags: [onboarding, kyc]
+    mode-tags: [onboarding, kyc, structure]
     operator-domain: party
 
   target:
@@ -422,7 +422,7 @@ party.assign-identifier:
     target-label: "Identifier"
 
   routing:
-    mode-tags: [onboarding, kyc]
+    mode-tags: [onboarding, kyc, structure]
     operator-domain: party
 
   target:
@@ -488,7 +488,7 @@ party.set-address:
     target-label: "Address"
 
   routing:
-    mode-tags: [onboarding, kyc]
+    mode-tags: [onboarding, kyc, structure]
     operator-domain: party
 
   target:
