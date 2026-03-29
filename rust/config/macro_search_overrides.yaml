@@ -141,6 +141,80 @@ struct.uk.authorised.oeic:
     - "create UK OEIC"
     - "onboard a UK OEIC"
 
+struct.uk.authorised.aut:
+  aliases:
+    - "uk unit trust"
+    - "uk authorised unit trust"
+    - "uk aut"
+    - "set up a uk unit trust"
+
+struct.uk.authorised.acs:
+  aliases:
+    - "uk contractual scheme"
+    - "uk acs"
+    - "uk authorised contractual scheme"
+    - "create a uk contractual scheme"
+    - "co-ownership scheme"
+
+struct.uk.authorised.ltaf:
+  aliases:
+    - "uk ltaf"
+    - "uk long-term asset fund"
+    - "long term asset fund"
+    - "set up a uk ltaf"
+    - "illiquid asset fund"
+
+struct.uk.manager.llp:
+  aliases:
+    - "uk manager llp"
+    - "uk llp"
+    - "manager llp"
+    - "create a uk llp"
+
+struct.uk.private-equity.lp:
+  aliases:
+    - "uk pe lp"
+    - "uk private equity lp"
+    - "uk limited partnership"
+    - "uk pe fund"
+
+struct.us.40act.closed-end:
+  aliases:
+    - "us closed-end fund"
+    - "closed-end fund"
+    - "40 act closed end"
+    - "create a closed-end fund"
+
+struct.us.etf.40act:
+  aliases:
+    - "us etf"
+    - "40 act etf"
+    - "exchange traded fund"
+    - "set up a us etf"
+
+struct.us.private-fund.delaware-lp:
+  aliases:
+    - "delaware lp"
+    - "delaware limited partnership"
+    - "us private fund"
+    - "create a delaware lp"
+    - "delaware lp private fund"
+
+struct.ie.aif.icav:
+  aliases:
+    - "irish aif icav"
+    - "ireland aif"
+    - "ie aif"
+    - "set up an irish aif"
+    - "irish alternative investment fund"
+
+struct.ie.hedge.icav:
+  aliases:
+    - "irish hedge fund"
+    - "ireland hedge icav"
+    - "ie hedge"
+    - "irish hedge fund icav"
+
 struct.hedge.cross-border:
   aliases:
     - "cross border hedge"
@@ -177,9 +251,445 @@ mandate.create:
     - "set up a mandate"
     - "new mandate"
 
+party.add-person:
+  aliases:
+    - "add a person"
+    - "add new person"
+    - "register a person"
+    - "add a natural person"
+
+party.details:
+  aliases:
+    - "view party details"
+    - "show party details"
+    - "party information"
+    - "who is this party"
+
+party.update:
+  aliases:
+    - "update party"
+    - "edit party"
+    - "change party information"
+    - "update party details"
+
+party.list:
+  aliases:
+    - "list all parties"
+    - "show parties"
+    - "who are the parties"
+
+party.assign-identifier:
+  aliases:
+    - "add identifier"
+    - "add an identifier"
+    - "assign lei"
+    - "add passport number"
+    - "attach identifier"
+
+party.set-address:
+  aliases:
+    - "set party address"
+    - "update address"
+    - "set the address"
+    - "change address"
+
+party.search:
+  aliases:
+    - "search for a party"
+    - "find a party"
+    - "look up party"
+
 structure.setup:
   aliases:
     - "set up a structure"
     - "create a structure"
     - "new structure"
     - "add a structure"
+
+structure.list:
+  aliases:
+    - "list structures"
+    - "show structures"
+    - "list all structures"
+
+structure.select:
+  aliases:
+    - "select a structure"
+    - "pick a structure"
+    - "switch structure"
+
+structure.roles:
+  aliases:
+    - "show roles"
+    - "list roles"
+    - "show roles for this structure"
+    - "who has what role"
+
+structure.assign-role:
+  aliases:
+    - "assign a role"
+    - "assign role to structure"
+    - "add a role"
+
+# =========================================================================
+# CASE MACROS
+# =========================================================================
+
+case.open:
+  aliases:
+    - "open a case"
+    - "create a case"
+    - "new case"
+    - "start a case"
+    - "open kyc case"
+
+case.add-party:
+  aliases:
+    - "add party to case"
+    - "add a party to the case"
+    - "include party in case"
+
+case.solicit-document:
+  aliases:
+    - "request a document"
+    - "request document from party"
+    - "solicit document"
+
+case.submit:
+  aliases:
+    - "submit the case"
+    - "submit case for review"
+    - "send case for approval"
+
+case.approve:
+  aliases:
+    - "approve the case"
+    - "approve kyc case"
+    - "case approved"
+    - "approve this case"
+
+case.reject:
+  aliases:
+    - "reject the case"
+    - "reject kyc case"
+    - "decline the case"
+
+case.request-info:
+  aliases:
+    - "request more information"
+    - "ask for more info"
+    - "request additional info"
+    - "need more information"
+
+case.list:
+  aliases:
+    - "list cases"
+    - "show cases"
+    - "list kyc cases"
+
+case.select:
+  aliases:
+    - "select a case"
+    - "pick a case"
+    - "switch case"
+
+# =========================================================================
+# KYC WORKSTREAM MACROS
+# =========================================================================
+
+kyc-workstream.add:
+  aliases:
+    - "add a workstream"
+    - "create workstream"
+    - "new workstream"
+    - "add workstream for party"
+
+kyc-workstream.update-status:
+  aliases:
+    - "update workstream status"
+    - "change workstream status"
+    - "advance workstream"
+
+kyc-workstream.close:
+  aliases:
+    - "close workstream"
+    - "complete workstream"
+    - "finish workstream"
+
+# =========================================================================
+# DOCUMENT REQUEST MACROS
+# =========================================================================
+
+doc-request.create:
+  aliases:
+    - "create document request"
+    - "request a document"
+    - "new document request"
+    - "create a document request for the workstream"
+    - "request document for workstream"
+
+doc-request.send:
+  aliases:
+    - "send document request"
+    - "send the request"
+    - "mark request as sent"
+
+doc-request.respond:
+  aliases:
+    - "record document response"
+    - "document received"
+    - "mark document received"
+
+doc-request.verify:
+  aliases:
+    - "verify document request"
+    - "verify the document"
+    - "approve document"
+    - "verify document"
+
+doc-request.reject:
+  aliases:
+    - "reject document"
+    - "reject the submitted document"
+    - "document not acceptable"
+
+# =========================================================================
+# EVIDENCE MACROS
+# =========================================================================
+
+evidence.require:
+  aliases:
+    - "require evidence"
+    - "create evidence requirement"
+    - "evidence needed"
+    - "require evidence for ownership"
+
+evidence.link:
+  aliases:
+    - "link evidence"
+    - "attach document to evidence"
+    - "link document to evidence"
+
+evidence.verify:
+  aliases:
+    - "verify evidence"
+    - "approve evidence"
+    - "evidence verified"
+
+evidence.reject:
+  aliases:
+    - "reject evidence"
+    - "evidence rejected"
+    - "evidence not acceptable"
+
+evidence.waive:
+  aliases:
+    - "waive evidence"
+    - "waive evidence requirement"
+    - "skip evidence"
+
+# =========================================================================
+# RED FLAG MACROS
+# =========================================================================
+
+red-flag.raise:
+  aliases:
+    - "raise a risk flag"
+    - "flag a risk"
+    - "raise risk flag"
+    - "create risk flag"
+
+red-flag.resolve:
+  aliases:
+    - "resolve risk flag"
+    - "close risk flag"
+    - "resolve the flag"
+
+red-flag.escalate:
+  aliases:
+    - "escalate risk flag"
+    - "escalate the flag"
+    - "block on risk flag"
+    - "escalate risk"
+
+# =========================================================================
+# TOLLGATE MACROS
+# =========================================================================
+
+tollgate.evaluate:
+  aliases:
+    - "evaluate tollgate"
+    - "evaluate approval gate"
+    - "run tollgate"
+    - "check tollgate"
+    - "tollgate evaluation"
+
+tollgate.override:
+  aliases:
+    - "override tollgate"
+    - "override approval gate"
+    - "management override"
+    - "override the tollgate decision"
+
+# =========================================================================
+# UBO MACROS
+# =========================================================================
+
+ubo.discover:
+  aliases:
+    - "discover beneficial owners"
+    - "compute ubo"
+    - "find ubos"
+    - "discover ubo structure"
+
+ubo.allege:
+  aliases:
+    - "record beneficial owner"
+    - "allege ubo"
+    - "add ubo allegation"
+
+ubo.verify:
+  aliases:
+    - "verify beneficial owner"
+    - "verify ubo"
+
+ubo.promote:
+  aliases:
+    - "promote beneficial owner"
+    - "advance ubo status"
+
+ubo.approve:
+  aliases:
+    - "approve beneficial owner"
+    - "approve ubo"
+
+ubo.reject:
+  aliases:
+    - "reject beneficial owner"
+    - "reject ubo"
+
+ubo.expire:
+  aliases:
+    - "expire beneficial ownership"
+    - "expire ubo allegation"
+    - "expire the beneficial ownership allegation"
+    - "expire ownership"
+
+ubo.trace-chains:
+  aliases:
+    - "trace ownership chains"
+    - "show ownership chains"
+    - "trace ubo chains"
+
+# =========================================================================
+# MANDATE MACROS
+# =========================================================================
+
+mandate.add-product:
+  aliases:
+    - "add product to mandate"
+    - "add a product to the mandate"
+    - "mandate add product"
+    - "attach product"
+
+mandate.set-instruments:
+  aliases:
+    - "set mandate instruments"
+    - "set permitted instruments"
+    - "configure instruments"
+
+mandate.set-markets:
+  aliases:
+    - "set mandate markets"
+    - "set permitted markets"
+    - "configure markets"
+
+mandate.list:
+  aliases:
+    - "list mandates"
+    - "show mandates"
+    - "list mandates for this structure"
+
+mandate.select:
+  aliases:
+    - "select a mandate"
+    - "pick a mandate"
+    - "switch mandate"
+
+mandate.details:
+  aliases:
+    - "show mandate details"
+    - "mandate details"
+    - "view mandate"
+
+# =========================================================================
+# PRODUCT SUITE MACROS
+# =========================================================================
+
+structure.product-suite-custody-fa-ta:
+  aliases:
+    - "standard product suite"
+    - "add custody fa ta"
+    - "add standard product suite"
+
+structure.product-suite-full:
+  aliases:
+    - "full product suite"
+    - "add full product suite"
+    - "all products"
+
+structure.remove-all-products:
+  aliases:
+    - "remove all products"
+    - "clear products"
+    - "remove products from cbu"
+
+# =========================================================================
+# GOVERNANCE MACROS
+# =========================================================================
+
+governance.bootstrap-attribute-registry:
+  aliases:
+    - "bootstrap attribute registry"
+    - "bootstrap the registry"
+    - "bridge attributes to semos"
+    - "bootstrap registry"
+
+governance.define-service-dictionary:
+  aliases:
+    - "define service dictionary"
+    - "define service resource dictionary"
+    - "service dictionary"
+    - "build service dictionary"
+
+governance.full-publish-pipeline:
+  aliases:
+    - "full publish pipeline"
+    - "run full publish"
+    - "publish changeset"
+    - "run the full publish pipeline"
+    - "governance publish"
+
+governance.reconcile-registry:
+  aliases:
+    - "reconcile registry"
+    - "reconcile the registry"
+    - "registry reconciliation"
+    - "sync and reconcile"
+
+# =========================================================================
+# ATTRIBUTE SEED MACROS
+# =========================================================================
+
+attribute.seed-domain:
+  aliases:
+    - "seed attribute domain"
+    - "seed attributes for domain"
+    - "seed attributes for a domain"
+    - "generate attribute definitions"
+
+attribute.seed-derived:
+  aliases:
+    - "seed derived attributes"
+    - "seed derived"
+    - "generate derived attribute definitions"
