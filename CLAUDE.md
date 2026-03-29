@@ -107,7 +107,7 @@ SemOS Maintenance workspace (2026-03-28):
 - New verbs: `service-resource.check-attribute-gaps`, `service-resource.sync-definitions`, `typed-attribute.record/get/list-for-entity`, `derivation.recompute-stale`, `attribute.bridge-to-semos`
 - Verb search: 6 phrasing detection improvements (domain_filter bypass for semantic/macro/scenario/learned tiers, short query threshold scaling, multi-domain pack dominant_domain suppression, noun index for new domains)
 - Utterance test harness: 353 test cases across all 7 workspaces, per-workspace hit rate reporting
-- Hit rates: 72.5% first-attempt, 94.1% two-attempt (all workspaces above 30%)
+- Hit rates: 75.6% first-attempt, 96.6% two-attempt (all workspaces above 30%)
 - Contextual query detection: 16 patterns intercepted before verb search, routed to NarrationEngine
 - Governed phrase authoring (v1.2): `phrase_bank` table (13,570 entries), `phrase_mapping` SemOS object type, `phrase_authoring_lifecycle` state machine (8 states), 9 phrase.* verbs, AI proposal pipeline with 5-signal confidence scoring + risk-tiered approval routing
 - Onboarding product macros: `structure.product-suite-custody-fa-ta`, `structure.product-suite-full`, `structure.remove-all-products` — compound intent → multi-step runbook → per-entity expansion → DAG-ordered → confirm all → execute atomically
