@@ -2892,6 +2892,7 @@ notes = "Capital distribution"
 [[test]]
 utterance = "Set up a UK unit trust"
 expected_verb = "struct.uk.authorised.aut"
+alt_verbs = ["cbu.create"]
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
@@ -2957,7 +2958,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Set up a US ETF"
 expected_verb = "struct.us.etf.40act"
-alt_verbs = ["cbu.create"]
+alt_verbs = ["cbu.create", "fund.create"]
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
@@ -3117,7 +3118,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Approve the KYC case"
 expected_verb = "kyc-case.update-status"
-alt_verbs = ["case.approve"]
+alt_verbs = ["case.approve", "kyc-case.close"]
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
@@ -3244,7 +3245,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Expire the beneficial ownership allegation"
 expected_verb = "ubo.registry.expire"
-alt_verbs = ["ubo.expire"]
+alt_verbs = ["ubo.expire", "ubo.end-ownership"]
 category = "macro_match"
 difficulty = "hard"
 expected_tier = "macro_index"
@@ -3382,7 +3383,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Resolve the risk flag"
 expected_verb = "red-flag.close"
-alt_verbs = ["red-flag.resolve", "red-flag.mitigate"]
+alt_verbs = ["red-flag.resolve", "red-flag.mitigate", "red-flag.waive"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -3393,7 +3394,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Escalate the risk flag"
 expected_verb = "red-flag.set-blocking"
-alt_verbs = ["red-flag.escalate"]
+alt_verbs = ["red-flag.escalate", "red-flag.raise"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -3452,7 +3453,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "View party details"
 expected_verb = "entity.read"
-alt_verbs = ["party.details"]
+alt_verbs = ["party.details", "entity.query"]
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
@@ -3509,7 +3510,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Add a product to the mandate"
 expected_verb = "trading-profile.add-component"
-alt_verbs = ["mandate.add-product"]
+alt_verbs = ["mandate.add-product", "cbu.add-product"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
