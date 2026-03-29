@@ -8,7 +8,7 @@
 
 use ob_poc_types::narration::{
     ActionPriority, NarrationBlocker, NarrationGap, NarrationPayload, NarrationVerbosity,
-    SlotDelta, SuggestedAction,
+    SlotDelta, SuggestedAction, WorkspaceTransition,
 };
 
 use crate::sem_os_runtime::constellation_runtime::{HydratedCardinality, HydratedSlot};
@@ -28,6 +28,7 @@ pub fn compute_narration(
     writes_since_push: u32,
     is_first_action: bool,
     constellation_label: &str,
+    current_workspace: Option<&str>,
 ) -> NarrationPayload {
     let verbosity = compute_verbosity(last_verb, writes_since_push, is_first_action, post_slots);
 
@@ -51,6 +52,13 @@ pub fn compute_narration(
         None
     };
 
+    // Compute workspace transition if all required slots are filled
+    let workspace_transition = if required_gaps.is_empty() {
+        current_workspace.and_then(suggest_workspace_transition)
+    } else {
+        None
+    };
+
     NarrationPayload {
         progress,
         delta,
@@ -58,6 +66,7 @@ pub fn compute_narration(
         optional_gaps,
         suggested_next,
         blockers,
+        workspace_transition,
         verbosity,
     }
 }
@@ -110,7 +119,11 @@ const CONTEXTUAL_PATTERNS: &[&str] = &[
 /// Unlike `compute_narration()` (which is post-execution with delta),
 /// this produces a snapshot view: current gaps, blockers, progress,
 /// and suggested next steps — no delta since nothing changed.
-pub fn query_narration(post_slots: &[HydratedSlot], constellation_label: &str) -> NarrationPayload {
+pub fn query_narration(
+    post_slots: &[HydratedSlot],
+    constellation_label: &str,
+    current_workspace: Option<&str>,
+) -> NarrationPayload {
     let (required_gaps, optional_gaps) = compute_gaps(post_slots);
     let suggested_next = compute_suggested_next(&required_gaps, &optional_gaps);
     let blockers = compute_blockers(post_slots);
@@ -126,6 +139,12 @@ pub fn query_narration(post_slots: &[HydratedSlot], constellation_label: &str) -
         None
     };
 
+    let workspace_transition = if required_gaps.is_empty() {
+        current_workspace.and_then(suggest_workspace_transition)
+    } else {
+        None
+    };
+
     NarrationPayload {
         progress,
         delta: Vec::new(), // No delta — this is a snapshot query
@@ -133,6 +152,7 @@ pub fn query_narration(post_slots: &[HydratedSlot], constellation_label: &str) -
         optional_gaps,
         suggested_next,
         blockers,
+        workspace_transition,
         verbosity: NarrationVerbosity::Full,
     }
 }
@@ -428,6 +448,60 @@ fn compute_blockers(post_slots: &[HydratedSlot]) -> Vec<NarrationBlocker> {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Workspace transition graph
+// ---------------------------------------------------------------------------
+
+/// Suggest the natural next workspace after the current one is complete.
+///
+/// The transition graph encodes the standard onboarding flow:
+///
+/// ```text
+/// CBU (structure setup)
+///   → KYC (due diligence)
+///   → InstrumentMatrix (trading config)
+/// KYC (due diligence)
+///   → Deal (commercial terms)
+///   → InstrumentMatrix (trading config)
+/// Deal → ProductMaintenance
+/// InstrumentMatrix → (done)
+/// OnBoarding → CBU (first workspace)
+/// ```
+fn suggest_workspace_transition(current: &str) -> Option<WorkspaceTransition> {
+    match current {
+        "cbu" => Some(WorkspaceTransition {
+            target_workspace: "kyc".into(),
+            target_label: "KYC".into(),
+            reason: "Structure setup complete — begin due diligence".into(),
+            suggested_utterance: "switch to KYC workspace".into(),
+        }),
+        "kyc" => Some(WorkspaceTransition {
+            target_workspace: "deal".into(),
+            target_label: "Deal".into(),
+            reason: "KYC approved — set up commercial terms".into(),
+            suggested_utterance: "switch to Deal workspace".into(),
+        }),
+        "deal" => Some(WorkspaceTransition {
+            target_workspace: "instrument_matrix".into(),
+            target_label: "Instrument Matrix".into(),
+            reason: "Deal agreed — configure trading matrix".into(),
+            suggested_utterance: "switch to Instrument Matrix".into(),
+        }),
+        "on_boarding" => Some(WorkspaceTransition {
+            target_workspace: "cbu".into(),
+            target_label: "CBU".into(),
+            reason: "Onboarding request complete — set up fund structures".into(),
+            suggested_utterance: "switch to CBU workspace".into(),
+        }),
+        // instrument_matrix, product_maintenance, sem_os_maintenance — no natural successor
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 /// Convert a slot name like "management_company" → "Management Company"
 fn humanize_slot_name(name: &str) -> String {
     name.replace(['_', '-'], " ")
@@ -496,7 +570,7 @@ mod tests {
             vec![],
             vec![],
         )];
-        let result = compute_narration(&[], &slots, "cbu.read", 1, false, "Test Fund");
+        let result = compute_narration(&[], &slots, "cbu.read", 1, false, "Test Fund", Some("cbu"));
         assert_eq!(result.verbosity, NarrationVerbosity::Silent);
     }
 
@@ -518,7 +592,15 @@ mod tests {
                 vec![],
             ),
         ];
-        let result = compute_narration(&[], &slots, "cbu.create", 1, true, "Lux UCITS SICAV Alpha");
+        let result = compute_narration(
+            &[],
+            &slots,
+            "cbu.create",
+            1,
+            true,
+            "Lux UCITS SICAV Alpha",
+            Some("cbu"),
+        );
         assert_eq!(result.verbosity, NarrationVerbosity::Full);
         assert_eq!(result.required_gaps.len(), 1);
         assert_eq!(result.optional_gaps.len(), 1);
@@ -551,6 +633,7 @@ mod tests {
             2,
             false,
             "Lux UCITS SICAV Alpha",
+            Some("cbu"),
         );
         assert_eq!(result.verbosity, NarrationVerbosity::Medium);
         assert_eq!(result.required_gaps.len(), 1);
@@ -582,11 +665,15 @@ mod tests {
             3,
             false,
             "Lux UCITS SICAV Alpha",
+            Some("cbu"),
         );
         // All mandatory filled → Full (celebration)
         assert_eq!(result.verbosity, NarrationVerbosity::Full);
         assert!(result.required_gaps.is_empty());
         assert_eq!(result.optional_gaps.len(), 1);
+        // Workspace transition should be suggested when all required filled
+        assert!(result.workspace_transition.is_some());
+        assert_eq!(result.workspace_transition.unwrap().target_workspace, "kyc");
     }
 
     #[test]
@@ -603,7 +690,15 @@ mod tests {
             vec![],
             vec![],
         )];
-        let result = compute_narration(&pre, &post, "cbu.assign-role", 1, false, "Test Fund");
+        let result = compute_narration(
+            &pre,
+            &post,
+            "cbu.assign-role",
+            1,
+            false,
+            "Test Fund",
+            Some("cbu"),
+        );
         assert_eq!(result.delta.len(), 1);
         assert_eq!(result.delta[0].from_state, "empty");
         assert_eq!(result.delta[0].to_state, "filled");
@@ -627,7 +722,7 @@ mod tests {
                 vec![],
             ),
         ];
-        let result = compute_narration(&[], &slots, "cbu.create", 1, true, "Test");
+        let result = compute_narration(&[], &slots, "cbu.create", 1, true, "Test", Some("cbu"));
         assert!(!result.suggested_next.is_empty());
         assert_eq!(result.suggested_next[0].priority, ActionPriority::Critical);
     }
@@ -657,7 +752,7 @@ mod tests {
             vec![],
             vec![blocked],
         )];
-        let result = compute_narration(&[], &slots, "cbu.create", 1, true, "Test");
+        let result = compute_narration(&[], &slots, "cbu.create", 1, true, "Test", Some("cbu"));
         assert_eq!(result.blockers.len(), 1);
         assert_eq!(result.blockers[0].blocked_verb, "case.open");
     }
@@ -694,7 +789,7 @@ mod tests {
             vec![],
             vec![],
         )];
-        let result = query_narration(&slots, "Lux UCITS SICAV Alpha");
+        let result = query_narration(&slots, "Lux UCITS SICAV Alpha", Some("cbu"));
         assert_eq!(result.verbosity, NarrationVerbosity::Full);
         assert!(result.required_gaps.is_empty());
         assert!(result.delta.is_empty()); // No delta for queries
@@ -726,7 +821,7 @@ mod tests {
                 vec![],
             ),
         ];
-        let result = query_narration(&slots, "Test Fund");
+        let result = query_narration(&slots, "Test Fund", Some("kyc"));
         assert_eq!(result.required_gaps.len(), 1);
         assert_eq!(result.optional_gaps.len(), 1);
         assert_eq!(result.required_gaps[0].slot_label, "Management Company");

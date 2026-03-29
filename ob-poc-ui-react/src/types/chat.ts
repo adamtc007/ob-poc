@@ -403,7 +403,15 @@ export interface NarrationPayload {
   optional_gaps: NarrationGap[];
   suggested_next: SuggestedAction[];
   blockers: NarrationBlocker[];
+  workspace_transition?: WorkspaceTransition;
   verbosity: NarrationVerbosity;
+}
+
+export interface WorkspaceTransition {
+  target_workspace: string;
+  target_label: string;
+  reason: string;
+  suggested_utterance: string;
 }
 
 export interface SlotDelta {

@@ -37,6 +37,10 @@ pub struct NarrationPayload {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blockers: Vec<NarrationBlocker>,
 
+    /// Workspace transition suggestion — shown when all required slots are filled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_transition: Option<WorkspaceTransition>,
+
     /// Narration verbosity for this turn.
     pub verbosity: NarrationVerbosity,
 }
@@ -101,6 +105,19 @@ pub struct NarrationBlocker {
     pub unblock_hint: String,
 }
 
+/// Workspace transition suggestion — the natural next workspace after completion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceTransition {
+    /// The workspace to transition to.
+    pub target_workspace: String,
+    /// Human-readable label for the target workspace.
+    pub target_label: String,
+    /// Why this transition is suggested.
+    pub reason: String,
+    /// Utterance to trigger the transition.
+    pub suggested_utterance: String,
+}
+
 /// Narration verbosity — controls how much context the UI shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -125,6 +142,7 @@ impl NarrationPayload {
             optional_gaps: Vec::new(),
             suggested_next: Vec::new(),
             blockers: Vec::new(),
+            workspace_transition: None,
             verbosity: NarrationVerbosity::Silent,
         }
     }
@@ -174,6 +192,7 @@ mod tests {
                 reason: "required for UCITS authorisation".into(),
             }],
             blockers: Vec::new(),
+            workspace_transition: None,
             verbosity: NarrationVerbosity::Medium,
         };
 

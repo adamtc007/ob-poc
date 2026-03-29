@@ -102,7 +102,7 @@ export const NarrationPanel: React.FC<NarrationPanelProps> = ({
         <BlockerList blockers={narration.blockers} />
       )}
 
-      {/* Completion message */}
+      {/* Completion + workspace transition */}
       {allComplete && (
         <div
           style={{
@@ -112,6 +112,53 @@ export const NarrationPanel: React.FC<NarrationPanelProps> = ({
           }}
         >
           All required slots filled — ready to proceed.
+        </div>
+      )}
+
+      {/* Workspace transition suggestion */}
+      {narration.workspace_transition && (
+        <div
+          style={{
+            marginTop: "10px",
+            padding: "8px 12px",
+            borderRadius: "6px",
+            border: "1px solid #1976d2",
+            backgroundColor: "rgba(25, 118, 210, 0.06)",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
+          <span style={{ fontSize: "16px" }}>{"\u27A1"}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, color: "#1565c0" }}>
+              Next: {narration.workspace_transition.target_label}
+            </div>
+            <div style={{ fontSize: "12px", color: "#757575" }}>
+              {narration.workspace_transition.reason}
+            </div>
+          </div>
+          {onSendMessage && (
+            <button
+              onClick={() =>
+                onSendMessage(
+                  narration.workspace_transition!.suggested_utterance,
+                )
+              }
+              style={{
+                padding: "6px 16px",
+                fontSize: "12px",
+                fontWeight: 600,
+                borderRadius: "16px",
+                border: "1px solid #1976d2",
+                backgroundColor: "#1976d2",
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Switch
+            </button>
+          )}
         </div>
       )}
     </div>

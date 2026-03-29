@@ -2612,8 +2612,15 @@ impl ReplOrchestratorV2 {
             .as_deref()
             .unwrap_or(&constellation.constellation);
 
-        let narration =
-            crate::agent::narration_engine::query_narration(&constellation.slots, label);
+        let ws_key = serde_json::to_value(&frame.workspace)
+            .ok()
+            .and_then(|v| v.as_str().map(|s| s.to_string()))
+            .unwrap_or_default();
+        let narration = crate::agent::narration_engine::query_narration(
+            &constellation.slots,
+            label,
+            Some(&ws_key),
+        );
 
         // Build a human-readable message from the narration.
         let mut msg = String::new();
@@ -2644,6 +2651,12 @@ impl ReplOrchestratorV2 {
         }
         if narration.required_gaps.is_empty() && narration.optional_gaps.is_empty() {
             msg.push_str("\nAll slots filled — ready to proceed.");
+        }
+        if let Some(ref transition) = narration.workspace_transition {
+            msg.push_str(&format!(
+                "\n\nNext workspace: {} — {}\nSay: \"{}\"",
+                transition.target_label, transition.reason, transition.suggested_utterance
+            ));
         }
 
         // Store hot verbs for boost signal.
