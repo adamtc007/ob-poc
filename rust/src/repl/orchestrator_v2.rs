@@ -601,6 +601,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 };
                 return Ok(Some(response));
             }
@@ -647,8 +648,17 @@ impl ReplOrchestratorV2 {
             });
         }
 
+        // Capture pre-execution slot snapshots for narration delta (ADR 043).
+        let pre_narration_slots: Vec<crate::agent::narration_engine::SlotSnapshot> = session
+            .workspace_stack
+            .last()
+            .and_then(|f| f.hydrated_state.as_ref())
+            .and_then(|hs| hs.hydrated_constellation.as_ref())
+            .map(|c| crate::agent::narration_engine::SlotSnapshot::capture(&c.slots))
+            .unwrap_or_default();
+
         // Dispatch based on current state.
-        let response = match session.state.clone() {
+        let mut response = match session.state.clone() {
             ReplStateV2::ScopeGate { .. } => self.handle_scope_gate(session, input).await,
             ReplStateV2::WorkspaceSelection { .. } => {
                 self.handle_workspace_selection(session, input)
@@ -675,6 +685,60 @@ impl ReplOrchestratorV2 {
                 if let Some(ref pool) = self.pool {
                     if let Ok(hydrated) = self.rehydrate_tos(pool, session).await {
                         session.hydrate_tos(hydrated);
+                    }
+                }
+            }
+        }
+
+        // Compute post-execution narration (ADR 043) when writes occurred and
+        // the contextual query path didn't already attach a narration payload.
+        if response.narration.is_none() {
+            if let Some(tos) = session.workspace_stack.last_mut() {
+                if tos.writes_since_push > 0 {
+                    if let Some(ref hs) = tos.hydrated_state {
+                        if let Some(ref constellation) = hs.hydrated_constellation {
+                            let label = constellation
+                                .description
+                                .as_deref()
+                                .unwrap_or(&constellation.constellation);
+                            let ws_key = serde_json::to_value(&tos.workspace)
+                                .ok()
+                                .and_then(|v| v.as_str().map(|s| s.to_string()))
+                                .unwrap_or_default();
+                            let last_verb = session
+                                .runbook
+                                .entries
+                                .iter()
+                                .rev()
+                                .find(|e| {
+                                    matches!(
+                                        e.status,
+                                        super::runbook::EntryStatus::Completed
+                                            | super::runbook::EntryStatus::Failed
+                                    )
+                                })
+                                .map(|e| e.verb.as_str())
+                                .unwrap_or("");
+                            let narration =
+                                crate::agent::narration_engine::compute_narration(
+                                    &pre_narration_slots,
+                                    &constellation.slots,
+                                    last_verb,
+                                    tos.writes_since_push,
+                                    tos.writes_since_push == 1,
+                                    label,
+                                    Some(&ws_key),
+                                );
+                            // Store hot verbs for boost signal.
+                            tos.narration_hot_verbs = narration
+                                .suggested_next
+                                .iter()
+                                .map(|s| s.verb_fqn.clone())
+                                .collect();
+                            if narration.has_content() {
+                                response.narration = Some(narration);
+                            }
+                        }
                     }
                 }
             }
@@ -1017,6 +1081,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: 0,
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             _ => self.invalid_input(session, "Please select a scope first."),
@@ -1070,6 +1135,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: None,
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -1203,6 +1269,7 @@ impl ReplOrchestratorV2 {
                             runbook_summary: None,
                             step_count: 0,
                             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                         }
                     }
                     PackRouteOutcome::NoMatch => {
@@ -1219,6 +1286,7 @@ impl ReplOrchestratorV2 {
                             runbook_summary: None,
                             step_count: 0,
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                         }
                     }
                 }
@@ -1272,6 +1340,7 @@ impl ReplOrchestratorV2 {
                             runbook_summary: None,
                             step_count: session.runbook.entries.len(),
                             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                         };
                     }
 
@@ -1311,6 +1380,7 @@ impl ReplOrchestratorV2 {
                             runbook_summary: Some(summary),
                             step_count: session.runbook.entries.len(),
                             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                         }
                     } else {
                         self.invalid_input(session, "Step not found.")
@@ -1329,6 +1399,7 @@ impl ReplOrchestratorV2 {
                         runbook_summary: Some(summary),
                         step_count: session.runbook.entries.len(),
                         session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                     }
                 }
                 ReplCommandV2::Disable(id) => self.handle_disable(session, id),
@@ -1369,6 +1440,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             UserInputV2::Command {
@@ -1431,6 +1503,7 @@ impl ReplOrchestratorV2 {
                         runbook_summary: Some(summary),
                         step_count: session.runbook.entries.len(),
                         session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                     }
                 } else {
                     self.invalid_input(session, "No sentence to confirm.")
@@ -1459,6 +1532,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             _ => self.invalid_input(session, "Please confirm or reject the proposed step."),
@@ -1497,6 +1571,7 @@ impl ReplOrchestratorV2 {
                             runbook_summary: Some(summary),
                             step_count: session.runbook.entries.len(),
                             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                         }
                     } else {
                         self.invalid_input(session, "Step not found.")
@@ -1515,6 +1590,7 @@ impl ReplOrchestratorV2 {
                         runbook_summary: Some(summary),
                         step_count: session.runbook.entries.len(),
                         session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                     }
                 }
                 ReplCommandV2::Disable(id) => self.handle_disable(session, id),
@@ -1628,6 +1704,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: Some(summary),
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -1824,6 +1901,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: Some(summary),
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -1853,6 +1931,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: Some(summary),
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -1991,6 +2070,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: None,
             step_count: if succeeded { 1 } else { 0 },
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -2025,6 +2105,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: None,
             step_count: 0,
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -2107,6 +2188,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: 0,
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
 
@@ -2130,6 +2212,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: 0,
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
 
@@ -2155,6 +2238,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: 0,
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
 
@@ -2370,6 +2454,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: None,
                 step_count: 0,
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             }
         } else {
             ReplResponseV2 {
@@ -2383,6 +2468,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: None,
                 step_count: 0,
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             }
         }
     }
@@ -2453,6 +2539,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: Some(summary),
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             FastCommand::DropStep(n) => {
@@ -2476,6 +2563,7 @@ impl ReplOrchestratorV2 {
                                 runbook_summary: Some(summary),
                                 step_count: session.runbook.entries.len(),
                                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                             }
                         } else {
                             self.invalid_input(session, &format!("Could not remove step {}.", n))
@@ -2509,6 +2597,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             FastCommand::Options => {
@@ -2526,6 +2615,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             FastCommand::SwitchJourney => {
@@ -2541,6 +2631,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             FastCommand::Cancel => self.handle_cancel(session),
@@ -2565,6 +2656,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             FastCommand::Help => self.handle_help(session),
@@ -2685,6 +2777,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: None,
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+            narration: Some(narration),
         })
     }
 
@@ -2797,6 +2890,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: Some(self.runbook_summary(session)),
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 };
             }
 
@@ -2822,6 +2916,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: None,
                 step_count: session.runbook.entries.len(),
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             };
         }
 
@@ -2848,6 +2943,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: None,
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         };
         session.last_proposal_set = Some(proposal_set);
         response
@@ -2890,6 +2986,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             None => self.invalid_input(session, "Proposal not found. Please try again."),
@@ -3191,6 +3288,7 @@ impl ReplOrchestratorV2 {
                             runbook_summary: None,
                             step_count: session.runbook.entries.len(),
                             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                         };
                     }
                     ClarificationOutcome::Complete => {
@@ -3262,6 +3360,7 @@ impl ReplOrchestratorV2 {
                         runbook_summary: Some(self.runbook_summary(session)),
                         step_count: session.runbook.entries.len(),
                         session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                     };
                 }
 
@@ -3280,6 +3379,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
 
@@ -3363,6 +3463,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
 
@@ -3427,6 +3528,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
 
@@ -3569,6 +3671,7 @@ impl ReplOrchestratorV2 {
                         runbook_summary: Some(self.runbook_summary(session)),
                         step_count: session.runbook.entries.len(),
                         session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                     };
                 }
 
@@ -3587,6 +3690,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
 
@@ -3633,6 +3737,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
 
@@ -3665,6 +3770,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
 
@@ -3723,6 +3829,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: None,
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -3748,6 +3855,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: 0,
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 };
             }
         };
@@ -3810,6 +3918,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: Some(summary),
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             Err(e) => ReplResponseV2 {
@@ -3822,6 +3931,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: None,
                 step_count: 0,
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             },
         }
     }
@@ -3905,6 +4015,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: Some(summary),
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -3931,6 +4042,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: Some(summary),
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -3951,6 +4063,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: Some(summary),
                 step_count: session.runbook.entries.len(),
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             }
         } else {
             self.invalid_input(session, "Nothing to undo.")
@@ -3973,6 +4086,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: Some(summary),
                 step_count: session.runbook.entries.len(),
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             }
         } else {
             self.invalid_input(session, "Nothing to redo.")
@@ -3993,6 +4107,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: Some(summary),
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -4040,6 +4155,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: None,
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -4064,6 +4180,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: None,
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -4081,6 +4198,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: Some(summary),
                 step_count: session.runbook.entries.len(),
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             }
         } else {
             self.invalid_input(session, "Step not found or already disabled.")
@@ -4101,6 +4219,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: Some(summary),
                 step_count: session.runbook.entries.len(),
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             }
         } else {
             self.invalid_input(session, "Step not found or not disabled.")
@@ -4127,6 +4246,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: Some(summary),
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 }
             }
             None => self.invalid_input(session, "Step not found."),
@@ -4174,6 +4294,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 };
             }
         }
@@ -4504,6 +4625,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: Some(summary),
                 step_count: session.runbook.entries.len(),
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             }
         } else {
             // All entries processed — back to editing.
@@ -4540,6 +4662,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: Some(summary),
                 step_count: session.runbook.entries.len(),
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             }
         }
     }
@@ -5080,6 +5203,7 @@ impl ReplOrchestratorV2 {
                 runbook_summary: None,
                 step_count: session.runbook.entries.len(),
                 session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
             }),
             crate::runbook::OrchestratorResponse::ConstraintViolation(v) => {
                 let msg = format!("Pack constraint violation: {}", v.explanation,);
@@ -5093,6 +5217,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 })
             }
             crate::runbook::OrchestratorResponse::CompilationError(e) => {
@@ -5107,6 +5232,7 @@ impl ReplOrchestratorV2 {
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
                     session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
                 })
             }
         }
@@ -5154,6 +5280,7 @@ impl ReplOrchestratorV2 {
             runbook_summary: None,
             step_count: session.runbook.entries.len(),
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         }
     }
 
@@ -6602,6 +6729,7 @@ definition_of_done:
             runbook_summary: None,
             step_count: 0,
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         };
 
         assert_eq!(
@@ -6655,6 +6783,7 @@ definition_of_done:
             runbook_summary: None,
             step_count: 0,
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         };
 
         assert_eq!(
@@ -6773,6 +6902,7 @@ definition_of_done:
             runbook_summary: None,
             step_count: 0,
             session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
         };
 
         let payload = build_repl_phase4_evaluation(

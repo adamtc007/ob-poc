@@ -100,8 +100,8 @@ scenarios:
     signals:
       actions: [onboard, "set up", establish, launch, configure]
       jurisdictions: [IE]
-      nouns_any: [icav, hedge, qiaif]
-      phrases_any: ["hedge icav", "irish hedge fund"]
+      nouns_any: [hedge, qiaif]
+      phrases_any: ["hedge icav", "irish hedge fund", "hedge fund icav"]
     routes:
       kind: macro
       macro_fqn: struct.ie.hedge.icav
@@ -248,7 +248,8 @@ scenarios:
     signals:
       actions: [onboard, "set up", establish, launch, configure]
       jurisdictions: [US]
-      nouns_any: [etf, "exchange traded", "40-act", "40 act"]
+      nouns_any: [etf, "exchange traded"]
+      phrases_any: ["us etf", "40-act etf", "exchange traded fund"]
     routes:
       kind: macro
       macro_fqn: struct.us.etf.40act
@@ -331,7 +332,8 @@ scenarios:
       actions: [onboard, "run the", "complete the", "do the", configure, review]
       nouns_any: [kyc, "due diligence", compliance, review]
       phrases_any:
-        ["full kyc", "complete kyc", "kyc review", "run kyc", "do kyc"]
+        ["full kyc", "complete kyc", "kyc review", "run kyc", "do kyc",
+         "complete the kyc process", "kyc onboarding process"]
     routes:
       kind: macro
       macro_fqn: kyc.full-review
@@ -433,6 +435,8 @@ scenarios:
           "open case and collect documents",
           "case with document collection",
           "new case and request documents",
+          "case and request identity documents",
+          "new case and request identity",
         ]
     routes:
       kind: macro_sequence

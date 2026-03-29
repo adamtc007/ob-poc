@@ -28,6 +28,7 @@ const COMPOUND_ACTIONS: &[&str] = &[
     "launch",
     "build out",
     "stand up",
+    "screen",
 ];
 
 /// Structure nouns that indicate fund/entity type (domain-specific).
@@ -53,6 +54,28 @@ const STRUCTURE_NOUNS: &[&str] = &[
     "spv",
     "vehicle",
     "sub-funds",
+    // UK structure types
+    "oeic",
+    "aut",
+    "unit trust",
+    "acs",
+    "ltaf",
+    "long-term asset fund",
+    // US structure types
+    "etf",
+    "40-act",
+    "40 act",
+    "closed-end",
+    "open-end",
+    "mutual fund",
+    "delaware",
+    // PE / hedge
+    "pe",
+    "private equity",
+    "hedge",
+    "scsp",
+    "qiaif",
+    "riaif",
 ];
 
 /// Phase nouns that indicate workflow stages.
@@ -71,6 +94,13 @@ const PHASE_NOUNS: &[&str] = &[
     "settlement",
     "documentation",
     "approval",
+    "case",
+    "document",
+    "documents",
+    "identity",
+    "sanctions",
+    "pep",
+    "adverse media",
 ];
 
 /// Quantifier patterns that suggest multi-entity scope.

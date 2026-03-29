@@ -44,7 +44,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
         onboarding_state: None,
         runbook_plan: None,
         session_feedback,
-        narration: None,
+        narration: resp.narration.clone(),
     };
 
     match resp.kind {
@@ -253,6 +253,7 @@ mod tests {
             runbook_summary: None,
             step_count: 0,
             session_feedback: None,
+            narration: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.decision.is_some());
@@ -283,6 +284,7 @@ mod tests {
             runbook_summary: None,
             step_count: 0,
             session_feedback: None,
+            narration: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.decision.is_some());
@@ -310,6 +312,7 @@ mod tests {
             runbook_summary: None,
             step_count: 0,
             session_feedback: None,
+            narration: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         let d = chat.decision.unwrap();
@@ -335,6 +338,7 @@ mod tests {
             runbook_summary: None,
             step_count: 1,
             session_feedback: None,
+            narration: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.coder_proposal.is_some());
@@ -355,6 +359,7 @@ mod tests {
             runbook_summary: None,
             step_count: 0,
             session_feedback: None,
+            narration: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.message.contains("Could not find"));

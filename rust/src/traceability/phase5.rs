@@ -414,6 +414,7 @@ mod tests {
             runbook_summary: None,
             step_count: 1,
             session_feedback: None,
+            narration: None,
         };
 
         let session = ReplSessionV2::new();
@@ -474,6 +475,7 @@ mod tests {
             runbook_summary: None,
             step_count: 2,
             session_feedback: None,
+            narration: None,
         };
 
         let payload = build_phase5_repl_payload(&session, &response);
@@ -502,6 +504,7 @@ mod tests {
             runbook_summary: None,
             step_count: 1,
             session_feedback: None,
+            narration: None,
         };
 
         let evaluation = evaluate_phase5_repl(&session, &response);

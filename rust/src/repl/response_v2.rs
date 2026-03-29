@@ -38,6 +38,11 @@ pub struct ReplResponseV2 {
     /// Session-scoped navigation feedback for the active top-of-stack frame.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_feedback: Option<SessionFeedback>,
+
+    /// Proactive narration payload (ADR 043). Attached after state-changing
+    /// actions or on contextual queries ("what's next", "where are we").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub narration: Option<ob_poc_types::narration::NarrationPayload>,
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +178,7 @@ mod tests {
             runbook_summary: None,
             step_count: 1,
             session_feedback: None,
+            narration: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -193,6 +199,7 @@ mod tests {
             runbook_summary: None,
             step_count: 0,
             session_feedback: None,
+            narration: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -223,6 +230,7 @@ mod tests {
             runbook_summary: None,
             step_count: 0,
             session_feedback: None,
+            narration: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -250,6 +258,7 @@ mod tests {
             runbook_summary: Some("1 step completed successfully.".to_string()),
             step_count: 1,
             session_feedback: None,
+            narration: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();

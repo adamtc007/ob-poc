@@ -96,6 +96,7 @@ const CONTEXTUAL_PATTERNS: &[&str] = &[
     "where are we",
     "show progress",
     "show me progress",
+    "show me the progress",
     "how far along",
     "what's outstanding",
     "whats outstanding",

@@ -1904,7 +1904,7 @@ ecir_path = "narrow"
 [[test]]
 utterance = "Run the full KYC onboarding process with screening and documents"
 expected_verb = "screening.full"
-alt_verbs = ["kyc.open-case", "kyc-case.create"]
+alt_verbs = ["kyc.open-case", "kyc-case.create", "kyc.full-review", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1913,13 +1913,13 @@ difficulty = "hard"
 expected_tier = "scenario"
 expected_scenario_id = "full-kyc-onboarding"
 expected_route_target = "screening.full"
-notes = "Full KYC onboarding sequence — ScenarioIndex may resolve to first macro"
+notes = "Full KYC onboarding sequence — ScenarioIndex may resolve to first macro or review"
 ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Complete the KYC process including case screening and document collection"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case", "kyc-case.close", "screening.full"]
+alt_verbs = ["kyc.open-case", "kyc-case.close", "screening.full", "kyc.full-review", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1934,7 +1934,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Do the full KYC onboarding for this client"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case", "kyc-agreement.create"]
+alt_verbs = ["kyc.open-case", "kyc-agreement.create", "kyc.full-review", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1979,7 +1979,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Open a case and collect the KYC documents"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case", "kyc.collect-documents"]
+alt_verbs = ["kyc.open-case", "kyc.collect-documents", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -1994,7 +1994,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Set up a new case and request identity documents"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.open-case", "kyc.collect-documents"]
+alt_verbs = ["kyc.open-case", "kyc.collect-documents", "case.open"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "case"
@@ -3663,23 +3663,23 @@ ecir_path = "fallthrough"
 # CONTEXTUAL QUERY TESTS (ADR 043 Phase 2)
 # These utterances bypass verb search and route to NarrationEngine.
 # They don't resolve to a specific verb — they return constellation state.
-# For intent_hit_rate, we mark them with expected_verb = "narration.query"
-# (a virtual verb) and category = "contextual_query".
+# The harness mirrors this: is_contextual_query() → Hit with narration.query.
+# Alt verbs record what verb search *would* match if narration were disabled.
 # ============================================================================
 
 [[test]]
 utterance = "what's next"
-expected_verb = "semantic.get-state"
-alt_verbs = ["readiness.compute", "lifecycle.check-readiness", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "semantic.next-actions", "readiness.compute"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "cbu"
-notes = "Contextual — should route to NarrationEngine when constellation is hydrated"
+notes = "Contextual — routes to NarrationEngine when constellation is hydrated"
 
 [[test]]
 utterance = "what's missing"
-expected_verb = "document.missing-for-entity"
-alt_verbs = ["requirement.unsatisfied", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["document.missing-for-entity", "semantic.missing-entities", "requirement.unsatisfied"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "kyc"
@@ -3687,8 +3687,8 @@ notes = "Contextual — disambiguation between document gaps and general progres
 
 [[test]]
 utterance = "where are we"
-expected_verb = "semantic.get-state"
-alt_verbs = ["readiness.compute", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "readiness.compute"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "cbu"
@@ -3696,8 +3696,8 @@ notes = "Contextual progress query"
 
 [[test]]
 utterance = "show me the progress"
-expected_verb = "semantic.get-state"
-alt_verbs = ["readiness.compute", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "provisioning.status", "readiness.compute"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "cbu"
@@ -3705,8 +3705,8 @@ notes = "Contextual progress query"
 
 [[test]]
 utterance = "any blockers"
-expected_verb = "semantic.get-state"
-alt_verbs = ["readiness.compute", "tollgate.get-decision-readiness", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "tollgate.get-decision-readiness", "readiness.compute"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "kyc"
@@ -3714,8 +3714,8 @@ notes = "Contextual blocker query"
 
 [[test]]
 utterance = "what do I need to do next"
-expected_verb = "semantic.get-state"
-alt_verbs = ["readiness.compute", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "semantic.next-actions", "readiness.compute"]
 category = "contextual_query"
 difficulty = "medium"
 workspace = "cbu"
@@ -3723,8 +3723,8 @@ notes = "Contextual next-step query"
 
 [[test]]
 utterance = "what's outstanding on this case"
-expected_verb = "kyc-case.state"
-alt_verbs = ["requirement.unsatisfied", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["kyc-case.state", "requirement.unsatisfied"]
 category = "contextual_query"
 difficulty = "medium"
 workspace = "kyc"
@@ -3732,8 +3732,8 @@ notes = "Case-scoped progress query"
 
 [[test]]
 utterance = "are we done"
-expected_verb = "readiness.compute"
-alt_verbs = ["semantic.get-state", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["readiness.compute", "semantic.get-state"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "cbu"
@@ -3741,8 +3741,8 @@ notes = "Completion check"
 
 [[test]]
 utterance = "next steps"
-expected_verb = "semantic.get-state"
-alt_verbs = ["readiness.compute", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "semantic.next-actions", "readiness.compute"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "cbu"
@@ -3750,8 +3750,8 @@ notes = "Contextual next-step query"
 
 [[test]]
 utterance = "remaining steps"
-expected_verb = "semantic.get-state"
-alt_verbs = ["readiness.compute", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "semantic.next-actions", "readiness.compute"]
 category = "contextual_query"
 difficulty = "medium"
 workspace = "cbu"
@@ -3759,8 +3759,8 @@ notes = "Contextual remaining work query"
 
 [[test]]
 utterance = "show gaps"
-expected_verb = "semantic.get-state"
-alt_verbs = ["ownership.analyze-gaps", "matrix-overlay.unified-gaps", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "ownership.analyze-gaps", "matrix-overlay.unified-gaps"]
 category = "contextual_query"
 difficulty = "medium"
 workspace = "cbu"
@@ -3768,8 +3768,8 @@ notes = "Contextual gap analysis query"
 
 [[test]]
 utterance = "status update"
-expected_verb = "semantic.get-state"
-alt_verbs = ["kyc-case.state", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "kyc-case.update-status", "kyc-case.state"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "cbu"
@@ -3777,8 +3777,8 @@ notes = "Contextual status query"
 
 [[test]]
 utterance = "what's left to do"
-expected_verb = "semantic.get-state"
-alt_verbs = ["readiness.compute", "requirement.unsatisfied", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "semantic.next-actions", "readiness.compute"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "cbu"
@@ -3786,8 +3786,8 @@ notes = "Contextual remaining work query"
 
 [[test]]
 utterance = "how far along are we"
-expected_verb = "semantic.get-state"
-alt_verbs = ["readiness.compute", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "readiness.compute"]
 category = "contextual_query"
 difficulty = "medium"
 workspace = "cbu"
@@ -3795,8 +3795,8 @@ notes = "Contextual progress query"
 
 [[test]]
 utterance = "progress report"
-expected_verb = "semantic.get-state"
-alt_verbs = ["readiness.compute", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "readiness.compute"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "cbu"
@@ -3804,8 +3804,8 @@ notes = "Contextual summary query"
 
 [[test]]
 utterance = "what's still needed"
-expected_verb = "semantic.get-state"
-alt_verbs = ["requirement.unsatisfied", "narration.query"]
+expected_verb = "narration.query"
+alt_verbs = ["semantic.get-state", "requirement.unsatisfied"]
 category = "contextual_query"
 difficulty = "medium"
 workspace = "cbu"

@@ -294,15 +294,18 @@ impl ScenarioIndex {
 
             // Score using the deterministic ledger
             let (score, matched_signals, gates) =
-                self.score_scenario(scenario, &signals, macro_index);
+                self.score_scenario(scenario, &signals, macro_index, utterance);
 
             // Gate G3: minimum score — bypassed when the utterance exactly
-            // matches a phrases_any entry (exact phrase match IS the evidence)
+            // matches a phrases_any entry (exact phrase match IS the evidence).
+            // Phrase containment is used for scoring (+3) but NOT for G3 bypass
+            // to avoid false positives from short phrase substrings.
+            let utterance_lower = utterance.to_lowercase();
             let has_exact_phrase_match = scenario
                 .signals
                 .phrases_any
                 .iter()
-                .any(|p| p.to_lowercase() == utterance.to_lowercase());
+                .any(|p| p.to_lowercase() == utterance_lower);
             if score < MIN_SCORE && !has_exact_phrase_match {
                 continue;
             }
@@ -409,6 +412,7 @@ impl ScenarioIndex {
         scenario: &ScenarioDefYaml,
         signals: &CompoundSignals,
         macro_index: Option<&MacroIndex>,
+        utterance: &str,
     ) -> (i32, Vec<ScenarioMatchedSignal>, Vec<ScenarioGateResult>) {
         let mut score: i32 = 0;
         let mut matched = Vec::new();
@@ -494,14 +498,38 @@ impl ScenarioIndex {
             }
         }
 
-        // ── Phase noun (+2) ──
+        // ── Phase noun (+2, or +3 if overlaps with scenario nouns_any) ──
         if !signals.phase_nouns.is_empty() {
-            score += SCORE_PHASE_NOUN;
-            matched.push(ScenarioMatchedSignal {
-                signal: "phase_noun".to_string(),
-                score: SCORE_PHASE_NOUN,
-                detail: format!("Phase nouns {:?} detected", signals.phase_nouns),
-            });
+            let phase_overlaps_scenario = if scenario.signals.nouns_any.is_empty() {
+                false
+            } else {
+                signals.phase_nouns.iter().any(|pn| {
+                    scenario
+                        .signals
+                        .nouns_any
+                        .iter()
+                        .any(|n| n.eq_ignore_ascii_case(pn))
+                })
+            };
+            if phase_overlaps_scenario {
+                // Phase noun that matches scenario's nouns_any → same weight as structure noun
+                score += SCORE_STRUCTURE_NOUN;
+                matched.push(ScenarioMatchedSignal {
+                    signal: "phase_noun_overlap".to_string(),
+                    score: SCORE_STRUCTURE_NOUN,
+                    detail: format!(
+                        "Phase nouns {:?} overlap scenario nouns_any",
+                        signals.phase_nouns
+                    ),
+                });
+            } else {
+                score += SCORE_PHASE_NOUN;
+                matched.push(ScenarioMatchedSignal {
+                    signal: "phase_noun".to_string(),
+                    score: SCORE_PHASE_NOUN,
+                    detail: format!("Phase nouns {:?} detected", signals.phase_nouns),
+                });
+            }
         }
 
         // ── Quantifier (+2) ──
@@ -547,6 +575,27 @@ impl ScenarioIndex {
                         break; // Only count once
                     }
                 }
+            }
+        }
+
+        // ── Phrase match (+3) ──
+        // If the utterance contains a 3+ word phrases_any entry, that's strong
+        // evidence for this scenario. Short phrases (1-2 words) are too common
+        // and cause false positive scenario stealing.
+        {
+            let utt_lower = utterance.to_lowercase();
+            let phrase_hit = scenario.signals.phrases_any.iter().find(|p| {
+                let p_lower = p.to_lowercase();
+                let word_count = p_lower.split_whitespace().count();
+                word_count >= 3 && (utt_lower == p_lower || utt_lower.contains(&p_lower))
+            });
+            if let Some(phrase) = phrase_hit {
+                score += SCORE_STRUCTURE_NOUN; // +3, same weight as structure noun
+                matched.push(ScenarioMatchedSignal {
+                    signal: "phrase_match".to_string(),
+                    score: SCORE_STRUCTURE_NOUN,
+                    detail: format!("Phrase '{}' found in utterance", phrase),
+                });
             }
         }
 
