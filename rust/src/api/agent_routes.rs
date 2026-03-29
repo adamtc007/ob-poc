@@ -210,9 +210,45 @@ async fn try_route_through_repl(
     }
 
     let input = match req {
-        SessionInputRequest::Utterance { message } => UserInputV2::Message {
-            content: message.clone(),
-        },
+        SessionInputRequest::Utterance { message } => {
+            // Detect slash commands from the chat input
+            let trimmed = message.trim();
+            if let Some(cmd) = trimmed.strip_prefix('/') {
+                use crate::repl::types_v2::ReplCommandV2;
+                match cmd.to_lowercase().as_str() {
+                    "run" => UserInputV2::Command {
+                        command: ReplCommandV2::Run,
+                    },
+                    "undo" => UserInputV2::Command {
+                        command: ReplCommandV2::Undo,
+                    },
+                    "redo" => UserInputV2::Command {
+                        command: ReplCommandV2::Redo,
+                    },
+                    "clear" => UserInputV2::Command {
+                        command: ReplCommandV2::Clear,
+                    },
+                    "cancel" => UserInputV2::Command {
+                        command: ReplCommandV2::Cancel,
+                    },
+                    "info" => UserInputV2::Command {
+                        command: ReplCommandV2::Info,
+                    },
+                    _ => UserInputV2::Message {
+                        content: message.clone(),
+                    },
+                }
+            } else if trimmed.eq_ignore_ascii_case("confirm")
+                || trimmed.eq_ignore_ascii_case("yes")
+                || trimmed.eq_ignore_ascii_case("go")
+            {
+                UserInputV2::Confirm
+            } else {
+                UserInputV2::Message {
+                    content: message.clone(),
+                }
+            }
+        }
         SessionInputRequest::DecisionReply { reply, .. } => {
             // Convert decision reply to a REPL message.
             // The REPL orchestrator handles numeric/name resolution.
