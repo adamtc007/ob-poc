@@ -216,17 +216,68 @@ fn compile_macro(
         ));
     }
 
+    // ── Per-entity expansion ──
+    // When the session has multiple CBUs in scope and the macro operates on
+    // CBU-scoped entities, replicate the expanded statements for each CBU UUID.
+    // Each CBU gets its own set of steps with the UUID bound in the DSL.
+    // Sort CBU IDs for deterministic ordering.
+    let expanded_statements = {
+        let mut sorted_cbu_ids: Vec<Uuid> = session.entity_scope.cbu_ids.iter().copied().collect();
+        sorted_cbu_ids.sort();
+
+        if sorted_cbu_ids.len() > 1 {
+            let mut per_entity_statements = Vec::new();
+            for cbu_id in &sorted_cbu_ids {
+                for stmt in &fixpoint.statements {
+                    let bound_stmt = if stmt.contains(":cbu-id") {
+                        // DSL already has a :cbu-id arg — leave it as-is
+                        // (macro authored with explicit binding)
+                        stmt.clone()
+                    } else if let Some(close_idx) = stmt.rfind(')') {
+                        // Insert :cbu-id before the closing paren
+                        let mut s = stmt.clone();
+                        s.insert_str(close_idx, &format!(" :cbu-id \"{}\"", cbu_id));
+                        s
+                    } else {
+                        stmt.clone()
+                    };
+                    per_entity_statements.push(bound_stmt);
+                }
+            }
+            per_entity_statements
+        } else if sorted_cbu_ids.len() == 1 {
+            // Single CBU — bind it to all steps
+            let cbu_id = &sorted_cbu_ids[0];
+            fixpoint
+                .statements
+                .iter()
+                .map(|stmt| {
+                    if stmt.contains(":cbu-id") {
+                        stmt.clone()
+                    } else if let Some(close_idx) = stmt.rfind(')') {
+                        let mut s = stmt.clone();
+                        s.insert_str(close_idx, &format!(" :cbu-id \"{}\"", cbu_id));
+                        s
+                    } else {
+                        stmt.clone()
+                    }
+                })
+                .collect()
+        } else {
+            // No CBUs in scope — use statements as-is
+            fixpoint.statements.clone()
+        }
+    };
+
     // Extract expanded verb names for downstream gates.
-    let expanded_verbs: Vec<String> = fixpoint
-        .statements
+    let expanded_verbs: Vec<String> = expanded_statements
         .iter()
         .map(|dsl| extract_verb_from_dsl(dsl))
         .collect();
 
     // §6.2 Step 2: DAG — build steps then run PlanAssembler for dependency ordering (INV-5).
     // Build raw steps first (write_set is empty — populated after Step 5).
-    let raw_steps: Vec<CompiledStep> = fixpoint
-        .statements
+    let raw_steps: Vec<CompiledStep> = expanded_statements
         .iter()
         .enumerate()
         .map(|(i, dsl)| {
