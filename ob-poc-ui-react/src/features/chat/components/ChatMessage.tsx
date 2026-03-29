@@ -14,6 +14,7 @@ import type {
 import { cn, formatTime } from "../../../lib/utils";
 import { DecisionCard } from "./DecisionCard";
 import { VerbDisambiguationCard } from "./VerbDisambiguationCard";
+import { NarrationPanel } from "./NarrationPanel";
 import { OnboardingStateCard } from "./OnboardingStateCard";
 
 interface ChatMessageProps {
@@ -432,6 +433,12 @@ export function ChatMessage({
               message={message}
               onVerbClick={onSendMessage}
             />
+            {message.narration && (
+              <NarrationPanel
+                narration={message.narration}
+                onSendMessage={onSendMessage}
+              />
+            )}
           </>
         )}
 

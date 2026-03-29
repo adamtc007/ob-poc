@@ -529,6 +529,7 @@ interface ChatInputEnvelope {
     coder_proposal?: CoderProposal;
     discovery_bootstrap?: DiscoveryBootstrap;
     session_feedback?: SessionFeedback;
+    narration?: import("../types/chat").NarrationPayload;
     available_verbs?: VerbProfile[];
     surface_fingerprint?: string;
     decision?: {
@@ -579,6 +580,7 @@ function buildAssistantMessage(
     discovery_bootstrap: response.discovery_bootstrap,
     onboarding_state: response.onboarding_state,
     session_feedback: response.session_feedback,
+    narration: response.narration,
   };
 
   if (response.verb_disambiguation) {

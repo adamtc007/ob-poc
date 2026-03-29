@@ -26,6 +26,8 @@ export interface ChatMessage {
   verb_disambiguation_detail?: VerbDisambiguationRequest;
   /** Present when a compiled runbook plan exists on the session. */
   runbook_plan?: import("../api/runbookPlan").RunbookPlan;
+  /** Proactive narration — progress, gaps, suggested next steps (ADR 043). */
+  narration?: NarrationPayload;
 }
 
 export interface SageExplain {
@@ -384,4 +386,53 @@ export interface SendMessageResponse {
   available_verbs?: VerbProfile[];
   /** SessionVerbSurface fingerprint — "vs1:<sha256>". Changes when visible verb set changes. */
   surface_fingerprint?: string;
+}
+
+// ============================================================================
+// NARRATION PAYLOAD — proactive workflow guidance (ADR 043)
+// ============================================================================
+
+export type NarrationVerbosity = "full" | "medium" | "light" | "silent";
+export type ActionPriority = "critical" | "recommended" | "optional";
+
+/** Proactive narration — computed after state-changing actions. */
+export interface NarrationPayload {
+  progress?: string;
+  delta: SlotDelta[];
+  required_gaps: NarrationGap[];
+  optional_gaps: NarrationGap[];
+  suggested_next: SuggestedAction[];
+  blockers: NarrationBlocker[];
+  verbosity: NarrationVerbosity;
+}
+
+export interface SlotDelta {
+  slot_name: string;
+  slot_label: string;
+  from_state: string;
+  to_state: string;
+  entity_name?: string;
+}
+
+export interface NarrationGap {
+  slot_name: string;
+  slot_label: string;
+  why_required?: string;
+  suggested_verb: string;
+  suggested_macro?: string;
+  suggested_utterance: string;
+}
+
+export interface SuggestedAction {
+  verb_fqn: string;
+  macro_fqn?: string;
+  utterance: string;
+  priority: ActionPriority;
+  reason: string;
+}
+
+export interface NarrationBlocker {
+  blocked_verb: string;
+  reason: string;
+  unblock_hint: string;
 }
