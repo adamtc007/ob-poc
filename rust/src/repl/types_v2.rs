@@ -419,6 +419,11 @@ pub struct WorkspaceFrame {
     /// Whether this frame was pushed as a peek (read-only workspace glance).
     #[serde(default)]
     pub is_peek: bool,
+    /// Verb FQNs from the last narration's `suggested_next`.
+    /// Used as a boost signal in `HybridVerbSearcher` (+0.05 score bias).
+    /// Cleared on workspace/scope change.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub narration_hot_verbs: Vec<String>,
 }
 
 impl WorkspaceFrame {
@@ -451,6 +456,7 @@ impl WorkspaceFrame {
             stale: false,
             writes_since_push: 0,
             is_peek: false,
+            narration_hot_verbs: Vec::new(),
         }
     }
 }

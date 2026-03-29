@@ -299,6 +299,38 @@ pub fn normalize_candidates(
     v
 }
 
+/// Apply narration boost to search results.
+///
+/// Verbs that were suggested by the NarrationEngine in the previous turn
+/// get a small score bump (+0.05), biasing disambiguation toward the
+/// contextually expected action. The boost is small enough that a strong
+/// unrelated match (0.10+ gap) still wins.
+///
+/// Design: ADR 044 (ai-thoughts/044-narration-boost-signal.md)
+pub fn apply_narration_boost(results: &mut [VerbSearchResult], hot_verbs: &[String]) {
+    const NARRATION_BOOST: f32 = 0.05;
+    if hot_verbs.is_empty() {
+        return;
+    }
+    for result in results.iter_mut() {
+        if hot_verbs.iter().any(|hv| hv == &result.verb) {
+            result.score += NARRATION_BOOST;
+            tracing::debug!(
+                verb = %result.verb,
+                new_score = result.score,
+                "NarrationBoost: +{} applied",
+                NARRATION_BOOST,
+            );
+        }
+    }
+    // Re-sort after boost to maintain descending score order
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+}
+
 /// Hybrid verb searcher combining all discovery strategies
 ///
 /// All DB access is through VerbService - no direct sqlx calls.

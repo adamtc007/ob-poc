@@ -63,6 +63,12 @@ pub struct MatchContext {
     /// When set, verb search only returns verbs in this set.
     #[serde(skip)]
     pub allowed_verbs: Option<HashSet<String>>,
+
+    /// Narration boost: verb FQNs from the last NarrationEngine `suggested_next`.
+    /// These get a +0.05 score bias in verb search to tip disambiguation
+    /// toward contextually expected actions. Design: ADR 044.
+    #[serde(skip)]
+    pub narration_hot_verbs: Vec<String>,
 }
 
 /// Scope context for matching

@@ -122,6 +122,48 @@ impl IntentService {
             .search_with_context(input, ctx, stack)
             .await?;
 
+        // Step 3.4: Apply narration boost (ADR 044).
+        // Verbs suggested by NarrationEngine in the previous turn get +0.05.
+        if !ctx.narration_hot_verbs.is_empty() {
+            let mut boosted = false;
+            for vc in result.verb_candidates.iter_mut() {
+                if ctx.narration_hot_verbs.iter().any(|hv| hv == &vc.verb_fqn) {
+                    vc.score += 0.05;
+                    boosted = true;
+                    tracing::debug!(verb = %vc.verb_fqn, new_score = vc.score, "NarrationBoost: +0.05");
+                }
+            }
+            if boosted {
+                // Re-sort and re-evaluate outcome after boost.
+                result.verb_candidates.sort_by(|a, b| {
+                    b.score
+                        .partial_cmp(&a.score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                let new_outcome = super::scoring::apply_ambiguity_policy(&result.verb_candidates);
+                result.outcome = match new_outcome {
+                    super::scoring::AmbiguityOutcome::NoMatch => MatchOutcome::NoMatch {
+                        reason: "No match after narration boost".to_string(),
+                    },
+                    super::scoring::AmbiguityOutcome::Confident { verb, score } => {
+                        MatchOutcome::Matched {
+                            verb,
+                            confidence: score,
+                        }
+                    }
+                    super::scoring::AmbiguityOutcome::Ambiguous { margin, .. } => {
+                        MatchOutcome::Ambiguous { margin }
+                    }
+                    super::scoring::AmbiguityOutcome::Proposed { verb, score } => {
+                        MatchOutcome::Matched {
+                            verb,
+                            confidence: score,
+                        }
+                    }
+                };
+            }
+        }
+
         // Step 3.5: Apply precondition filter — remove verbs whose
         // preconditions are not met, then re-evaluate the outcome.
         let filter_stats = super::preconditions::filter_by_preconditions(
@@ -514,6 +556,7 @@ mod tests {
             domain_hint: None,
             bindings: vec![],
             allowed_verbs: None,
+            narration_hot_verbs: Vec::new(),
         }
     }
 
