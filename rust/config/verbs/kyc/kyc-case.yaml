@@ -28,6 +28,9 @@ domains:
           - "we need to KYC this client"
           - "onboard this client start the KYC"
           - "fast-track this case setup"
+          - "KYC check"
+          - "run KYC check"
+          - "start KYC"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -375,6 +378,8 @@ domains:
           - "are we good to go on this case"
           - "KYC is clear close it"
           - "approve and close the case"
+          - "close it out"
+          - "close the case"
         metadata:
           tier: intent
           source_of_truth: workflow

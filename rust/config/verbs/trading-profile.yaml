@@ -336,6 +336,9 @@ domains:
         - "begin profile changes"
         - "open new mandate draft"
         - "initialize trading profile draft"
+        - "create a trading profile"
+        - "new trading profile"
+        - "create trading profile"
         behavior: plugin
         handler: create_draft_trading_profile
         metadata:
@@ -489,6 +492,13 @@ domains:
         - "add CSA configuration"
         - "add CSA collateral"
         - "add IM mandate"
+        - "configure counterparty limits"
+        - "ISDA terms for counterparty"
+        - "ISDA terms for this counterparty"
+        - "counterparty limits"
+        - "set up SSIs"
+        - "set up the SSIs"
+        - "standing settlement instructions"
         behavior: plugin
         handler: TradingProfileAddComponentOp
         metadata:
@@ -1223,6 +1233,9 @@ domains:
         - "who decides on corporate actions"
         - "set auto-instruct threshold for CA"
         - "define CA election authority"
+        - "set CA policy"
+        - "set CA policy for CBU"
+        - "corporate action policy"
         behavior: plugin
         handler: TradingProfileCaSetElectionOp
         metadata:

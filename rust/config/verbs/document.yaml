@@ -70,6 +70,10 @@ domains:
           - send a doc request
           - ask them for their ID
           - KYC document request
+          - chase the passport
+          - doc collection
+          - collect documents
+          - chase documents
         metadata:
           tier: intent
           source_of_truth: operational

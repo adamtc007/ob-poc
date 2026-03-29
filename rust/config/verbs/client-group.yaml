@@ -444,6 +444,8 @@ domains:
           - "search entities in this group"
           - "find entities matching Vanguard"
           - "search for this entity in the group"
+          - "search for entities"
+          - "search entities matching"
         metadata:
           tier: intent
           source_of_truth: operational

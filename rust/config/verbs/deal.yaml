@@ -46,6 +46,9 @@ domains:
           - "start the commercial process"
           - "new IMA deal"
           - "create a custody deal"
+          - "start a commercial deal"
+          - "start a deal for"
+          - "new deal for"
         args:
           - name: deal-name
             type: string
@@ -798,6 +801,9 @@ domains:
           - "new fee schedule"
           - "start the rate card for fund accounting"
           - "add pricing for this deal product"
+          - "create rate card"
+          - "rate card for deal"
+          - "create rate card for this deal"
         args:
           - name: deal-id
             type: uuid

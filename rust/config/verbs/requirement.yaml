@@ -391,6 +391,9 @@ domains:
         - pending requirements for this workflow
         - what hasn't been satisfied yet
         - check if everything is in
+        - list outstanding requirements
+        - outstanding KYC requirements
+        - unsatisfied requirements
         metadata:
           tier: intent
           source_of_truth: operational

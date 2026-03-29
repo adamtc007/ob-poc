@@ -171,6 +171,8 @@ domains:
           - "run stage 2 dry-run"
           - "test changeset in scratch schema"
           - "preview changeset application"
+          - "dry run the changeset"
+          - "dry run changeset"
         args:
           - name: changeset-id
             type: uuid

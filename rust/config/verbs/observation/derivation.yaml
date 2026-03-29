@@ -18,6 +18,8 @@ domains:
         - "run the stale derivation batch"
         - "recompute below the line values"
         - "update derived attributes"
+        - "refresh derived attributes"
+        - "recompute derived"
         behavior: plugin
         handler: derivation_recompute_stale
         args:

@@ -237,6 +237,8 @@ domains:
         - "get BODS entity for LEI"
         - "locate BODS record by LEI"
         - "search beneficial ownership by LEI"
+        - "pull BODS data"
+        - "BODS data for LEI"
         behavior: plugin
         args:
         - name: lei

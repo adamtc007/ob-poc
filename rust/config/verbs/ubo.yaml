@@ -744,6 +744,8 @@ domains:
           - "look through the shell companies"
           - "pull the UBO tree"
           - "unwind the ownership structure"
+          - "trace the ownership chain"
+          - "trace ownership"
         metadata:
           tier: intent
           source_of_truth: operational

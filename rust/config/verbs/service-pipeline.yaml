@@ -450,6 +450,10 @@ domains:
         - "calculate readiness score"
         - "evaluate transactional readiness"
         - "run readiness check for services"
+        - "are we good to go"
+        - "ready to go"
+        - "readiness check"
+        - "good to transact"
         behavior: plugin
         handler: ReadinessComputeOp
         args:

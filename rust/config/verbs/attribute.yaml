@@ -27,6 +27,7 @@ domains:
           - "register attribute for KYC"
           - "define governed attribute"
           - "register attribute in SemOS"
+          - "define attribute for"
         behavior: plugin
         handler: attribute_define_governed
         args:
