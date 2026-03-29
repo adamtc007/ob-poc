@@ -43,6 +43,54 @@ allowed_verbs:
   - structure.product-suite-custody-fa-ta
   - structure.product-suite-full
   - structure.remove-all-products
+  # Structure/onboarding macros
+  - case.list
+  - case.open
+  - kyc.collect-documents
+  - kyc.full-review
+  - mandate.create
+  - mandate.list
+  - mandate.add-product
+  - mandate.set-instruments
+  - mandate.set-markets
+  - mandate.select
+  - mandate.details
+  - party.add
+  - party.add-company
+  - party.add-person
+  - party.assign-identifier
+  - party.details
+  - party.list
+  - party.search
+  - party.set-address
+  - party.update
+  - screening.full
+  - screening.media-check
+  - screening.pep-check
+  - screening.sanctions-check
+  - struct.hedge.cross-border
+  - struct.ie.aif.icav
+  - struct.ie.hedge.icav
+  - struct.ie.ucits.icav
+  - struct.lux.aif.raif
+  - struct.lux.pe.scsp
+  - struct.lux.ucits.sicav
+  - struct.pe.cross-border
+  - struct.uk.authorised.acs
+  - struct.uk.authorised.aut
+  - struct.uk.authorised.ltaf
+  - struct.uk.authorised.oeic
+  - struct.uk.manager.llp
+  - struct.uk.private-equity.lp
+  - struct.us.40act.closed-end
+  - struct.us.40act.open-end
+  - struct.us.etf.40act
+  - struct.us.private-fund.delaware-lp
+  - structure.assign-role
+  - structure.list
+  - structure.roles
+  - structure.select
+  - structure.setup
 
 forbidden_verbs:
   - cbu.delete

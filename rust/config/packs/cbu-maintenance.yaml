@@ -56,6 +56,25 @@ allowed_verbs:
   - structure.product-suite-custody-fa-ta
   - structure.product-suite-full
   - structure.remove-all-products
+  # Structure macros
+  - struct.hedge.cross-border
+  - struct.ie.aif.icav
+  - struct.ie.hedge.icav
+  - struct.ie.ucits.icav
+  - struct.lux.aif.raif
+  - struct.lux.pe.scsp
+  - struct.lux.ucits.sicav
+  - struct.pe.cross-border
+  - struct.uk.authorised.acs
+  - struct.uk.authorised.aut
+  - struct.uk.authorised.ltaf
+  - struct.uk.authorised.oeic
+  - struct.uk.manager.llp
+  - struct.uk.private-equity.lp
+  - struct.us.40act.closed-end
+  - struct.us.40act.open-end
+  - struct.us.etf.40act
+  - struct.us.private-fund.delaware-lp
 
 forbidden_verbs:
   - cbu.delete

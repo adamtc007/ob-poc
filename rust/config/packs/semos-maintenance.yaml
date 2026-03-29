@@ -71,6 +71,9 @@ allowed_verbs:
   - phrase.approve
   - phrase.reject
   - phrase.defer
+  # Attribute seed macros
+  - attribute.seed-derived
+  - attribute.seed-domain
 
 forbidden_verbs: []
 

@@ -38,6 +38,66 @@ allowed_verbs:
   - document.solicit
   - document.solicit-set
   - screening.run
+  # KYC/screening/evidence macros
+  - case.add-party
+  - case.approve
+  - case.list
+  - case.open
+  - case.reject
+  - case.request-info
+  - case.select
+  - case.solicit-document
+  - case.submit
+  - doc-request.create
+  - doc-request.reject
+  - doc-request.respond
+  - doc-request.send
+  - doc-request.verify
+  - evidence.link
+  - evidence.reject
+  - evidence.require
+  - evidence.verify
+  - evidence.waive
+  - kyc-workstream.add
+  - kyc-workstream.close
+  - kyc-workstream.update-status
+  - kyc.check-readiness
+  - kyc.collect-documents
+  - kyc.full-review
+  - party.add
+  - party.add-company
+  - party.add-person
+  - party.assign-identifier
+  - party.details
+  - party.list
+  - party.search
+  - party.set-address
+  - party.update
+  - red-flag.escalate
+  - red-flag.raise
+  - red-flag.resolve
+  - screening-ops.bulk-refresh
+  - screening-ops.review-hit
+  - screening-ops.run
+  - screening.full
+  - screening.media-check
+  - screening.pep-check
+  - screening.sanctions-check
+  - structure.assign-role
+  - structure.list
+  - structure.roles
+  - structure.select
+  - structure.setup
+  - tollgate.evaluate
+  - tollgate.override
+  - ubo.allege
+  - ubo.approve
+  - ubo.discover
+  - ubo.expire
+  - ubo.promote
+  - ubo.reject
+  - ubo.trace-chains
+  - ubo.verify
 
 forbidden_verbs:
   - kyc.delete-case
