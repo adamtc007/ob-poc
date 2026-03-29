@@ -558,7 +558,7 @@ scenarios:
     title: "Standard Product Suite Assignment"
     modes: [onboarding, structure]
     requires:
-      all_of: [compound_action]
+      any_of: [compound_action, phrase_match]
     signals:
       actions: [add, assign, onboard, "set up", provision, subscribe, attach]
       nouns_any: [custody, "fund accounting", "transfer agent", "transfer agency", TA, FA, product, suite, products]
@@ -583,7 +583,7 @@ scenarios:
     title: "Full Product Suite Assignment"
     modes: [onboarding, structure]
     requires:
-      all_of: [compound_action]
+      any_of: [compound_action, phrase_match]
     signals:
       actions: [add, assign, onboard, "set up", provision]
       nouns_any: [full, all, complete, everything, "full suite", "all products"]
@@ -605,7 +605,7 @@ scenarios:
     title: "Remove All Products"
     modes: [onboarding, structure]
     requires:
-      all_of: [compound_action]
+      any_of: [compound_action, phrase_match]
     signals:
       actions: [remove, clear, strip, reset, unsubscribe, detach]
       nouns_any: [products, subscriptions, all, everything]

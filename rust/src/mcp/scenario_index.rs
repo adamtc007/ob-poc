@@ -661,6 +661,10 @@ fn signal_present(signals: &CompoundSignals, signal_name: &str) -> bool {
         "quantifier" => signals.has_quantifier,
         "jurisdiction_structure_pair" => signals.has_jurisdiction_structure_pair,
         "multi_noun_workflow" => signals.has_multi_noun_workflow,
+        // phrase_match: always true — the scenario's phrases_any scoring
+        // handles phrase matching; this gate just allows scenarios to fire
+        // on phrase match alone without requiring compound_action signals.
+        "phrase_match" => true,
         _ => {
             tracing::warn!(signal = signal_name, "Unknown signal name in requires gate");
             false
