@@ -181,3 +181,151 @@ governance.reconcile-registry:
       value: true
 
   unlocks: []
+
+# ── Onboarding Product Suite Macros ────────────────────────────────────────
+
+structure.product-suite-custody-fa-ta:
+  kind: macro
+
+  ui:
+    label: "Standard Product Suite (Custody + FA + TA)"
+    description: "Add the standard product suite — Custody, Fund Accounting, and Transfer Agency — to a CBU as a single runbook"
+    target-label: "Product Assignment Plan"
+
+  routing:
+    mode-tags: [onboarding, structure]
+    operator-domain: cbu
+
+  target:
+    operates-on: cbu-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      cbu:
+        type: cbu-ref
+        ui-label: "CBU"
+        picker: cbu_picker
+
+  prereqs: []
+
+  expands-to:
+    - verb: cbu.add-product
+      args:
+        product-name: "Custody"
+    - verb: cbu.add-product
+      args:
+        product-name: "Fund Accounting"
+      depends-on: [0]
+    - verb: cbu.add-product
+      args:
+        product-name: "Transfer Agency"
+
+  sets-state:
+    - key: structure.standard_products_assigned
+      value: true
+
+  unlocks: []
+
+structure.product-suite-full:
+  kind: macro
+
+  ui:
+    label: "Full Product Suite"
+    description: "Add the full product suite — Custody, Fund Accounting, Transfer Agency, Collateral Management, and Middle Office — to a CBU"
+    target-label: "Full Product Assignment Plan"
+
+  routing:
+    mode-tags: [onboarding, structure]
+    operator-domain: cbu
+
+  target:
+    operates-on: cbu-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      cbu:
+        type: cbu-ref
+        ui-label: "CBU"
+        picker: cbu_picker
+
+  prereqs: []
+
+  expands-to:
+    - verb: cbu.add-product
+      args:
+        product-name: "Custody"
+    - verb: cbu.add-product
+      args:
+        product-name: "Fund Accounting"
+      depends-on: [0]
+    - verb: cbu.add-product
+      args:
+        product-name: "Transfer Agency"
+    - verb: cbu.add-product
+      args:
+        product-name: "Collateral Management"
+      depends-on: [0]
+    - verb: cbu.add-product
+      args:
+        product-name: "Middle Office"
+      depends-on: [0]
+
+  sets-state:
+    - key: structure.full_products_assigned
+      value: true
+
+  unlocks: []
+
+structure.remove-all-products:
+  kind: macro
+
+  ui:
+    label: "Remove All Products"
+    description: "Remove all product subscriptions from a CBU — clean slate before re-assignment"
+    target-label: "Product Removal Plan"
+
+  routing:
+    mode-tags: [onboarding, structure]
+    operator-domain: cbu
+
+  target:
+    operates-on: cbu-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional: {}
+
+  prereqs: []
+
+  expands-to:
+    - verb: cbu.remove-product
+      args:
+        product-name: "Custody"
+    - verb: cbu.remove-product
+      args:
+        product-name: "Fund Accounting"
+    - verb: cbu.remove-product
+      args:
+        product-name: "Transfer Agency"
+    - verb: cbu.remove-product
+      args:
+        product-name: "Collateral Management"
+    - verb: cbu.remove-product
+      args:
+        product-name: "Middle Office"
+
+  sets-state:
+    - key: structure.products_cleared
+      value: true
+
+  unlocks:
+    - structure.product-suite-custody-fa-ta
+    - structure.product-suite-full

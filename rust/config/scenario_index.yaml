@@ -552,3 +552,73 @@ scenarios:
       macro_fqn: governance.reconcile-registry
     explain:
       summary: "Bridge ungoverned, sync SRDEFs, recompute stale derived values"
+
+  # ── Onboarding Product Assignment ──────────────────────────────────────
+  - id: onboard-standard-product-suite
+    title: "Standard Product Suite Assignment"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [add, assign, onboard, "set up", provision, subscribe, attach]
+      nouns_any: [custody, "fund accounting", "transfer agent", "transfer agency", TA, FA, product, suite, products]
+      phrases_any:
+        - "add custody fund accounting and transfer agency"
+        - "add custody, fund accounting, and TA"
+        - "onboard with the standard product suite"
+        - "assign custody FA and TA"
+        - "subscribe to custody fund accounting and transfer agency"
+        - "add the standard products"
+        - "provision custody and fund admin"
+        - "set up custody FA TA"
+        - "add all three products"
+        - "standard product assignment"
+    routes:
+      kind: macro
+      macro_fqn: structure.product-suite-custody-fa-ta
+    explain:
+      summary: "Add Custody + Fund Accounting + Transfer Agency as a single runbook (3 steps, DAG-ordered)"
+
+  - id: onboard-full-product-suite
+    title: "Full Product Suite Assignment"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [add, assign, onboard, "set up", provision]
+      nouns_any: [full, all, complete, everything, "full suite", "all products"]
+      phrases_any:
+        - "add the full product suite"
+        - "onboard with all products"
+        - "assign everything"
+        - "full product assignment"
+        - "provision all services"
+        - "add all products to this CBU"
+        - "complete product setup"
+    routes:
+      kind: macro
+      macro_fqn: structure.product-suite-full
+    explain:
+      summary: "Add all 5 products (Custody, FA, TA, Collateral, Middle Office) as a single runbook"
+
+  - id: remove-all-products
+    title: "Remove All Products"
+    modes: [onboarding, structure]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [remove, clear, strip, reset, unsubscribe, detach]
+      nouns_any: [products, subscriptions, all, everything]
+      phrases_any:
+        - "remove all products"
+        - "clear product subscriptions"
+        - "strip all products from this CBU"
+        - "reset product assignment"
+        - "unsubscribe from all products"
+        - "detach all services"
+        - "clean slate on products"
+    routes:
+      kind: macro
+      macro_fqn: structure.remove-all-products
+    explain:
+      summary: "Remove all product subscriptions — clean slate before re-assignment"
