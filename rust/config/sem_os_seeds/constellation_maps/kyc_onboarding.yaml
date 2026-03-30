@@ -394,6 +394,7 @@ slots:
     state_machine: identifier_lifecycle
     verbs:
       add: { verb: identifier.add, when: [empty, failed] }
+      attach: { verb: identifier.attach, when: [empty, failed, captured] }
       read: identifier.read
       list: identifier.list
       verify: { verb: identifier.verify, when: [captured] }
