@@ -211,6 +211,57 @@ fn get_optional_string_array(verb_call: &VerbCall, key: &str) -> Option<Vec<Stri
 // ENTITY-ADD
 // =============================================================================
 
+/// Consolidated entity lifecycle verb — dispatches add/remove/confirm/reject
+/// by action argument.
+#[register_custom_op]
+pub struct ClientGroupEntityManageOp;
+
+#[async_trait]
+impl CustomOperation for ClientGroupEntityManageOp {
+    fn domain(&self) -> &'static str {
+        "client-group"
+    }
+    fn verb(&self) -> &'static str {
+        "entity-manage"
+    }
+    fn rationale(&self) -> &'static str {
+        "Consolidated entity lifecycle — dispatches by action arg"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let action = super::helpers::extract_string_opt(verb_call, "action")
+            .ok_or_else(|| anyhow::anyhow!(":action required (add|remove|confirm|reject)"))?;
+
+        match action.as_str() {
+            "add" => ClientGroupEntityAddOp.execute(verb_call, ctx, pool).await,
+            "remove" => ClientGroupEntityRemoveOp.execute(verb_call, ctx, pool).await,
+            "confirm" => ClientGroupConfirmEntityOp.execute(verb_call, ctx, pool).await,
+            "reject" => ClientGroupRejectEntityOp.execute(verb_call, ctx, pool).await,
+            other => Err(anyhow::anyhow!(
+                "Unknown entity-manage action '{}'. Valid: add, remove, confirm, reject",
+                other
+            )),
+        }
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 #[register_custom_op]
 pub struct ClientGroupEntityAddOp;
 

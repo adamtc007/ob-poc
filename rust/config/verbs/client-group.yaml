@@ -144,6 +144,63 @@ domains:
       # ENTITY MEMBERSHIP - Track which entities belong to client groups
       # ============================================================================
 
+      entity-manage:
+        description: >
+          Consolidated entity lifecycle verb — add, remove, confirm, or reject
+          an entity's membership in a client group. The action arg selects the operation.
+        metadata:
+          tier: intent
+          noun: client_group
+          subject_kinds: [client-group]
+          tags: [entity, client-group, lifecycle, consolidated]
+          phase_tags: [onboarding, kyc]
+          side_effects: state_write
+        invocation_phrases:
+          - "manage entity in client group"
+          - "add entity to client group"
+          - "remove entity from group"
+          - "confirm entity membership"
+          - "reject entity from group"
+          - "include entity in group"
+          - "exclude entity from group"
+        behavior: plugin
+        handler: ClientGroupEntityManageOp
+        args:
+          - name: action
+            type: string
+            required: true
+            description: "Operation: add, remove, confirm, reject"
+            valid_values: [add, remove, confirm, reject]
+          - name: entity-id
+            type: uuid
+            required: true
+            description: Entity to manage
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: group-id
+            type: uuid
+            required: true
+            description: Client group
+          - name: membership-type
+            type: string
+            required: false
+            description: "Membership type (for add action): in_group, confirmed, suspected"
+            default: in_group
+          - name: reason
+            type: string
+            required: false
+            description: Reason (for reject action)
+          - name: tags
+            type: string_list
+            required: false
+            description: Tags to apply (for confirm action)
+        returns:
+          type: record
+
       entity-add:
         description: "Add an entity to this client group's universe"
         invocation_phrases:

@@ -2154,3 +2154,60 @@ impl CustomOperation for GleifImportToClientGroupOp {
         ))
     }
 }
+
+/// Consolidated GLEIF lookup — dispatches to specific handlers by target-type.
+///
+/// Replaces 8 individual get-* verbs: get-record, get-parent, get-children,
+/// get-manager, get-managed-funds, get-master-fund, get-umbrella, lookup-by-isin.
+///
+/// The `target-type` arg selects which lookup to perform.
+#[register_custom_op]
+pub struct GleifLookupOp;
+
+#[async_trait]
+impl CustomOperation for GleifLookupOp {
+    fn domain(&self) -> &'static str {
+        "gleif"
+    }
+    fn verb(&self) -> &'static str {
+        "lookup"
+    }
+    fn rationale(&self) -> &'static str {
+        "Consolidated GLEIF relationship lookup — dispatches by target-type"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let target_type = extract_string_opt(verb_call, "target-type")
+            .ok_or_else(|| anyhow::anyhow!(":target-type required (record|parent|children|manager|managed-funds|master-fund|umbrella|isin)"))?;
+
+        match target_type.as_str() {
+            "record" => GleifGetRecordOp.execute(verb_call, ctx, pool).await,
+            "parent" => GleifGetParentOp.execute(verb_call, ctx, pool).await,
+            "children" => GleifGetChildrenOp.execute(verb_call, ctx, pool).await,
+            "manager" => GleifGetManagerOp.execute(verb_call, ctx, pool).await,
+            "managed-funds" => GleifGetManagedFundsOp.execute(verb_call, ctx, pool).await,
+            "master-fund" => GleifGetMasterFundOp.execute(verb_call, ctx, pool).await,
+            "umbrella" => GleifGetUmbrellaOp.execute(verb_call, ctx, pool).await,
+            "isin" => GleifLookupByIsinOp.execute(verb_call, ctx, pool).await,
+            other => Err(anyhow::anyhow!(
+                "Unknown GLEIF lookup target-type '{}'. Valid: record, parent, children, manager, managed-funds, master-fund, umbrella, isin",
+                other
+            )),
+        }
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+}

@@ -3824,3 +3824,144 @@ category = "contextual_query"
 difficulty = "medium"
 workspace = "cbu"
 notes = "Contextual remaining work query"
+
+# ============================================================================
+# UBO EPISTEMIC LIFECYCLE — Added for Fix 6 (integrity hardening)
+# Tests the undiscovered → alleged → provable → proved → approved progression
+# and edge cases: screening blocks, evidence insufficiency, rejection, trust UBOs
+# ============================================================================
+
+[[test]]
+utterance = "allege this person is a beneficial owner"
+expected_verb = "ubo.allege"
+alt_verbs = ["ubo.registry.create", "allegation.record", "ubo.add-ownership"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+notes = "UBO epistemic: undiscovered → alleged"
+
+[[test]]
+utterance = "record a beneficial ownership allegation for the director"
+expected_verb = "ubo.allege"
+alt_verbs = ["allegation.record", "ubo.registry.create"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "UBO epistemic: allegation recording"
+
+[[test]]
+utterance = "verify the UBO evidence is sufficient"
+expected_verb = "ubo.verify"
+alt_verbs = ["ubo.registry.promote", "evidence.mark-verified"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+notes = "UBO epistemic: alleged → provable"
+
+[[test]]
+utterance = "promote the UBO candidate to identified status"
+expected_verb = "ubo.promote"
+alt_verbs = ["ubo.registry.advance"]
+category = "direct"
+difficulty = "medium"
+workspace = "kyc"
+notes = "UBO epistemic: provable → proved"
+
+[[test]]
+utterance = "approve the beneficial ownership determination"
+expected_verb = "ubo.approve"
+alt_verbs = ["ubo.registry.advance"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+notes = "UBO epistemic: proved → approved"
+
+[[test]]
+utterance = "reject this UBO allegation as unsubstantiated"
+expected_verb = "ubo.reject"
+alt_verbs = ["ubo.registry.reject"]
+category = "natural"
+difficulty = "medium"
+workspace = "kyc"
+notes = "UBO epistemic: rejection path"
+
+[[test]]
+utterance = "expire the UBO entry that has not been renewed"
+expected_verb = "ubo.expire"
+alt_verbs = ["ubo.registry.expire"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "UBO epistemic: expiry/terminal state"
+
+[[test]]
+utterance = "waive verification for this beneficial owner"
+expected_verb = "ubo.waive-verification"
+alt_verbs = ["ubo.registry.waive"]
+category = "direct"
+difficulty = "medium"
+workspace = "kyc"
+notes = "UBO epistemic: waiver bypass"
+
+[[test]]
+utterance = "identify the UBOs from the trust structure"
+expected_verb = "trust.identify-ubos"
+alt_verbs = ["ubo.discover", "control.identify-ubos"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Trust-specific UBO identification"
+
+[[test]]
+utterance = "analyze who controls the trust"
+expected_verb = "trust.analyze-control"
+alt_verbs = ["control.analyze", "board.analyze-control"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Trust control vector analysis"
+
+[[test]]
+utterance = "capture a snapshot of the current UBO state"
+expected_verb = "ubo.snapshot.capture"
+alt_verbs = ["ownership.snapshot.get"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "UBO epistemic: snapshot for audit trail"
+
+[[test]]
+utterance = "compare the UBO determination with the previous snapshot"
+expected_verb = "ubo.snapshot.diff"
+alt_verbs = ["ownership.reconcile"]
+category = "natural"
+difficulty = "expert"
+workspace = "kyc"
+notes = "UBO epistemic: diff for change detection"
+
+[[test]]
+utterance = "record a client allegation about who owns the shares"
+expected_verb = "allegation.record"
+alt_verbs = ["ubo.allege", "ubo.add-ownership"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Client allegation (unverified claim)"
+
+[[test]]
+utterance = "classify this as a discretionary trust"
+expected_verb = "trust.classify"
+alt_verbs = []
+category = "direct"
+difficulty = "medium"
+workspace = "kyc"
+notes = "Trust type classification"
+
+[[test]]
+utterance = "add a partnership capital contribution for this LP"
+expected_verb = "partnership.record-contribution"
+alt_verbs = ["partnership.add-partner"]
+category = "natural"
+difficulty = "hard"
+workspace = "kyc"
+notes = "Partnership capital structure"

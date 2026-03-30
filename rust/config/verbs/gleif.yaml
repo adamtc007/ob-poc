@@ -630,6 +630,79 @@ domains:
           capture: true
 
       # ==========================================================================
+      # CONSOLIDATED LOOKUP (replaces get-record, get-parent, get-children,
+      # get-manager, get-managed-funds, get-master-fund, get-umbrella, lookup-by-isin)
+      # ==========================================================================
+
+      lookup:
+        description: >
+          Consolidated GLEIF lookup — fetch relationship data by target-type.
+          Replaces 8 individual get-* verbs with a single entry point.
+          target-type: record | parent | children | manager | managed-funds | master-fund | umbrella | isin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          subject_kinds: [company]
+          tags: [gleif, external-api, lookup, onboarding, consolidated]
+          phase_tags: [onboarding, kyc]
+          side_effects: facts_only
+        invocation_phrases:
+          - "look up in GLEIF"
+          - "GLEIF lookup"
+          - "get GLEIF data"
+          - "fetch from GLEIF"
+          - "get LEI details"
+          - "who is the parent company"
+          - "show subsidiaries"
+          - "who manages this fund"
+          - "get umbrella fund"
+          - "get master fund"
+          - "find managed funds"
+          - "resolve ISIN to LEI"
+          - "look up GLEIF record"
+          - "show GLEIF relationship"
+          - "fetch GLEIF hierarchy"
+        behavior: plugin
+        args:
+          - name: target-type
+            type: string
+            required: true
+            description: "Type of lookup: record, parent, children, manager, managed-funds, master-fund, umbrella, isin"
+            valid_values: [record, parent, children, manager, managed-funds, master-fund, umbrella, isin]
+          - name: lei
+            type: string
+            required: false
+            description: LEI to look up (required for most target-types)
+          - name: entity-id
+            type: uuid
+            required: false
+            description: Entity UUID (will resolve to LEI)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: isin
+            type: string
+            required: false
+            description: ISIN code (required when target-type=isin)
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+            description: Maximum results to return
+          - name: resolve-umbrellas
+            type: boolean
+            required: false
+            default: true
+            description: Also fetch umbrella structure (for managed-funds)
+        returns:
+          type: record
+
+      # ==========================================================================
       # CLIENT GROUP INTEGRATION
       # ==========================================================================
 

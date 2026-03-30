@@ -36,6 +36,11 @@ pub struct VerbMatch {
     pub verb_fqn: String,
     pub slot_name: String,
     pub effective_state: String,
+    /// Match priority: 1 = verb domain prefix matches noun (high confidence),
+    /// 2 = slot name matches noun (lower confidence, broader).
+    /// Used to prefer domain-specific matches over slot-name fallbacks
+    /// when entity_workstream hosts verbs from 6+ sub-domains.
+    pub priority: u8,
 }
 
 /// Summary statistics for diagnostics.
@@ -86,12 +91,6 @@ impl ConstellationVerbIndex {
                 total_available_verbs += 1;
                 let action = extract_action_from_fqn(verb_fqn);
 
-                let vm = VerbMatch {
-                    verb_fqn: verb_fqn.clone(),
-                    slot_name: slot.name.clone(),
-                    effective_state: slot.effective_state.clone(),
-                };
-
                 let sc = SlotContext {
                     slot_name: slot.name.clone(),
                     slot_path: slot.path.clone(),
@@ -102,20 +101,37 @@ impl ConstellationVerbIndex {
 
                 // Combine slot noun keys with verb-domain noun keys.
                 // e.g., "document.solicit" on entity_workstream → nouns include "document"
-                let mut all_nouns = noun_keys.clone();
                 let domain_nouns = verb_domain_to_noun_keys(verb_fqn);
-                for dn in &domain_nouns {
-                    if !all_nouns.contains(dn) {
-                        all_nouns.push(dn.clone());
-                    }
-                }
 
-                // Forward: every (noun, action) pair
-                for noun in &all_nouns {
+                // Forward: every (noun, action) pair — with priority.
+                // Priority 1 = noun came from verb's domain prefix (high confidence)
+                // Priority 2 = noun came from slot name (broader, lower confidence)
+                // This ensures "document solicit" matches document.solicit (priority 1)
+                // over entity-workstream.update-status (priority 2 via slot name "entity").
+                let all_nouns_with_priority: Vec<(String, u8)> = {
+                    let mut pairs = Vec::new();
+                    for dn in &domain_nouns {
+                        pairs.push((dn.clone(), 1));
+                    }
+                    for sn in &noun_keys {
+                        if !domain_nouns.contains(sn) {
+                            pairs.push((sn.clone(), 2));
+                        }
+                    }
+                    pairs
+                };
+
+                for (noun, priority) in &all_nouns_with_priority {
+                    let vm = VerbMatch {
+                        verb_fqn: verb_fqn.clone(),
+                        slot_name: slot.name.clone(),
+                        effective_state: slot.effective_state.clone(),
+                        priority: *priority,
+                    };
                     forward
                         .entry((noun.clone(), action.clone()))
                         .or_default()
-                        .push(vm.clone());
+                        .push(vm);
 
                     // By noun
                     let noun_verbs = by_noun.entry(noun.clone()).or_default();
@@ -162,9 +178,12 @@ impl ConstellationVerbIndex {
 
     /// Look up verbs matching both a noun and action stem.
     /// This is the primary "two-clue" resolution path.
+    /// Results are sorted by priority (1 = domain-prefix match first, 2 = slot-name fallback).
     pub fn lookup(&self, noun: &str, action: &str) -> Vec<&VerbMatch> {
         let key = (normalize(noun), normalize_action(action));
-        self.forward.get(&key).map_or_else(Vec::new, |v| v.iter().collect())
+        let mut matches: Vec<&VerbMatch> = self.forward.get(&key).map_or_else(Vec::new, |v| v.iter().collect());
+        matches.sort_by_key(|m| m.priority);
+        matches
     }
 
     /// Look up verbs matching a noun (any action).

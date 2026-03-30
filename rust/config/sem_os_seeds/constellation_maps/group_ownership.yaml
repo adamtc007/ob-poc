@@ -19,6 +19,9 @@ slots:
         { verb: client-group.discover-entities, when: [empty, filled] }
       complete_discovery:
         { verb: client-group.complete-discovery, when: filled }
+      # Consolidated: client-group.entity-manage replaces entity-add/remove/confirm/reject
+      # action arg selects: add, remove, confirm, reject
+      entity_manage: { verb: client-group.entity-manage, when: [empty, filled] }
       entity_add: { verb: client-group.entity-add, when: [empty, filled] }
       confirm_entity:
         {
@@ -68,15 +71,10 @@ slots:
       search: { verb: gleif.search, when: [empty, filled] }
       refresh: { verb: gleif.refresh, when: [empty, filled] }
       enrich: { verb: gleif.enrich, when: [empty, filled] }
-      get_record: { verb: gleif.get-record, when: [empty, filled] }
-      get_parent: { verb: gleif.get-parent, when: [empty, filled] }
-      get_children: { verb: gleif.get-children, when: [empty, filled] }
-      get_manager: { verb: gleif.get-manager, when: [empty, filled] }
-      get_managed_funds:
-        { verb: gleif.get-managed-funds, when: [empty, filled] }
-      get_master_fund: { verb: gleif.get-master-fund, when: [empty, filled] }
-      get_umbrella: { verb: gleif.get-umbrella, when: [empty, filled] }
-      lookup_by_isin: { verb: gleif.lookup-by-isin, when: [empty, filled] }
+      # Consolidated: gleif.lookup replaces 8 individual get-* verbs.
+      # The target-type arg selects: record, parent, children, manager,
+      # managed-funds, master-fund, umbrella, isin.
+      lookup: { verb: gleif.lookup, when: [empty, filled] }
       resolve_successor:
         { verb: gleif.resolve-successor, when: [empty, filled] }
       trace_ownership: { verb: gleif.trace-ownership, when: [empty, filled] }
