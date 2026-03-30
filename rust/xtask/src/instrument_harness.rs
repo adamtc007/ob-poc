@@ -136,14 +136,11 @@ impl InstrumentHarness {
         let cbu_id = self.state.cbu_id.context("Failed to create CBU")?;
         println!("  CBU created: {}", cbu_id);
 
-        // Create trading profile draft
+        // Create trading profile draft (may already exist if CBU is idempotent)
         match self
             .exec(
                 "setup",
-                &format!(
-                    r#"(trading-profile.create-draft :cbu-id "{}")"#,
-                    cbu_id
-                ),
+                &format!(r#"(trading-profile.create-draft :cbu-id "{}")"#, cbu_id),
             )
             .await
         {
@@ -152,8 +149,23 @@ impl InstrumentHarness {
                 println!("  Trading profile created: {:?}", self.state.profile_id);
             }
             Err(e) => {
-                println!("  Trading profile skipped: {}", e);
-                self.state.errors.push(format!("trading-profile.create-draft: {}", e));
+                // Profile already exists — try to get the active one
+                println!("  Trading profile create skipped ({}), trying get-active...", e);
+                match self
+                    .exec(
+                        "setup",
+                        &format!(r#"(trading-profile.get-active :cbu-id "{}")"#, cbu_id),
+                    )
+                    .await
+                {
+                    Ok(results) => {
+                        self.state.profile_id = Self::extract_uuid(&results);
+                        println!("  Existing profile found: {:?}", self.state.profile_id);
+                    }
+                    Err(_) => {
+                        self.state.errors.push(format!("trading-profile: {}", e));
+                    }
+                }
             }
         }
 
@@ -166,6 +178,24 @@ impl InstrumentHarness {
                 Ok(_) => println!("  Trading profile read ✓"),
                 Err(e) => println!("  Trading profile read skipped: {}", e),
             }
+        }
+
+        // Create a legal entity for booking principal (needed by Phase 3)
+        match self
+            .exec(
+                "setup",
+                r#"(entity.ensure :name "Harness Custody Bank" :entity-type "limited_company_private" :jurisdiction "LU")"#,
+            )
+            .await
+        {
+            Ok(results) => {
+                // Store as principal entity
+                let eid = Self::extract_uuid(&results);
+                println!("  Custody entity created: {:?}", eid);
+                // Store on state for booking principal phase
+                self.state.custody_id = eid;
+            }
+            Err(e) => println!("  Custody entity skipped: {}", e),
         }
 
         self.state.phases_completed.push("setup".into());
@@ -226,13 +256,16 @@ impl InstrumentHarness {
 
         let cbu_id = self.state.cbu_id.context("CBU not created")?;
 
+        // Use seeded BNY Mellon SA/NV legal entity (booking_principal FK → legal_entity table)
+        let legal_entity_id = "a1000000-0000-0000-0000-000000000001";
+
         // Create booking principal
         match self
             .exec(
                 "booking",
                 &format!(
-                    r#"(booking-principal.create :cbu-id "{}" :name "{}")"#,
-                    cbu_id, TEST_PRINCIPAL_NAME
+                    r#"(booking-principal.create :legal-entity-id "{}" :principal-code "HARN-BP-001")"#,
+                    legal_entity_id
                 ),
             )
             .await
@@ -280,7 +313,7 @@ impl InstrumentHarness {
             .exec(
                 "settlement",
                 &format!(
-                    r#"(settlement-chain.create-chain :cbu-id "{}" :market "LU" :currency "EUR")"#,
+                    r#"(settlement-chain.create-chain :cbu-id "{}" :name "LU-EUR-Standard" :market "XLUX" :currency "EUR")"#,
                     cbu_id
                 ),
             )
@@ -397,6 +430,17 @@ impl InstrumentHarness {
             {
                 Ok(_) => println!("  CBU deleted: {}", cbu_id),
                 Err(e) => println!("  CBU delete failed: {}", e),
+            }
+        }
+
+        // Delete custody entity
+        if let Some(eid) = self.state.custody_id {
+            match self
+                .exec("cleanup", &format!(r#"(entity.delete :entity-id "{}")"#, eid))
+                .await
+            {
+                Ok(_) => println!("  Custody entity deleted: {}", eid),
+                Err(e) => println!("  Custody entity delete failed: {}", e),
             }
         }
 
