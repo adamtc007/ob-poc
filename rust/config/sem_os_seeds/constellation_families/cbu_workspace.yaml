@@ -1,0 +1,21 @@
+fqn: family.cbu_workspace
+family_id: cbu_workspace
+label: CBU Workspace
+description: Workspace-level root for CBU — entity, investor, holding, share-class, manco, temporal.
+domain_id: cbu
+selection_rules:
+  - condition: "true"
+    target_constellation: cbu.workspace
+    priority: 60
+constellation_refs:
+  - constellation_id: cbu.workspace
+    label: CBU Workspace Root
+    jurisdiction: ALL
+    entity_kind: cbu
+    triggers: [entity, investor, holding, share-class, manco, temporal]
+candidate_jurisdictions: [ALL]
+candidate_entity_kinds: [cbu]
+grounding_threshold:
+  required_input_keys: []
+  requires_entity_instance: false
+  allows_draft_instance: true

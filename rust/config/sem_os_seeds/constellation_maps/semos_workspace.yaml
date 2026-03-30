@@ -1,0 +1,106 @@
+constellation: semos.workspace
+description: >
+  SemOS Maintenance workspace root — operational and diagnostic verbs for
+  registry governance, schema management, and platform infrastructure.
+jurisdiction: ALL
+slots:
+  workspace_root:
+    type: cbu
+    table: client_group
+    pk: group_id
+    cardinality: root
+    verbs:
+      # ── Maintenance/infrastructure ──────────────────────────────────
+      maint_bootstrap: { verb: maintenance.bootstrap-seeds, when: [empty, filled] }
+      maint_cleanup: { verb: maintenance.cleanup, when: filled }
+      maint_drain: { verb: maintenance.drain-outbox, when: filled }
+      maint_health_pending: maintenance.health-pending
+      maint_health_stale: maintenance.health-stale-dryruns
+      maint_reindex: { verb: maintenance.reindex-embeddings, when: filled }
+      maint_validate: maintenance.validate-schema-sync
+      # ── Constellation operations ────────────────────────────────────
+      constellation_hydrate: { verb: constellation.hydrate, when: [empty, filled] }
+      constellation_summary: constellation.summary
+      # ── Discovery/introspection ─────────────────────────────────────
+      discovery_run: { verb: discovery.run, when: [empty, filled] }
+      discovery_explain: discovery.explain
+      discovery_available: discovery.available-actions
+      discovery_entity_context: discovery.entity-context
+      discovery_relationships: discovery.entity-relationships
+      discovery_graph_walk: { verb: discovery.graph-walk, when: filled }
+      discovery_inspect: discovery.inspect-data
+      discovery_search_data: { verb: discovery.search-data, when: [empty, filled] }
+      discovery_search_entities: { verb: discovery.search-entities, when: [empty, filled] }
+      discovery_transitions: discovery.valid-transitions
+      discovery_verb_detail: discovery.verb-detail
+      discovery_cascade: { verb: discovery.cascade-research, when: filled }
+      # ── Semantic operations ─────────────────────────────────────────
+      semantic_state: semantic.get-state
+      semantic_stages: semantic.list-stages
+      semantic_missing: semantic.missing-entities
+      semantic_next: semantic.next-actions
+      semantic_prompt: semantic.prompt-context
+      semantic_stages_product: semantic.stages-for-product
+      # ── State operations ────────────────────────────────────────────
+      state_derive: { verb: state.derive, when: filled }
+      state_derive_all: { verb: state.derive-all, when: filled }
+      state_diagnose: state.diagnose
+      state_consistency: state.check-consistency
+      state_blocked: state.blocked-why
+      state_override: { verb: state.override, when: filled }
+      state_revoke: { verb: state.revoke-override, when: filled }
+      state_list_overrides: state.list-overrides
+      # ── BPMN orchestration ──────────────────────────────────────────
+      bpmn_start: { verb: bpmn.start, when: [empty, filled] }
+      bpmn_signal: { verb: bpmn.signal, when: filled }
+      bpmn_cancel: { verb: bpmn.cancel, when: filled }
+      bpmn_inspect: bpmn.inspect
+      bpmn_compile: { verb: bpmn.compile, when: [empty, filled] }
+      # ── Batch operations ────────────────────────────────────────────
+      batch_status: batch.status
+      batch_pause: { verb: batch.pause, when: filled }
+      batch_resume: { verb: batch.resume, when: filled }
+      batch_abort: { verb: batch.abort, when: filled }
+      batch_skip: { verb: batch.skip, when: filled }
+      batch_continue: { verb: batch.continue, when: filled }
+      batch_add_products: { verb: batch.add-products, when: filled }
+      # ── Docs bundle ─────────────────────────────────────────────────
+      docs_apply: { verb: docs-bundle.apply, when: filled }
+      docs_list_applied: docs-bundle.list-applied
+      docs_list_available: docs-bundle.list-available
+      # ── Template operations ─────────────────────────────────────────
+      template_invoke: { verb: template.invoke, when: [empty, filled] }
+      template_batch: { verb: template.batch, when: filled }
+      # ── Admin/user/role management ──────────────────────────────────
+      admin_reg_create: { verb: admin.regulators.create, when: [empty, filled] }
+      admin_reg_list: admin.regulators.list
+      admin_reg_read: admin.regulators.read
+      admin_reg_update: { verb: admin.regulators.update, when: filled }
+      admin_reg_deactivate: { verb: admin.regulators.deactivate, when: filled }
+      admin_tiers_list: admin.regulatory-tiers.list
+      admin_tiers_read: admin.regulatory-tiers.read
+      admin_roles_create: { verb: admin.role-types.create, when: [empty, filled] }
+      admin_roles_list: admin.role-types.list
+      admin_roles_read: admin.role-types.read
+      admin_roles_update: { verb: admin.role-types.update, when: filled }
+      admin_roles_deactivate: { verb: admin.role-types.deactivate, when: filled }
+      user_create: { verb: user.create, when: [empty, filled] }
+      user_suspend: { verb: user.suspend, when: filled }
+      user_reactivate: { verb: user.reactivate, when: filled }
+      user_offboard: { verb: user.offboard, when: filled }
+      user_check_access: user.check-access
+      user_list_cbus: user.list-cbus
+      user_list_teams: user.list-teams
+      refdata_ensure: { verb: refdata.ensure, when: [empty, filled] }
+      refdata_list: refdata.list
+      refdata_read: refdata.read
+      refdata_deactivate: { verb: refdata.deactivate, when: filled }
+      refdata_load_all: { verb: refdata.load-all, when: [empty, filled] }
+      refdata_load_instruments: { verb: refdata.load-instrument-classes, when: [empty, filled] }
+      refdata_load_markets: { verb: refdata.load-markets, when: [empty, filled] }
+      refdata_load_sla: { verb: refdata.load-sla-templates, when: [empty, filled] }
+      refdata_load_subcustodians: { verb: refdata.load-subcustodians, when: [empty, filled] }
+      role_ensure: { verb: role.ensure, when: [empty, filled] }
+      role_list: role.list
+      role_read: role.read
+      role_delete: { verb: role.delete, when: filled }

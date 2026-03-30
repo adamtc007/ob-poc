@@ -132,7 +132,7 @@ impl WorkspaceKind {
             Self::ProductMaintenance => WorkspaceRegistryEntry {
                 workspace_id: self.clone(),
                 display_name: self.label(),
-                constellation_families: vec!["product_service_taxonomy"],
+                constellation_families: vec!["product_workspace", "product_service_taxonomy"],
                 subject_kinds: vec![
                     SubjectKind::Product,
                     SubjectKind::Service,
@@ -147,7 +147,7 @@ impl WorkspaceKind {
             Self::Deal => WorkspaceRegistryEntry {
                 workspace_id: self.clone(),
                 display_name: self.label(),
-                constellation_families: vec!["commercial", "handoff"],
+                constellation_families: vec!["deal_workspace", "commercial", "handoff"],
                 subject_kinds: vec![SubjectKind::Deal, SubjectKind::Handoff],
                 subject_required: true,
                 default_constellation_family: "commercial",
@@ -158,6 +158,7 @@ impl WorkspaceKind {
                 workspace_id: self.clone(),
                 display_name: self.label(),
                 constellation_families: vec![
+                    "cbu_workspace",
                     "operating",
                     "maintenance",
                     "lu_ucits",
@@ -190,7 +191,7 @@ impl WorkspaceKind {
             Self::InstrumentMatrix => WorkspaceRegistryEntry {
                 workspace_id: self.clone(),
                 display_name: self.label(),
-                constellation_families: vec!["trading_permission", "lifecycle"],
+                constellation_families: vec!["instrument_workspace", "trading_permission", "lifecycle"],
                 subject_kinds: vec![SubjectKind::Matrix, SubjectKind::Cbu],
                 subject_required: true,
                 default_constellation_family: "trading_permission",
@@ -200,7 +201,7 @@ impl WorkspaceKind {
             Self::OnBoarding => WorkspaceRegistryEntry {
                 workspace_id: self.clone(),
                 display_name: self.label(),
-                constellation_families: vec!["handoff", "activation"],
+                constellation_families: vec!["onboarding_workspace", "handoff", "activation"],
                 subject_kinds: vec![SubjectKind::Handoff, SubjectKind::Cbu],
                 subject_required: true,
                 default_constellation_family: "handoff",
@@ -210,7 +211,7 @@ impl WorkspaceKind {
             Self::SemOsMaintenance => WorkspaceRegistryEntry {
                 workspace_id: self.clone(),
                 display_name: self.label(),
-                constellation_families: vec!["registry_governance"],
+                constellation_families: vec!["semos_workspace", "registry_governance"],
                 subject_kinds: vec![],
                 subject_required: false,
                 default_constellation_family: "registry_governance",

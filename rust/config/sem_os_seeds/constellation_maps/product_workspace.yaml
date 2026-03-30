@@ -1,0 +1,35 @@
+constellation: product.workspace
+description: >
+  ProductMaintenance workspace root — service resource lifecycle management
+  and service availability configuration.
+jurisdiction: ALL
+slots:
+  workspace_root:
+    type: cbu
+    table: products
+    pk: product_id
+    cardinality: root
+    verbs:
+      # Service availability
+      svc_avail_list: service-availability.list
+      svc_avail_by_principal: service-availability.list-by-principal
+      svc_avail_set: { verb: service-availability.set, when: [empty, filled] }
+      # Service intent
+      svc_intent_supersede: { verb: service-intent.supersede, when: filled }
+      # Service resource lifecycle
+      svc_lifecycle_discover: { verb: service-resource.discover-lifecycles, when: [empty, filled] }
+      svc_lifecycle_list: service-resource.list-lifecycles
+      svc_lifecycle_read: service-resource.read-lifecycle
+      svc_lifecycle_list_by_instrument: service-resource.list-lifecycles-by-instrument
+      svc_lifecycle_list_instances: service-resource.list-lifecycle-instances
+      svc_lifecycle_list_types: service-resource.list-lifecycle-resource-types
+      svc_lifecycle_read_type: service-resource.read-lifecycle-resource-type
+      svc_lifecycle_list_resources: service-resource.list-resources-for-lifecycle
+      svc_lifecycle_activate: { verb: service-resource.activate-lifecycle, when: filled }
+      svc_lifecycle_suspend: { verb: service-resource.suspend-lifecycle, when: filled }
+      svc_lifecycle_decommission: { verb: service-resource.decommission-lifecycle, when: filled }
+      svc_lifecycle_provision: { verb: service-resource.provision-lifecycle, when: filled }
+      svc_lifecycle_analyze_gaps: service-resource.analyze-lifecycle-gaps
+      svc_lifecycle_check_readiness: service-resource.check-lifecycle-readiness
+      svc_lifecycle_generate_plan: { verb: service-resource.generate-lifecycle-plan, when: filled }
+      svc_lifecycle_execute_plan: { verb: service-resource.execute-lifecycle-plan, when: filled }

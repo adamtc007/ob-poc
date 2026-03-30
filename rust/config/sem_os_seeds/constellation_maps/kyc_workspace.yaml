@@ -14,5 +14,67 @@ slots:
     cardinality: root
     verbs:
       # Cross-constellation coverage and readiness
-      coverage_compute:
-        { verb: coverage.compute, when: filled }
+      coverage_compute: { verb: coverage.compute, when: filled }
+      # ── Research outreach (client information solicitation) ──────────
+      outreach_create: { verb: research.outreach.create-request, when: filled }
+      outreach_send: { verb: research.outreach.mark-sent, when: filled }
+      outreach_remind: { verb: research.outreach.send-reminder, when: filled }
+      outreach_respond: { verb: research.outreach.record-response, when: filled }
+      outreach_close: { verb: research.outreach.close-request, when: filled }
+      outreach_pending: research.outreach.list-pending
+      outreach_overdue: research.outreach.list-overdue
+      outreach_get: research.outreach.get-request
+      outreach_plan: { verb: research.outreach.plan-generate, when: filled }
+      # ── Research workflow (decision tracking) ───────────────────────
+      workflow_decision: { verb: research.workflow.record-decision, when: filled }
+      workflow_confirm: { verb: research.workflow.confirm-decision, when: filled }
+      workflow_reject: { verb: research.workflow.reject-decision, when: filled }
+      workflow_action: { verb: research.workflow.record-action, when: filled }
+      workflow_correction: { verb: research.workflow.record-correction, when: filled }
+      workflow_anomaly: { verb: research.workflow.record-anomaly, when: filled }
+      workflow_resolve_anomaly: { verb: research.workflow.resolve-anomaly, when: filled }
+      workflow_pending: research.workflow.pending-decisions
+      workflow_audit: research.workflow.audit-trail
+      workflow_supersession: research.workflow.supersession-trail
+      # ── Graph analysis (cross-constellation ownership queries) ──────
+      graph_ancestors: { verb: graph.ancestors, when: filled }
+      graph_descendants: { verb: graph.descendants, when: filled }
+      graph_path: { verb: graph.path, when: filled }
+      graph_filter: { verb: graph.filter, when: filled }
+      graph_focus: { verb: graph.focus, when: filled }
+      graph_compare: { verb: graph.compare, when: filled }
+      graph_find_connected: { verb: graph.find-connected, when: filled }
+      graph_group_by: { verb: graph.group-by, when: filled }
+      graph_validate: { verb: graph.validate, when: filled }
+      graph_view: graph.view
+      # ── Verification operations ─────────────────────────────────────
+      verify_assert: { verb: verify.assert, when: filled }
+      verify_challenge: { verb: verify.challenge, when: filled }
+      verify_respond: { verb: verify.respond-to-challenge, when: filled }
+      verify_resolve_challenge: { verb: verify.resolve-challenge, when: filled }
+      verify_escalate: { verb: verify.escalate, when: filled }
+      verify_resolve_escalation: { verb: verify.resolve-escalation, when: filled }
+      verify_status: verify.get-status
+      verify_confidence: { verb: verify.calculate-confidence, when: filled }
+      verify_detect_evasion: { verb: verify.detect-evasion, when: filled }
+      verify_detect_patterns: { verb: verify.detect-patterns, when: filled }
+      verify_record_pattern: { verb: verify.record-pattern, when: filled }
+      verify_resolve_pattern: { verb: verify.resolve-pattern, when: filled }
+      verify_list_challenges: verify.list-challenges
+      verify_list_escalations: verify.list-escalations
+      verify_list_patterns: verify.list-patterns
+      verify_against_registry: { verb: verify.verify-against-registry, when: filled }
+      # ── Observation management ──────────────────────────────────────
+      observation_record: { verb: observation.record, when: filled }
+      observation_record_from_doc: { verb: observation.record-from-document, when: filled }
+      observation_verify: { verb: observation.verify-allegations, when: filled }
+      observation_supersede: { verb: observation.supersede, when: filled }
+      observation_reconcile: { verb: observation.reconcile, when: filled }
+      observation_current: observation.get-current
+      observation_for_entity: observation.list-for-entity
+      observation_for_attribute: observation.list-for-attribute
+      # ── Discrepancy management ──────────────────────────────────────
+      discrepancy_record: { verb: discrepancy.record, when: filled }
+      discrepancy_resolve: { verb: discrepancy.resolve, when: filled }
+      discrepancy_escalate: { verb: discrepancy.escalate, when: filled }
+      discrepancy_list_open: discrepancy.list-open

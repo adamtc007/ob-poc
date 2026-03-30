@@ -1,0 +1,21 @@
+fqn: family.product_workspace
+family_id: product_workspace
+label: Product Workspace
+description: Workspace-level root for ProductMaintenance.
+domain_id: product
+selection_rules:
+  - condition: "true"
+    target_constellation: product.workspace
+    priority: 60
+constellation_refs:
+  - constellation_id: product.workspace
+    label: Product Workspace Root
+    jurisdiction: ALL
+    entity_kind: product
+    triggers: [product, service, lifecycle, resource]
+candidate_jurisdictions: [ALL]
+candidate_entity_kinds: [product, service]
+grounding_threshold:
+  required_input_keys: []
+  requires_entity_instance: false
+  allows_draft_instance: true

@@ -1,0 +1,148 @@
+constellation: instrument.workspace
+description: >
+  InstrumentMatrix workspace root — trading profile, settlement, custody,
+  and instrument management verbs spanning the trading infrastructure.
+jurisdiction: ALL
+slots:
+  workspace_root:
+    type: cbu
+    table: cbu_trading_profiles
+    pk: profile_id
+    cardinality: root
+    verbs:
+      # Matrix overlays
+      matrix_add: { verb: matrix-overlay.add, when: [empty, filled] }
+      matrix_activate: { verb: matrix-overlay.activate, when: filled }
+      matrix_suspend: { verb: matrix-overlay.suspend, when: filled }
+      matrix_list: matrix-overlay.list-by-subscription
+      matrix_compare: matrix-overlay.compare-products
+      matrix_effective: matrix-overlay.effective-matrix
+      matrix_gaps: matrix-overlay.unified-gaps
+      # Economic exposure
+      exposure_compute: { verb: economic-exposure.compute, when: filled }
+      exposure_summary: economic-exposure.summary
+      # Issuer control
+      issuer_config_read: issuer-control-config.read
+      issuer_config_upsert: { verb: issuer-control-config.upsert, when: [empty, filled] }
+      # Trading profile CA policy
+      tp_ca_policy: trading-profile.ca.get-policy
+      tp_ca_election: { verb: trading-profile.ca.set-election-policy, when: filled }
+      tp_ca_notification: { verb: trading-profile.ca.set-notification-policy, when: filled }
+      # Movement/settlement
+      movement_subscribe: { verb: movement.subscribe, when: filled }
+      movement_redeem: { verb: movement.redeem, when: filled }
+      movement_transfer_in: { verb: movement.transfer-in, when: filled }
+      movement_transfer_out: { verb: movement.transfer-out, when: filled }
+      movement_settle: { verb: movement.settle, when: filled }
+      movement_confirm: { verb: movement.confirm, when: filled }
+      movement_cancel: { verb: movement.cancel, when: filled }
+      movement_fail: { verb: movement.fail, when: filled }
+      movement_read: movement.read
+      movement_list: movement.list-by-holding
+      movement_capital_call: { verb: movement.capital-call, when: filled }
+      movement_distribute: { verb: movement.distribute, when: filled }
+      movement_distribute_recallable: { verb: movement.distribute-recallable, when: filled }
+      movement_commitment: { verb: movement.record-commitment, when: filled }
+      # Settlement chain
+      sc_create: { verb: settlement-chain.create-chain, when: [empty, filled] }
+      sc_add_hop: { verb: settlement-chain.add-hop, when: filled }
+      sc_remove_hop: { verb: settlement-chain.remove-hop, when: filled }
+      sc_list_chains: settlement-chain.list-chains
+      sc_list_hops: settlement-chain.list-hops
+      sc_deactivate: { verb: settlement-chain.deactivate-chain, when: filled }
+      sc_define_location: { verb: settlement-chain.define-location, when: [empty, filled] }
+      sc_list_locations: settlement-chain.list-locations
+      sc_set_preference: { verb: settlement-chain.set-location-preference, when: filled }
+      sc_list_preferences: settlement-chain.list-location-preferences
+      sc_cross_border: { verb: settlement-chain.set-cross-border, when: filled }
+      sc_list_cross_border: settlement-chain.list-cross-border
+      sc_deactivate_cross: { verb: settlement-chain.deactivate-cross-border, when: filled }
+      # Trade gateway
+      gw_define: { verb: trade-gateway.define-gateway, when: [empty, filled] }
+      gw_enable: { verb: trade-gateway.enable-gateway, when: filled }
+      gw_activate: { verb: trade-gateway.activate-gateway, when: filled }
+      gw_suspend: { verb: trade-gateway.suspend-gateway, when: filled }
+      gw_read: trade-gateway.read-gateway
+      gw_list: trade-gateway.list-gateways
+      gw_list_cbu: trade-gateway.list-cbu-gateways
+      gw_add_rule: { verb: trade-gateway.add-routing-rule, when: filled }
+      gw_remove_rule: { verb: trade-gateway.remove-routing-rule, when: filled }
+      gw_list_rules: trade-gateway.list-routing-rules
+      gw_set_fallback: { verb: trade-gateway.set-fallback, when: filled }
+      gw_list_fallbacks: trade-gateway.list-fallbacks
+      # Cash sweep
+      cash_sweep_set: { verb: cash-sweep.set, when: [empty, filled] }
+      cash_sweep_list: cash-sweep.list
+      cash_sweep_read: cash-sweep.read
+      cash_sweep_activate: { verb: cash-sweep.activate, when: filled }
+      cash_sweep_suspend: { verb: cash-sweep.suspend, when: filled }
+      cash_sweep_execute: { verb: cash-sweep.execute, when: filled }
+      cash_sweep_list_history: cash-sweep.list-history
+      cash_sweep_set_threshold: { verb: cash-sweep.set-threshold, when: filled }
+      cash_sweep_preview: cash-sweep.preview
+      # Instruction profile
+      ip_create_template: { verb: instruction-profile.create-template, when: [empty, filled] }
+      ip_read_template: instruction-profile.read-template
+      ip_list_templates: instruction-profile.list-templates
+      ip_define_msg_type: { verb: instruction-profile.define-message-type, when: [empty, filled] }
+      ip_list_msg_types: instruction-profile.list-message-types
+      ip_list_assignments: instruction-profile.list-assignments
+      ip_list_overrides: instruction-profile.list-field-overrides
+      # Delivery
+      delivery_record: { verb: delivery.record, when: filled }
+      delivery_complete: { verb: delivery.complete, when: filled }
+      delivery_fail: { verb: delivery.fail, when: filled }
+      # ISDA
+      isda_create: { verb: isda.create, when: [empty, filled] }
+      isda_list: isda.list
+      isda_add_csa: { verb: isda.add-csa, when: filled }
+      isda_remove_csa: { verb: isda.remove-csa, when: filled }
+      isda_add_coverage: { verb: isda.add-coverage, when: filled }
+      isda_remove_coverage: { verb: isda.remove-coverage, when: filled }
+      # Instrument class / security type
+      ic_ensure: { verb: instrument-class.ensure, when: [empty, filled] }
+      ic_list: instrument-class.list
+      ic_read: instrument-class.read
+      st_ensure: { verb: security-type.ensure, when: [empty, filled] }
+      st_list: security-type.list
+      # Subcustodian
+      sub_ensure: { verb: subcustodian.ensure, when: [empty, filled] }
+      sub_list: subcustodian.list-by-market
+      sub_lookup: subcustodian.lookup
+      # Tax config
+      tax_jurisdiction: { verb: tax-config.define-jurisdiction, when: [empty, filled] }
+      tax_list_jurisdictions: tax-config.list-jurisdictions
+      tax_status: { verb: tax-config.set-tax-status, when: filled }
+      tax_list_status: tax-config.list-tax-status
+      tax_treaty: { verb: tax-config.set-treaty-rate, when: filled }
+      tax_list_treaty: tax-config.list-treaty-rates
+      tax_reclaim: { verb: tax-config.set-reclaim-config, when: filled }
+      tax_list_reclaim: tax-config.list-reclaim-configs
+      tax_deactivate_reclaim: { verb: tax-config.deactivate-reclaim, when: filled }
+      tax_reporting: { verb: tax-config.set-reporting, when: filled }
+      tax_list_reporting: tax-config.list-reporting
+      # Booking
+      booking_loc_update: { verb: booking-location.update, when: filled }
+      # CBU custody
+      custody_setup_ssi: { verb: cbu-custody.setup-ssi, when: [empty, filled] }
+      custody_lookup_ssi: cbu-custody.lookup-ssi
+      custody_list_ssis: cbu-custody.list-ssis
+      custody_list_universe: cbu-custody.list-universe
+      custody_list_rules: cbu-custody.list-booking-rules
+      custody_list_overrides: cbu-custody.list-agent-overrides
+      custody_validate: cbu-custody.validate-booking-coverage
+      custody_derive: { verb: cbu-custody.derive-required-coverage, when: filled }
+      # Entity settlement
+      es_add_ssi: { verb: entity-settlement.add-ssi, when: [empty, filled] }
+      es_remove_ssi: { verb: entity-settlement.remove-ssi, when: filled }
+      es_set_identity: { verb: entity-settlement.set-identity, when: filled }
+      # Corporate action
+      ca_define_type: { verb: corporate-action.define-event-type, when: [empty, filled] }
+      ca_list_types: corporate-action.list-event-types
+      ca_set_prefs: { verb: corporate-action.set-preferences, when: filled }
+      ca_list_prefs: corporate-action.list-preferences
+      ca_remove_pref: { verb: corporate-action.remove-preference, when: filled }
+      ca_set_window: { verb: corporate-action.set-instruction-window, when: filled }
+      ca_list_windows: corporate-action.list-instruction-windows
+      ca_link_ssi: { verb: corporate-action.link-ca-ssi, when: filled }
+      ca_list_ssi: corporate-action.list-ca-ssi-mappings

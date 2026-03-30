@@ -1,0 +1,31 @@
+constellation: deal.workspace
+description: >
+  Deal workspace root — cross-cutting deal verbs and domains not hosted
+  on deal_lifecycle slots (pricing config, client-principal relationships).
+jurisdiction: ALL
+slots:
+  workspace_root:
+    type: cbu
+    table: deals
+    pk: deal_id
+    cardinality: root
+    verbs:
+      # Pricing configuration
+      pricing_set: { verb: pricing-config.set, when: [empty, filled] }
+      pricing_list: pricing-config.list
+      pricing_remove: { verb: pricing-config.remove, when: filled }
+      pricing_deactivate: { verb: pricing-config.deactivate, when: filled }
+      pricing_link_resource: { verb: pricing-config.link-resource, when: filled }
+      pricing_fallback_list: pricing-config.list-fallback-chains
+      pricing_fallback_set: { verb: pricing-config.set-fallback-chain, when: filled }
+      pricing_nav_thresholds: pricing-config.list-nav-thresholds
+      pricing_valuation: pricing-config.list-valuation-schedules
+      pricing_stale_list: pricing-config.list-stale-policies
+      pricing_stale_set: { verb: pricing-config.set-stale-policy, when: filled }
+      # Client-principal relationships
+      cpr_record: { verb: client-principal-relationship.record, when: [empty, filled] }
+      cpr_list: client-principal-relationship.list
+      cpr_terminate: { verb: client-principal-relationship.terminate, when: filled }
+      cpr_cross_sell: client-principal-relationship.cross-sell-check
+      # Contract pack
+      contract_pack_add: { verb: contract-pack.add-template, when: filled }

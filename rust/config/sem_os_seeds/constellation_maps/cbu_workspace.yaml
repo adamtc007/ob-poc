@@ -1,0 +1,114 @@
+constellation: cbu.workspace
+description: >
+  CBU workspace root — cross-cutting entity, investor, holding, share-class,
+  and manco verbs that span all CBU structure constellations. The struct_*
+  constellations handle jurisdiction-specific structure setup; this root
+  hosts verbs that work across all structures.
+jurisdiction: ALL
+slots:
+  workspace_root:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    cardinality: root
+    verbs:
+      # ── Entity lifecycle (cross-structure) ──────────────────────────
+      entity_create: { verb: entity.create, when: [empty, filled] }
+      entity_ensure: { verb: entity.ensure, when: [empty, filled] }
+      entity_list: entity.list
+      entity_update: { verb: entity.update, when: filled }
+      entity_delete: { verb: entity.delete, when: filled }
+      entity_ghost: { verb: entity.ghost, when: filled }
+      entity_identify: { verb: entity.identify, when: filled }
+      entity_query: entity.query
+      entity_verify: { verb: entity.verify, when: filled }
+      entity_list_ghosts: entity.list-ghosts
+      entity_list_placeholders: entity.list-placeholders
+      entity_placeholder_summary: entity.placeholder-summary
+      # ── CBU extras ──────────────────────────────────────────────────
+      cbu_set_category: { verb: cbu.set-category, when: filled }
+      legal_entity_update: { verb: legal-entity.update, when: filled }
+      edge_upsert: { verb: edge.upsert, when: filled }
+      # ── Investor lifecycle ──────────────────────────────────────────
+      investor_create: { verb: investor.create, when: [empty, filled] }
+      investor_ensure: { verb: investor.ensure, when: [empty, filled] }
+      investor_read: investor.read
+      investor_list_by_cbu: investor.list-by-cbu
+      investor_list_by_entity: investor.list-by-entity
+      investor_activate: { verb: investor.activate, when: filled }
+      investor_suspend: { verb: investor.suspend, when: filled }
+      investor_offboard: { verb: investor.offboard, when: filled }
+      investor_reinstate: { verb: investor.reinstate, when: filled }
+      investor_mark_eligible: { verb: investor.mark-eligible, when: filled }
+      investor_start_kyc: { verb: investor.start-kyc, when: filled }
+      investor_approve_kyc: { verb: investor.approve-kyc, when: filled }
+      investor_reject_kyc: { verb: investor.reject-kyc, when: filled }
+      investor_request_docs: { verb: investor.request-documents, when: filled }
+      investor_schedule_review: { verb: investor.schedule-review, when: filled }
+      investor_record_sub: { verb: investor.record-subscription, when: filled }
+      investor_start_redemption: { verb: investor.start-redemption, when: filled }
+      investor_complete_redemption: { verb: investor.complete-redemption, when: filled }
+      investor_count: investor.count-by-state
+      investor_history: investor.get-lifecycle-history
+      # ── Investor roles ──────────────────────────────────────────────
+      investor_role_set: { verb: investor-role.set, when: filled }
+      investor_role_read: investor-role.read
+      investor_role_read_as_of: investor-role.read-as-of
+      investor_role_history: investor-role.history
+      investor_role_by_holder: investor-role.list-by-holder
+      investor_role_by_issuer: investor-role.list-by-issuer
+      investor_role_nominee: { verb: investor-role.mark-as-nominee, when: filled }
+      investor_role_fof: { verb: investor-role.mark-as-fof, when: filled }
+      investor_role_master: { verb: investor-role.mark-as-master-pool, when: filled }
+      investor_role_end: { verb: investor-role.mark-as-end-investor, when: filled }
+      # ── Holdings ────────────────────────────────────────────────────
+      holding_create: { verb: holding.create, when: [empty, filled] }
+      holding_ensure: { verb: holding.ensure, when: [empty, filled] }
+      holding_create_for_investor: { verb: holding.create-for-investor, when: filled }
+      holding_read: holding.read
+      holding_list_by_investor: holding.list-by-investor
+      holding_list_by_investor_record: holding.list-by-investor-record
+      holding_list_by_share_class: holding.list-by-share-class
+      holding_update_status: { verb: holding.update-status, when: filled }
+      holding_update_units: { verb: holding.update-units, when: filled }
+      holding_close: { verb: holding.close, when: filled }
+      # ── Share class ─────────────────────────────────────────────────
+      share_class_create: { verb: share-class.create, when: [empty, filled] }
+      share_class_ensure: { verb: share-class.ensure, when: [empty, filled] }
+      share_class_read: share-class.read
+      share_class_list: share-class.list
+      share_class_list_by_compartment: share-class.list-by-compartment
+      share_class_link: { verb: share-class.link-to-compartment, when: filled }
+      share_class_unlink: { verb: share-class.unlink-from-compartment, when: filled }
+      share_class_set_instrument: { verb: share-class.set-instrument-type, when: filled }
+      share_class_update_nav: { verb: share-class.update-nav, when: filled }
+      share_class_close: { verb: share-class.close, when: filled }
+      # ── Manco/group ─────────────────────────────────────────────────
+      manco_group_create: { verb: manco.group.create, when: [empty, filled] }
+      manco_group_list: manco.group.list
+      manco_group_for_cbu: manco.group.for-cbu
+      manco_group_cbus: manco.group.cbus
+      manco_group_derive: { verb: manco.group.derive, when: filled }
+      manco_group_add: { verb: manco.group.add-member, when: filled }
+      manco_group_remove: { verb: manco.group.remove-member, when: filled }
+      manco_book_summary: manco.book.summary
+      manco_control_chain: manco.control-chain
+      manco_primary: manco.primary-controller
+      # ── Temporal queries ────────────────────────────────────────────
+      temporal_entity_history: temporal.entity-history
+      temporal_relationship_history: temporal.relationship-history
+      temporal_ownership_as_of: temporal.ownership-as-of
+      temporal_compare_ownership: temporal.compare-ownership
+      temporal_ubo_chain: temporal.ubo-chain-as-of
+      temporal_cbu_relationships: temporal.cbu-relationships-as-of
+      temporal_cbu_roles: temporal.cbu-roles-as-of
+      temporal_cbu_state: temporal.cbu-state-at-approval
+      # ── Ownership bridge verbs ──────────────────────────────────────
+      ownership_bridge_bods: { verb: ownership.bridge.bods-ownership, when: filled }
+      ownership_bridge_gleif: { verb: ownership.bridge.gleif-fund-managers, when: filled }
+      ownership_bridge_manco: { verb: ownership.bridge.manco-roles, when: filled }
+      ownership_control_compute: { verb: ownership.control-links.compute, when: filled }
+      ownership_control_list: ownership.control-links.list
+      # ── Client group extras ─────────────────────────────────────────
+      cg_add_ownership_source: { verb: client-group.add-ownership-source, when: filled }
+      cg_list_tags: client-group.list-tags

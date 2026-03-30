@@ -56,28 +56,52 @@ slots:
         { verb: client-group.list-relationships, when: filled }
       tag_add: { verb: client-group.tag-add, when: filled }
       tag_remove: { verb: client-group.tag-remove, when: filled }
-  gleif_import:
+  # Entity Research — multi-source entity discovery and import.
+  # GLEIF (LEI), Companies House (UK), SEC EDGAR (US), and generic sources
+  # all feed entity discovery into the client group perimeter.
+  entity_research:
     type: entity
     entity_kinds: [company]
     join: { via: client_group_entity, parent_fk: group_id, child_fk: entity_id }
     cardinality: optional
     depends_on: [client_group]
     verbs:
-      import: { verb: gleif.import-tree, when: empty }
-      import_to_group:
+      # ── GLEIF source (LEI registry) ──────────────────────────────────
+      gleif_import: { verb: gleif.import-tree, when: empty }
+      gleif_import_to_group:
         { verb: gleif.import-to-client-group, when: [empty, filled] }
-      import_managed_funds:
+      gleif_import_funds:
         { verb: gleif.import-managed-funds, when: [empty, filled] }
-      search: { verb: gleif.search, when: [empty, filled] }
-      refresh: { verb: gleif.refresh, when: [empty, filled] }
-      enrich: { verb: gleif.enrich, when: [empty, filled] }
-      # Consolidated: gleif.lookup replaces 8 individual get-* verbs.
-      # The target-type arg selects: record, parent, children, manager,
-      # managed-funds, master-fund, umbrella, isin.
-      lookup: { verb: gleif.lookup, when: [empty, filled] }
-      resolve_successor:
-        { verb: gleif.resolve-successor, when: [empty, filled] }
-      trace_ownership: { verb: gleif.trace-ownership, when: [empty, filled] }
+      gleif_search: { verb: gleif.search, when: [empty, filled] }
+      gleif_refresh: { verb: gleif.refresh, when: [empty, filled] }
+      gleif_enrich: { verb: gleif.enrich, when: [empty, filled] }
+      gleif_lookup: { verb: gleif.lookup, when: [empty, filled] }
+      gleif_resolve: { verb: gleif.resolve-successor, when: [empty, filled] }
+      gleif_trace: { verb: gleif.trace-ownership, when: [empty, filled] }
+      # ── Companies House source (UK registry) ────────────────────────
+      ch_search: { verb: research.companies-house.search, when: [empty, filled] }
+      ch_fetch: { verb: research.companies-house.fetch-company, when: [empty, filled] }
+      ch_psc: { verb: research.companies-house.fetch-psc, when: [empty, filled] }
+      ch_officers: { verb: research.companies-house.fetch-officers, when: [empty, filled] }
+      ch_import: { verb: research.companies-house.import-company, when: [empty, filled] }
+      # ── SEC EDGAR source (US filings) ───────────────────────────────
+      sec_search: { verb: research.sec-edgar.search, when: [empty, filled] }
+      sec_fetch: { verb: research.sec-edgar.fetch-company, when: [empty, filled] }
+      sec_ubos: { verb: research.sec-edgar.fetch-beneficial-owners, when: [empty, filled] }
+      sec_filings: { verb: research.sec-edgar.fetch-filings, when: [empty, filled] }
+      sec_import: { verb: research.sec-edgar.import-company, when: [empty, filled] }
+      # ── Generic source operations ───────────────────────────────────
+      source_list: research.sources.list
+      source_info: research.sources.info
+      source_search: { verb: research.sources.search, when: [empty, filled] }
+      source_fetch: { verb: research.sources.fetch, when: [empty, filled] }
+      source_for_jurisdiction: research.sources.find-for-jurisdiction
+      # ── Import run tracking (provenance) ────────────────────────────
+      import_begin: { verb: research.import-run.begin, when: [empty, filled] }
+      import_complete: { verb: research.import-run.complete, when: filled }
+      import_supersede: { verb: research.import-run.supersede, when: filled }
+      # ── Generic normalization ───────────────────────────────────────
+      normalize: { verb: research.generic.normalize, when: filled }
   ubo_discovery:
     type: entity_graph
     entity_kinds: [person, company]

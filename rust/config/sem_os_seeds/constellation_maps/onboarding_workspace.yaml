@@ -1,0 +1,21 @@
+constellation: onboarding.workspace
+description: >
+  OnBoarding workspace root — handoff and activation verbs for cross-workspace
+  onboarding orchestration. Most OnBoarding verbs are shared with CBU/KYC/Deal
+  constellations; this root hosts the pure orchestration verbs.
+jurisdiction: ALL
+slots:
+  workspace_root:
+    type: cbu
+    table: cbus
+    pk: cbu_id
+    cardinality: root
+    verbs:
+      auto_complete: { verb: onboarding.auto-complete, when: filled }
+      provisioning_run: { verb: provisioning.run, when: filled }
+      provisioning_status: provisioning.status
+      readiness_compute: { verb: readiness.compute, when: filled }
+      readiness_explain: readiness.explain
+      pipeline_full: { verb: pipeline.full, when: filled }
+      pack_select: { verb: pack.select, when: [empty, filled] }
+      pack_answer: { verb: pack.answer, when: filled }
