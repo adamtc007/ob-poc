@@ -1,0 +1,18 @@
+constellation: kyc.workspace
+description: >
+  KYC workspace root constellation — cross-cutting verbs that span all KYC
+  constellation families. This is the workspace-level container; child
+  constellations (group.ownership, kyc.onboarding, kyc.extended) hang off
+  their own families. Verbs placed here operate at the workspace/case level,
+  not on a specific entity slot within a child constellation.
+jurisdiction: ALL
+slots:
+  workspace_root:
+    type: cbu
+    table: client_group
+    pk: group_id
+    cardinality: root
+    verbs:
+      # Cross-constellation coverage and readiness
+      coverage_compute:
+        { verb: coverage.compute, when: filled }

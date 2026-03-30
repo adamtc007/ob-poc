@@ -1,0 +1,33 @@
+fqn: family.kyc_workspace
+family_id: kyc_workspace
+label: KYC Workspace
+description: >
+  Workspace-level root family for KYC. Contains cross-cutting verbs that
+  span all KYC constellations (coverage computation, readiness checks,
+  workspace-level summaries). Every workspace should have a root family
+  with priority higher than its child families.
+domain_id: kyc
+selection_rules:
+  - condition: "true"
+    target_constellation: kyc.workspace
+    priority: 60
+constellation_refs:
+  - constellation_id: kyc.workspace
+    label: KYC Workspace Root
+    jurisdiction: ALL
+    entity_kind: client-group
+    triggers:
+      - coverage
+      - readiness
+      - workspace
+      - overall status
+      - cross-constellation
+candidate_jurisdictions:
+  - ALL
+candidate_entity_kinds:
+  - client-group
+grounding_threshold:
+  required_input_keys:
+    - client_group_id
+  requires_entity_instance: false
+  allows_draft_instance: true

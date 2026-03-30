@@ -176,7 +176,7 @@ impl WorkspaceKind {
             Self::Kyc => WorkspaceRegistryEntry {
                 workspace_id: self.clone(),
                 display_name: self.label(),
-                constellation_families: vec!["ownership", "clearance", "delta_review", "screening"],
+                constellation_families: vec!["kyc_workspace", "ownership", "clearance", "delta_review", "screening"],
                 subject_kinds: vec![
                     SubjectKind::ClientGroup,
                     SubjectKind::Case,
