@@ -10,6 +10,7 @@ use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
 mod allianz_harness;
+mod onboarding_harness;
 mod aviva_deal_harness;
 mod bpmn_lite;
 mod calibration;
@@ -256,6 +257,17 @@ enum Command {
         /// Use complete funds file (417 funds with umbrella data) instead of legacy sample
         #[arg(long, short = 'c')]
         complete: bool,
+    },
+
+    /// Onboarding Test Harness - Full KYC lifecycle with synthetic test group
+    OnboardingHarness {
+        /// Mode: full, setup, kyc, clean
+        #[arg(long, short = 'm', default_value = "full")]
+        mode: String,
+
+        /// Verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
     },
 
     /// Allianz Test Harness - Complete GLEIF/BODS onboarding pipeline test
@@ -1298,6 +1310,15 @@ fn main() -> Result<()> {
             rt.block_on(gleif_load::gleif_load(
                 output, fund_limit, corp_limit, dry_run, execute, complete,
             ))
+        }
+        Command::OnboardingHarness { mode, verbose } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(async {
+                let db_url =
+                    std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+                let pool = sqlx::PgPool::connect(&db_url).await?;
+                onboarding_harness::run_onboarding_harness(&pool, &mode, verbose).await
+            })
         }
         Command::AllianzHarness {
             mode,
