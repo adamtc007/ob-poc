@@ -67,6 +67,9 @@ slots:
       complete: { verb: access-review.complete, when: filled }
       approve: { verb: access-review.approve, when: filled }
       reject: { verb: access-review.reject, when: filled }
+      bulk_confirm: { verb: access-review.bulk-confirm, when: filled }
+      confirm_access: { verb: access-review.confirm-access, when: filled }
+      confirm_all_clean: { verb: access-review.confirm-all-clean, when: filled }
   regulatory:
     type: entity
     entity_kinds: [entity]
@@ -84,6 +87,7 @@ slots:
       update: { verb: regulatory.update, when: filled }
       submit: { verb: regulatory.submit, when: filled }
       registration_remove: { verb: regulatory.registration.remove, when: filled }
+      status_check: regulatory.status.check
   ruleset:
     type: entity
     entity_kinds: [entity]
@@ -137,6 +141,14 @@ slots:
       list_ops: { verb: team.list-ops-members, when: filled }
       assign_capacity: { verb: team.assign-capacity, when: filled }
       list_capacity: { verb: team.list-capacity, when: filled }
+      add_cbu_access: { verb: team.add-cbu-access, when: filled }
+      remove_cbu_access: { verb: team.remove-cbu-access, when: filled }
+      list_cbus: team.list-cbus
+      grant_service: { verb: team.grant-service, when: filled }
+      revoke_service: { verb: team.revoke-service, when: filled }
+      update_member: { verb: team.update-member, when: filled }
+      verify_governance: team.verify-governance-access
+      archive: { verb: team.archive, when: filled }
   rule:
     type: entity
     entity_kinds: [entity]
@@ -147,6 +159,8 @@ slots:
       create: { verb: rule.create, when: empty }
       read: { verb: rule.read, when: filled }
       update: { verb: rule.update, when: filled }
+      add: { verb: rule.add, when: [empty, filled] }
+      disable: { verb: rule.disable, when: filled }
   rule_field:
     type: entity
     entity_kinds: [entity]
@@ -156,3 +170,4 @@ slots:
     verbs:
       list: { verb: rule-field.list, when: [empty, filled] }
       read: { verb: rule-field.read, when: filled }
+      register: { verb: rule-field.register, when: [empty, filled] }

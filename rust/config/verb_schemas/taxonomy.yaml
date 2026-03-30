@@ -462,7 +462,7 @@ domains:
         verbs:
           - gleif.lookup
           - gleif.search
-          - gleif.get-by-lei
+          # gleif.get-by-lei removed — consolidated into gleif.lookup
       - id: import
         label: Import
         description: Import data from external sources

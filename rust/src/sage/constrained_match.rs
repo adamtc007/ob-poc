@@ -424,12 +424,12 @@ fn preferred_scoped_verbs(utterance_lower: &str, tokens: &[String]) -> &'static 
     } else if has_any_token(tokens, GLEIF_WORDS) {
         if has_parent_lookup_intent(tokens) {
             &[
-                "gleif.get-parent",
+                "gleif.lookup",
                 "gleif.trace-ownership",
                 "gleif.import-tree",
             ]
         } else if has_gleif_enrich_intent(tokens) {
-            &["gleif.enrich", "gleif.get-record"]
+            &["gleif.enrich", "gleif.lookup"]
         } else if has_gleif_import_intent(tokens) {
             &[
                 "gleif.import-tree",
@@ -437,7 +437,7 @@ fn preferred_scoped_verbs(utterance_lower: &str, tokens: &[String]) -> &'static 
                 "gleif.search",
             ]
         } else {
-            &["gleif.search", "gleif.get-record"]
+            &["gleif.search", "gleif.lookup"]
         }
     } else {
         &[]

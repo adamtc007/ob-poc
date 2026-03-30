@@ -104,3 +104,16 @@ slots:
       role_list: role.list
       role_read: role.read
       role_delete: { verb: role.delete, when: filled }
+      # ── Attribute management ────────────────────────────────────────
+      attr_update: { verb: attribute.update, when: filled }
+      attr_check_coverage: attribute.check-coverage
+      attr_list_by_document: attribute.list-by-document
+      attr_list_sinks: attribute.list-sinks
+      attr_list_sources: attribute.list-sources
+      attr_map_to_doc: { verb: attribute.map-to-document, when: filled }
+      attr_unmap: { verb: attribute.unmap-from-document, when: filled }
+      attr_trace_lineage: attribute.trace-lineage
+      attrs_gaps: attributes.gaps
+      attrs_populate: { verb: attributes.populate, when: filled }
+      attrs_rollup: { verb: attributes.rollup, when: filled }
+      attrs_set: { verb: attributes.set, when: filled }

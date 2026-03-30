@@ -274,6 +274,11 @@ slots:
       req_waive: { verb: requirement.waive, when: [documents_requested] }
       req_reinstate:
         { verb: requirement.reinstate, when: [evidence_collected, verified] }
+      req_get: requirement.get
+      req_list_for_workflow: requirement.list-for-workflow
+      req_list_with_status: requirement.list-with-status
+      req_mark_expired: { verb: requirement.mark-expired, when: [documents_requested, evidence_collected] }
+      req_reset: { verb: requirement.reset, when: [documents_requested, evidence_collected] }
       doc_solicit:
         {
           verb: document.solicit,

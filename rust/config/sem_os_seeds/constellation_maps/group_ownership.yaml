@@ -131,6 +131,7 @@ slots:
       list_ubos: { verb: ubo.list-ubos, when: filled }
       list_owned: { verb: ubo.list-owned, when: filled }
       list_owners: { verb: ubo.list-owners, when: filled }
+      list_owners_of: { verb: ubo.list-owners-of, when: filled }
       add_ownership: { verb: ubo.add-ownership, when: filled }
       update_ownership: { verb: ubo.update-ownership, when: filled }
       add_control: { verb: control.add, when: filled }

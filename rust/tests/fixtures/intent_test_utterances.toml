@@ -786,7 +786,8 @@ ecir_path = "narrow"
 
 [[test]]
 utterance = "who is the parent company according to GLEIF?"
-expected_verb = "gleif.get-parent"
+expected_verb = "gleif.lookup"
+alt_verbs = ["gleif.trace-ownership"]
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "gleif"
