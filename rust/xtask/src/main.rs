@@ -2699,6 +2699,24 @@ fn lint_macros(errors_only: bool, verbose: bool) -> Result<()> {
         }
     }
 
+    // ── PACK002: Pack-constellation verb membership check ────────────
+    let pack_orphans = lint_pack_constellation_membership(&root);
+    for (severity, msg) in &pack_orphans {
+        match severity.as_str() {
+            "error" => {
+                total_errors += 1;
+                println!("  [PACK002] error: {}", msg);
+            }
+            "warn" => {
+                if !errors_only {
+                    total_warnings += 1;
+                    println!("  [PACK002] warn: {}", msg);
+                }
+            }
+            _ => {}
+        }
+    }
+
     println!("\n===========================================");
     println!("  Lint Summary");
     println!("===========================================");
@@ -2884,6 +2902,197 @@ fn workspace_accepts_any_mode_tag(workspace: &str, tags: &[String]) -> bool {
         _ => return false, // Unknown workspace — fail closed, force table update
     };
     tags.iter().any(|tag| accepted.contains(&tag.as_str()))
+}
+
+/// PACK002: Detect pack verbs absent from constellation slots and macro registry.
+///
+/// Every verb in a pack's `allowed_verbs` must exist on at least one constellation
+/// map slot OR in the macro registry. Verbs in neither are dead weight that inflates
+/// pack scoring denominators and can never execute through the constellation pipeline.
+///
+/// - Verbs on constellation slots → ok (silent)
+/// - Verbs in macro registry only → warn (macro, not direct constellation verb)
+/// - Verbs in neither → error (orphaned, should be removed from pack)
+///
+/// Returns Vec<(severity, message)>.
+fn lint_pack_constellation_membership(root: &std::path::Path) -> Vec<(String, String)> {
+    let mut diags = Vec::new();
+
+    let packs_dir = root.join("rust/config/packs");
+    let constellations_dir = root.join("rust/config/sem_os_seeds/constellation_maps");
+    let macros_dir = root.join("rust/config/verb_schemas/macros");
+
+    if !packs_dir.exists() || !constellations_dir.exists() {
+        return diags;
+    }
+
+    // Phase 1: Collect all verb FQNs from all constellation map slots.
+    let mut constellation_verbs: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
+
+    if let Ok(entries) = std::fs::read_dir(&constellations_dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if !path
+                .extension()
+                .map(|e| e == "yaml" || e == "yml")
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(doc) = serde_yaml::from_str::<serde_yaml::Value>(&content) {
+                    collect_constellation_verbs(&doc, &mut constellation_verbs);
+                }
+            }
+        }
+    }
+
+    // Phase 2: Collect all macro FQNs from macro registry.
+    let mut macro_fqns: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    if macros_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&macros_dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if !path
+                    .extension()
+                    .map(|e| e == "yaml" || e == "yml")
+                    .unwrap_or(false)
+                {
+                    continue;
+                }
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(doc) = serde_yaml::from_str::<serde_yaml::Value>(&content) {
+                        if let Some(map) = doc.as_mapping() {
+                            for k in map.keys() {
+                                if let Some(fqn) = k.as_str() {
+                                    macro_fqns.insert(fqn.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Phase 3: Check each pack's allowed_verbs against both sets.
+    if let Ok(entries) = std::fs::read_dir(&packs_dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if !path
+                .extension()
+                .map(|e| e == "yaml" || e == "yml")
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let doc: serde_yaml::Value = match serde_yaml::from_str(&content) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let map = match doc.as_mapping() {
+                Some(m) => m,
+                None => continue,
+            };
+
+            let pack_id = map.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+
+            let allowed_verbs: Vec<String> = map
+                .get("allowed_verbs")
+                .and_then(|v| v.as_sequence())
+                .map(|seq| {
+                    seq.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let mut orphan_count = 0usize;
+            for verb in &allowed_verbs {
+                if constellation_verbs.contains(verb) {
+                    // Direct constellation verb — fine
+                    continue;
+                }
+                if macro_fqns.contains(verb) {
+                    // Macro-only — warn (not a direct constellation verb)
+                    // Don't report as error; macros are a valid pack entry.
+                    continue;
+                }
+                // Check if it looks like a constellation map ID (struct.*)
+                if verb.starts_with("struct.") {
+                    // Structure template launcher — not a verb or macro
+                    continue;
+                }
+                // Session/view verbs are workspace-navigation, not constellation-scoped
+                if verb.starts_with("session.") || verb.starts_with("view.") {
+                    continue;
+                }
+                // Orphaned verb — not on any constellation slot or macro registry
+                orphan_count += 1;
+                diags.push((
+                    "warn".to_string(),
+                    format!(
+                        "pack '{}': verb '{}' not found on any constellation slot or in macro registry",
+                        pack_id, verb,
+                    ),
+                ));
+            }
+            if orphan_count > 0 {
+                diags.push((
+                    "error".to_string(),
+                    format!(
+                        "pack '{}': {} of {} allowed_verbs are orphaned (not on any constellation slot or macro)",
+                        pack_id, orphan_count, allowed_verbs.len(),
+                    ),
+                ));
+            }
+        }
+    }
+
+    diags
+}
+
+/// Recursively extract all verb FQNs from a constellation map YAML document.
+fn collect_constellation_verbs(
+    doc: &serde_yaml::Value,
+    verbs: &mut std::collections::HashSet<String>,
+) {
+    if let Some(slots) = doc.get("slots").and_then(|s| s.as_mapping()) {
+        collect_slot_verbs(slots, verbs);
+    }
+}
+
+fn collect_slot_verbs(
+    slots: &serde_yaml::Mapping,
+    verbs: &mut std::collections::HashSet<String>,
+) {
+    for (_slot_name, slot_def) in slots {
+        if let Some(slot_map) = slot_def.as_mapping() {
+            // Extract verbs from this slot
+            if let Some(verb_map) = slot_map.get("verbs").and_then(|v| v.as_mapping()) {
+                for (_key, val) in verb_map {
+                    // Two forms: simple string or { verb: ..., when: ... }
+                    if let Some(fqn) = val.as_str() {
+                        verbs.insert(fqn.to_string());
+                    } else if let Some(obj) = val.as_mapping() {
+                        if let Some(fqn) = obj.get("verb").and_then(|v| v.as_str()) {
+                            verbs.insert(fqn.to_string());
+                        }
+                    }
+                }
+            }
+            // Recurse into children
+            if let Some(children) = slot_map.get("children").and_then(|c| c.as_mapping()) {
+                collect_slot_verbs(children, verbs);
+            }
+        }
+    }
 }
 
 /// Inline YAML lint for when the binary isn't available

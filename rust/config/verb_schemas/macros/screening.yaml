@@ -6,6 +6,12 @@
 # INVARIANTS:
 # - UI labels NEVER contain: entity_ref
 # - Screening runs against parties within a case context
+# - The three screening verbs (pep, sanctions, adverse-media) are INDEPENDENT.
+#   Each creates an idempotent PENDING record per (workstream_id, screening_type).
+#   Execution order is irrelevant — providers run concurrently.
+#   The screening_lifecycle state machine uses a 2-phase model:
+#   Phase 1 (Provider): parallel execution → 'executing' state
+#   Phase 2 (Adjudication): sequential analyst review → 'adjudicating' state
 
 screening.full:
   kind: macro

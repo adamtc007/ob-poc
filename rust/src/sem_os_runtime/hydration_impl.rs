@@ -308,6 +308,15 @@ async fn query_slot_rows(
                     .map_err(ConstellationError::Other)?;
                     return Ok(select_occurrence(rows, slot.def.occurrence));
                 }
+                // Unrecognised via — log so silent empties are visible.
+                // This is a known limitation: only cbu_entity_roles has a
+                // dedicated hydration query. Other entity slots need their
+                // own query paths or a generic join implementation.
+                tracing::debug!(
+                    slot = %slot.name,
+                    via = %join.via,
+                    "Entity slot has unhandled join.via — returning empty (hydration not implemented for this table)"
+                );
             }
             Ok(Vec::new())
         }
@@ -361,6 +370,11 @@ async fn query_slot_rows_tx(
                     .map_err(ConstellationError::Other)?;
                     return Ok(select_occurrence(rows, slot.def.occurrence));
                 }
+                tracing::debug!(
+                    slot = %slot.name,
+                    via = %join.via,
+                    "Entity slot has unhandled join.via — returning empty (hydration not implemented for this table)"
+                );
             }
             Ok(Vec::new())
         }

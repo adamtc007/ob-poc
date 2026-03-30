@@ -1,25 +1,30 @@
 state_machine: document_request_lifecycle
-description: Document request lifecycle for KYC evidence collection
-states: [pending, requested, received, verified, rejected, waived]
+description: >
+  Document request lifecycle — tracks the solicitation workflow.
+  A request moves: pending → sent → received → fulfilled.
+  Verification of the document content is NOT this lifecycle's concern —
+  that belongs to document_lifecycle (evidence QA). This lifecycle only
+  tracks whether the requested item was delivered.
+states: [pending, sent, received, fulfilled, returned, waived]
 initial: pending
 transitions:
   - from: pending
-    to: requested
+    to: sent
     verbs: [request.create]
   - from: pending
     to: waived
     verbs: [request.cancel]
-  - from: requested
+  - from: sent
     to: received
     verbs: [request.update]
   - from: received
-    to: verified
+    to: fulfilled
     verbs: [request.complete]
   - from: received
-    to: rejected
+    to: returned
     verbs: [request.escalate]
-  - from: rejected
-    to: requested
+  - from: returned
+    to: sent
     verbs: [request.reopen]
   - from: waived
     to: pending

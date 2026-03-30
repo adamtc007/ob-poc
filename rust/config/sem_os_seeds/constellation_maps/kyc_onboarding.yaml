@@ -265,7 +265,7 @@ slots:
   kyc_agreement:
     type: entity
     entity_kinds: [company]
-    join: { via: kyc_agreements, parent_fk: case_id, child_fk: agreement_id }
+    join: { via: kyc_service_agreements, parent_fk: case_id, child_fk: agreement_id }
     cardinality: optional
     depends_on: [kyc_case]
     state_machine: agreement_lifecycle
@@ -305,20 +305,22 @@ slots:
   request:
     type: entity
     entity_kinds: [entity]
-    join: { via: kyc_requests, parent_fk: case_id, child_fk: request_id }
+    # doc_requests joins via workstream_id, not case_id.
+    # The request slot hangs off the kyc_case dependency, so we join through workstream.
+    join: { via: doc_requests, parent_fk: workstream_id, child_fk: request_id }
     cardinality: optional
     depends_on: [kyc_case]
     state_machine: document_request_lifecycle
     verbs:
-      create: { verb: request.create, when: [empty, pending, rejected] }
+      create: { verb: request.create, when: [empty, pending, returned] }
       read: request.read
       list: request.list
-      update: { verb: request.update, when: [requested, received] }
+      update: { verb: request.update, when: [sent, received] }
       complete: { verb: request.complete, when: [received] }
-      cancel: { verb: request.cancel, when: [pending, requested] }
-      assign: { verb: request.assign, when: [pending, requested, received] }
-      reopen: { verb: request.reopen, when: [rejected, waived, verified] }
-      escalate: { verb: request.escalate, when: [requested, received] }
+      cancel: { verb: request.cancel, when: [pending, sent] }
+      assign: { verb: request.assign, when: [pending, sent, received] }
+      reopen: { verb: request.reopen, when: [returned, waived, fulfilled] }
+      escalate: { verb: request.escalate, when: [sent, received] }
   # red_flag is a STATE of an entity workstream (like "screened" or
   # "document requested"), not a separate positioned entity.
   # Red flag verbs are on the entity_workstream slot above.

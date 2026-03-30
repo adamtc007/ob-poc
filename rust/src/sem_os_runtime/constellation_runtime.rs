@@ -999,6 +999,73 @@ fn flatten_validated_slots(
     }
 }
 
+/// Known join tables from the schema. Used to validate constellation map
+/// `join.via` names at load time. Prevents silent empty-slot hydration
+/// when a YAML declares a table name that doesn't exist.
+///
+/// This set is maintained manually — add entries when new join tables
+/// are created via migration.
+fn known_join_tables() -> HashSet<&'static str> {
+    [
+        "access_reviews",
+        "bods_entity_statements",
+        "bods_ownership_statements",
+        "bods_person_statements",
+        "booking_locations",
+        "booking_principals",
+        "capital_events",
+        "cases",
+        "cash_sweep_configs",
+        "cbu_custody_profiles",
+        "cbu_entity_roles",
+        "cbu_structure_links",
+        "cbu_trading_profiles",
+        "client_group_entity",
+        "contract_packs",
+        "deal_contracts",
+        "deal_onboarding_requests",
+        "deal_participants",
+        "deal_products",
+        "deal_rate_cards",
+        "deal_slas",
+        "deals",
+        "delegations",
+        "delivery_channels",
+        "doc_requests",
+        "entity_funds",
+        "entity_identifiers",
+        "entity_relationships",
+        "entity_workstreams",
+        "fee_billing_profiles",
+        "fund_feeder_links",
+        "fund_investments",
+        "fund_share_classes",
+        "kyc_service_agreements",
+        "legal_contracts",
+        "legal_entities",
+        "manco_groups",
+        "ownership_snapshots",
+        "partnership_structures",
+        "pricing_configs",
+        "product_services",
+        "products",
+        "regulatory_filings",
+        "rule_fields",
+        "rules",
+        "rulesets",
+        "screenings",
+        "service_intents",
+        "service_resource_capabilities",
+        "service_resources",
+        "team_members",
+        "tollgate_evaluations",
+        "trust_structures",
+        "ubo_registry",
+    ]
+    .into_iter()
+    .collect()
+}
+
 fn validate_flattened_slot(
     slot: &ResolvedSlot,
     names: &HashSet<String>,
@@ -1012,6 +1079,18 @@ fn validate_flattened_slot(
             "slot '{}' requires a join definition",
             slot.name
         )));
+    }
+
+    // Validate join.via against known schema tables
+    if let Some(ref join) = slot.def.join {
+        let known = known_join_tables();
+        if !known.contains(join.via.as_str()) {
+            tracing::warn!(
+                slot = %slot.name,
+                via = %join.via,
+                "Constellation slot declares join via unknown table — hydration will return empty"
+            );
+        }
     }
     if slot.def.cardinality == Cardinality::Recursive && slot.def.max_depth.is_none() {
         return Err(ConstellationError::Validation(format!(
