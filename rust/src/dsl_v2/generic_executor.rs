@@ -754,6 +754,23 @@ impl GenericCrudExecutor {
             }
         }
 
+        // Add set_values (hardcoded column values from YAML, e.g., relationship_type: ownership)
+        if let Some(ref sv) = crud.set_values {
+            for (col, val) in sv {
+                if !insert_cols.contains(col) {
+                    columns.push(format!("\"{}\"", col));
+                    placeholders.push(format!("${}", idx));
+                    let str_val = val
+                        .as_str()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| format!("{:?}", val));
+                    bind_values.push(SqlValue::String(str_val));
+                    insert_cols.push(col.clone());
+                    idx += 1;
+                }
+            }
+        }
+
         if columns.len() == 1 {
             // Only PK, no other columns
             bail!("No columns to insert for {}.{}", verb.domain, verb.verb);
@@ -1990,8 +2007,8 @@ impl GenericCrudExecutor {
         // (e.g., "LIMITED_COMPANY" matches "LIMITED_COMPANY_PRIVATE")
         let type_sql = format!(
             r#"SELECT entity_type_id, table_name FROM "{}".entity_types
-               WHERE type_code = $1 OR type_code LIKE $1 || '_%'
-               ORDER BY CASE WHEN type_code = $1 THEN 0 ELSE 1 END
+               WHERE UPPER(type_code) = UPPER($1) OR UPPER(type_code) LIKE UPPER($1) || '_%'
+               ORDER BY CASE WHEN UPPER(type_code) = UPPER($1) THEN 0 ELSE 1 END
                LIMIT 1"#,
             crud.schema
         );
@@ -2205,8 +2222,8 @@ impl GenericCrudExecutor {
         // Look up entity_type_id and table_name
         let type_sql = format!(
             r#"SELECT entity_type_id, table_name FROM "{}".entity_types
-               WHERE type_code = $1 OR type_code LIKE $1 || '_%'
-               ORDER BY CASE WHEN type_code = $1 THEN 0 ELSE 1 END
+               WHERE UPPER(type_code) = UPPER($1) OR UPPER(type_code) LIKE UPPER($1) || '_%'
+               ORDER BY CASE WHEN UPPER(type_code) = UPPER($1) THEN 0 ELSE 1 END
                LIMIT 1"#,
             crud.schema
         );
@@ -3228,8 +3245,8 @@ impl GenericCrudExecutor {
         // Look up entity_type_id and table_name within tx
         let type_sql = format!(
             r#"SELECT entity_type_id, table_name FROM "{}".entity_types
-               WHERE type_code = $1 OR type_code LIKE $1 || '_%'
-               ORDER BY CASE WHEN type_code = $1 THEN 0 ELSE 1 END
+               WHERE UPPER(type_code) = UPPER($1) OR UPPER(type_code) LIKE UPPER($1) || '_%'
+               ORDER BY CASE WHEN UPPER(type_code) = UPPER($1) THEN 0 ELSE 1 END
                LIMIT 1"#,
             crud.schema
         );
@@ -3398,8 +3415,8 @@ impl GenericCrudExecutor {
 
         let type_sql = format!(
             r#"SELECT entity_type_id, table_name FROM "{}".entity_types
-               WHERE type_code = $1 OR type_code LIKE $1 || '_%'
-               ORDER BY CASE WHEN type_code = $1 THEN 0 ELSE 1 END
+               WHERE UPPER(type_code) = UPPER($1) OR UPPER(type_code) LIKE UPPER($1) || '_%'
+               ORDER BY CASE WHEN UPPER(type_code) = UPPER($1) THEN 0 ELSE 1 END
                LIMIT 1"#,
             crud.schema
         );

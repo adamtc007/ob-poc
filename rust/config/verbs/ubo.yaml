@@ -33,16 +33,14 @@ domains:
           phase_tags: [kyc]
           side_effects: state_write
         crud:
-          operation: upsert
+          operation: insert
           table: entity_relationships
           schema: ob-poc
           returning: relationship_id
-          conflict_keys:
-            - from_entity_id
-            - to_entity_id
-            - relationship_type
           set_values:
             relationship_type: ownership
+            source: manual
+            confidence: medium
         args:
           - name: owner-entity-id
             type: uuid

@@ -268,7 +268,7 @@ impl OnboardingHarness {
         match self.exec(
             "ubo",
             &format!(
-                r#"(ubo.add-ownership :from-entity-id "{}" :to-entity-id "{}" :percentage 30.0 :source "manual")"#,
+                r#"(ubo.add-ownership :owner-entity-id "{}" :owned-entity-id "{}" :percentage 30.0 :source "manual")"#,
                 ubo_id, manco_id
             ),
         )
@@ -293,6 +293,14 @@ impl OnboardingHarness {
         println!("\n=== Phase 3: KYC Case ===");
 
         let cbu_id = self.state.cbu_id.context("CBU not created")?;
+
+        // Clean up any existing active case for this CBU (from previous runs)
+        let _ = sqlx::query(
+            r#"UPDATE "ob-poc".cases SET closed_at = now(), status = 'WITHDRAWN' WHERE cbu_id = $1 AND closed_at IS NULL"#
+        )
+        .bind(cbu_id)
+        .execute(&self.pool)
+        .await;
 
         // Create KYC case
         let results = self
