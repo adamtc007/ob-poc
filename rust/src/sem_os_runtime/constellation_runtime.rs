@@ -1008,6 +1008,8 @@ fn flatten_validated_slots(
 fn known_join_tables() -> HashSet<&'static str> {
     [
         "access_reviews",
+        "appointment_rights",
+        "board_compositions",
         "bods_entity_statements",
         "bods_ownership_statements",
         "bods_person_statements",

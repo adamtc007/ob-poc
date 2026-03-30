@@ -14,24 +14,22 @@ slots:
     cardinality: root
     verbs:
       read: { verb: entity.read, when: filled }
-  # board slot commented out — board_appointments table does not exist in schema.
-  # TODO: create board_appointments migration before re-enabling.
-  # board:
-  #   type: entity
-  #   entity_kinds: [person]
-  #   join: { via: board_appointments, parent_fk: entity_id, child_fk: person_id }
-  #   cardinality: optional
-  #   depends_on: [entity]
-  #   verbs:
-  #     appoint: { verb: board.appoint, when: [empty, filled] }
-  #     resign: { verb: board.resign, when: filled }
-  #     list_by_entity: { verb: board.list-by-entity, when: filled }
-  #     list_by_person: { verb: board.list-by-person, when: filled }
-  #     grant_right: { verb: board.grant-appointment-right, when: filled }
-  #     revoke_right: { verb: board.revoke-appointment-right, when: filled }
-  #     list_rights: { verb: board.list-appointment-rights, when: filled }
-  #     list_held: { verb: board.list-rights-held, when: filled }
-  #     analyze: { verb: board.analyze-control, when: filled }
+  board:
+    type: entity
+    entity_kinds: [person]
+    join: { via: board_compositions, parent_fk: entity_id, child_fk: person_entity_id }
+    cardinality: optional
+    depends_on: [entity]
+    verbs:
+      appoint: { verb: board.appoint, when: [empty, filled] }
+      resign: { verb: board.resign, when: filled }
+      list_by_entity: { verb: board.list-by-entity, when: filled }
+      list_by_person: { verb: board.list-by-person, when: filled }
+      grant_right: { verb: board.grant-appointment-right, when: filled }
+      revoke_right: { verb: board.revoke-appointment-right, when: filled }
+      list_rights: { verb: board.list-appointment-rights, when: filled }
+      list_held: { verb: board.list-rights-held, when: filled }
+      analyze: { verb: board.analyze-control, when: filled }
   bods:
     type: entity
     entity_kinds: [person, company]
