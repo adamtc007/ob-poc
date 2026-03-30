@@ -243,6 +243,9 @@ domains:
           conflict_keys:
             - workstream_id
             - screening_type
+          set_values:
+            screening_type: CONSOLIDATED
+            status: PENDING
         emits_event: screening.started
         args:
           - name: workstream-id

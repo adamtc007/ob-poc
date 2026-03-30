@@ -250,7 +250,7 @@ domains:
         crud:
           operation: upsert
           table: doc_requests
-          schema: kyc
+          schema: ob-poc
           returning: request_id
           conflict_keys:
             - workstream_id
@@ -264,7 +264,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: doc-type
@@ -343,7 +343,7 @@ domains:
         crud:
           operation: update
           table: doc_requests
-          schema: kyc
+          schema: ob-poc
           key: request_id
           set_values:
             status: REQUESTED
@@ -357,7 +357,7 @@ domains:
             lookup:
               table: doc_requests
               entity_type: doc_request
-              schema: kyc
+              schema: ob-poc
               search_key: request_id
               primary_key: request_id
         returns:
@@ -391,7 +391,7 @@ domains:
         crud:
           operation: update
           table: doc_requests
-          schema: kyc
+          schema: ob-poc
           key: request_id
           set_values:
             status: RECEIVED
@@ -405,7 +405,7 @@ domains:
             lookup:
               table: doc_requests
               entity_type: doc_request
-              schema: kyc
+              schema: ob-poc
               search_key: request_id
               primary_key: request_id
           - name: document-id
@@ -446,7 +446,7 @@ domains:
         crud:
           operation: update
           table: doc_requests
-          schema: kyc
+          schema: ob-poc
           key: request_id
           set_values:
             status: VERIFIED
@@ -460,7 +460,7 @@ domains:
             lookup:
               table: doc_requests
               entity_type: doc_request
-              schema: kyc
+              schema: ob-poc
               search_key: request_id
               primary_key: request_id
           - name: notes
@@ -499,7 +499,7 @@ domains:
         crud:
           operation: update
           table: doc_requests
-          schema: kyc
+          schema: ob-poc
           key: request_id
           set_values:
             status: REJECTED
@@ -512,7 +512,7 @@ domains:
             lookup:
               table: doc_requests
               entity_type: doc_request
-              schema: kyc
+              schema: ob-poc
               search_key: request_id
               primary_key: request_id
           - name: reason
@@ -546,7 +546,7 @@ domains:
         crud:
           operation: update
           table: doc_requests
-          schema: kyc
+          schema: ob-poc
           key: request_id
           set_values:
             status: WAIVED
@@ -559,7 +559,7 @@ domains:
             lookup:
               table: doc_requests
               entity_type: doc_request
-              schema: kyc
+              schema: ob-poc
               search_key: request_id
               primary_key: request_id
           - name: notes
@@ -594,7 +594,7 @@ domains:
         crud:
           operation: list_by_fk
           table: doc_requests
-          schema: kyc
+          schema: ob-poc
           fk_col: workstream_id
         args:
           - name: workstream-id
@@ -603,7 +603,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: status

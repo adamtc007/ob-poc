@@ -191,27 +191,33 @@ impl CustomOperation for TollgateEvaluateOp {
             blocking_failures.iter().map(|f| f.to_string()).collect();
         let warning_texts: Vec<String> = warnings.iter().map(|w| w.to_string()).collect();
 
-        // Record evaluation - schema requires cbu_id
+        // Record evaluation — schema: tollgate_evaluations
+        // Maps evaluation_type to tollgate_id (FK to tollgate_definitions)
+        let passed = overall_result == "PASS" || overall_result == "PASS_WITH_WARNINGS";
+        let evaluation_detail = json!({
+            "overall_result": overall_result,
+            "score": score.to_string(),
+            "metrics": metrics,
+            "threshold_results": threshold_results,
+            "blocking_failures": blocking_failure_texts,
+            "warnings": warning_texts,
+            "evaluated_by": evaluated_by,
+        });
+
         let evaluation_id: (Uuid,) = sqlx::query_as(
             r#"
             INSERT INTO "ob-poc".tollgate_evaluations (
-                case_id, cbu_id, evaluation_type, overall_result, score,
-                metrics, threshold_results, blocking_failures, warnings, evaluated_by
+                case_id, tollgate_id, passed, evaluation_detail, config_version
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING id
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING evaluation_id
             "#,
         )
         .bind(case_id)
-        .bind(cbu_id)
-        .bind(evaluation_type)
-        .bind(overall_result)
-        .bind(score)
-        .bind(json!(&metrics))
-        .bind(threshold_results)
-        .bind(&blocking_failure_texts)
-        .bind(&warning_texts)
-        .bind(evaluated_by)
+        .bind(evaluation_type) // maps to tollgate_id
+        .bind(passed)
+        .bind(&evaluation_detail)
+        .bind("1.0")
         .fetch_one(pool)
         .await?;
 
@@ -424,11 +430,11 @@ impl CustomOperation for TollgateDecisionReadinessOp {
         // Get latest evaluations for each type
         let evaluations: Vec<(String, String, rust_decimal::Decimal)> = sqlx::query_as(
             r#"
-            SELECT DISTINCT ON (evaluation_type)
-                evaluation_type, overall_result, score
+            SELECT DISTINCT ON (tollgate_id)
+                tollgate_id, passed::text, COALESCE((evaluation_detail->>'score')::numeric, 0)
             FROM "ob-poc".tollgate_evaluations
             WHERE case_id = $1
-            ORDER BY evaluation_type, evaluated_at DESC
+            ORDER BY tollgate_id, evaluated_at DESC
             "#,
         )
         .bind(case_id)
