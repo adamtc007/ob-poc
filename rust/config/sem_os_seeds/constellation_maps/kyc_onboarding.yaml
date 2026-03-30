@@ -51,6 +51,11 @@ slots:
       close: { verb: kyc-case.close, when: filled }
       reopen: { verb: kyc-case.reopen, when: filled }
       escalate: { verb: kyc-case.escalate, when: filled }
+      # Case audit trail
+      event_log: { verb: case-event.log, when: filled }
+      event_list: case-event.list-by-case
+      # Skeleton pipeline orchestration
+      skeleton_build: { verb: skeleton.build, when: [empty, filled] }
     children:
       tollgate:
         type: tollgate
@@ -176,6 +181,77 @@ slots:
           verb: red-flag.close,
           when: [screening_complete, evidence_collected, verified],
         }
+      flag_mitigate:
+        {
+          verb: red-flag.mitigate,
+          when: [screening_complete, evidence_collected, verified],
+        }
+      flag_waive:
+        {
+          verb: red-flag.waive,
+          when: [screening_initiated, screening_complete, evidence_collected],
+        }
+      flag_dismiss:
+        {
+          verb: red-flag.dismiss,
+          when: [open, documents_requested, screening_initiated, screening_complete],
+        }
+      flag_set_blocking:
+        {
+          verb: red-flag.set-blocking,
+          when:
+            [
+              open,
+              documents_requested,
+              screening_initiated,
+              screening_complete,
+              evidence_collected,
+            ],
+        }
+      flag_list_by_case: red-flag.list-by-case
+      flag_list_by_workstream: red-flag.list-by-workstream
+      # Allegation verbs — client claims about entity attributes
+      allegation_record:
+        {
+          verb: allegation.record,
+          when: [open, documents_requested, screening_initiated],
+        }
+      allegation_verify:
+        {
+          verb: allegation.verify,
+          when: [screening_complete, evidence_collected],
+        }
+      allegation_contradict:
+        {
+          verb: allegation.contradict,
+          when: [screening_complete, evidence_collected],
+        }
+      allegation_partial:
+        {
+          verb: allegation.mark-partial,
+          when: [screening_complete, evidence_collected],
+        }
+      allegation_list: allegation.list-by-entity
+      allegation_pending: allegation.list-pending
+      # Evidence/UBO proof verbs — evidence requirements for beneficial ownership
+      evidence_create:
+        { verb: evidence.create-requirement, when: [open, documents_requested] }
+      evidence_attach:
+        {
+          verb: evidence.attach-document,
+          when: [documents_requested, screening_complete, evidence_collected],
+        }
+      evidence_verify:
+        {
+          verb: evidence.mark-verified,
+          when: [evidence_collected, verified],
+        }
+      evidence_reject: { verb: evidence.mark-rejected, when: [evidence_collected] }
+      evidence_waive:
+        {
+          verb: evidence.mark-waived,
+          when: [open, documents_requested, screening_initiated],
+        }
       # Evidence/document state verbs — documents are evidence FOR the entity,
       # not positioned entities. The requirement dictionary defines what's needed,
       # the state machine tracks each requirement instance.
@@ -228,6 +304,32 @@ slots:
           verb: document.missing-for-entity,
           when: [documents_requested, screening_complete, evidence_collected],
         }
+      # Document QA/version verbs (Layer B-D)
+      doc_catalog:
+        { verb: document.catalog, when: [documents_requested, evidence_collected] }
+      doc_extract:
+        { verb: document.extract, when: [documents_requested, evidence_collected] }
+      doc_create: { verb: document.create, when: [open, documents_requested] }
+      doc_upload_version: { verb: document.upload-version, when: [documents_requested] }
+      doc_start_qa:
+        { verb: document.start-qa, when: [documents_requested, screening_complete] }
+      doc_get: document.get
+      doc_list_versions: document.list-versions
+      doc_for_entity: document.for-entity
+      # Document request tracking (separate from QA — tracks solicitation state)
+      doc_create_request:
+        { verb: document.create-request, when: [open, documents_requested] }
+      doc_mark_requested:
+        { verb: document.mark-requested, when: [documents_requested] }
+      doc_mark_received:
+        { verb: document.mark-received, when: [documents_requested] }
+      doc_verify_request:
+        { verb: document.verify-request, when: [documents_requested, screening_complete, evidence_collected] }
+      doc_reject_request:
+        { verb: document.reject-request, when: [documents_requested, screening_complete] }
+      doc_waive_request:
+        { verb: document.waive-request, when: [documents_requested] }
+      doc_list_requests: document.list-requests-by-workstream
   screening:
     type: entity
     entity_kinds: [person, company]
@@ -302,6 +404,16 @@ slots:
       list_by_type: identifier.list-by-type
       set_primary: { verb: identifier.set-primary, when: [verified] }
       remove: { verb: identifier.remove, when: [captured, verified, failed] }
+      # Scheme-specific attachment and lookup
+      attach_lei: { verb: identifier.attach-lei, when: [empty, failed, captured] }
+      attach_clearstream: { verb: identifier.attach-clearstream, when: [empty, failed, captured] }
+      find_by_lei: identifier.find-by-lei
+      find_by_clearstream: identifier.find-by-clearstream
+      find_by_isin: identifier.find-by-isin
+      list_by_entity: identifier.list-by-entity
+      validate: { verb: identifier.validate, when: [captured] }
+      invalidate: { verb: identifier.invalidate, when: [captured, verified] }
+      update_lei_status: { verb: identifier.update-lei-status, when: [captured, verified] }
   request:
     type: entity
     entity_kinds: [entity]
@@ -321,6 +433,12 @@ slots:
       assign: { verb: request.assign, when: [pending, sent, received] }
       reopen: { verb: request.reopen, when: [returned, waived, fulfilled] }
       escalate: { verb: request.escalate, when: [sent, received] }
+      # Request lifecycle extras
+      fulfill: { verb: request.fulfill, when: [received] }
+      extend: { verb: request.extend, when: [sent, received] }
+      remind: { verb: request.remind, when: [sent, received] }
+      overdue: request.overdue
+      waive: { verb: request.waive, when: [pending, sent, received] }
   # red_flag is a STATE of an entity workstream (like "screened" or
   # "document requested"), not a separate positioned entity.
   # Red flag verbs are on the entity_workstream slot above.

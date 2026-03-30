@@ -1,10 +1,14 @@
 constellation: kyc.extended
-description: Extended KYC investigation topology — board composition and BODS beneficial ownership data for deep compliance analysis. Entities positioned in the corporate governance structure of a subject entity.
+description: >
+  Extended KYC investigation topology — board composition, BODS beneficial ownership,
+  trust control vectors, and partnership capital structure for deep compliance analysis.
+  Entity-type-specific slots (trust, partnership) only hydrate when entity_kinds matches
+  the subject entity. This is Option B: one constellation, conditional slots.
 jurisdiction: ALL
 slots:
   entity:
     type: entity
-    entity_kinds: [person, company]
+    entity_kinds: [person, company, trust, partnership, llp]
     table: entities
     pk: entity_id
     cardinality: root
@@ -44,6 +48,41 @@ slots:
       list_persons: { verb: bods.list-persons, when: filled }
       list_ownership: { verb: bods.list-ownership, when: filled }
       sync: { verb: bods.sync-from-gleif, when: filled }
+  # ── Trust-specific control structure (entity_kinds: trust) ──────────
+  # Only hydrates when the subject entity is a trust.
+  # Maps trust deed provisions to control vectors for UBO analysis.
+  trust_control:
+    type: entity
+    entity_kinds: [trust]
+    join: { via: trust_structures, parent_fk: entity_id, child_fk: trust_id }
+    cardinality: optional
+    depends_on: [entity]
+    verbs:
+      record_provision: { verb: trust.record-provision, when: [empty, filled] }
+      update_provision: { verb: trust.update-provision, when: filled }
+      end_provision: { verb: trust.end-provision, when: filled }
+      list_provisions: trust.list-provisions
+      list_by_holder: trust.list-by-holder
+      analyze_control: { verb: trust.analyze-control, when: filled }
+      identify_ubos: { verb: trust.identify-ubos, when: filled }
+      classify: { verb: trust.classify, when: [empty, filled] }
+  # ── Partnership capital structure (entity_kinds: partnership, llp) ──
+  # Only hydrates for partnership/LLP entities.
+  # Records GP/LP relationships, capital commitments, and control analysis.
+  partnership_capital:
+    type: entity
+    entity_kinds: [partnership, llp]
+    join: { via: partnership_structures, parent_fk: entity_id, child_fk: partnership_id }
+    cardinality: optional
+    depends_on: [entity]
+    verbs:
+      add_partner: { verb: partnership.add-partner, when: [empty, filled] }
+      record_contribution: { verb: partnership.record-contribution, when: filled }
+      record_distribution: { verb: partnership.record-distribution, when: filled }
+      withdraw_partner: { verb: partnership.withdraw-partner, when: filled }
+      list_partners: partnership.list-partners
+      reconcile: { verb: partnership.reconcile, when: filled }
+      analyze_control: { verb: partnership.analyze-control, when: filled }
   # red_flag verbs are annotations/events ON entities, not entities
   # positioned in a structural topology. They're available via the
   # entity's verb surface but don't create constellation slots.
