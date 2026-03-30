@@ -291,7 +291,7 @@ domains:
         writes: [cbu_entity_roles]
       cbu.parties:
         reads: [cbu_entity_roles, entities]
-      cbu.show:
+      cbu.inspect:
         reads: [cbus, cbu_entity_roles, roles]
       cbu.set-category:
         reads: [cbus, master_jurisdictions]
@@ -1785,7 +1785,7 @@ domains:
       document.solicit:
         reads: [document_catalog, document_types]
         writes: [document_catalog]
-      document.solicit-set:
+      document.solicit-batch:
         reads: [document_catalog, document_requirements]
         writes: [document_requests]
       document.verify:

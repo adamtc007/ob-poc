@@ -3,7 +3,7 @@
 # These are composite KYC operations that drive multi-step BPMN processes.
 # Each verb parks a token via WorkflowDispatcher and resumes on external signal.
 #
-# The underlying service tasks (kyc-case.create, document.solicit-set, etc.)
+# The underlying service tasks (kyc-case.create, document.solicit-batch, etc.)
 # remain as standalone verbs with their own behavior (crud/plugin).
 
 domains:

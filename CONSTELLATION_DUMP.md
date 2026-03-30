@@ -764,7 +764,7 @@ slots:
     # cbu.read/show are navigation — owned by group.ownership constellation.
     # KYC reads the CBU but does not create/modify it.
     verbs:
-      show: { verb: cbu.show, when: filled }
+      inspect: { verb: cbu.inspect, when: filled }
   kyc_case:
     type: case
     table: cases
@@ -795,7 +795,7 @@ slots:
         depends_on: [{ slot: kyc_case, min_state: review }]
         verbs:
           evaluate: { verb: tollgate.evaluate, when: empty }
-          evaluate_gate: { verb: tollgate.evaluate-gate, when: [empty, filled] }
+          check_gate: { verb: tollgate.check-gate, when: [empty, filled] }
           read: { verb: tollgate.read, when: filled }
           get_decision_readiness: { verb: tollgate.get-decision-readiness, when: filled }
           get_metrics: { verb: tollgate.get-metrics, when: filled }
@@ -818,7 +818,7 @@ slots:
       list_by_case: { verb: entity-workstream.list-by-case, when: filled }
       state: { verb: entity-workstream.state, when: filled }
       update: { verb: entity-workstream.update-status, when: filled }
-      set_enhanced_dd: { verb: entity-workstream.set-enhanced-dd, when: filled }
+      escalate_dd: { verb: entity-workstream.escalate-dd, when: filled }
       set_ubo: { verb: entity-workstream.set-ubo, when: filled }
       complete: { verb: entity-workstream.complete, when: filled }
       block: { verb: entity-workstream.block, when: filled }
@@ -843,7 +843,7 @@ slots:
       req_waive: { verb: requirement.waive, when: filled }
       req_reinstate: { verb: requirement.reinstate, when: filled }
       doc_solicit: { verb: document.solicit, when: [empty, filled] }
-      doc_solicit_set: { verb: document.solicit-set, when: [empty, filled] }
+      doc_solicit_batch: { verb: document.solicit-batch, when: [empty, filled] }
       doc_upload: { verb: document.upload, when: filled }
       doc_verify: { verb: document.verify, when: filled }
       doc_reject: { verb: document.reject, when: filled }
@@ -941,7 +941,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
     children:
       us_feeder:
         type: cbu
@@ -1227,7 +1227,7 @@ slots:
     verbs:
       create: cbu.create
       read: cbu.read
-      show: cbu.show
+      inspect: cbu.inspect
   aifm:
     type: entity
     entity_kinds: [company]
@@ -1407,7 +1407,7 @@ slots:
     verbs:
       create: cbu.create
       read: cbu.read
-      show: cbu.show
+      inspect: cbu.inspect
   aifm:
     type: entity
     entity_kinds: [company]
@@ -1619,7 +1619,7 @@ slots:
     verbs:
       create: cbu.create
       read: cbu.read
-      show: cbu.show
+      inspect: cbu.inspect
   management_company:
     type: entity
     entity_kinds: [company]
@@ -1804,7 +1804,7 @@ slots:
     verbs:
       create: cbu.create
       read: cbu.read
-      show: cbu.show
+      inspect: cbu.inspect
   aifm:
     type: entity
     entity_kinds: [company]
@@ -2072,7 +2072,7 @@ slots:
     verbs:
       create: cbu.create
       read: cbu.read
-      show: cbu.show
+      inspect: cbu.inspect
   general_partner:
     type: entity
     entity_kinds: [company]
@@ -2340,7 +2340,7 @@ slots:
     verbs:
       create: cbu.create
       read: cbu.read
-      show: cbu.show
+      inspect: cbu.inspect
   management_company:
     type: entity
     entity_kinds: [company]
@@ -2507,7 +2507,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
     children:
       us_parallel:
         type: cbu
@@ -2763,7 +2763,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   acs_operator:
     type: entity
     entity_kinds: [company]
@@ -2866,7 +2866,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   authorised_fund_manager:
     type: entity
     entity_kinds: [company]
@@ -2969,7 +2969,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   authorised_corporate_director:
     type: entity
     entity_kinds: [company]
@@ -3092,7 +3092,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   authorised_corporate_director:
     type: entity
     entity_kinds: [company]
@@ -3215,7 +3215,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   designated_member_1:
     type: entity
     entity_kinds: [company, person]
@@ -3312,7 +3312,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   general_partner:
     type: entity
     entity_kinds: [company]
@@ -3425,7 +3425,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   investment_adviser:
     type: entity
     entity_kinds: [company]
@@ -3548,7 +3548,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   investment_adviser:
     type: entity
     entity_kinds: [company]
@@ -3681,7 +3681,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   investment_adviser:
     type: entity
     entity_kinds: [company]
@@ -3824,7 +3824,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   general_partner:
     type: entity
     entity_kinds: [company]

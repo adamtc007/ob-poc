@@ -23,7 +23,7 @@ workflows:
         max_retries: 3
 
       - task_type: request_documents
-        verb_fqn: document.solicit-set
+        verb_fqn: document.solicit-batch
         timeout_ms: 60000
         max_retries: 3
 
@@ -54,7 +54,7 @@ workflows:
         max_retries: 3
 
   # Document Solicitation Set — batch document request lifecycle
-  - verb_fqn: document.solicit-set
+  - verb_fqn: document.solicit-batch
     route: orchestrated
     process_key: kyc-document-request-set
     correlation_field: workflow-instance-id

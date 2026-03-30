@@ -202,7 +202,7 @@ domains:
         verbs:
           - cbu.read
           - cbu.list
-          - cbu.show
+          - cbu.inspect
 
   # ===========================================================================
   # ENTITY MANAGEMENT
@@ -387,7 +387,7 @@ domains:
         description: Request documents from parties
         verbs:
           - document.solicit
-          - document.solicit-set
+          - document.solicit-batch
           - document.remind
       - id: review
         label: Review & Verify

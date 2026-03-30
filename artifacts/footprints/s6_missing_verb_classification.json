@@ -4317,7 +4317,7 @@
       "behavior": "crud",
       "bucket": "A_pure_crud",
       "domain": "entity-workstream",
-      "fqn": "entity-workstream.set-enhanced-dd",
+      "fqn": "entity-workstream.escalate-dd",
       "harm_class": null,
       "has_crud": true,
       "has_lifecycle": false,

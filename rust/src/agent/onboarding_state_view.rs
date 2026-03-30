@@ -329,7 +329,7 @@ fn build_document_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
     let forward = filter_hints(
         &c.next_likely_verbs,
-        &["document.solicit", "document.solicit-set"],
+        &["document.solicit", "document.solicit-batch"],
         VerbDirection::Forward,
     );
 
@@ -664,7 +664,7 @@ fn verb_fqn_to_label(fqn: &str) -> String {
         "screening.sanctions" => "Run Sanctions Check".into(),
         "screening.pep" => "Run PEP Check".into(),
         "document.solicit" => "Request Documents".into(),
-        "document.solicit-set" => "Request Document Set".into(),
+        "document.solicit-batch" => "Request Document Batch".into(),
         "deal.request-onboarding" => "Request Onboarding Handoff".into(),
         "kyc-case.read" => "Check Case Status".into(),
         "deal.read" => "Review Deal".into(),
@@ -701,7 +701,7 @@ fn verb_fqn_to_utterance(fqn: &str) -> String {
         "screening.sanctions" => "Run a sanctions check".into(),
         "screening.pep" => "Run a PEP check".into(),
         "document.solicit" => "Request a document".into(),
-        "document.solicit-set" => "Request the full document set".into(),
+        "document.solicit-batch" => "Request the full document batch".into(),
         "deal.request-onboarding" => "request onboarding for this deal".into(),
         "kyc-case.read" => "Check the KYC case status".into(),
         "deal.read" => "Review the deal record".into(),

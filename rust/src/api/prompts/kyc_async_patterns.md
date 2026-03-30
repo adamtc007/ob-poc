@@ -50,7 +50,7 @@ When you need to see what's pending, use the state query:
 
 ```clojure
 ;; Get case with embedded awaiting requests
-(kyc-case.get-state :case-id @case)
+(kyc-case.summarize :case-id @case)
 ```
 
 The response shows requests as **child nodes of workstreams** in `awaiting` arrays:
@@ -116,5 +116,5 @@ When KYC case context shows issues:
 (case-screening.run :workstream-id @ws :screening-type "PEP")
 
 ;; 4. Later, check state to see what's still pending
-(kyc-case.get-state :case-id @case)
+(kyc-case.summarize :case-id @case)
 ```

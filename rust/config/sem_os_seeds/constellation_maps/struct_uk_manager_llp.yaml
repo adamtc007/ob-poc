@@ -7,7 +7,7 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    verbs: { create: cbu.create, read: cbu.read, show: cbu.show }
+    verbs: { create: cbu.create, read: cbu.read, inspect: cbu.inspect }
   designated_member_1:
     type: entity
     entity_kinds: [company, person]

@@ -384,7 +384,7 @@ skeleton.build :case-id @case
     │       Cap at 8 items per plan
     │       → Insert to kyc.outreach_plans + kyc.outreach_items
     │
-    ├─► Step 6: tollgate.evaluate-gate (SKELETON_READY)
+    ├─► Step 6: tollgate.check-gate (SKELETON_READY)
     │       Load gate definition from ob_ref.tollgate_definitions
     │       Check ownership_coverage_pct >= 70% threshold
     │       Check all entities have at least one ownership edge
@@ -651,7 +651,7 @@ Defined in `ob_ref.tollgate_definitions`:
 ### 12.2 Gate Evaluation Flow
 
 ```
-tollgate.evaluate-gate :case-id @case :gate "SKELETON_READY"
+tollgate.check-gate :case-id @case :gate "SKELETON_READY"
     │
     ├─ Load gate definition from ob_ref.tollgate_definitions
     ├─ Compute current metrics against thresholds
@@ -706,7 +706,7 @@ tollgate.evaluate-gate :case-id @case :gate "SKELETON_READY"
 | Verb | Behavior | Description |
 |------|----------|-------------|
 | `evaluate` | plugin | Run tollgate evaluation for a case |
-| `evaluate-gate` | plugin | Evaluate a named tollgate gate |
+| `check-gate` | plugin | Check a named tollgate gate |
 | `get-metrics` | plugin | Compute current metrics without recording |
 | `set-threshold` | crud | Update a tollgate threshold |
 | `override` | plugin | Record management override |
@@ -1086,7 +1086,7 @@ This ensures compliance classification is always current without manual interven
 
 | Verb | Behavior | Description |
 |------|----------|-------------|
-| `build` | plugin | Orchestrates: import-run.begin → graph.validate → ubo.compute-chains → coverage.compute → outreach.plan-generate → tollgate.evaluate-gate → import-run.complete |
+| `build` | plugin | Orchestrates: import-run.begin → graph.validate → ubo.compute-chains → coverage.compute → outreach.plan-generate → tollgate.check-gate → import-run.complete |
 
 #### research.import-run (3 verbs)
 

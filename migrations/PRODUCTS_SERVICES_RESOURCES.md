@@ -1510,7 +1510,7 @@ graph TB
 
 ### Document Verb: Durable Behavior
 
-The `document.solicit` and `document.solicit-set` verbs use `behavior: durable` — they are orchestrated through BPMN-Lite:
+The `document.solicit` and `document.solicit-batch` verbs use `behavior: durable` — they are orchestrated through BPMN-Lite:
 
 ```yaml
 # rust/config/verbs/document.yaml
@@ -1767,7 +1767,7 @@ Request operations send best-effort BPMN signals for workflow correlation:
 | Verb | Behavior | Description |
 |---|---|---|
 | `document.solicit` | durable | Solicit single document (BPMN-orchestrated) |
-| `document.solicit-set` | durable | Solicit multiple documents (BPMN-orchestrated) |
+| `document.solicit-batch` | durable | Solicit multiple documents (BPMN-orchestrated) |
 | `document.create` | crud | Create document record |
 | `document.upload-version` | plugin | Upload new version (triggers auto-fulfill) |
 | `document.verify` | plugin | QA approve version |

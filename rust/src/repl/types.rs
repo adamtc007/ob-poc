@@ -69,6 +69,13 @@ pub struct MatchContext {
     /// toward contextually expected actions. Design: ADR 044.
     #[serde(skip)]
     pub narration_hot_verbs: Vec<String>,
+
+    /// Constellation verb index: two-way (noun, action) → verb lookup built
+    /// from the live hydrated constellation's state-gated available verbs.
+    /// Consulted at Tier -0.5 in HybridVerbSearcher (after ECIR, before embeddings).
+    #[serde(skip)]
+    pub constellation_verb_index:
+        Option<std::sync::Arc<crate::agent::constellation_verb_index::ConstellationVerbIndex>>,
 }
 
 /// Scope context for matching

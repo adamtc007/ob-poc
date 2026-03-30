@@ -15,7 +15,7 @@ initial: missing
 transitions:
   - from: missing
     to: requested
-    verbs: [document.solicit, document.solicit-set]
+    verbs: [document.solicit, document.solicit-batch]
   - from: missing
     to: waived
     verbs: [requirement.waive]

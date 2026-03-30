@@ -242,7 +242,7 @@ impl GroupCompositeState {
                 reason: "Documents incomplete — solicitation next".into(),
             });
             self.next_likely_verbs.push(ScoredVerbHint {
-                verb_fqn: "document.solicit-set".into(),
+                verb_fqn: "document.solicit-batch".into(),
                 boost: 0.10,
                 reason: "Documents incomplete — bulk request next".into(),
             });

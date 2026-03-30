@@ -541,7 +541,7 @@ impl CustomOperation for TollgateEvaluateGateOp {
     }
 
     fn verb(&self) -> &'static str {
-        "evaluate-gate"
+        "check-gate"
     }
 
     fn rationale(&self) -> &'static str {
@@ -769,7 +769,7 @@ mod tests {
     fn test_handler_metadata() {
         let op = TollgateEvaluateGateOp;
         assert_eq!(op.domain(), "tollgate");
-        assert_eq!(op.verb(), "evaluate-gate");
+        assert_eq!(op.verb(), "check-gate");
     }
 
     #[test]

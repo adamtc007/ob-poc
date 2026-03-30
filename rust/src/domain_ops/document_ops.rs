@@ -9,7 +9,7 @@
 //! workflow task queue for async external system interaction:
 //!
 //! - `document.solicit` - Request document from entity (creates pending task)
-//! - `document.solicit-set` - Request multiple documents (single multi-result task)
+//! - `document.solicit-batch` - Request multiple documents (single multi-result task)
 //! - `document.upload-version` - Upload a new version of a document
 //! - `document.verify` - QA approves a document version
 //! - `document.reject` - QA rejects with standardized reason code
@@ -413,7 +413,7 @@ impl CustomOperation for DocumentSolicitSetOp {
         "document"
     }
     fn verb(&self) -> &'static str {
-        "solicit-set"
+        "solicit-batch"
     }
     fn rationale(&self) -> &'static str {
         "Creates single multi-result task for multiple document requirements"
@@ -520,7 +520,7 @@ impl CustomOperation for DocumentSolicitSetOp {
                 INSERT INTO "ob-poc".workflow_pending_tasks
                     (task_id, instance_id, blocker_type, blocker_key, verb, args,
                      expected_cargo_count, status)
-                VALUES ($1, $2, 'document_set', $3, 'document.solicit-set', $4, $5, 'pending')
+                VALUES ($1, $2, 'document_set', $3, 'document.solicit-batch', $4, $5, 'pending')
                 "#,
             )
             .bind(task_id)

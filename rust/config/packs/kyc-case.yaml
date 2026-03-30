@@ -36,7 +36,7 @@ allowed_verbs:
   - kyc.approve-case
   - ubo.discover
   - document.solicit
-  - document.solicit-set
+  - document.solicit-batch
   - screening.run
   # KYC/screening/evidence macros
   - case.add-party
@@ -154,7 +154,7 @@ templates:
         args:
           entity_ref: "{answers.entity_name}"
 
-      - verb: document.solicit-set
+      - verb: document.solicit-batch
         args:
           entity_ref: "{answers.entity_name}"
           doc_types: "{answers.document_types}"
@@ -181,7 +181,7 @@ templates:
         args:
           entity_ref: "{answers.entity_name}"
 
-      - verb: document.solicit-set
+      - verb: document.solicit-batch
         when: "document_types"
         args:
           entity_ref: "{answers.entity_name}"

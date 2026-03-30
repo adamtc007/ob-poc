@@ -611,7 +611,7 @@ pub struct ExecuteResult {
     pub entity_id: Option<String>,
     #[serde(default)]
     pub entity_type: Option<String>,
-    /// Query result data (for cbu.show, cbu.list, etc.)
+    /// Query result data (for cbu.inspect, cbu.list, etc.)
     #[serde(default)]
     pub result: Option<serde_json::Value>,
 }

@@ -541,7 +541,7 @@ Returns the... |
 | missing-for-entity | intent | operational | List missing document requirements for an entity |
 | reject | intent | operational | QA rejects a document version with reason code |
 | solicit | intent | operational | Solicit a single document from an entity (creates pending... |
-| solicit-set | intent | operational | Solicit multiple documents from an entity (creates single... |
+| solicit-batch | intent | operational | Solicit multiple documents from an entity (creates single... |
 | start-qa | diagnostics | operational | Move document version to QA queue |
 | upload-version | diagnostics | operational | Upload a new version of a document (Layer C - immutable s... |
 | verify | intent | operational | QA approves a document version |
@@ -594,7 +594,7 @@ Returns the... |
 | create | intent | workflow | Create a new entity workstream (idempotent by case+entity) |
 | list-by-case | reference | workflow | List workstreams for a case |
 | read | reference | workflow | Read workstream details |
-| set-enhanced-dd | intent | workflow | Flag workstream for enhanced due diligence |
+| escalate-dd | intent | workflow | Escalate workstream to enhanced due diligence |
 | set-ubo | intent | workflow | Mark workstream entity as UBO |
 | state | intent | workflow | Get workstream state with embedded awaiting requests, che... |
 | update-status | intent | workflow | Update workstream status |

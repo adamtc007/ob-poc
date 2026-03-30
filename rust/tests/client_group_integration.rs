@@ -462,7 +462,7 @@ mod e2e_tests {
 
         // Test: "allianz" should match session.load-cluster
         let results = searcher
-            .search("allianz", None, None, None, 5, None, None)
+            .search("allianz", None, None, None, 5, None, None, None)
             .await?;
 
         assert!(!results.is_empty(), "Should find at least one verb match");
@@ -504,7 +504,7 @@ mod e2e_tests {
 
         // Test: "load the allianz book" should match session.load-cluster
         let results = searcher
-            .search("load the allianz book", None, None, None, 5, None, None)
+            .search("load the allianz book", None, None, None, 5, None, None, None)
             .await?;
 
         assert!(!results.is_empty(), "Should find at least one verb match");
@@ -595,7 +595,7 @@ mod e2e_tests {
             .with_embedder(dyn_embedder);
 
         let results = searcher
-            .search("allianz", None, None, None, 3, None, None)
+            .search("allianz", None, None, None, 3, None, None, None)
             .await?;
         assert!(!results.is_empty());
         let verb = &results[0].verb;

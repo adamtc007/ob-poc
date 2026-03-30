@@ -218,7 +218,7 @@ tier_2:
       - id: request
         label: "Request documents / Information"
         description: "Solicit documents or data from parties"
-        verbs: [document.solicit, document.solicit-set, requirement.create]
+        verbs: [document.solicit, document.solicit-batch, requirement.create]
 
 # =============================================================================
 # VERB → TIER MAPPING (for reverse lookup)
@@ -294,7 +294,7 @@ verb_tier_mapping:
   kyc-case.reject: [workflow, reject]
   document.reject: [workflow, reject]
   document.solicit: [workflow, request]
-  document.solicit-set: [workflow, request]
+  document.solicit-batch: [workflow, request]
   requirement.create: [workflow, request]
 
 # =============================================================================

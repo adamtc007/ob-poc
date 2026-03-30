@@ -680,7 +680,7 @@
         "manager_onboarding"
       ],
       "domain": "cbu",
-      "fqn": "cbu.show",
+      "fqn": "cbu.inspect",
       "subject_kinds": [
         "cbu",
         "contract",
@@ -2129,7 +2129,7 @@
         "manager_onboarding"
       ],
       "domain": "document",
-      "fqn": "document.solicit-set",
+      "fqn": "document.solicit-batch",
       "subject_kinds": [
         "cbu",
         "contract",

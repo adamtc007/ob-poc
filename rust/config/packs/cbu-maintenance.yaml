@@ -38,7 +38,7 @@ allowed_verbs:
   - cbu.rename
   - cbu.suspend
   - cbu.activate
-  - cbu.show
+  - cbu.inspect
   - cbu.assign-role
   - cbu.remove-role
   - cbu.assign-product

@@ -144,7 +144,7 @@ stateDiagram-v2
 | `cbu.delete-cascade` | plugin | Delete CBU + all related data across 25+ tables |
 | `cbu.list` | crud | List CBUs with filters (status, jurisdiction, client-type) |
 | `cbu.ensure` | crud | Upsert CBU by natural key (name + jurisdiction) |
-| `cbu.show` | plugin | Full CBU structure (entities, roles, docs, screenings, services) |
+| `cbu.inspect` | plugin | Full CBU structure (entities, roles, docs, screenings, services) |
 | `cbu.decide` | plugin | Record KYC/AML decision (APPROVED/REJECTED/REFERRED) |
 | `cbu.set-category` | crud | Set CBU category classification |
 | `cbu.assign-role` | crud | Assign entity role within CBU |

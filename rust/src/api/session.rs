@@ -2994,7 +2994,7 @@ pub struct ExecutionResult {
     /// Type of entity created (CBU, ENTITY, etc.)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entity_type: Option<String>,
-    /// Result data for Record/RecordSet operations (e.g., cbu.show)
+    /// Result data for Record/RecordSet operations (e.g., cbu.inspect)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<serde_json::Value>,
 }

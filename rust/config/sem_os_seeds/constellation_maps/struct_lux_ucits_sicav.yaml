@@ -10,7 +10,7 @@ slots:
     verbs:
       create: cbu.create
       read: cbu.read
-      show: cbu.show
+      inspect: cbu.inspect
       parties: cbu.parties
   management_company:
     type: entity

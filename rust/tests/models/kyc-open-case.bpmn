@@ -13,7 +13,7 @@
 
   Task types map to ob-poc verbs via config/workflows.yaml:
     create_case_record  → kyc-case.create
-    request_documents   → document.solicit-set
+    request_documents   → document.solicit-batch
     record_decision     → kyc-case.update-status
 -->
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"

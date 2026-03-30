@@ -2671,7 +2671,7 @@
       "evidence_source": [
         "yaml_crud"
       ],
-      "fqn": "entity-workstream.set-enhanced-dd",
+      "fqn": "entity-workstream.escalate-dd",
       "operation": "update",
       "postconditions": [
         "target record updated"

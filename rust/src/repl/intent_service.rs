@@ -557,6 +557,7 @@ mod tests {
             bindings: vec![],
             allowed_verbs: None,
             narration_hot_verbs: Vec::new(),
+            constellation_verb_index: None,
         }
     }
 

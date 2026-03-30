@@ -141,7 +141,7 @@ domains:
             task_id: uuid
             requirement_id: uuid
 
-      solicit-set:
+      solicit-batch:
         description: Solicit multiple documents from an entity and track through to fulfillment
         behavior: durable
         durable:
@@ -155,18 +155,18 @@ domains:
           timeout: P14D
         invocation_phrases:
           - request documents
-          - solicit document set
+          - solicit document batch
           - ask for passport and proof of address
           - get KYC documents
-          - request identity document set
+          - request identity document batch
           - send out the full document request pack
           - send out the whole doc pack for this entity
           - request the full CDD document pack
           - request all outstanding documents
-          - solicit the complete document set
+          - solicit the complete document batch
           - solicit all required documents from entity
           - send out the KYC document pack
-          - request the full set of KYC documents
+          - request the full batch of KYC documents
           - ask for all the missing documents
           - chase the outstanding document pack
           - send the complete document request to entity

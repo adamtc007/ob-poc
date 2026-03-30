@@ -201,7 +201,7 @@ slots:
     state_machine: kyc_case_lifecycle
     verbs:
       read: { verb: kyc-case.read, when: filled }
-      state: { verb: kyc-case.get-state, when: filled }
+      state: { verb: kyc-case.summarize, when: filled }
       update_status: { verb: kyc-case.update-status, when: filled }
       close: { verb: kyc-case.close, when: filled }
   cbu_identification:

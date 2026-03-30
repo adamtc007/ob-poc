@@ -2695,7 +2695,7 @@
         "kyc_lifecycle"
       ],
       "domain": "document",
-      "fqn": "document.solicit-set",
+      "fqn": "document.solicit-batch",
       "subject_kinds": [
         "allegation",
         "client-group",
@@ -2959,7 +2959,7 @@
         "kyc_lifecycle"
       ],
       "domain": "entity-workstream",
-      "fqn": "entity-workstream.set-enhanced-dd",
+      "fqn": "entity-workstream.escalate-dd",
       "subject_kinds": [
         "allegation",
         "client-group",

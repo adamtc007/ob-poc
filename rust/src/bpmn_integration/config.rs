@@ -223,7 +223,7 @@ mod tests {
                         },
                         TaskBinding {
                             task_type: "request_documents".to_string(),
-                            verb_fqn: "document.solicit-set".to_string(),
+                            verb_fqn: "document.solicit-batch".to_string(),
                             timeout_ms: None,
                             max_retries: 3,
                         },

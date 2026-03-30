@@ -247,13 +247,15 @@ domains:
           - VERY_HIGH
         returns:
           type: affected
-      set-enhanced-dd:
-        description: Flag workstream for enhanced due diligence
+      escalate-dd:
+        description: Escalate workstream to enhanced due diligence
         invocation_phrases:
-        - "set enhanced due diligence"
+        - "escalate due diligence"
+        - "escalate to enhanced dd"
+        - "escalate to enhanced due diligence"
         - "flag for enhanced dd"
         - "require enhanced dd"
-        - "escalate to enhanced due diligence"
+        - "set enhanced due diligence"
         metadata:
           tier: intent
           source_of_truth: workflow

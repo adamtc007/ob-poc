@@ -207,15 +207,15 @@ fn test_verb_sentences_deserialization_document() {
         .domains
         .get("document")
         .expect("document domain should exist");
-    let solicit_set = document_domain
+    let solicit_batch = document_domain
         .verbs
-        .get("solicit-set")
-        .expect("document.solicit-set should exist");
+        .get("solicit-batch")
+        .expect("document.solicit-batch should exist");
 
-    let sentences = solicit_set
+    let sentences = solicit_batch
         .sentences
         .as_ref()
-        .expect("document.solicit-set should have sentences");
+        .expect("document.solicit-batch should have sentences");
 
     assert!(!sentences.step.is_empty());
     assert!(sentences.clarify.contains_key("doc-types"));

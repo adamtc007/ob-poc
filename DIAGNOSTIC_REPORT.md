@@ -122,7 +122,7 @@ When ECIR fires but selects the wrong verb from a multi-candidate set, the embed
    - "move" → None (should be Update → deal.update-status)
 
 2. **Overly broad `create` mapping** in document noun:
-   - `create: [document.solicit, document.solicit-set, document.create, document.request, doc-request.create]` — 5 verbs for "create" action
+   - `create: [document.solicit, document.solicit-batch, document.create, document.request, doc-request.create]` — 5 verbs for "create" action
 
 3. **Noun ambiguity between overlapping domains**:
    - "ownership structure" appears as natural_alias for BOTH `ubo` and `ownership` nouns
@@ -184,7 +184,7 @@ The highest-collision verb clusters based on domain overlap and naming:
 | Cluster | Verbs | Collision Risk |
 |---|---|---|
 | **Ownership/UBO/Control** | `ubo.list-ubos`, `ubo.list-owners`, `ownership.compute`, `ownership.who-controls`, `control.list-controllers`, `control.identify-ubos`, `control.build-graph`, `control.compute-controllers` | **CRITICAL** — 8 verbs across 3 domains, all answering "who owns/controls this?" |
-| **Document request** | `document.solicit`, `document.request`, `document.create`, `doc-request.create`, `document.solicit-set` | **HIGH** — 5 verbs for "request a document" |
+| **Document request** | `document.solicit`, `document.request`, `document.create`, `doc-request.create`, `document.solicit-batch` | **HIGH** — 5 verbs for "request a document" |
 | **Fund/share-class create** | `fund.create`, `fund.create-umbrella`, `fund.create-subfund`, `fund.create-standalone`, `fund.create-share-class`, `share-class.create`, `fund.create-feeder`, `fund.create-master` | **HIGH** — 8 create verbs in fund domain |
 | **Screening types** | `screening.sanctions`, `screening.pep`, `screening.adverse-media`, `screening.run`, `screening.full` | **MEDIUM** — "run a check" maps to 5 verbs |
 | **KYC case vs screening** | `kyc-case.create` vs `screening.run` | **MEDIUM** — "start KYC" could mean either |
@@ -289,7 +289,7 @@ Based on the YAML config analysis, the system has ~134 domains with ~1,098 verbs
 
 **document.solicit vs kyc-case.create for "request identity documents":**
 - Test fixture line 560: `ecir_path = "narrow"`, `expected_noun = "document"`, `expected_action = "create"`
-- In noun_index.yaml line 601: document.create action = `[document.solicit, document.solicit-set, document.create, document.request, doc-request.create]`
+- In noun_index.yaml line 601: document.create action = `[document.solicit, document.solicit-batch, document.create, document.request, doc-request.create]`
 - **Diagnosis:** If ECIR correctly identifies noun=document and action=create, it gets 5 candidates → narrow path → post-boost. The word "request" is NOT in any action category, so action classification returns None. This causes fallback to NounKeyMatch which returns ALL document verbs. The user's reported misfire to `kyc-case.create` would happen if: (a) ECIR misclassifies "due diligence" as a kyc-case noun match, or (b) the embedding tier scores kyc-case.create higher than document.solicit.
 
 **struct.* verbs:**

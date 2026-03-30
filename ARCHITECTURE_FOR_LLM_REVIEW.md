@@ -161,7 +161,7 @@ A standalone **BPMN-Lite** durable orchestration service (23-opcode fiber VM, gR
 
 **Industry Equivalents:** Maps to a "Party Review" or "Subject Review" in compliance case management, or an "Entity Due Diligence Track" in KYC workflow systems.
 
-**Key Verbs:** `entity-workstream.create`, `entity-workstream.read`, `entity-workstream.list-by-case`, `entity-workstream.state`, `entity-workstream.update-status`, `entity-workstream.set-enhanced-dd`, `entity-workstream.set-ubo`, `entity-workstream.complete`, `entity-workstream.block`.
+**Key Verbs:** `entity-workstream.create`, `entity-workstream.read`, `entity-workstream.list-by-case`, `entity-workstream.state`, `entity-workstream.update-status`, `entity-workstream.escalate-dd`, `entity-workstream.set-ubo`, `entity-workstream.complete`, `entity-workstream.block`.
 
 **Relationships:**
 - Belongs to exactly one **KYC Case** via `entity_workstreams.case_id`
@@ -340,7 +340,7 @@ A standalone **BPMN-Lite** durable orchestration service (23-opcode fiber VM, gR
 
 **Business Definition:** A Tollgate Evaluation is a compliance decision gate that assesses whether a KYC case meets all requirements for approval. It evaluates configurable thresholds (screening clearance, document coverage, risk rating) and produces a decision readiness assessment. Tollgates are only available when the case reaches the `review` state.
 
-**Key Verbs:** `tollgate.evaluate`, `tollgate.evaluate-gate`, `tollgate.read`, `tollgate.get-decision-readiness`, `tollgate.get-metrics`, `tollgate.list-evaluations`, `tollgate.set-threshold`, `tollgate.override`, `tollgate.list-overrides`.
+**Key Verbs:** `tollgate.evaluate`, `tollgate.check-gate`, `tollgate.read`, `tollgate.get-decision-readiness`, `tollgate.get-metrics`, `tollgate.list-evaluations`, `tollgate.set-threshold`, `tollgate.override`, `tollgate.list-overrides`.
 
 ---
 
@@ -576,7 +576,7 @@ The constellation model is the system's approach to organizing entities into dom
 
 | From | To | Trigger Verbs | Business Meaning |
 |------|-----|--------------|------------------|
-| missing | requested | `document.solicit`, `document.solicit-set` | Document solicited from client |
+| missing | requested | `document.solicit`, `document.solicit-batch` | Document solicited from client |
 | missing | waived | `requirement.waive` | Requirement waived (low risk) |
 | requested | received | `document.upload` | Document uploaded by client |
 | received | in_qa | `document.review` | QA review started |

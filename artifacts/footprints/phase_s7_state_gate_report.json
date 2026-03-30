@@ -121,7 +121,7 @@
       ]
     },
     {
-      "fqn": "document.solicit-set",
+      "fqn": "document.solicit-batch",
       "node_state_gates": [
         "missing",
         "open"

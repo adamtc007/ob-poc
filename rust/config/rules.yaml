@@ -143,7 +143,7 @@ rules:
           description: "Politically Exposed Person identified"
           source: SCREENING
           source-reference: "${screening.id}"
-      - type: set-enhanced-dd
+      - type: escalate-dd
       - type: require-document
         params:
           doc-type: SOURCE_OF_WEALTH
@@ -202,7 +202,7 @@ rules:
           description: "Discretionary trust with no fixed beneficiaries"
           source: RULE_ENGINE
           source-reference: discretionary-trust
-      - type: set-enhanced-dd
+      - type: escalate-dd
       - type: require-document
         params:
           doc-type: TRUST_DEED
@@ -334,7 +334,7 @@ rules:
           description: "Complex ownership structure with ${workstream.discovery_depth} layers"
           source: RULE_ENGINE
           source-reference: complex-ownership-structure
-      - type: set-enhanced-dd
+      - type: escalate-dd
       - type: escalate-case
         params:
           level: SENIOR_COMPLIANCE
@@ -629,7 +629,7 @@ rules:
           description: "Entity in FATF increased monitoring jurisdiction (${entity.jurisdiction})"
           source: RULE_ENGINE
           source-reference: fatf-increased-monitoring
-      - type: set-enhanced-dd
+      - type: escalate-dd
       - type: require-document
         params:
           doc-type: SOURCE_OF_FUNDS

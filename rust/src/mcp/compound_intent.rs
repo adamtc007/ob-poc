@@ -1001,9 +1001,17 @@ mod tests {
 
     #[test]
     fn test_action_stem_none() {
-        // Practitioner slang without clear action stem
-        assert_eq!(extract_action_stem("chase the passport"), None);
+        // Utterances without a recognizable action stem
         assert_eq!(extract_action_stem("ISDA terms for counterparty"), None);
+        assert_eq!(extract_action_stem("what about the passport"), None);
+    }
+
+    #[test]
+    fn test_action_stem_practitioner_slang() {
+        // "Chase" is practitioner slang for "solicit" (follow-up/remind)
+        assert_eq!(extract_action_stem("chase the passport"), Some("solicit".into()));
+        assert_eq!(extract_action_stem("follow up on the documents"), Some("solicit".into()));
+        assert_eq!(extract_action_stem("remind them about the cert"), Some("solicit".into()));
     }
 
     #[test]

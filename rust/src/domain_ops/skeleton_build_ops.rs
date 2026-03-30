@@ -133,7 +133,7 @@ impl CustomOperation for SkeletonBuildOp {
 
         // Step 6: Tollgate evaluate (SKELETON_READY) — real gate evaluation
         let skeleton_ready = run_tollgate_evaluate(&mut tx, case_id).await?;
-        steps_completed.push("tollgate.evaluate-gate".to_string());
+        steps_completed.push("tollgate.check-gate".to_string());
 
         // Step 7: Complete import run
         sqlx::query(

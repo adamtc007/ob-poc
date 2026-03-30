@@ -508,6 +508,17 @@ impl ReplSessionV2 {
     /// ```
     pub fn hydrate_tos(&mut self, state_view: WorkspaceStateView) {
         if let Some(tos) = self.workspace_stack.last_mut() {
+            // Build constellation verb index from hydrated slots (Tier -0.5 in verb search)
+            tos.constellation_verb_index = state_view
+                .hydrated_constellation
+                .as_ref()
+                .map(|c| {
+                    std::sync::Arc::new(
+                        crate::agent::constellation_verb_index::ConstellationVerbIndex::build(
+                            &c.slots,
+                        ),
+                    )
+                });
             tos.hydrated_state = Some(state_view);
             tos.stale = false;
             self.active_workspace = Some(tos.workspace.clone());
@@ -847,12 +858,33 @@ required_context:
         session
             .push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Deal, scope.clone()))
             .unwrap();
+        let mut kyc_frame = WorkspaceFrame::new(WorkspaceKind::Kyc, scope);
+        // Simulate a write so pop marks the underlying frame stale
+        kyc_frame.writes_since_push = 1;
+        session.push_workspace_frame(kyc_frame).unwrap();
+        assert!(session.pop_workspace_frame().is_some());
+        assert_eq!(session.workspace_stack.len(), 1);
+        // Frame underneath is stale because popped frame had writes
+        assert!(session.workspace_stack[0].stale);
+    }
+
+    #[test]
+    fn test_push_pop_peek_not_stale() {
+        let mut session = ReplSessionV2::new();
+        let scope = SessionScope {
+            client_group_id: Uuid::nil(),
+            client_group_name: None,
+        };
+        session
+            .push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Deal, scope.clone()))
+            .unwrap();
+        // Peek frame with no writes — pop should NOT mark underlying stale
         session
             .push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Kyc, scope))
             .unwrap();
         assert!(session.pop_workspace_frame().is_some());
         assert_eq!(session.workspace_stack.len(), 1);
-        assert!(session.workspace_stack[0].stale);
+        assert!(!session.workspace_stack[0].stale);
     }
 
     #[test]

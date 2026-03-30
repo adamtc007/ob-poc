@@ -237,6 +237,7 @@ mod tests {
                     5,                           // limit
                     None,                        // allowed_verbs (no SemReg in test)
                     None,                        // entity_mention_spans
+                    None,                        // constellation_index (not available in offline test)
                 )
                 .await;
 
@@ -1517,6 +1518,7 @@ mod clarification_roundtrip {
                     10,
                     None,
                     None, // entity_mention_spans
+                    None, // constellation_index
                 )
                 .await
             {
@@ -1551,7 +1553,7 @@ mod clarification_roundtrip {
                 total_phrases_tested += 1;
 
                 let re_candidates = searcher
-                    .search(phrase, None, None, None, 10, None, None)
+                    .search(phrase, None, None, None, 10, None, None, None)
                     .await;
 
                 match re_candidates {

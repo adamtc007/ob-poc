@@ -3316,9 +3316,9 @@
       ]
     },
     {
-      "action": "show",
+      "action": "inspect",
       "domain": "cbu",
-      "fqn": "cbu.show",
+      "fqn": "cbu.inspect",
       "invocation_phrase_count": 12,
       "invocation_phrases": [
         "describe CBU structure",
@@ -5895,9 +5895,9 @@
       ]
     },
     {
-      "action": "solicit-set",
+      "action": "solicit-batch",
       "domain": "document",
-      "fqn": "document.solicit-set",
+      "fqn": "document.solicit-batch",
       "invocation_phrase_count": 18,
       "invocation_phrases": [
         "ask for all the missing documents",
@@ -6168,9 +6168,9 @@
       ]
     },
     {
-      "action": "set-enhanced-dd",
+      "action": "escalate-dd",
       "domain": "entity-workstream",
-      "fqn": "entity-workstream.set-enhanced-dd",
+      "fqn": "entity-workstream.escalate-dd",
       "invocation_phrase_count": 4,
       "invocation_phrases": [
         "escalate to enhanced due diligence",

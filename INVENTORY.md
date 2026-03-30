@@ -458,7 +458,7 @@
   - `waived`
   - `expired`
 - Transitions:
-  - `missing -> requested` trigger=`document.solicit, document.solicit-set`
+  - `missing -> requested` trigger=`document.solicit, document.solicit-batch`
   - `missing -> waived` trigger=`requirement.waive`
   - `requested -> received` trigger=`document.upload`
   - `received -> in_qa` trigger=`document.review`
@@ -903,10 +903,10 @@
 ### `kyc.onboarding`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `1` | `cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `1` | `cbu.inspect` |
 | `kyc_case` | `case` | `mandatory` | `-` | `cbu` | `kyc_case_lifecycle` | `11` | `kyc-case.create, kyc.open-case, kyc-case.read, kyc-case.list-by-cbu, kyc-case.state, kyc-case.assign, kyc-case.update-status, kyc-case.set-risk-rating, kyc-case.close, kyc-case.reopen, kyc-case.escalate` |
-| `kyc_case.tollgate` | `tollgate` | `optional` | `-` | `kyc_case (min_state=review)` | `-` | `11` | `tollgate.evaluate, tollgate.evaluate-gate, tollgate.read, tollgate.get-decision-readiness, tollgate.get-metrics, tollgate.list-evaluations, tollgate.list-thresholds, tollgate.set-threshold, tollgate.override, tollgate.list-overrides, tollgate.expire-override` |
-| `entity_workstream` | `entity` | `optional` | `person, company` | `kyc_case` | `-` | `34` | `entity-workstream.create, entity-workstream.read, entity-workstream.list-by-case, entity-workstream.state, entity-workstream.update-status, entity-workstream.set-enhanced-dd, entity-workstream.set-ubo, entity-workstream.complete, entity-workstream.block, red-flag.raise, red-flag.read, red-flag.list, red-flag.resolve, red-flag.escalate, red-flag.update, red-flag.list-by-severity, red-flag.close, requirement.create, requirement.create-set, requirement.check, requirement.list, requirement.for-entity, requirement.unsatisfied, requirement.waive, requirement.reinstate, document.solicit, document.solicit-set, document.upload, document.verify, document.reject, document.read, document.list, document.compute-requirements, document.missing-for-entity` |
+| `kyc_case.tollgate` | `tollgate` | `optional` | `-` | `kyc_case (min_state=review)` | `-` | `11` | `tollgate.evaluate, tollgate.check-gate, tollgate.read, tollgate.get-decision-readiness, tollgate.get-metrics, tollgate.list-evaluations, tollgate.list-thresholds, tollgate.set-threshold, tollgate.override, tollgate.list-overrides, tollgate.expire-override` |
+| `entity_workstream` | `entity` | `optional` | `person, company` | `kyc_case` | `-` | `34` | `entity-workstream.create, entity-workstream.read, entity-workstream.list-by-case, entity-workstream.state, entity-workstream.update-status, entity-workstream.escalate-dd, entity-workstream.set-ubo, entity-workstream.complete, entity-workstream.block, red-flag.raise, red-flag.read, red-flag.list, red-flag.resolve, red-flag.escalate, red-flag.update, red-flag.list-by-severity, red-flag.close, requirement.create, requirement.create-set, requirement.check, requirement.list, requirement.for-entity, requirement.unsatisfied, requirement.waive, requirement.reinstate, document.solicit, document.solicit-batch, document.upload, document.verify, document.reject, document.read, document.list, document.compute-requirements, document.missing-for-entity` |
 | `screening` | `entity` | `optional` | `person, company` | `entity_workstream` | `screening_lifecycle` | `13` | `screening.run, screening.sanctions, screening.pep, screening.adverse-media, screening.bulk-refresh, screening.read, screening.list, screening.list-by-workstream, screening.review-hit, screening.update-status, screening.escalate, screening.resolve, screening.complete` |
 | `kyc_agreement` | `entity` | `optional` | `company` | `kyc_case` | `-` | `6` | `kyc-agreement.create, kyc-agreement.read, kyc-agreement.list, kyc-agreement.update, kyc-agreement.update-status, kyc-agreement.sign` |
 | `identifier` | `entity` | `optional` | `entity` | `entity_workstream` | `-` | `11` | `identifier.add, identifier.read, identifier.list, identifier.verify, identifier.expire, identifier.update, identifier.search, identifier.resolve, identifier.list-by-type, identifier.set-primary, identifier.remove` |
@@ -915,7 +915,7 @@
 ### `struct.hedge.cross-border`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `cbu.us_feeder` | `cbu` | `optional` | `-` | `cbu` | `-` | `1` | `cbu.read` |
 | `cbu.ie_feeder` | `cbu` | `optional` | `-` | `cbu` | `-` | `1` | `cbu.read` |
 | `aifm` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -933,7 +933,7 @@
 ### `struct.ie.aif.icav`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `aifm` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `depositary` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `investment_manager` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -949,7 +949,7 @@
 ### `struct.ie.hedge.icav`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `aifm` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `depositary` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `investment_manager` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -967,7 +967,7 @@
 ### `struct.ie.ucits.icav`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `management_company` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `depositary` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `investment_manager` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -983,7 +983,7 @@
 ### `struct.lux.aif.raif`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `aifm` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `depositary` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `investment_manager` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -998,7 +998,7 @@
 ### `struct.lux.pe.scsp`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `general_partner` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `aifm` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `depositary` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1013,7 +1013,7 @@
 ### `struct.lux.ucits.sicav`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `management_company` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `depositary` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `4` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add` |
 | `investment_manager` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `2` | `entity.ensure-or-placeholder, cbu.assign-role` |
@@ -1025,7 +1025,7 @@
 ### `struct.pe.cross-border`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `cbu.us_parallel` | `cbu` | `optional` | `-` | `cbu` | `-` | `1` | `cbu.read` |
 | `cbu.aggregator` | `cbu` | `optional` | `-` | `cbu` | `-` | `1` | `cbu.read` |
 | `general_partner` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1042,7 +1042,7 @@
 ### `struct.uk.authorised.acs`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `acs_operator` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `depositary` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `investment_manager` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1056,7 +1056,7 @@
 ### `struct.uk.authorised.aut`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `authorised_fund_manager` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `trustee` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `investment_manager` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1070,7 +1070,7 @@
 ### `struct.uk.authorised.ltaf`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `authorised_corporate_director` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `depositary` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `investment_manager` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1086,7 +1086,7 @@
 ### `struct.uk.authorised.oeic`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `authorised_corporate_director` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `depositary` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `investment_manager` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1101,7 +1101,7 @@
 ### `struct.uk.manager.llp`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `designated_member_1` | `entity` | `mandatory` | `company, person` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `designated_member_2` | `entity` | `mandatory` | `company, person` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `compliance_officer` | `entity` | `optional` | `person` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1114,7 +1114,7 @@
 ### `struct.uk.private-equity.lp`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `general_partner` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `aifm` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `depositary` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1129,7 +1129,7 @@
 ### `struct.us.40act.closed-end`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `investment_adviser` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `custodian` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `sub_adviser` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1145,7 +1145,7 @@
 ### `struct.us.40act.open-end`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `investment_adviser` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `custodian` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `sub_adviser` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1162,7 +1162,7 @@
 ### `struct.us.etf.40act`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `investment_adviser` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `custodian` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `authorized_participant` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1180,7 +1180,7 @@
 ### `struct.us.private-fund.delaware-lp`
 | Slot | Type | Cardinality | Entity Kinds | Depends On | State Machine | Verb Count | Verb FQNs |
 | --- | --- | --- | --- | --- | --- | ---: | --- |
-| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.show` |
+| `cbu` | `cbu` | `root` | `-` | `-` | `-` | `3` | `cbu.create, cbu.read, cbu.inspect` |
 | `general_partner` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `investment_manager` | `entity` | `mandatory` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
 | `custodian` | `entity` | `optional` | `company` | `cbu` | `entity_kyc_lifecycle` | `5` | `entity.ensure-or-placeholder, cbu.assign-role, party.search, party.add, entity.read` |
@@ -1663,7 +1663,7 @@
 ### `kyc.onboarding`
 | Slot | Verb Key | Verb FQN | Gated? | When Condition |
 | --- | --- | --- | --- | --- |
-| `cbu` | `show` | `cbu.show` | `Y` | `filled` |
+| `cbu` | `inspect` | `cbu.inspect` | `Y` | `filled` |
 | `kyc_case` | `create` | `kyc-case.create` | `Y` | `empty` |
 | `kyc_case` | `open` | `kyc.open-case` | `Y` | `empty` |
 | `kyc_case` | `read` | `kyc-case.read` | `Y` | `filled` |
@@ -1676,7 +1676,7 @@
 | `kyc_case` | `reopen` | `kyc-case.reopen` | `Y` | `filled` |
 | `kyc_case` | `escalate` | `kyc-case.escalate` | `Y` | `filled` |
 | `kyc_case.tollgate` | `evaluate` | `tollgate.evaluate` | `Y` | `empty` |
-| `kyc_case.tollgate` | `evaluate_gate` | `tollgate.evaluate-gate` | `Y` | `empty, filled` |
+| `kyc_case.tollgate` | `check_gate` | `tollgate.check-gate` | `Y` | `empty, filled` |
 | `kyc_case.tollgate` | `read` | `tollgate.read` | `Y` | `filled` |
 | `kyc_case.tollgate` | `get_decision_readiness` | `tollgate.get-decision-readiness` | `Y` | `filled` |
 | `kyc_case.tollgate` | `get_metrics` | `tollgate.get-metrics` | `Y` | `filled` |
@@ -1691,7 +1691,7 @@
 | `entity_workstream` | `list_by_case` | `entity-workstream.list-by-case` | `Y` | `filled` |
 | `entity_workstream` | `state` | `entity-workstream.state` | `Y` | `filled` |
 | `entity_workstream` | `update` | `entity-workstream.update-status` | `Y` | `filled` |
-| `entity_workstream` | `set_enhanced_dd` | `entity-workstream.set-enhanced-dd` | `Y` | `filled` |
+| `entity_workstream` | `escalate_dd` | `entity-workstream.escalate-dd` | `Y` | `filled` |
 | `entity_workstream` | `set_ubo` | `entity-workstream.set-ubo` | `Y` | `filled` |
 | `entity_workstream` | `complete` | `entity-workstream.complete` | `Y` | `filled` |
 | `entity_workstream` | `block` | `entity-workstream.block` | `Y` | `filled` |
@@ -1712,7 +1712,7 @@
 | `entity_workstream` | `req_waive` | `requirement.waive` | `Y` | `filled` |
 | `entity_workstream` | `req_reinstate` | `requirement.reinstate` | `Y` | `filled` |
 | `entity_workstream` | `doc_solicit` | `document.solicit` | `Y` | `empty, filled` |
-| `entity_workstream` | `doc_solicit_set` | `document.solicit-set` | `Y` | `empty, filled` |
+| `entity_workstream` | `doc_solicit_batch` | `document.solicit-batch` | `Y` | `empty, filled` |
 | `entity_workstream` | `doc_upload` | `document.upload` | `Y` | `filled` |
 | `entity_workstream` | `doc_verify` | `document.verify` | `Y` | `filled` |
 | `entity_workstream` | `doc_reject` | `document.reject` | `Y` | `filled` |
@@ -1765,7 +1765,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `cbu.us_feeder` | `show` | `cbu.read` | `N` | `-` |
 | `cbu.ie_feeder` | `show` | `cbu.read` | `N` | `-` |
 | `aifm` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
@@ -1822,7 +1822,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `aifm` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `aifm` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `aifm` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -1877,7 +1877,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `aifm` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `aifm` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `aifm` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -1942,7 +1942,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `management_company` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `management_company` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `management_company` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -1997,7 +1997,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `aifm` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `aifm` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `aifm` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2047,7 +2047,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `general_partner` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `general_partner` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `general_partner` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2097,7 +2097,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `management_company` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `management_company` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `management_company` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2128,7 +2128,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `cbu.us_parallel` | `show` | `cbu.read` | `N` | `-` |
 | `cbu.aggregator` | `show` | `cbu.read` | `N` | `-` |
 | `general_partner` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
@@ -2180,7 +2180,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `acs_operator` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `acs_operator` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `acs_operator` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2225,7 +2225,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `authorised_fund_manager` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `authorised_fund_manager` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `authorised_fund_manager` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2270,7 +2270,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `authorised_corporate_director` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `authorised_corporate_director` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `authorised_corporate_director` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2325,7 +2325,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `authorised_corporate_director` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `authorised_corporate_director` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `authorised_corporate_director` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2375,7 +2375,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `designated_member_1` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `designated_member_1` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `designated_member_1` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2419,7 +2419,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `general_partner` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `general_partner` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `general_partner` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2469,7 +2469,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `investment_adviser` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `investment_adviser` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `investment_adviser` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2524,7 +2524,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `investment_adviser` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `investment_adviser` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `investment_adviser` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2584,7 +2584,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `investment_adviser` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `investment_adviser` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `investment_adviser` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -2649,7 +2649,7 @@
 | --- | --- | --- | --- | --- |
 | `cbu` | `create` | `cbu.create` | `N` | `-` |
 | `cbu` | `read` | `cbu.read` | `N` | `-` |
-| `cbu` | `show` | `cbu.show` | `N` | `-` |
+| `cbu` | `inspect` | `cbu.inspect` | `N` | `-` |
 | `general_partner` | `ensure` | `entity.ensure-or-placeholder` | `Y` | `empty` |
 | `general_partner` | `assign` | `cbu.assign-role` | `Y` | `placeholder` |
 | `general_partner` | `search` | `party.search` | `Y` | `placeholder, filled` |
@@ -3519,7 +3519,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_extended.yaml` slot=`bods` verb=`bods.list-persons`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_extended.yaml` slot=`bods` verb=`bods.list-ownership`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_extended.yaml` slot=`bods` verb=`bods.sync-from-gleif`
-  - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case` verb=`kyc.open-case`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case` verb=`kyc-case.read`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case` verb=`kyc-case.list-by-cbu`
@@ -3528,7 +3528,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case` verb=`kyc-case.update-status`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case` verb=`kyc-case.reopen`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case.tollgate` verb=`tollgate.evaluate`
-  - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case.tollgate` verb=`tollgate.evaluate-gate`
+  - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case.tollgate` verb=`tollgate.check-gate`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case.tollgate` verb=`tollgate.read`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case.tollgate` verb=`tollgate.get-decision-readiness`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`kyc_case.tollgate` verb=`tollgate.get-metrics`
@@ -3542,7 +3542,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`entity_workstream` verb=`entity-workstream.list-by-case`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`entity_workstream` verb=`entity-workstream.state`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`entity_workstream` verb=`entity-workstream.update-status`
-  - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`entity_workstream` verb=`entity-workstream.set-enhanced-dd`
+  - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`entity_workstream` verb=`entity-workstream.escalate-dd`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`entity_workstream` verb=`entity-workstream.set-ubo`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`entity_workstream` verb=`entity-workstream.complete`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`entity_workstream` verb=`entity-workstream.block`
@@ -3605,7 +3605,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`request` verb=`request.reopen`
   - file=`rust/config/sem_os_seeds/constellation_maps/kyc_onboarding.yaml` slot=`request` verb=`request.escalate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_hedge_cross_border.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_hedge_cross_border.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_hedge_cross_border.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_hedge_cross_border.yaml` slot=`cbu.us_feeder` verb=`cbu.read`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_hedge_cross_border.yaml` slot=`cbu.ie_feeder` verb=`cbu.read`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_hedge_cross_border.yaml` slot=`aifm` verb=`entity.ensure-or-placeholder`
@@ -3650,7 +3650,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_hedge_cross_border.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_hedge_cross_border.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_aif_icav.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_aif_icav.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_aif_icav.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_aif_icav.yaml` slot=`aifm` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_aif_icav.yaml` slot=`aifm` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_aif_icav.yaml` slot=`aifm` verb=`party.add`
@@ -3693,7 +3693,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_aif_icav.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_aif_icav.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_hedge_icav.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_hedge_icav.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_hedge_icav.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_hedge_icav.yaml` slot=`aifm` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_hedge_icav.yaml` slot=`aifm` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_hedge_icav.yaml` slot=`aifm` verb=`party.add`
@@ -3744,7 +3744,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_hedge_icav.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_hedge_icav.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_ucits_icav.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_ucits_icav.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_ucits_icav.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_ucits_icav.yaml` slot=`management_company` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_ucits_icav.yaml` slot=`management_company` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_ucits_icav.yaml` slot=`management_company` verb=`party.add`
@@ -3787,7 +3787,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_ucits_icav.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_ie_ucits_icav.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_aif_raif.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_aif_raif.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_aif_raif.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_aif_raif.yaml` slot=`aifm` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_aif_raif.yaml` slot=`aifm` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_aif_raif.yaml` slot=`aifm` verb=`party.add`
@@ -3826,7 +3826,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_aif_raif.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_aif_raif.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_pe_scsp.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_pe_scsp.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_pe_scsp.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_pe_scsp.yaml` slot=`general_partner` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_pe_scsp.yaml` slot=`general_partner` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_pe_scsp.yaml` slot=`general_partner` verb=`party.add`
@@ -3865,7 +3865,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_pe_scsp.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_pe_scsp.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_ucits_sicav.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_ucits_sicav.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_ucits_sicav.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_ucits_sicav.yaml` slot=`management_company` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_ucits_sicav.yaml` slot=`management_company` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_ucits_sicav.yaml` slot=`management_company` verb=`party.add`
@@ -3888,7 +3888,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_ucits_sicav.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_lux_ucits_sicav.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_pe_cross_border.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_pe_cross_border.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_pe_cross_border.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_pe_cross_border.yaml` slot=`cbu.us_parallel` verb=`cbu.read`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_pe_cross_border.yaml` slot=`cbu.aggregator` verb=`cbu.read`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_pe_cross_border.yaml` slot=`general_partner` verb=`entity.ensure-or-placeholder`
@@ -3929,7 +3929,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_pe_cross_border.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_pe_cross_border.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_acs.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_acs.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_acs.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_acs.yaml` slot=`acs_operator` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_acs.yaml` slot=`acs_operator` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_acs.yaml` slot=`acs_operator` verb=`party.add`
@@ -3964,7 +3964,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_acs.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_acs.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_aut.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_aut.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_aut.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_aut.yaml` slot=`authorised_fund_manager` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_aut.yaml` slot=`authorised_fund_manager` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_aut.yaml` slot=`authorised_fund_manager` verb=`party.add`
@@ -3999,7 +3999,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_aut.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_aut.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_ltaf.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_ltaf.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_ltaf.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_ltaf.yaml` slot=`authorised_corporate_director` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_ltaf.yaml` slot=`authorised_corporate_director` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_ltaf.yaml` slot=`authorised_corporate_director` verb=`party.add`
@@ -4042,7 +4042,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_ltaf.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_ltaf.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_oeic.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_oeic.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_oeic.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_oeic.yaml` slot=`authorised_corporate_director` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_oeic.yaml` slot=`authorised_corporate_director` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_oeic.yaml` slot=`authorised_corporate_director` verb=`party.add`
@@ -4081,7 +4081,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_oeic.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_authorised_oeic.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_manager_llp.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_manager_llp.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_manager_llp.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_manager_llp.yaml` slot=`designated_member_1` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_manager_llp.yaml` slot=`designated_member_1` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_manager_llp.yaml` slot=`designated_member_1` verb=`party.add`
@@ -4115,7 +4115,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_manager_llp.yaml` slot=`case` verb=`case.request-info`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_manager_llp.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_pe_lp.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_pe_lp.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_pe_lp.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_pe_lp.yaml` slot=`general_partner` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_pe_lp.yaml` slot=`general_partner` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_pe_lp.yaml` slot=`general_partner` verb=`party.add`
@@ -4154,7 +4154,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_pe_lp.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_uk_pe_lp.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_closed_end.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_closed_end.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_closed_end.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_closed_end.yaml` slot=`investment_adviser` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_closed_end.yaml` slot=`investment_adviser` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_closed_end.yaml` slot=`investment_adviser` verb=`party.add`
@@ -4197,7 +4197,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_closed_end.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_closed_end.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_open_end.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_open_end.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_open_end.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_open_end.yaml` slot=`investment_adviser` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_open_end.yaml` slot=`investment_adviser` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_open_end.yaml` slot=`investment_adviser` verb=`party.add`
@@ -4244,7 +4244,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_open_end.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_40act_open_end.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_etf_40act.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_etf_40act.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_etf_40act.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_etf_40act.yaml` slot=`investment_adviser` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_etf_40act.yaml` slot=`investment_adviser` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_etf_40act.yaml` slot=`investment_adviser` verb=`party.add`
@@ -4295,7 +4295,7 @@
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_etf_40act.yaml` slot=`case.tollgate` verb=`tollgate.evaluate`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_etf_40act.yaml` slot=`mandate` verb=`mandate.create`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_private_fund_delaware_lp.yaml` slot=`cbu` verb=`cbu.read`
-  - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_private_fund_delaware_lp.yaml` slot=`cbu` verb=`cbu.show`
+  - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_private_fund_delaware_lp.yaml` slot=`cbu` verb=`cbu.inspect`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_private_fund_delaware_lp.yaml` slot=`general_partner` verb=`entity.ensure-or-placeholder`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_private_fund_delaware_lp.yaml` slot=`general_partner` verb=`party.search`
   - file=`rust/config/sem_os_seeds/constellation_maps/struct_us_private_fund_delaware_lp.yaml` slot=`general_partner` verb=`party.add`

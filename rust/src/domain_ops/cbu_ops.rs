@@ -1244,15 +1244,15 @@ impl CustomOperation for CbuAddProductOp {
 /// Rationale: Requires multiple joins across CBU, entities, roles, documents,
 /// screenings, and service deliveries to build a complete picture.
 #[register_custom_op]
-pub struct CbuShowOp;
+pub struct CbuInspectOp;
 
 #[async_trait]
-impl CustomOperation for CbuShowOp {
+impl CustomOperation for CbuInspectOp {
     fn domain(&self) -> &'static str {
         "cbu"
     }
     fn verb(&self) -> &'static str {
-        "show"
+        "inspect"
     }
     fn rationale(&self) -> &'static str {
         "Requires aggregating data from multiple tables into a structured view"
@@ -1509,7 +1509,7 @@ impl CustomOperation for CbuShowOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({
-            "error": "Database required for cbu.show"
+            "error": "Database required for cbu.inspect"
         })))
     }
 }

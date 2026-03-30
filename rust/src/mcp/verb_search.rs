@@ -176,6 +176,8 @@ pub enum VerbSearchSource {
     LexiconToken,
     /// Noun taxonomy deterministic match (Tier -1, ECIR - highest priority)
     NounTaxonomy,
+    /// Constellation state-aware index match (Tier -0.5)
+    ConstellationIndex,
     /// MacroIndex deterministic scored match (Tier -2B)
     MacroIndex,
     /// ScenarioIndex journey-level match (Tier -2A)
@@ -543,6 +545,7 @@ impl HybridVerbSearcher {
         limit: usize,
         allowed_verbs: Option<&HashSet<String>>,
         entity_mention_spans: Option<&[(usize, usize)]>,
+        constellation_index: Option<&crate::agent::constellation_verb_index::ConstellationVerbIndex>,
     ) -> Result<Vec<VerbSearchResult>> {
         let mut results = Vec::new();
         let mut seen_verbs: HashSet<String> = HashSet::new();
@@ -930,6 +933,93 @@ impl HybridVerbSearcher {
                     "VerbSearch: returning early with exact legacy macro match"
                 );
                 return Ok(results);
+            }
+        }
+
+        // ── Tier -0.5: ConstellationVerbIndex (state-aware, deterministic) ──────
+        // Uses the live hydrated constellation's available verbs, keyed by
+        // (noun, action_stem). Two clues = direct resolution; one clue = boost set.
+        // Score 0.94 — below ECIR (0.95) but above all embedding tiers.
+        if let Some(cvi) = constellation_index {
+            let action_stem = compound_signals.action_stem.as_deref();
+
+            // Extract nouns via NounIndex (same extraction ECIR used above)
+            let cvi_nouns: Vec<String> = if let Some(ref noun_index) = self.noun_index {
+                let noun_matches = if let Some(spans) = entity_mention_spans {
+                    noun_index.extract_with_exclusions(&normalized, spans)
+                } else {
+                    noun_index.extract(&normalized)
+                };
+                noun_matches.iter().map(|m| m.noun.key.clone()).collect()
+            } else {
+                // Fallback: use phase_nouns from compound_signals
+                compound_signals.phase_nouns.clone()
+            };
+
+            let mut cvi_matches: Vec<VerbSearchResult> = Vec::new();
+
+            // Two-clue: noun + action_stem (highest signal)
+            if let Some(action) = action_stem {
+                for noun in &cvi_nouns {
+                    for vm in cvi.lookup(noun, action) {
+                        if allowed_verbs.is_none_or(|av| av.contains(&vm.verb_fqn))
+                            && !seen_verbs.contains(&vm.verb_fqn)
+                        {
+                            cvi_matches.push(VerbSearchResult {
+                                verb: vm.verb_fqn.clone(),
+                                score: 0.94,
+                                source: VerbSearchSource::ConstellationIndex,
+                                matched_phrase: format!(
+                                    "constellation:({},{})",
+                                    noun, action
+                                ),
+                                journey: None,
+                                description: None,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Single-clue fallback: by-noun only (boost set, not short-circuit)
+            if cvi_matches.is_empty() && !cvi_nouns.is_empty() {
+                for noun in &cvi_nouns {
+                    for fqn in cvi.lookup_by_noun(noun) {
+                        if allowed_verbs.is_none_or(|av| av.contains(fqn)) {
+                            ecir_boost_set.insert(fqn.clone());
+                        }
+                    }
+                }
+                tracing::debug!(
+                    nouns = ?cvi_nouns,
+                    boost_count = ecir_boost_set.len(),
+                    "ConstellationIndex: noun-only match, added to boost set"
+                );
+            }
+
+            // If two-clue matched exactly 1 verb, short-circuit
+            if cvi_matches.len() == 1 {
+                tracing::info!(
+                    verb = %cvi_matches[0].verb,
+                    matched_phrase = %cvi_matches[0].matched_phrase,
+                    "ConstellationIndex: deterministic single-verb resolution"
+                );
+                seen_verbs.insert(cvi_matches[0].verb.clone());
+                results.push(cvi_matches.remove(0));
+                return Ok(normalize_candidates(results, limit));
+            }
+
+            // Multiple constellation matches — add as high-confidence candidates
+            if !cvi_matches.is_empty() {
+                tracing::info!(
+                    count = cvi_matches.len(),
+                    verbs = ?cvi_matches.iter().map(|m| m.verb.as_str()).collect::<Vec<_>>(),
+                    "ConstellationIndex: multi-candidate set"
+                );
+                for m in cvi_matches {
+                    seen_verbs.insert(m.verb.clone());
+                    results.push(m);
+                }
             }
         }
 
@@ -1956,7 +2046,7 @@ mod tests {
     async fn test_minimal_searcher() {
         let searcher = HybridVerbSearcher::minimal();
         let results = searcher
-            .search("create cbu", None, None, None, 5, None, None)
+            .search("create cbu", None, None, None, 5, None, None, None)
             .await
             .unwrap();
 

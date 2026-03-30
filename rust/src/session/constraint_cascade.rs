@@ -307,9 +307,12 @@ pub fn verb_available_for_persona(verb_fqn: &str, persona: Persona) -> bool {
         }
         Persona::Kyc => {
             // KYC focuses on kyc, entity, ubo, document domains
-            matches!(
+            // Note: verb FQN domains like "kyc-case" start with "kyc-"
+            domain.starts_with("kyc") || matches!(
                 domain,
-                "kyc" | "entity" | "ubo" | "document" | "case" | "session" | "view" | "structure"
+                "entity" | "entity-workstream" | "ubo" | "document" | "case" | "session" | "view"
+                    | "structure" | "screening" | "red-flag" | "requirement" | "identifier"
+                    | "tollgate" | "allegation" | "bods"
             )
         }
         Persona::Trading => {

@@ -17,7 +17,7 @@
     "text": "send out the full CDD doc pack",
     "calibration_mode": "positive",
     "negative_type": null,
-    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.solicit-set", "kyc.collect-documents"] },
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.solicit-batch", "kyc.collect-documents"] },
     "generation_rationale": "Bulk document solicitation."
   },
   {
@@ -52,7 +52,7 @@
     "text": "request everything and then some",
     "calibration_mode": "boundary",
     "negative_type": null,
-    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.solicit-set", "document.solicit", "kyc.collect-documents"] },
+    "expected_outcome": { "type": "resolves_to_one_of", "value": ["document.solicit-batch", "document.solicit", "kyc.collect-documents"] },
     "generation_rationale": "Boundary: single vs batch request."
   },
   {

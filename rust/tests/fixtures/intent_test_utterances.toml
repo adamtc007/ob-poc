@@ -627,13 +627,13 @@ ecir_path = "fallthrough"
 
 [[test]]
 utterance = "send out the whole doc pack for this entity"
-expected_verb = "document.solicit-set"
+expected_verb = "document.solicit-batch"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "document"
 category = "natural"
 difficulty = "hard"
-notes = "'doc pack' -> solicit-set (batch solicitation)"
+notes = "'doc pack' -> solicit-batch (batch solicitation)"
 ecir_path = "fallthrough"
 
 # ============================================================================
@@ -1139,7 +1139,7 @@ expected_polarity = "read"
 expected_domain_concept = "ubo"
 category = "adversarial"
 difficulty = "hard"
-alt_verbs = ["fund.list-subfunds", "client-group.list-relationships", "ownership.compute", "graph.view", "cbu.show", "control.build-graph"]
+alt_verbs = ["fund.list-subfunds", "client-group.list-relationships", "ownership.compute", "graph.view", "cbu.inspect", "control.build-graph"]
 notes = "'structure' = ownership? fund? corporate?"
 ecir_path = "fallthrough"
 
@@ -1590,7 +1590,7 @@ ecir_path = "fallthrough"
 [[test]]
 utterance = "Request identity documents for due diligence"
 expected_verb = "kyc.collect-documents"
-alt_verbs = ["document.solicit-set", "document.solicit"]
+alt_verbs = ["document.solicit-batch", "document.solicit"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "kyc"
@@ -1599,7 +1599,7 @@ difficulty = "hard"
 expected_tier = "scenario"
 expected_scenario_id = "kyc-doc-collection"
 expected_route_target = "kyc.collect-documents"
-notes = "Indirect phrasing — may resolve to document.solicit-set"
+notes = "Indirect phrasing — may resolve to document.solicit-batch"
 ecir_path = "fallthrough"
 
 [[test]]
@@ -1891,7 +1891,7 @@ ecir_path = "narrow"
 [[test]]
 utterance = "Check KYC case status"
 expected_verb = "kyc-case.read"
-alt_verbs = ["kyc-case.get-state", "kyc-case.update-status"]
+alt_verbs = ["kyc-case.summarize", "kyc-case.update-status"]
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "kyc"
@@ -3738,7 +3738,7 @@ notes = "Contextual next-step query"
 [[test]]
 utterance = "what's outstanding on this case"
 expected_verb = "narration.query"
-alt_verbs = ["kyc-case.get-state", "requirement.list-outstanding"]
+alt_verbs = ["kyc-case.summarize", "requirement.list-outstanding"]
 category = "contextual_query"
 difficulty = "medium"
 workspace = "kyc"
@@ -3783,7 +3783,7 @@ notes = "Contextual gap analysis query"
 [[test]]
 utterance = "status update"
 expected_verb = "narration.query"
-alt_verbs = ["semantic.get-state", "kyc-case.update-status", "kyc-case.get-state"]
+alt_verbs = ["semantic.get-state", "kyc-case.update-status", "kyc-case.summarize"]
 category = "contextual_query"
 difficulty = "easy"
 workspace = "cbu"

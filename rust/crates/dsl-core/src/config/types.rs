@@ -2093,7 +2093,7 @@ timeout: P90D
 escalation: kyc.escalate-case
 task_bindings:
   create_case_record: kyc-case.create
-  request_documents: document.solicit-set
+  request_documents: document.solicit-batch
 "#;
         let config: DurableConfig = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(config.runtime, DurableRuntime::BpmnLite);

@@ -66,6 +66,7 @@ impl IntentMatcher for VerbSearchIntentMatcher {
                 10, // top-k candidates
                 context.allowed_verbs.as_ref(),
                 None, // entity mention spans — caller can provide via LookupService
+                context.constellation_verb_index.as_deref(),
             )
             .await?;
 

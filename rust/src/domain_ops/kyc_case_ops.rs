@@ -319,7 +319,7 @@ mod tests {
     fn test_kyc_case_state_op_metadata() {
         let op = KycCaseStateOp;
         assert_eq!(op.domain(), "kyc-case");
-        assert_eq!(op.verb(), "get-state");
+        assert_eq!(op.verb(), "summarize");
     }
 
     #[test]
@@ -710,11 +710,11 @@ impl CustomOperation for KycCaseStateOp {
     }
 
     fn verb(&self) -> &'static str {
-        "get-state"
+        "summarize"
     }
 
     fn rationale(&self) -> &'static str {
-        "Returns case with workstreams and embedded awaiting requests - requires complex join query"
+        "Returns case summary with workstreams and embedded awaiting requests - requires complex join query"
     }
 
     #[cfg(feature = "database")]

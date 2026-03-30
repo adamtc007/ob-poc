@@ -204,7 +204,7 @@ pub use attribute_ops::{
 };
 pub use cbu_ops::{
     CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuLinkStructureOp, CbuListStructureLinksOp,
-    CbuShowOp,
+    CbuInspectOp,
 };
 pub use cbu_role_ops::{
     CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOwnershipOp, CbuRoleAssignServiceOp,
@@ -652,7 +652,7 @@ mod tests {
         assert!(registry.has("cbu-custody", "derive-required-coverage"));
         // CBU operations
         assert!(registry.has("cbu", "add-product"));
-        assert!(registry.has("cbu", "show"));
+        assert!(registry.has("cbu", "inspect"));
         assert!(registry.has("cbu", "delete-cascade"));
         // CBU Role operations (Role Taxonomy V2)
         assert!(registry.has("cbu", "assign-ownership"));
@@ -696,7 +696,7 @@ mod tests {
         // KYC case operations
         assert!(registry.has("kyc-case", "create"));
         assert!(registry.has("kyc-case", "close"));
-        assert!(registry.has("kyc-case", "state"));
+        assert!(registry.has("kyc-case", "summarize"));
         assert!(registry.has("entity-workstream", "state"));
         // UBO chain computation (Phase 2.3)
         assert!(registry.has("ubo", "compute-chains"));

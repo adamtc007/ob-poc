@@ -7,10 +7,10 @@ slots:
     table: cbus
     pk: cbu_id
     cardinality: root
-    # cbu.read/show are navigation — owned by group.ownership constellation.
+    # cbu.read/inspect are navigation — owned by group.ownership constellation.
     # KYC reads the CBU after it has inherited the group's baseline clearance.
     verbs:
-      show: { verb: cbu.show, when: filled }
+      inspect: { verb: cbu.inspect, when: filled }
   client_group:
     type: cbu
     table: client_group
@@ -30,7 +30,7 @@ slots:
     state_machine: kyc_case_lifecycle
     verbs:
       read: { verb: kyc-case.read, when: filled }
-      state: { verb: kyc-case.get-state, when: filled }
+      state: { verb: kyc-case.summarize, when: filled }
   kyc_case:
     type: case
     table: cases
@@ -44,7 +44,7 @@ slots:
       open: { verb: kyc-case.create, when: empty }
       read: { verb: kyc-case.read, when: filled }
       list_by_cbu: { verb: kyc-case.list-by-cbu, when: filled }
-      state: { verb: kyc-case.get-state, when: filled }
+      state: { verb: kyc-case.summarize, when: filled }
       assign: { verb: kyc-case.assign, when: filled }
       update_status: { verb: kyc-case.update-status, when: filled }
       set_risk: { verb: kyc-case.set-risk-rating, when: filled }
@@ -66,7 +66,7 @@ slots:
         depends_on: [{ slot: kyc_case, min_state: review }]
         verbs:
           evaluate: { verb: tollgate.evaluate, when: empty }
-          evaluate_gate: { verb: tollgate.evaluate-gate, when: [empty, filled] }
+          check_gate: { verb: tollgate.check-gate, when: [empty, filled] }
           read: { verb: tollgate.read, when: filled }
           get_decision_readiness:
             { verb: tollgate.get-decision-readiness, when: filled }
@@ -103,9 +103,9 @@ slots:
               verified,
             ],
         }
-      set_enhanced_dd:
+      escalate_dd:
         {
-          verb: entity-workstream.set-enhanced-dd,
+          verb: entity-workstream.escalate-dd,
           when:
             [
               open,
@@ -203,8 +203,8 @@ slots:
           verb: document.solicit,
           when: [open, documents_requested, evidence_collected],
         }
-      doc_solicit_set:
-        { verb: document.solicit-set, when: [open, documents_requested] }
+      doc_solicit_batch:
+        { verb: document.solicit-batch, when: [open, documents_requested] }
       doc_upload: { verb: document.upload, when: [documents_requested] }
       doc_verify:
         {

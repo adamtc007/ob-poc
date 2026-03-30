@@ -117,7 +117,7 @@ intents:
       - "show parties"
       - "who are the parties"
     verbs:
-      - cbu.show
+      - cbu.inspect
       - cbu.parties
       - cbu.read
     priority: 90
@@ -708,7 +708,7 @@ categories:
       - cbu.assign-role
       - cbu.remove-role
       - cbu.parties
-      - cbu.show
+      - cbu.inspect
       - cbu.add-product
       - cbu.decide
 
@@ -904,7 +904,7 @@ graph_context:
   # When cursor is on a CBU node
   cursor_on_cbu:
     verbs:
-      - cbu.show
+      - cbu.inspect
       - cbu.assign-role
       - cbu.add-product
       - cbu.parties
@@ -1076,7 +1076,7 @@ workflow_phases:
     description: "Final review and decision"
     verbs:
       - kyc-case.state
-      - cbu.show
+      - cbu.inspect
       - red-flag.raise
       - red-flag.mitigate
       - kyc-case.escalate

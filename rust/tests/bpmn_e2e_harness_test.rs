@@ -247,7 +247,7 @@ fn build_kyc_config() -> WorkflowConfigIndex {
                     },
                     TaskBinding {
                         task_type: "request_documents".to_string(),
-                        verb_fqn: "document.solicit-set".to_string(),
+                        verb_fqn: "document.solicit-batch".to_string(),
                         timeout_ms: None,
                         max_retries: 3,
                     },
@@ -1590,7 +1590,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
                 },
                 TaskBinding {
                     task_type: "request_documents".to_string(),
-                    verb_fqn: "document.solicit-set".to_string(),
+                    verb_fqn: "document.solicit-batch".to_string(),
                     timeout_ms: None,
                     max_retries: 1,
                 },

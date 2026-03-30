@@ -400,21 +400,23 @@ SELECT * FROM agent.teach_phrases_batch('[
     {"phrase": "cancel product for fund", "verb": "cbu.remove-product"}
 ]'::jsonb, 'claude_accelerated_learning');
 
--- CBU.SHOW - Display single CBU
+-- CBU.INSPECT - Deep inspect single CBU
 SELECT * FROM agent.teach_phrases_batch('[
-    {"phrase": "show fund", "verb": "cbu.show"},
-    {"phrase": "display fund", "verb": "cbu.show"},
-    {"phrase": "show CBU", "verb": "cbu.show"},
-    {"phrase": "display CBU", "verb": "cbu.show"},
-    {"phrase": "show structure", "verb": "cbu.show"},
-    {"phrase": "display structure", "verb": "cbu.show"},
-    {"phrase": "view fund", "verb": "cbu.show"},
-    {"phrase": "view CBU", "verb": "cbu.show"},
-    {"phrase": "view structure", "verb": "cbu.show"},
-    {"phrase": "open fund", "verb": "cbu.show"},
-    {"phrase": "open CBU", "verb": "cbu.show"},
-    {"phrase": "inspect fund", "verb": "cbu.show"},
-    {"phrase": "inspect CBU", "verb": "cbu.show"}
+    {"phrase": "inspect fund", "verb": "cbu.inspect"},
+    {"phrase": "inspect CBU", "verb": "cbu.inspect"},
+    {"phrase": "inspect structure", "verb": "cbu.inspect"},
+    {"phrase": "inspect client business unit", "verb": "cbu.inspect"},
+    {"phrase": "show fund", "verb": "cbu.inspect"},
+    {"phrase": "display fund", "verb": "cbu.inspect"},
+    {"phrase": "show CBU", "verb": "cbu.inspect"},
+    {"phrase": "display CBU", "verb": "cbu.inspect"},
+    {"phrase": "show structure", "verb": "cbu.inspect"},
+    {"phrase": "display structure", "verb": "cbu.inspect"},
+    {"phrase": "view fund", "verb": "cbu.inspect"},
+    {"phrase": "view CBU", "verb": "cbu.inspect"},
+    {"phrase": "view structure", "verb": "cbu.inspect"},
+    {"phrase": "open fund", "verb": "cbu.inspect"},
+    {"phrase": "open CBU", "verb": "cbu.inspect"}
 ]'::jsonb, 'claude_accelerated_learning');
 
 -- CBU.SET-CATEGORY - Category assignment

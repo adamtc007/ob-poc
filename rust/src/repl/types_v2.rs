@@ -424,6 +424,12 @@ pub struct WorkspaceFrame {
     /// Cleared on workspace/scope change.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub narration_hot_verbs: Vec<String>,
+
+    /// Cached constellation verb index — two-way (noun, action) → verb lookup.
+    /// Rebuilt on each constellation hydration. Transient (not serialized).
+    #[serde(skip)]
+    pub constellation_verb_index:
+        Option<std::sync::Arc<crate::agent::constellation_verb_index::ConstellationVerbIndex>>,
 }
 
 impl WorkspaceFrame {
@@ -457,6 +463,7 @@ impl WorkspaceFrame {
             writes_since_push: 0,
             is_peek: false,
             narration_hot_verbs: Vec::new(),
+            constellation_verb_index: None,
         }
     }
 }

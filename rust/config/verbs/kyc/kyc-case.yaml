@@ -580,18 +580,17 @@ domains:
               - DISCOVERY
         returns:
           type: affected
-      get-state:
-        description: Get full case state with workstreams and embedded awaiting requests
+      summarize:
+        description: Summarize full case state with workstreams and embedded awaiting requests
         invocation_phrases:
-          - "case state"
-          - "get case state"
-          - "show case status"
+          - "summarize case"
+          - "summarize kyc case"
           - "case summary"
           - "case overview"
-          - "full case status"
+          - "full case summary"
           - "case with workstreams"
           - "show case progress"
-          - "what is the case state"
+          - "summarize the case"
           - "get case overview with workstreams"
           - "how's this case looking overall"
           - "give me the full picture on this case"

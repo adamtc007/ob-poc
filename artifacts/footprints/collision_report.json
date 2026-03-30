@@ -270,7 +270,7 @@
       "phrase": "request identity documents",
       "verb_fqns": [
         "document.solicit",
-        "document.solicit-set"
+        "document.solicit-batch"
       ]
     },
     {
@@ -311,7 +311,7 @@
     {
       "phrase": "show cbu details",
       "verb_fqns": [
-        "cbu.show",
+        "cbu.inspect",
         "view.cbu"
       ]
     },

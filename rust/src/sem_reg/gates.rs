@@ -1030,7 +1030,7 @@ mod tests {
         spec.evidence_grade = EvidenceGrade::AllowedWithConstraints;
         let failures = check_derivation_evidence_grade(&spec, GovernanceTier::Operational);
         assert_eq!(failures.len(), 1);
-        assert!(failures[0].message.contains("AllowedWithConstraints"));
+        assert!(failures[0].message.contains("allowed_with_constraints"));
     }
 
     #[test]

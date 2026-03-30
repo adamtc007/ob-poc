@@ -103,12 +103,12 @@
     {
       "live": true,
       "source_file": "kyc-workflow.yaml",
-      "verb_fqn": "document.solicit-set"
+      "verb_fqn": "document.solicit-batch"
     },
     {
       "live": true,
       "source_file": "kyc-workflow.yaml",
-      "verb_fqn": "document.solicit-set"
+      "verb_fqn": "document.solicit-batch"
     },
     {
       "live": true,

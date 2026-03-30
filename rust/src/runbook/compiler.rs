@@ -690,7 +690,7 @@ mod tests {
                         );
                         m.insert(
                             "client-id".to_string(),
-                            serde_json::Value::String("${scope.client_id}".to_string()),
+                            serde_json::Value::String("\"${scope.client_id}\"".to_string()),
                         );
                         m
                     },

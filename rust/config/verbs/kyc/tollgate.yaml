@@ -490,14 +490,14 @@ domains:
       # GATE-BASED EVALUATION (KYC/UBO Computed Architecture)
       # =========================================================================
 
-      evaluate-gate:
-        description: "Evaluate a named tollgate against case state and coverage data"
+      check-gate:
+        description: "Check a named tollgate gate against case state and coverage data"
         invocation_phrases:
-        - "evaluate tollgate gate"
         - "check tollgate gate"
-        - "evaluate skeleton ready"
+        - "check gate status"
+        - "check skeleton ready"
         - "check named gate"
-        - "run gate evaluation"
+        - "run gate check"
         - "tollgate gate check"
         metadata:
           tier: intent

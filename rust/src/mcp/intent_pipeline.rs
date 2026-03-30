@@ -535,6 +535,7 @@ impl IntentPipeline {
                 5,
                 self.allowed_verbs.as_ref(),
                 spans_ref,
+                None, // No constellation index in MCP/chat path
             )
             .await?;
 

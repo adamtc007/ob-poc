@@ -191,7 +191,7 @@ nouns:
       - kyc_case
     action_verbs:
       create: [kyc-case.create]
-      list: [kyc-case.list-by-cbu, kyc-case.read, kyc-case.get-state]
+      list: [kyc-case.list-by-cbu, kyc-case.read, kyc-case.summarize]
       update:
         [
           kyc-case.close,
@@ -607,8 +607,8 @@ nouns:
       - requirement
     action_verbs:
       create: [document.create]
-      request: [document.solicit, document.solicit-set]
-      solicit: [document.solicit, document.solicit-set]
+      request: [document.solicit, document.solicit-batch]
+      solicit: [document.solicit, document.solicit-batch]
       list:
         [
           document.catalog,
@@ -1031,7 +1031,7 @@ nouns:
       compute:
         [
           tollgate.evaluate,
-          tollgate.evaluate-gate,
+          tollgate.check-gate,
           tollgate.get-decision-readiness,
           tollgate.get-metrics,
         ]
@@ -1255,7 +1255,8 @@ nouns:
       - decision point
     noun_keys: [tollgate]
     action_verbs:
-      evaluate: [tollgate.evaluate, tollgate.evaluate-gate]
+      evaluate: [tollgate.evaluate]
+      check: [tollgate.check-gate]
       read: [tollgate.read]
       list: [tollgate.list-evaluations]
       override: [tollgate.override]

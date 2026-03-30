@@ -1036,10 +1036,14 @@ domains:
                 - CORRESPONDENT_BANK
         returns:
           type: affected
-      show:
-        description: Show full CBU structure including entities, roles, documents, screenings
+      inspect:
+        description: Inspect full CBU structure including entities, roles, documents, screenings
         invocation_phrases:
-          - "show CBU structure"
+          - "inspect CBU"
+          - "inspect CBU structure"
+          - "inspect client business unit"
+          - "inspect fund structure"
+          - "deep inspect CBU"
           - "display full CBU"
           - "show CBU details"
           - "show me cbu details"
@@ -1047,7 +1051,6 @@ domains:
           - "describe CBU structure"
           - "view complete structure"
           - "show CBU with entities and roles"
-          - "inspect CBU"
           - "show everything about CBU"
           - "display structure details"
           - "full CBU overview"
@@ -1061,7 +1064,7 @@ domains:
           phase_tags: [onboarding]
           side_effects: facts_only
         plugin:
-          handler: CbuShowOp
+          handler: CbuInspectOp
         args:
           - name: cbu-id
             type: uuid

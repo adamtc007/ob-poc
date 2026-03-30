@@ -104,7 +104,7 @@ impl LookupService {
         // Step 1: Verb search with entity names masked from ECIR
         let verbs = if let Some(searcher) = &self.verb_searcher {
             searcher
-                .search(utterance, None, None, None, limit, None, spans_ref)
+                .search(utterance, None, None, None, limit, None, spans_ref, None)
                 .await
                 .unwrap_or_default()
         } else {

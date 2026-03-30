@@ -2679,17 +2679,18 @@ impl ReplOrchestratorV2 {
     /// of reading ClientContext/JourneyContext directly.
     fn build_match_context(&self, session: &ReplSessionV2) -> MatchContext {
         let ctx = self.build_context_stack(session);
-        let narration_hot_verbs = session
-            .workspace_stack
-            .last()
+        let tos = session.workspace_stack.last();
+        let narration_hot_verbs = tos
             .map(|f| f.narration_hot_verbs.clone())
             .unwrap_or_default();
+        let constellation_verb_index = tos.and_then(|f| f.constellation_verb_index.clone());
         MatchContext {
             client_group_id: ctx.derived_scope.client_group_id,
             client_group_name: ctx.derived_scope.client_group_name.clone(),
             domain_hint: ctx.active_pack().and_then(|p| p.dominant_domain.clone()),
             entity_kind: ctx.focus.cbu.as_ref().map(|_| "cbu".to_string()),
             narration_hot_verbs,
+            constellation_verb_index,
             ..Default::default()
         }
     }
