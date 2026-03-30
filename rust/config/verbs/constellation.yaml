@@ -2,8 +2,8 @@ domains:
   constellation:
     description: Constellation map hydration and structure visualization
     invocation_hints:
-      - "hydrate constellation"
-      - "constellation summary"
+    - hydrate constellation
+    - constellation summary
     verbs:
       hydrate:
         description: Hydrate a full constellation with reducer states and action surfaces
@@ -14,23 +14,32 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: constellation
-          subject_kinds: [cbu]
-          phase_tags: [discovery, monitoring]
+          subject_kinds:
+          - cbu
+          phase_tags:
+          - discovery
+          - monitoring
           side_effects: facts_only
           harm_class: read_only
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-          - name: case-id
-            type: uuid
-            required: false
-          - name: map-name
-            type: string
-            required: true
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: case-id
+          type: uuid
+          required: false
+        - name: map-name
+          type: string
+          required: true
         returns:
           type: record
           capture: false
+        invocation_phrases:
+        - hydrate constellation
+        - load constellation state
+        - refresh constellation
+        - compute constellation
+        - hydrate the constellation tree
       summary:
         description: Constellation summary counts
         behavior: plugin
@@ -40,20 +49,29 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: constellation_summary
-          subject_kinds: [cbu]
-          phase_tags: [discovery, monitoring]
+          subject_kinds:
+          - cbu
+          phase_tags:
+          - discovery
+          - monitoring
           side_effects: facts_only
           harm_class: read_only
         args:
-          - name: cbu-id
-            type: uuid
-            required: true
-          - name: case-id
-            type: uuid
-            required: false
-          - name: map-name
-            type: string
-            required: true
+        - name: cbu-id
+          type: uuid
+          required: true
+        - name: case-id
+          type: uuid
+          required: false
+        - name: map-name
+          type: string
+          required: true
         returns:
           type: record
           capture: false
+        invocation_phrases:
+        - constellation summary
+        - show constellation stats
+        - constellation overview
+        - how many slots
+        - constellation status
