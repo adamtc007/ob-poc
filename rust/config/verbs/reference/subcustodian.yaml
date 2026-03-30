@@ -24,7 +24,7 @@ domains:
         crud:
           operation: upsert
           table: subcustodian_network
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - market_id
           - currency
@@ -39,7 +39,7 @@ domains:
           lookup:
             table: markets
             entity_type: market
-            schema: custody
+            schema: ob-poc
             code_column: mic
             id_column: market_id
         - name: currency
@@ -105,7 +105,7 @@ domains:
         crud:
           operation: list_by_fk
           table: subcustodian_network
-          schema: custody
+          schema: ob-poc
           fk_col: market_id
         args:
         - name: market
@@ -115,7 +115,7 @@ domains:
           lookup:
             table: markets
             entity_type: market
-            schema: custody
+            schema: ob-poc
             code_column: mic
             id_column: market_id
         - name: currency

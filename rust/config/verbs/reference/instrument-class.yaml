@@ -24,7 +24,7 @@ domains:
         crud:
           operation: upsert
           table: instrument_classes
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - code
           returning: class_id
@@ -73,7 +73,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: code
             id_column: class_id
         returns:
@@ -102,7 +102,7 @@ domains:
         crud:
           operation: select
           table: instrument_classes
-          schema: custody
+          schema: ob-poc
         args:
         - name: code
           type: string
@@ -132,7 +132,7 @@ domains:
         crud:
           operation: select
           table: instrument_classes
-          schema: custody
+          schema: ob-poc
         args:
         - name: smpg-group
           type: string

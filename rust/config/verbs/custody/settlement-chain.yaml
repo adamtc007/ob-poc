@@ -31,7 +31,7 @@ domains:
         crud:
           operation: upsert
           table: settlement_locations
-          schema: custody
+          schema: ob-poc
           conflict_keys:
             - location_code
           returning: location_id
@@ -101,7 +101,7 @@ domains:
         crud:
           operation: select
           table: settlement_locations
-          schema: custody
+          schema: ob-poc
         args:
           - name: location-type
             type: string
@@ -144,7 +144,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_settlement_chains
-          schema: custody
+          schema: ob-poc
           conflict_keys:
             - cbu_id
             - chain_name
@@ -171,7 +171,7 @@ domains:
             lookup:
               table: markets
               entity_type: market
-              schema: custody
+              schema: ob-poc
               code_column: mic
               id_column: market_id
           - name: instrument-class
@@ -181,7 +181,7 @@ domains:
             lookup:
               table: instrument_classes
               entity_type: instrument_class
-              schema: custody
+              schema: ob-poc
               code_column: code
               id_column: class_id
           - name: currency
@@ -237,7 +237,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_settlement_chains
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
           - name: cbu-id
@@ -284,7 +284,7 @@ domains:
         crud:
           operation: update
           table: cbu_settlement_chains
-          schema: custody
+          schema: ob-poc
           key: chain_id
           set_values:
             is_active: false
@@ -328,7 +328,7 @@ domains:
         crud:
           operation: upsert
           table: settlement_chain_hops
-          schema: custody
+          schema: ob-poc
           conflict_keys:
             - chain_id
             - hop_sequence
@@ -381,7 +381,7 @@ domains:
             lookup:
               table: cbu_ssi
               entity_type: ssi
-              schema: custody
+              schema: ob-poc
               search_key: ssi_name
               primary_key: ssi_id
           - name: instructions
@@ -423,7 +423,7 @@ domains:
         crud:
           operation: list_by_fk
           table: settlement_chain_hops
-          schema: custody
+          schema: ob-poc
           fk_col: chain_id
           order_by: hop_sequence
         args:
@@ -458,7 +458,7 @@ domains:
         crud:
           operation: delete
           table: settlement_chain_hops
-          schema: custody
+          schema: ob-poc
         args:
           - name: hop-id
             type: uuid
@@ -499,7 +499,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_settlement_location_preferences
-          schema: custody
+          schema: ob-poc
           conflict_keys:
             - cbu_id
             - market_id
@@ -524,7 +524,7 @@ domains:
             lookup:
               table: markets
               entity_type: market
-              schema: custody
+              schema: ob-poc
               code_column: mic
               id_column: market_id
           - name: instrument-class
@@ -534,7 +534,7 @@ domains:
             lookup:
               table: instrument_classes
               entity_type: instrument_class
-              schema: custody
+              schema: ob-poc
               code_column: code
               id_column: class_id
           - name: location-id
@@ -544,7 +544,7 @@ domains:
             lookup:
               table: settlement_locations
               entity_type: settlement_location
-              schema: custody
+              schema: ob-poc
               search_key: location_code
               primary_key: location_id
           - name: priority
@@ -589,7 +589,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_settlement_location_preferences
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
           order_by: priority
         args:
@@ -634,7 +634,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_cross_border_config
-          schema: custody
+          schema: ob-poc
           conflict_keys:
             - cbu_id
             - source_market_id
@@ -658,7 +658,7 @@ domains:
             lookup:
               table: markets
               entity_type: market
-              schema: custody
+              schema: ob-poc
               code_column: mic
               id_column: market_id
           - name: target-market
@@ -668,7 +668,7 @@ domains:
             lookup:
               table: markets
               entity_type: market
-              schema: custody
+              schema: ob-poc
               code_column: mic
               id_column: market_id
           - name: settlement-method
@@ -686,7 +686,7 @@ domains:
             lookup:
               table: settlement_locations
               entity_type: settlement_location
-              schema: custody
+              schema: ob-poc
               search_key: location_code
               primary_key: location_id
           - name: preferred-currency
@@ -743,7 +743,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_cross_border_config
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
           - name: cbu-id
@@ -786,7 +786,7 @@ domains:
         crud:
           operation: update
           table: cbu_cross_border_config
-          schema: custody
+          schema: ob-poc
           key: config_id
           set_values:
             is_active: false

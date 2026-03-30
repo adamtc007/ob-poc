@@ -30,7 +30,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_instrument_universe
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -68,7 +68,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_ssi
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -114,7 +114,7 @@ domains:
         crud:
           operation: list_by_fk
           table: ssi_booking_rules
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
           order_by: priority
         args:
@@ -157,7 +157,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_ssi_agent_override
-          schema: custody
+          schema: ob-poc
           fk_col: ssi_id
           order_by: sequence_order
         args:
@@ -168,7 +168,7 @@ domains:
           lookup:
             table: cbu_ssi
             entity_type: ssi
-            schema: custody
+            schema: ob-poc
             search_key: ssi_name
             primary_key: ssi_id
         returns:

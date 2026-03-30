@@ -27,7 +27,7 @@ domains:
         crud:
           operation: upsert
           table: isda_agreements
-          schema: custody
+          schema: ob-poc
           returning: isda_id
           conflict_constraint: isda_agreements_cbu_id_counterparty_entity_id_agreement_dat_key
         args:
@@ -95,7 +95,7 @@ domains:
         crud:
           operation: upsert
           table: isda_product_coverage
-          schema: custody
+          schema: ob-poc
           returning: coverage_id
           conflict_keys:
             - isda_id
@@ -108,7 +108,7 @@ domains:
             lookup:
               table: isda_agreements
               entity_type: isda
-              schema: custody
+              schema: ob-poc
               search_key: isda_id
               primary_key: isda_id
           - name: instrument-class
@@ -118,7 +118,7 @@ domains:
             lookup:
               table: instrument_classes
               entity_type: instrument_class
-              schema: custody
+              schema: ob-poc
               code_column: code
               id_column: class_id
           - name: isda-taxonomy
@@ -127,7 +127,7 @@ domains:
             maps_to: isda_taxonomy_id
             lookup:
               table: isda_product_taxonomy
-              schema: custody
+              schema: ob-poc
               code_column: taxonomy_code
               id_column: taxonomy_id
         returns:
@@ -158,7 +158,7 @@ domains:
         crud:
           operation: upsert
           table: csa_agreements
-          schema: custody
+          schema: ob-poc
           returning: csa_id
           conflict_constraint: csa_agreements_isda_id_csa_type_key
         args:
@@ -169,7 +169,7 @@ domains:
             lookup:
               table: isda_agreements
               entity_type: isda
-              schema: custody
+              schema: ob-poc
               search_key: isda_id
               primary_key: isda_id
           - name: csa-type
@@ -228,7 +228,7 @@ domains:
         crud:
           operation: delete
           table: isda_product_coverage
-          schema: custody
+          schema: ob-poc
         args:
           - name: coverage-id
             type: uuid
@@ -261,7 +261,7 @@ domains:
         crud:
           operation: delete
           table: csa_agreements
-          schema: custody
+          schema: ob-poc
         args:
           - name: csa-id
             type: uuid
@@ -293,7 +293,7 @@ domains:
         crud:
           operation: list_by_fk
           table: isda_agreements
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
           - name: cbu-id

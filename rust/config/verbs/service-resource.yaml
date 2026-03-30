@@ -548,7 +548,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: code
             id_column: class_id
         - name: is-mandatory
@@ -696,7 +696,7 @@ domains:
           lookup:
             table: markets
             entity_type: market
-            schema: custody
+            schema: ob-poc
             code_column: mic
             id_column: market_id
         - name: currency
@@ -935,7 +935,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: code
             id_column: class_id
         - name: market
@@ -944,7 +944,7 @@ domains:
           lookup:
             table: markets
             entity_type: market
-            schema: custody
+            schema: ob-poc
             code_column: mic
             id_column: market_id
         - name: counterparty
@@ -1050,7 +1050,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: code
             id_column: class_id
         - name: include-optional

@@ -30,7 +30,7 @@ domains:
         crud:
           operation: upsert
           table: instruction_message_types
-          schema: custody
+          schema: ob-poc
           conflict_keys:
             - lifecycle_event
             - message_standard
@@ -94,7 +94,7 @@ domains:
         crud:
           operation: select
           table: instruction_message_types
-          schema: custody
+          schema: ob-poc
         args:
           - name: lifecycle-event
             type: string
@@ -134,7 +134,7 @@ domains:
         crud:
           operation: upsert
           table: instruction_templates
-          schema: custody
+          schema: ob-poc
           conflict_keys:
             - template_code
           returning: template_id
@@ -153,7 +153,7 @@ domains:
             maps_to: message_type_id
             lookup:
               table: instruction_message_types
-              schema: custody
+              schema: ob-poc
               search_key: message_type
               primary_key: message_type_id
           - name: base-template
@@ -198,7 +198,7 @@ domains:
         crud:
           operation: select
           table: instruction_templates
-          schema: custody
+          schema: ob-poc
         args:
           - name: template-id
             type: uuid
@@ -234,7 +234,7 @@ domains:
         crud:
           operation: select
           table: instruction_templates
-          schema: custody
+          schema: ob-poc
         args:
           - name: message-type-id
             type: uuid
@@ -271,7 +271,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_instruction_assignments
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
           order_by: priority
         args:
@@ -322,7 +322,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_instruction_field_overrides
-          schema: custody
+          schema: ob-poc
           fk_col: assignment_id
         args:
           - name: assignment-id

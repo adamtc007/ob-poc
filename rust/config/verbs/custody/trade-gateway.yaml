@@ -29,7 +29,7 @@ domains:
         crud:
           operation: upsert
           table: trade_gateways
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - gateway_code
           returning: gateway_id
@@ -98,7 +98,7 @@ domains:
         crud:
           operation: select
           table: trade_gateways
-          schema: custody
+          schema: ob-poc
         args:
         - name: gateway-id
           type: uuid
@@ -136,7 +136,7 @@ domains:
         crud:
           operation: select
           table: trade_gateways
-          schema: custody
+          schema: ob-poc
         args:
         - name: gateway-type
           type: string
@@ -178,7 +178,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_gateway_connectivity
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - gateway_id
@@ -200,7 +200,7 @@ domains:
           maps_to: gateway_id
           lookup:
             table: trade_gateways
-            schema: custody
+            schema: ob-poc
             search_key: gateway_code
             primary_key: gateway_id
         - name: status
@@ -268,7 +268,7 @@ domains:
         crud:
           operation: update
           table: cbu_gateway_connectivity
-          schema: custody
+          schema: ob-poc
           key: connectivity_id
           set_values:
             status: ACTIVE
@@ -308,7 +308,7 @@ domains:
         crud:
           operation: update
           table: cbu_gateway_connectivity
-          schema: custody
+          schema: ob-poc
           key: connectivity_id
           set_values:
             status: SUSPENDED
@@ -351,7 +351,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_gateway_connectivity
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -399,7 +399,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_gateway_routing
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - gateway_id
@@ -425,7 +425,7 @@ domains:
           maps_to: gateway_id
           lookup:
             table: trade_gateways
-            schema: custody
+            schema: ob-poc
             search_key: gateway_code
             primary_key: gateway_id
         - name: lifecycle-event
@@ -439,7 +439,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: class_code
             id_column: class_id
         - name: market
@@ -449,7 +449,7 @@ domains:
           lookup:
             table: markets
             entity_type: market
-            schema: custody
+            schema: ob-poc
             code_column: mic
             id_column: market_id
         - name: counterparty
@@ -506,7 +506,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_gateway_routing
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
           order_by: priority
         args:
@@ -555,7 +555,7 @@ domains:
         crud:
           operation: delete
           table: cbu_gateway_routing
-          schema: custody
+          schema: ob-poc
         args:
         - name: routing-id
           type: uuid
@@ -590,7 +590,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_gateway_fallbacks
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - primary_gateway_id
@@ -613,7 +613,7 @@ domains:
           maps_to: primary_gateway_id
           lookup:
             table: trade_gateways
-            schema: custody
+            schema: ob-poc
             search_key: gateway_code
             primary_key: gateway_id
         - name: fallback-gateway-id
@@ -622,7 +622,7 @@ domains:
           maps_to: fallback_gateway_id
           lookup:
             table: trade_gateways
-            schema: custody
+            schema: ob-poc
             search_key: gateway_code
             primary_key: gateway_id
         - name: lifecycle-event
@@ -673,7 +673,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_gateway_fallbacks
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id

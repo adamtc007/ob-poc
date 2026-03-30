@@ -29,7 +29,7 @@ domains:
         crud:
           operation: upsert
           table: tax_jurisdictions
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - jurisdiction_code
           returning: jurisdiction_id
@@ -103,7 +103,7 @@ domains:
         crud:
           operation: select
           table: tax_jurisdictions
-          schema: custody
+          schema: ob-poc
         args:
         - name: country-code
           type: string
@@ -145,7 +145,7 @@ domains:
         crud:
           operation: upsert
           table: tax_treaty_rates
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - source_jurisdiction_id
           - investor_jurisdiction_id
@@ -160,7 +160,7 @@ domains:
           lookup:
             table: tax_jurisdictions
             entity_type: tax_jurisdiction
-            schema: custody
+            schema: ob-poc
             code_column: jurisdiction_code
             id_column: jurisdiction_id
         - name: investor-jurisdiction
@@ -170,7 +170,7 @@ domains:
           lookup:
             table: tax_jurisdictions
             entity_type: tax_jurisdiction
-            schema: custody
+            schema: ob-poc
             code_column: jurisdiction_code
             id_column: jurisdiction_id
         - name: income-type
@@ -189,7 +189,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: code
             id_column: class_id
         - name: standard-rate
@@ -251,7 +251,7 @@ domains:
         crud:
           operation: select
           table: tax_treaty_rates
-          schema: custody
+          schema: ob-poc
         args:
         - name: source-jurisdiction
           type: string
@@ -295,7 +295,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_tax_status
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - tax_jurisdiction_id
@@ -318,7 +318,7 @@ domains:
           lookup:
             table: tax_jurisdictions
             entity_type: tax_jurisdiction
-            schema: custody
+            schema: ob-poc
             code_column: jurisdiction_code
             id_column: jurisdiction_id
         - name: investor-type
@@ -414,7 +414,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_tax_status
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -458,7 +458,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_tax_reclaim_config
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - source_jurisdiction_id
@@ -481,7 +481,7 @@ domains:
           lookup:
             table: tax_jurisdictions
             entity_type: tax_jurisdiction
-            schema: custody
+            schema: ob-poc
             code_column: jurisdiction_code
             id_column: jurisdiction_id
         - name: reclaim-method
@@ -562,7 +562,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_tax_reclaim_config
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -606,7 +606,7 @@ domains:
         crud:
           operation: update
           table: cbu_tax_reclaim_config
-          schema: custody
+          schema: ob-poc
           key: config_id
           set_values:
             is_active: false
@@ -649,7 +649,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_tax_reporting
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - reporting_regime
@@ -684,7 +684,7 @@ domains:
           lookup:
             table: tax_jurisdictions
             entity_type: tax_jurisdiction
-            schema: custody
+            schema: ob-poc
             code_column: jurisdiction_code
             id_column: jurisdiction_id
         - name: status
@@ -763,7 +763,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_tax_reporting
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id

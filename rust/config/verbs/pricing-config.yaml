@@ -31,7 +31,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_pricing_config
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - instrument_class_id
@@ -65,7 +65,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: code
             id_column: class_id
         - name: market
@@ -75,7 +75,7 @@ domains:
           lookup:
             table: markets
             entity_type: market
-            schema: custody
+            schema: ob-poc
             code_column: mic
             id_column: market_id
         - name: currency
@@ -169,7 +169,7 @@ domains:
         crud:
           operation: update
           table: cbu_pricing_config
-          schema: custody
+          schema: ob-poc
           key: config_id
         args:
         - name: config-id
@@ -213,7 +213,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_pricing_config
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
           order_by: priority
         args:
@@ -261,7 +261,7 @@ domains:
         crud:
           operation: delete
           table: cbu_pricing_config
-          schema: custody
+          schema: ob-poc
         args:
         - name: config-id
           type: uuid
@@ -294,7 +294,7 @@ domains:
         crud:
           operation: update
           table: cbu_pricing_config
-          schema: custody
+          schema: ob-poc
           key: config_id
           set_values:
             is_active: false
@@ -382,7 +382,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_valuation_schedule
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - instrument_class_id
@@ -406,7 +406,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: class_code
             id_column: class_id
         - name: market
@@ -416,7 +416,7 @@ domains:
           lookup:
             table: markets
             entity_type: market
-            schema: custody
+            schema: ob-poc
             code_column: mic
             id_column: market_id
         - name: frequency
@@ -472,7 +472,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_valuation_schedule
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -518,7 +518,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_pricing_fallback_chains
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - instrument_class_id
@@ -542,7 +542,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: class_code
             id_column: class_id
         - name: market
@@ -552,7 +552,7 @@ domains:
           lookup:
             table: markets
             entity_type: market
-            schema: custody
+            schema: ob-poc
             code_column: mic
             id_column: market_id
         - name: fallback-sources
@@ -599,7 +599,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_pricing_fallback_chains
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -645,7 +645,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_stale_price_policies
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - instrument_class_id
@@ -668,7 +668,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: class_code
             id_column: class_id
         - name: max-age-hours
@@ -718,7 +718,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_stale_price_policies
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -764,7 +764,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_nav_impact_thresholds
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - instrument_class_id
@@ -787,7 +787,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: class_code
             id_column: class_id
         - name: threshold-pct
@@ -838,7 +838,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_nav_impact_thresholds
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id

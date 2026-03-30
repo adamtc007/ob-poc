@@ -24,7 +24,7 @@ domains:
         crud:
           operation: upsert
           table: entity_settlement_identity
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - entity_id
           - primary_bic
@@ -82,7 +82,7 @@ domains:
         crud:
           operation: upsert
           table: entity_ssi
-          schema: custody
+          schema: ob-poc
           returning: entity_ssi_id
           conflict_keys:
           - entity_id
@@ -107,7 +107,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: code
             id_column: class_id
         - name: security-type
@@ -116,7 +116,7 @@ domains:
           maps_to: security_type_id
           lookup:
             table: security_types
-            schema: custody
+            schema: ob-poc
             code_column: code
             id_column: security_type_id
         - name: market
@@ -126,7 +126,7 @@ domains:
           lookup:
             table: markets
             entity_type: market
-            schema: custody
+            schema: ob-poc
             code_column: mic
             id_column: market_id
         - name: currency
@@ -184,7 +184,7 @@ domains:
         crud:
           operation: delete
           table: entity_ssi
-          schema: custody
+          schema: ob-poc
         args:
         - name: ssi-id
           type: uuid

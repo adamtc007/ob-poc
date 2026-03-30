@@ -29,7 +29,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_cash_sweep_config
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - currency
@@ -142,7 +142,7 @@ domains:
         crud:
           operation: update
           table: cbu_cash_sweep_config
-          schema: custody
+          schema: ob-poc
           key: sweep_id
         args:
         - name: sweep-id
@@ -184,7 +184,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_cash_sweep_config
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -226,7 +226,7 @@ domains:
         crud:
           operation: update
           table: cbu_cash_sweep_config
-          schema: custody
+          schema: ob-poc
           key: sweep_id
         args:
         - name: sweep-id
@@ -262,7 +262,7 @@ domains:
         crud:
           operation: update
           table: cbu_cash_sweep_config
-          schema: custody
+          schema: ob-poc
           key: sweep_id
         args:
         - name: sweep-id
@@ -311,7 +311,7 @@ domains:
         crud:
           operation: update
           table: cbu_cash_sweep_config
-          schema: custody
+          schema: ob-poc
           key: sweep_id
         args:
         - name: sweep-id
@@ -362,7 +362,7 @@ domains:
         crud:
           operation: update
           table: cbu_cash_sweep_config
-          schema: custody
+          schema: ob-poc
           key: sweep_id
           set_values:
             is_active: false
@@ -396,7 +396,7 @@ domains:
         crud:
           operation: update
           table: cbu_cash_sweep_config
-          schema: custody
+          schema: ob-poc
           key: sweep_id
           set_values:
             is_active: true
@@ -430,7 +430,7 @@ domains:
         crud:
           operation: delete
           table: cbu_cash_sweep_config
-          schema: custody
+          schema: ob-poc
         args:
         - name: sweep-id
           type: uuid

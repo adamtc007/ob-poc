@@ -24,7 +24,7 @@ domains:
         crud:
           operation: upsert
           table: security_types
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - code
           returning: security_type_id
@@ -36,7 +36,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: code
             id_column: class_id
         - name: code
@@ -77,7 +77,7 @@ domains:
         crud:
           operation: list_by_fk
           table: security_types
-          schema: custody
+          schema: ob-poc
           fk_col: class_id
         args:
         - name: class
@@ -87,7 +87,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: code
             id_column: class_id
         returns:

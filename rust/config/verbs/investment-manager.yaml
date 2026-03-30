@@ -28,7 +28,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_im_assignments
-          schema: custody
+          schema: ob-poc
           returning: assignment_id
           conflict_keys:
           - cbu_id
@@ -169,7 +169,7 @@ domains:
         crud:
           operation: update
           table: cbu_im_assignments
-          schema: custody
+          schema: ob-poc
           key: assignment_id
         args:
         - name: assignment-id
@@ -221,7 +221,7 @@ domains:
         crud:
           operation: update
           table: cbu_im_assignments
-          schema: custody
+          schema: ob-poc
           key: assignment_id
         args:
         - name: assignment-id
@@ -263,7 +263,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_im_assignments
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
           order_by: priority
         args:
@@ -305,7 +305,7 @@ domains:
         crud:
           operation: update
           table: cbu_im_assignments
-          schema: custody
+          schema: ob-poc
           key: assignment_id
           set_values:
             status: SUSPENDED
@@ -339,7 +339,7 @@ domains:
         crud:
           operation: update
           table: cbu_im_assignments
-          schema: custody
+          schema: ob-poc
           key: assignment_id
           set_values:
             status: TERMINATED

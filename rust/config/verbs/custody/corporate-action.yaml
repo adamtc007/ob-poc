@@ -32,7 +32,7 @@ domains:
         crud:
           operation: upsert
           table: ca_event_types
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - event_code
           returning: event_type_id
@@ -95,7 +95,7 @@ domains:
         crud:
           operation: select
           table: ca_event_types
-          schema: custody
+          schema: ob-poc
         args:
         - name: category
           type: string
@@ -143,7 +143,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_ca_preferences
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - event_type_id
@@ -166,7 +166,7 @@ domains:
           maps_to: event_type_id
           lookup:
             table: ca_event_types
-            schema: custody
+            schema: ob-poc
             code_column: event_code
             id_column: event_type_id
         - name: instrument-class
@@ -176,7 +176,7 @@ domains:
           lookup:
             table: instrument_classes
             entity_type: instrument_class
-            schema: custody
+            schema: ob-poc
             code_column: class_code
             id_column: class_id
         - name: processing-mode
@@ -235,7 +235,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_ca_preferences
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -281,7 +281,7 @@ domains:
         crud:
           operation: delete
           table: cbu_ca_preferences
-          schema: custody
+          schema: ob-poc
         args:
         - name: preference-id
           type: uuid
@@ -319,7 +319,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_ca_instruction_windows
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - event_type_id
@@ -342,7 +342,7 @@ domains:
           maps_to: event_type_id
           lookup:
             table: ca_event_types
-            schema: custody
+            schema: ob-poc
             code_column: event_code
             id_column: event_type_id
         - name: market
@@ -352,7 +352,7 @@ domains:
           lookup:
             table: markets
             entity_type: market
-            schema: custody
+            schema: ob-poc
             code_column: mic
             id_column: market_id
         - name: cutoff-days-before
@@ -409,7 +409,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_ca_instruction_windows
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
@@ -456,7 +456,7 @@ domains:
         crud:
           operation: upsert
           table: cbu_ca_ssi_mappings
-          schema: custody
+          schema: ob-poc
           conflict_keys:
           - cbu_id
           - event_type_id
@@ -479,7 +479,7 @@ domains:
           maps_to: event_type_id
           lookup:
             table: ca_event_types
-            schema: custody
+            schema: ob-poc
             code_column: event_code
             id_column: event_type_id
         - name: currency
@@ -493,7 +493,7 @@ domains:
           lookup:
             table: cbu_ssi
             entity_type: ssi
-            schema: custody
+            schema: ob-poc
             search_key: ssi_name
             primary_key: ssi_id
         returns:
@@ -530,7 +530,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cbu_ca_ssi_mappings
-          schema: custody
+          schema: ob-poc
           fk_col: cbu_id
         args:
         - name: cbu-id
