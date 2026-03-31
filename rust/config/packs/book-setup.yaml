@@ -26,7 +26,6 @@ optional_context:
 
 workspaces:
   - cbu
-  - instrument_matrix
   - on_boarding
 
 allowed_verbs:
