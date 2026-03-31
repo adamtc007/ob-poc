@@ -3082,11 +3082,27 @@ impl ReplOrchestratorV2 {
                 );
             }
         } else {
-            tracing::warn!(
-                session_id = %session.id,
-                "REPL: SemOsClient unavailable — blocking unconstrained verb matching"
-            );
-            match_ctx.allowed_verbs = Some(std::collections::HashSet::new());
+            // SemOS unavailable — fall back to pack-level verb governance.
+            // If a pack is active, its allowed_verbs becomes the constraint.
+            // This maintains the fail-closed principle (no unconstrained search)
+            // while allowing the REPL to function without SemOS in dev/test.
+            if let Some(ref pack) = session.staged_pack {
+                let pack_verbs: std::collections::HashSet<String> =
+                    pack.allowed_verbs.iter().cloned().collect();
+                tracing::info!(
+                    session_id = %session.id,
+                    pack_id = %pack.id,
+                    verb_count = pack_verbs.len(),
+                    "REPL: SemOS unavailable — using pack allowed_verbs as constraint"
+                );
+                match_ctx.allowed_verbs = Some(pack_verbs);
+            } else {
+                tracing::warn!(
+                    session_id = %session.id,
+                    "REPL: SemOS unavailable and no pack active — blocking verb matching"
+                );
+                match_ctx.allowed_verbs = Some(std::collections::HashSet::new());
+            }
             session.pending_sem_os_envelope = None;
         }
 
