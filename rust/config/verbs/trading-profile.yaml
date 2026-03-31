@@ -483,6 +483,11 @@ domains:
         invocation_phrases:
         - "add component to trading profile"
         - "add instrument class"
+        - "add equity component"
+        - "add equity"
+        - "add fixed income component"
+        - "add fixed income"
+        - "add FI component"
         - "add market"
         - "add allowed currency"
         - "add standing instruction"

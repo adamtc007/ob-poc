@@ -248,7 +248,7 @@ optional_questions:
     default: "review"
 
 pack_summary_template: >
-  Instrument Matrix {{answers.cbu_name}}.
+  Instrument Matrix (group template).
 
 section_layout:
   - title: "Trading Profile"

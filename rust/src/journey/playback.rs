@@ -66,7 +66,16 @@ impl PackPlayback {
                 summary = summary.replace(&format!("{{{{answers.{}.length}}}}", key), &len);
             }
             summary = summary.replace("{step_count}", &runbook.entries.len().to_string());
-            return summary;
+            // Clean up any remaining unresolved {{answers.X}} placeholders
+            // (e.g., from optional questions that weren't answered)
+            while let Some(start) = summary.find("{{answers.") {
+                if let Some(end) = summary[start..].find("}}") {
+                    summary.replace_range(start..start + end + 2, "");
+                } else {
+                    break;
+                }
+            }
+            return summary.trim().to_string();
         }
 
         // Fallback: auto-generate summary.
