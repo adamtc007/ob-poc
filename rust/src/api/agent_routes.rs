@@ -245,6 +245,12 @@ async fn try_route_through_repl(
                     | "yep" | "sure" | "approved" | "lgtm"
             ) {
                 UserInputV2::Confirm
+            } else if matches!(
+                trimmed.to_lowercase().as_str(),
+                "no" | "reject" | "cancel" | "nope" | "not that"
+                    | "wrong" | "try again" | "skip" | "back"
+            ) {
+                UserInputV2::Reject
             } else {
                 UserInputV2::Message {
                     content: message.clone(),
