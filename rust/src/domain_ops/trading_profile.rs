@@ -1378,7 +1378,8 @@ impl CustomOperation for TradingProfileCreateDraftOp {
     ) -> Result<ExecutionResult> {
         use crate::trading_profile::ast_db;
 
-        let cbu_id: Uuid = verb_call
+        // Support both CBU-level instances (cbu-id) and group-level templates (group-id)
+        let cbu_id: Option<Uuid> = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "cbu-id")
@@ -1388,8 +1389,19 @@ impl CustomOperation for TradingProfileCreateDraftOp {
                 } else {
                     a.value.as_uuid()
                 }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+            });
+
+        let group_id: Option<Uuid> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "group-id")
+            .and_then(|a| a.value.as_uuid());
+
+        let is_template = cbu_id.is_none() && group_id.is_some();
+
+        if cbu_id.is_none() && group_id.is_none() {
+            anyhow::bail!("Either cbu-id or group-id is required");
+        }
 
         let notes = verb_call
             .arguments
@@ -1398,9 +1410,33 @@ impl CustomOperation for TradingProfileCreateDraftOp {
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let (profile_id, _doc) = ast_db::create_draft(pool, cbu_id, notes)
+        // For templates: insert directly with group_id and is_template=true
+        // For CBU instances: use existing create_draft path
+        let profile_id = if is_template {
+            let gid = group_id.unwrap();
+            let pid = Uuid::new_v4();
+            let empty_doc = serde_json::json!({"components": [], "is_template": true});
+            let doc_hash = format!("template-{}", pid);
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".cbu_trading_profiles
+                   (profile_id, group_id, is_template, status, version, document, document_hash)
+                   VALUES ($1, $2, true, 'DRAFT', 1, $3, $4)"#,
+            )
+            .bind(pid)
+            .bind(gid)
+            .bind(&empty_doc)
+            .bind(&doc_hash)
+            .execute(pool)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to create draft: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create template draft: {}", e))?;
+            pid
+        } else {
+            let cid = cbu_id.unwrap();
+            let (pid, _doc) = ast_db::create_draft(pool, cid, notes)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to create draft: {}", e))?;
+            pid
+        };
 
         ctx.bind("profile", profile_id);
 

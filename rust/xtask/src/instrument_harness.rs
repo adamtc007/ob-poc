@@ -478,6 +478,211 @@ impl InstrumentHarness {
 
         Ok(())
     }
+    // =========================================================================
+    // Two-Stage Test: Group Template → CBU Instance
+    // =========================================================================
+
+    pub async fn run_two_stage(&mut self) -> Result<()> {
+        println!("╔══════════════════════════════════════════════════╗");
+        println!("║  Two-Stage Test: Template → CBU Instance        ║");
+        println!("╚══════════════════════════════════════════════════╝");
+
+        // --- Stage 1: Create group-level template ---
+        println!("\n=== Stage 1: Group Template ===");
+
+        // Create client group
+        let results = self
+            .exec("template", r#"(client-group.create :canonical-name "Harness IM Group")"#)
+            .await?;
+        let group_id = Self::extract_uuid(&results).context("Failed to create group")?;
+        println!("  Group created: {}", group_id);
+
+        // Create template trading profile (no CBU)
+        match self
+            .exec(
+                "template",
+                &format!(r#"(trading-profile.create-draft :group-id "{}")"#, group_id),
+            )
+            .await
+        {
+            Ok(results) => {
+                self.state.profile_id = Self::extract_uuid(&results);
+                println!("  Template profile created: {:?}", self.state.profile_id);
+            }
+            Err(e) => {
+                println!("  Template create failed: {}", e);
+                self.state.errors.push(format!("template create-draft: {}", e));
+            }
+        }
+
+        // Add equity component to template
+        if let Some(pid) = self.state.profile_id {
+            match self
+                .exec(
+                    "template",
+                    &format!(
+                        r#"(trading-profile.add-component :profile-id "{}" :component-type "EQUITY" :market "XLUX")"#,
+                        pid
+                    ),
+                )
+                .await
+            {
+                Ok(_) => println!("  Equity component added ✓"),
+                Err(e) => println!("  Equity component skipped: {}", e),
+            }
+
+            // Add FI component
+            match self
+                .exec(
+                    "template",
+                    &format!(
+                        r#"(trading-profile.add-component :profile-id "{}" :component-type "FIXED_INCOME" :market "XLUX")"#,
+                        pid
+                    ),
+                )
+                .await
+            {
+                Ok(_) => println!("  Fixed Income component added ✓"),
+                Err(e) => println!("  FI component skipped: {}", e),
+            }
+        }
+
+        // Create IM entity (investment manager)
+        let results = self
+            .exec(
+                "template",
+                r#"(entity.ensure :name "Harness Investment Manager" :entity-type "limited_company_private" :jurisdiction "LU")"#,
+            )
+            .await?;
+        let im_entity_id = Self::extract_uuid(&results);
+        println!("  IM entity created: {:?}", im_entity_id);
+
+        // Create AO entity (account operator)
+        let results = self
+            .exec(
+                "template",
+                r#"(entity.ensure :name "Harness Account Operator" :entity-type "limited_company_private" :jurisdiction "LU")"#,
+            )
+            .await?;
+        let ao_entity_id = Self::extract_uuid(&results);
+        println!("  AO entity created: {:?}", ao_entity_id);
+
+        self.state.phases_completed.push("template".into());
+        println!("  Stage 1 complete ✓");
+
+        // --- Stage 2: Attach to CBU ---
+        println!("\n=== Stage 2: CBU Attachment ===");
+
+        // Create CBU
+        let results = self
+            .exec(
+                "attach",
+                r#"(cbu.create :name "Harness IM CBU" :jurisdiction "LU" :structure-type "ucits")"#,
+            )
+            .await?;
+        self.state.cbu_id = Self::extract_uuid(&results);
+        let cbu_id = self.state.cbu_id.context("Failed to create CBU")?;
+        println!("  CBU created: {}", cbu_id);
+
+        // Clone template to CBU (the attachment step)
+        if let Some(template_id) = self.state.profile_id {
+            match self
+                .exec(
+                    "attach",
+                    &format!(
+                        r#"(trading-profile.clone-to :profile-id "{}" :target-cbu-id "{}")"#,
+                        template_id, cbu_id
+                    ),
+                )
+                .await
+            {
+                Ok(results) => {
+                    let instance_id = Self::extract_uuid(&results);
+                    println!("  Template cloned to CBU: {:?}", instance_id);
+                }
+                Err(e) => {
+                    println!("  Clone skipped: {}", e);
+                    self.state.errors.push(format!("clone-to: {}", e));
+                }
+            }
+        }
+
+        // CBU-specific: assign IM role
+        if let Some(im_id) = im_entity_id {
+            match self
+                .exec(
+                    "attach",
+                    &format!(
+                        r#"(cbu.assign-role :cbu-id "{}" :entity-id "{}" :role "INVESTMENT_MANAGER")"#,
+                        cbu_id, im_id
+                    ),
+                )
+                .await
+            {
+                Ok(_) => println!("  IM role assigned ✓"),
+                Err(e) => println!("  IM role skipped: {}", e),
+            }
+        }
+
+        // CBU-specific: assign AO role
+        if let Some(ao_id) = ao_entity_id {
+            match self
+                .exec(
+                    "attach",
+                    &format!(
+                        r#"(cbu.assign-role :cbu-id "{}" :entity-id "{}" :role "ACCOUNT_OPERATOR")"#,
+                        cbu_id, ao_id
+                    ),
+                )
+                .await
+            {
+                Ok(_) => println!("  AO role assigned ✓"),
+                Err(e) => println!("  AO role skipped: {}", e),
+            }
+        }
+
+        // CBU-specific: setup SSI
+        match self
+            .exec(
+                "attach",
+                &format!(r#"(cbu-custody.list-ssis :cbu-id "{}")"#, cbu_id),
+            )
+            .await
+        {
+            Ok(_) => println!("  CBU SSIs listed ✓"),
+            Err(e) => println!("  SSI list skipped: {}", e),
+        }
+
+        self.state.phases_completed.push("attach".into());
+        println!("  Stage 2 complete ✓");
+
+        // --- Summary ---
+        println!("\n=== Summary ===");
+        println!("  Stages: {}", self.state.phases_completed.join(" → "));
+        println!("  Verbs executed: {}", self.state.verb_count);
+        println!("  Total time: {}ms", self.state.total_ms);
+        if !self.state.errors.is_empty() {
+            println!("  Errors: {}", self.state.errors.len());
+            for e in &self.state.errors {
+                println!("    ✗ {}", e);
+            }
+        }
+
+        // Cleanup
+        println!("\n  Cleaning up...");
+        // Delete entities
+        for eid in [im_entity_id, ao_entity_id].iter().flatten() {
+            let _ = self.exec("cleanup", &format!(r#"(entity.delete :entity-id "{}")"#, eid)).await;
+        }
+        // Delete group
+        let _ = sqlx::query(r#"DELETE FROM "ob-poc".client_group WHERE id = $1"#)
+            .bind(group_id)
+            .execute(&self.pool)
+            .await;
+        self.phase_cleanup().await?;
+
+        Ok(())
+    }
 }
 
 // =============================================================================
@@ -498,6 +703,7 @@ pub async fn run_instrument_harness(
             harness.phase_cleanup().await?;
         }
         "setup" => harness.phase_setup().await?,
+        "two-stage" => harness.run_two_stage().await?,
         "clean" => harness.phase_cleanup().await?,
         other => anyhow::bail!("Unknown mode: {}. Use: full, setup, clean", other),
     }
