@@ -1,0 +1,112 @@
+constellation: instrument.template
+description: >
+  Group-level instrument matrix template — design-time artefact.
+  Defines what the group trades: instrument families, settlement patterns,
+  SSI frameworks, ISDA terms, corporate action policies. Templates exist
+  independently of CBUs and are cloned on CBU attachment.
+jurisdiction: ALL
+slots:
+  group:
+    type: cbu
+    table: client_group
+    pk: group_id
+    cardinality: root
+    verbs:
+      read: { verb: client-group.read, when: filled }
+  trading_profile:
+    type: mandate
+    table: cbu_trading_profiles
+    pk: profile_id
+    join: { via: cbu_trading_profiles, parent_fk: group_id, child_fk: profile_id }
+    cardinality: optional
+    depends_on: [group]
+    verbs:
+      # Template lifecycle
+      create_draft: { verb: trading-profile.create-draft, when: [empty, filled] }
+      read: { verb: trading-profile.read, when: filled }
+      list_versions: { verb: trading-profile.list-versions, when: filled }
+      diff: { verb: trading-profile.diff, when: filled }
+      new_version: { verb: trading-profile.create-new-version, when: filled }
+      import: { verb: trading-profile.import, when: empty }
+      # Component assembly (instrument families)
+      add_component: { verb: trading-profile.add-component, when: filled }
+      remove_component: { verb: trading-profile.remove-component, when: filled }
+      set_base_currency: { verb: trading-profile.set-base-currency, when: filled }
+      # Validation (pre-attachment)
+      validate_coverage: { verb: trading-profile.validate-universe-coverage, when: filled }
+      # Matrix overlays (template-level defaults)
+      overlay_create: { verb: matrix-overlay.create, when: [empty, filled] }
+      overlay_read: { verb: matrix-overlay.read, when: filled }
+      overlay_list: { verb: matrix-overlay.list, when: filled }
+      overlay_update: { verb: matrix-overlay.update, when: filled }
+      overlay_diff: { verb: matrix-overlay.diff, when: filled }
+  settlement_pattern:
+    type: entity
+    entity_kinds: [settlement]
+    join: { via: cbu_settlement_chains, parent_fk: profile_id, child_fk: chain_id }
+    cardinality: optional
+    depends_on: [trading_profile]
+    verbs:
+      create_chain: { verb: settlement-chain.create-chain, when: [empty, filled] }
+      add_hop: { verb: settlement-chain.add-hop, when: filled }
+      remove_hop: { verb: settlement-chain.remove-hop, when: filled }
+      list_chains: settlement-chain.list-chains
+      list_hops: settlement-chain.list-hops
+      deactivate: { verb: settlement-chain.deactivate-chain, when: filled }
+      define_location: { verb: settlement-chain.define-location, when: [empty, filled] }
+      list_locations: settlement-chain.list-locations
+      set_preference: { verb: settlement-chain.set-location-preference, when: filled }
+      list_preferences: settlement-chain.list-location-preferences
+      cross_border: { verb: settlement-chain.set-cross-border, when: filled }
+      list_cross_border: settlement-chain.list-cross-border
+      deactivate_cross: { verb: settlement-chain.deactivate-cross-border, when: filled }
+  isda_framework:
+    type: entity
+    entity_kinds: [contract]
+    cardinality: optional
+    depends_on: [trading_profile]
+    verbs:
+      create: { verb: isda.create, when: [empty, filled] }
+      list: isda.list
+      add_csa: { verb: isda.add-csa, when: filled }
+      remove_csa: { verb: isda.remove-csa, when: filled }
+      add_coverage: { verb: isda.add-coverage, when: filled }
+      remove_coverage: { verb: isda.remove-coverage, when: filled }
+  corporate_action_policy:
+    type: entity
+    entity_kinds: [policy]
+    cardinality: optional
+    depends_on: [trading_profile]
+    verbs:
+      get_policy: trading-profile.ca.get-policy
+      set_election: { verb: trading-profile.ca.set-election-policy, when: filled }
+      set_notification: { verb: trading-profile.ca.set-notification-policy, when: filled }
+      enable_types: { verb: trading-profile.ca.enable-event-types, when: filled }
+      disable_types: { verb: trading-profile.ca.disable-event-types, when: filled }
+      set_default: { verb: trading-profile.ca.set-default-option, when: filled }
+      remove_default: { verb: trading-profile.ca.remove-default-option, when: filled }
+      link_proceeds: { verb: trading-profile.ca.link-proceeds-ssi, when: filled }
+      remove_proceeds: { verb: trading-profile.ca.remove-proceeds-ssi, when: filled }
+      add_cutoff: { verb: trading-profile.ca.add-cutoff-rule, when: filled }
+      remove_cutoff: { verb: trading-profile.ca.remove-cutoff-rule, when: filled }
+      list_event_types: corporate-action.list-event-types
+      define_event_type: { verb: corporate-action.define-event-type, when: [empty, filled] }
+      set_preferences: { verb: corporate-action.set-preferences, when: filled }
+      list_preferences: corporate-action.list-preferences
+  trade_gateway:
+    type: entity
+    entity_kinds: [gateway]
+    cardinality: optional
+    depends_on: [trading_profile]
+    verbs:
+      define: { verb: trade-gateway.define-gateway, when: [empty, filled] }
+      enable: { verb: trade-gateway.enable-gateway, when: filled }
+      activate: { verb: trade-gateway.activate-gateway, when: filled }
+      suspend: { verb: trade-gateway.suspend-gateway, when: filled }
+      read: trade-gateway.read-gateway
+      list: trade-gateway.list-gateways
+      add_rule: { verb: trade-gateway.add-routing-rule, when: filled }
+      remove_rule: { verb: trade-gateway.remove-routing-rule, when: filled }
+      list_rules: trade-gateway.list-routing-rules
+      set_fallback: { verb: trade-gateway.set-fallback, when: filled }
+      list_fallbacks: trade-gateway.list-fallbacks

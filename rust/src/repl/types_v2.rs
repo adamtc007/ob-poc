@@ -191,9 +191,9 @@ impl WorkspaceKind {
             Self::InstrumentMatrix => WorkspaceRegistryEntry {
                 workspace_id: self.clone(),
                 display_name: self.label(),
-                constellation_families: vec!["instrument_workspace", "trading_permission", "lifecycle"],
-                subject_kinds: vec![SubjectKind::Matrix, SubjectKind::Cbu],
-                subject_required: true,
+                constellation_families: vec!["instrument_workspace", "instrument_template", "trading_permission", "lifecycle"],
+                subject_kinds: vec![SubjectKind::Matrix, SubjectKind::Cbu, SubjectKind::ClientGroup],
+                subject_required: false,
                 default_constellation_family: "trading_permission",
                 default_constellation_map: "cbu.trading.matrix",
                 supports_handoff_mode: true,

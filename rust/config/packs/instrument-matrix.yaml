@@ -234,20 +234,21 @@ risk_policy:
   require_confirm_before_execute: true
   max_steps_without_confirm: 5
 
-required_questions:
-  - field: cbu_name
-    prompt: "Which CBU is this for?"
-    answer_kind: entity_ref
+required_questions: []
 
 optional_questions:
+  - field: cbu_name
+    prompt: "Which CBU is this for? (leave blank for group template)"
+    answer_kind: entity_ref
+
   - field: profile_action
-    prompt: "What would you like to do? (create profile / review / configure)"
+    prompt: "What would you like to do? (create template / attach to CBU / review / configure)"
     answer_kind: enum
     options_source: profile_actions
     default: "review"
 
 pack_summary_template: >
-  Instrument Matrix for {{answers.cbu_name}}.
+  Instrument Matrix {{answers.cbu_name}}.
 
 section_layout:
   - title: "Trading Profile"

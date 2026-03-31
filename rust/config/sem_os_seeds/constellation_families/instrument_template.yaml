@@ -1,0 +1,30 @@
+fqn: family.instrument_template
+family_id: instrument_template
+label: Instrument Matrix Template
+description: >
+  Group-level instrument matrix template design. Design the master trading
+  matrix at group level — instrument families, settlement patterns, ISDA,
+  corporate actions. Templates are cloned to CBUs on attachment.
+domain_id: trading
+selection_rules:
+  - condition: "true"
+    target_constellation: instrument.template
+    priority: 55
+constellation_refs:
+  - constellation_id: instrument.template
+    label: Instrument Matrix Template
+    jurisdiction: ALL
+    entity_kind: client-group
+    triggers:
+      - template
+      - instrument template
+      - matrix template
+      - group trading
+      - design matrix
+candidate_jurisdictions: [ALL]
+candidate_entity_kinds: [client-group]
+grounding_threshold:
+  required_input_keys:
+    - client_group_id
+  requires_entity_instance: false
+  allows_draft_instance: true

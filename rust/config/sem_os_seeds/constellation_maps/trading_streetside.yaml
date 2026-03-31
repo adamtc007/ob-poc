@@ -1,5 +1,10 @@
 constellation: trading.streetside
-description: Street-side operations constellation — trading profiles, custody, settlement, booking principals, service delivery. Post-KYC approval operations.
+description: >
+  CBU-level instrument matrix instance — runtime artefact. Created by
+  cloning a group template (instrument.template constellation). Adds
+  CBU-specific configuration: custody SSIs, booking principals, instruction
+  profiles, cash sweep, delivery channels, and CBU-level overlays.
+  The attachment step (trading-profile.clone-to) bridges from template to instance.
 jurisdiction: ALL
 slots:
   cbu:
@@ -18,6 +23,8 @@ slots:
     depends_on: [cbu]
     state_machine: trading_profile_lifecycle
     verbs:
+      # Attachment: clone from group template → CBU instance
+      clone_from_template: { verb: trading-profile.clone-to, when: empty }
       import: { verb: trading-profile.import, when: empty }
       create_draft: { verb: trading-profile.create-draft, when: [empty, filled] }
       read: { verb: trading-profile.read, when: filled }
