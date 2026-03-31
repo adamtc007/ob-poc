@@ -321,7 +321,7 @@ The single convergence point for all governance layers. Computed once per turn a
 
 | Step | Filter |
 |------|--------|
-| 1 | Base set from RuntimeVerbRegistry (~1,200 verbs) |
+| 1 | Base set from RuntimeVerbRegistry (~1,455 verbs) |
 | 2 | AgentMode filter (Research vs Governed) |
 | 3 | Scope + Workflow (merged: group scope + workflow phase) |
 | 4 | SemReg CCIR (SemOsContextEnvelope allowed set) |
