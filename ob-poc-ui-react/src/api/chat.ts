@@ -225,6 +225,58 @@ export const chatApi = {
   },
 
   /**
+   * Resume a session by creating a new one with the old session's scope context.
+   * The old session is a bookmark (group + workspace). The new session gets
+   * fresh state from the DB — no stale data, no TOCTOU risk.
+   *
+   * Falls back gracefully: if group or workspace no longer exists, the user
+   * lands at the appropriate tollgate instead of getting an error.
+   */
+  async resumeSession(
+    oldSession: ChatSessionSummary,
+  ): Promise<{ session: ChatSession; messages: ChatMessage[] }> {
+    // Create a fresh session
+    const session = await chatApi.createSession(
+      oldSession.client_group_name
+        ? `${oldSession.client_group_name} (resumed)`
+        : "Resumed session",
+    );
+
+    const messages: ChatMessage[] = [];
+
+    // Fast-forward through tollgates if we have saved context
+    if (oldSession.client_group_name) {
+      try {
+        const scopeResp = await chatApi.sendMessage(session.id, {
+          message: oldSession.client_group_name,
+        });
+        messages.push(scopeResp.message);
+
+        // If scope resolved and we have a workspace, select it
+        if (
+          oldSession.workspace &&
+          scopeResp.message.content &&
+          !scopeResp.message.content.includes("not found") &&
+          !scopeResp.message.content.includes("No matching")
+        ) {
+          try {
+            const wsResp = await chatApi.sendMessage(session.id, {
+              message: oldSession.workspace,
+            });
+            messages.push(wsResp.message);
+          } catch (e) {
+            console.warn("[resume] Workspace selection failed, user will pick manually:", e);
+          }
+        }
+      } catch (e) {
+        console.warn("[resume] Scope resolution failed, user will pick manually:", e);
+      }
+    }
+
+    return { session, messages };
+  },
+
+  /**
    * Send a message to a session (via unified /input endpoint)
    * Backend: POST /api/session/:id/input with { kind: "utterance", ... }
    */
@@ -250,7 +302,7 @@ export const chatApi = {
     const response = envelope.response;
     const assistantMessage = buildAssistantMessage(sessionId, response);
 
-    // Update local storage message count
+    // Update local storage: message count + scope context for session recovery
     const stored = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
     if (stored) {
       const sessions: ChatSessionSummary[] = JSON.parse(stored);
@@ -259,6 +311,34 @@ export const chatApi = {
         session.message_count = (session.message_count || 0) + 2;
         session.updated_at = new Date().toISOString();
         session.last_message_preview = request.message.slice(0, 100);
+        // Save scope context for session recovery (group + workspace)
+        const feedback = response.session_feedback as Record<string, unknown> | undefined;
+        if (feedback?.tos) {
+          const tos = feedback.tos as Record<string, unknown>;
+          if (tos.workspace && typeof tos.workspace === "string") {
+            session.workspace = tos.workspace;
+          }
+        }
+        // Extract group name from scope-related decision prompts
+        if (response.decision?.kind === "clarify_workspace" && response.message) {
+          const match = response.message.match(/Scope set to (.+?)\./);
+          if (match) {
+            session.client_group_name = match[1];
+          }
+        }
+        // Extract group ID from session_feedback scope if available
+        if (feedback) {
+          const sf = feedback as Record<string, unknown>;
+          if (sf.scope && typeof sf.scope === "object" && sf.scope !== null) {
+            const scope = sf.scope as Record<string, unknown>;
+            if (scope.client_group_id) {
+              session.client_group_id = String(scope.client_group_id);
+            }
+            if (scope.client_group_name) {
+              session.client_group_name = String(scope.client_group_name);
+            }
+          }
+        }
         localStorage.setItem(
           CHAT_SESSIONS_STORAGE_KEY,
           JSON.stringify(sessions),

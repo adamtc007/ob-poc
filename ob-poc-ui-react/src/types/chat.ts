@@ -351,6 +351,10 @@ export interface ChatSessionSummary {
   updated_at: string;
   message_count: number;
   last_message_preview?: string;
+  /** Saved context for session recovery — resume creates a fresh session with this scope */
+  client_group_id?: string;
+  client_group_name?: string;
+  workspace?: string;
 }
 
 /** Verb argument profile */

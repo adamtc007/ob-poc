@@ -50,6 +50,26 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
     },
   });
 
+  // Resume session mutation — creates a new session with the old session's scope
+  const resumeMutation = useMutation({
+    mutationFn: (oldSession: ChatSessionSummary) =>
+      chatApi.resumeSession(oldSession),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
+      navigate(`/chat/${result.session.id}`);
+    },
+  });
+
+  const handleSessionClick = (session: ChatSessionSummary) => {
+    if (session.client_group_name || session.workspace) {
+      // Has saved context — resume by creating a fresh session with same scope
+      resumeMutation.mutate(session);
+    } else {
+      // No saved context — just navigate to it (will show initial prompt)
+      navigate(`/chat/${session.id}`);
+    }
+  };
+
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (confirm("Delete this session?")) {
@@ -87,7 +107,7 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
             {sessions.map((session: ChatSessionSummary) => (
               <button
                 key={session.id}
-                onClick={() => navigate(`/chat/${session.id}`)}
+                onClick={() => handleSessionClick(session)}
                 className={cn(
                   "group flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors",
                   sessionId === session.id
@@ -98,7 +118,9 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
                 <MessageSquare size={16} className="mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {session.title || "Untitled Session"}
+                    {session.client_group_name
+                      ? `${session.client_group_name}${session.workspace ? ` / ${session.workspace}` : ""}`
+                      : session.title || `Session ${session.id.slice(0, 8)}`}
                   </p>
                   {session.last_message_preview && (
                     <p className="text-xs text-[var(--text-muted)] truncate">
