@@ -777,9 +777,7 @@ impl ScenarioIndex {
                         let leaf_fqn = self
                             .resolve_verb_sub_selector(sub, signals)
                             .unwrap_or_else(|| sub.default_verb_fqn.clone());
-                        ResolvedRoute::Verb {
-                            verb_fqn: leaf_fqn,
-                        }
+                        ResolvedRoute::Verb { verb_fqn: leaf_fqn }
                     }
                     Some(opt) if opt.verb_fqn.is_some() => {
                         // Single-axis leaf
@@ -800,14 +798,11 @@ impl ScenarioIndex {
                                 options: options
                                     .iter()
                                     .filter_map(|o| {
-                                        let fqn = o
-                                            .verb_fqn
-                                            .clone()
-                                            .or_else(|| {
-                                                o.sub_select
-                                                    .as_ref()
-                                                    .map(|s| s.default_verb_fqn.clone())
-                                            })?;
+                                        let fqn = o.verb_fqn.clone().or_else(|| {
+                                            o.sub_select
+                                                .as_ref()
+                                                .map(|s| s.default_verb_fqn.clone())
+                                        })?;
                                         Some((o.value.clone(), fqn))
                                     })
                                     .collect(),

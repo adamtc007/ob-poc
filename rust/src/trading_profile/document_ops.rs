@@ -86,7 +86,9 @@ pub async fn get_profile_cbu_id(pool: &PgPool, profile_id: Uuid) -> Result<Uuid,
     .await?
     .ok_or(DocumentOpError::ProfileNotFound(profile_id))?;
 
-    Ok(row.cbu_id)
+    row.cbu_id.ok_or_else(|| {
+        DocumentOpError::InvalidReference(format!("Profile {profile_id} has no CBU assigned"))
+    })
 }
 
 /// Update profile document in database
@@ -2076,7 +2078,11 @@ pub async fn clone_to_cbu(
     .await?
     .ok_or(DocumentOpError::ProfileNotFound(source_profile_id))?;
 
-    let source_cbu_id = source_row.cbu_id;
+    let source_cbu_id = source_row.cbu_id.ok_or_else(|| {
+        DocumentOpError::InvalidReference(format!(
+            "Profile {source_profile_id} has no CBU assigned"
+        ))
+    })?;
     let mut doc: TradingProfileDocument = serde_json::from_value(source_row.document.clone())?;
 
     // Prevent cloning to the same CBU (use create-draft with copy_from_profile instead)

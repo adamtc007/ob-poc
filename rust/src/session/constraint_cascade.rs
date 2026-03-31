@@ -308,12 +308,25 @@ pub fn verb_available_for_persona(verb_fqn: &str, persona: Persona) -> bool {
         Persona::Kyc => {
             // KYC focuses on kyc, entity, ubo, document domains
             // Note: verb FQN domains like "kyc-case" start with "kyc-"
-            domain.starts_with("kyc") || matches!(
-                domain,
-                "entity" | "entity-workstream" | "ubo" | "document" | "case" | "session" | "view"
-                    | "structure" | "screening" | "red-flag" | "requirement" | "identifier"
-                    | "tollgate" | "allegation" | "bods"
-            )
+            domain.starts_with("kyc")
+                || matches!(
+                    domain,
+                    "entity"
+                        | "entity-workstream"
+                        | "ubo"
+                        | "document"
+                        | "case"
+                        | "session"
+                        | "view"
+                        | "structure"
+                        | "screening"
+                        | "red-flag"
+                        | "requirement"
+                        | "identifier"
+                        | "tollgate"
+                        | "allegation"
+                        | "bods"
+                )
         }
         Persona::Trading => {
             // Trading focuses on trading, instruments, markets
@@ -552,7 +565,10 @@ mod tests {
     fn test_verb_available_for_persona_admin() {
         assert!(verb_available_for_persona("admin.reset", Persona::Admin));
         assert!(verb_available_for_persona("system.config", Persona::Admin));
-        assert!(verb_available_for_persona("kyc-case.create", Persona::Admin));
+        assert!(verb_available_for_persona(
+            "kyc-case.create",
+            Persona::Admin
+        ));
         assert!(verb_available_for_persona(
             "trading-profile.create",
             Persona::Admin

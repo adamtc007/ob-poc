@@ -477,7 +477,9 @@ impl CustomOperation for TradingProfileMaterializeOp {
         .fetch_one(pool)
         .await?;
 
-        let cbu_id = row.cbu_id;
+        let cbu_id = row
+            .cbu_id
+            .ok_or_else(|| anyhow::anyhow!("Trading profile {profile_id} has no CBU assigned"))?;
         let document: TradingProfileDocument = serde_json::from_value(row.document)?;
 
         let mut result = MaterializationResult {
@@ -4092,7 +4094,9 @@ impl CustomOperation for TradingProfileApproveOp {
         .fetch_one(pool)
         .await?;
 
-        let cbu_id = row.cbu_id;
+        let cbu_id = row
+            .cbu_id
+            .ok_or_else(|| anyhow::anyhow!("Trading profile {profile_id} has no CBU assigned"))?;
         let document: TradingProfileDocument = serde_json::from_value(row.document)?;
 
         // Start transaction for materialization

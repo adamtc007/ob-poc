@@ -504,7 +504,16 @@ mod e2e_tests {
 
         // Test: "load the allianz book" should match session.load-cluster
         let results = searcher
-            .search("load the allianz book", None, None, None, 5, None, None, None)
+            .search(
+                "load the allianz book",
+                None,
+                None,
+                None,
+                5,
+                None,
+                None,
+                None,
+            )
             .await?;
 
         assert!(!results.is_empty(), "Should find at least one verb match");

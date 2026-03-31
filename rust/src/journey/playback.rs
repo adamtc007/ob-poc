@@ -58,9 +58,12 @@ impl PackPlayback {
             for (key, value) in answers {
                 let len = match value {
                     serde_json::Value::Array(arr) => arr.len().to_string(),
-                    serde_json::Value::String(s) => {
-                        s.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).count().to_string()
-                    }
+                    serde_json::Value::String(s) => s
+                        .split(',')
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .count()
+                        .to_string(),
                     _ => "0".to_string(),
                 };
                 summary = summary.replace(&format!("{{{{answers.{}.length}}}}", key), &len);

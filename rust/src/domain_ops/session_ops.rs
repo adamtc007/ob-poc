@@ -1484,7 +1484,7 @@ impl CustomOperation for SessionSetMandateOp {
         let result = SetMandateResult {
             mandate_id,
             mandate_name: display_name,
-            structure_id: Some(profile.cbu_id),
+            structure_id: profile.cbu_id,
         };
 
         Ok(ExecutionResult::Record(json!(result)))

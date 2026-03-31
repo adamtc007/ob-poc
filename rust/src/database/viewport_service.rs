@@ -406,7 +406,7 @@ impl ViewportService {
 
         Ok(Some(InstrumentMatrixSummary {
             profile_id: profile.profile_id,
-            cbu_id: profile.cbu_id,
+            cbu_id,
             version: profile.version,
             status: profile.status,
             instrument_type_count,

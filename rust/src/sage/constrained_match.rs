@@ -423,11 +423,7 @@ fn preferred_scoped_verbs(utterance_lower: &str, tokens: &[String]) -> &'static 
         &["screening.sanctions", "screening.run"]
     } else if has_any_token(tokens, GLEIF_WORDS) {
         if has_parent_lookup_intent(tokens) {
-            &[
-                "gleif.lookup",
-                "gleif.trace-ownership",
-                "gleif.import-tree",
-            ]
+            &["gleif.lookup", "gleif.trace-ownership", "gleif.import-tree"]
         } else if has_gleif_enrich_intent(tokens) {
             &["gleif.enrich", "gleif.lookup"]
         } else if has_gleif_import_intent(tokens) {
@@ -902,7 +898,8 @@ pub async fn resolve_constrained_hybrid(
         || utterance_lower.contains("add a role");
     let entity_creation_ok = !has_entity_create_intent || !top.verb.starts_with("cbu.assign-role");
     let investor_lookup_ok = !has_investor_intent || top.verb != "cbu.parties";
-    let circular_ownership_ok = !has_circular_ownership || !top.verb.starts_with("ubo.compute-chains");
+    let circular_ownership_ok =
+        !has_circular_ownership || !top.verb.starts_with("ubo.compute-chains");
     let generic_screening_ok = !has_generic_screening_check || top.verb == "screening.sanctions";
     let ownership_domain_ok = !has_ownership_intent
         || top.verb.starts_with("ubo.")
@@ -1029,11 +1026,7 @@ mod tests {
                 "entity",
                 vec!["entity", "update", "modify"],
             ),
-            (
-                "deal.update",
-                "deal",
-                vec!["deal", "update", "record"],
-            ),
+            ("deal.update", "deal", vec!["deal", "update", "record"]),
         ]);
 
         let result = resolve_constrained("update something", &valid);

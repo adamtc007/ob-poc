@@ -1647,7 +1647,16 @@ impl ToolHandlers {
 
         // Perform hybrid search with SemReg pre-constraint (Phase 3 CCIR)
         let results = searcher
-            .search(query, None, domain, None, limit, allowed_verbs_ref, None, None)
+            .search(
+                query,
+                None,
+                domain,
+                None,
+                limit,
+                allowed_verbs_ref,
+                None,
+                None,
+            )
             .await?;
 
         Ok(json!({

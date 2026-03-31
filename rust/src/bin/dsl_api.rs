@@ -17,8 +17,9 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{FromRow, PgPool, Row};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
@@ -770,7 +771,7 @@ fn find_closest_with_score(target: &str, candidates: &[String]) -> Option<(Strin
 // Query Handlers
 // ============================================================================
 
-#[derive(Serialize)]
+#[derive(Serialize, FromRow)]
 struct CbuSummary {
     cbu_id: Uuid,
     name: String,
@@ -781,9 +782,8 @@ struct CbuSummary {
 async fn list_cbus(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<CbuSummary>>, (StatusCode, String)> {
-    let rows = sqlx::query_as!(
-        CbuSummary,
-        r#"SELECT cbu_id, name, jurisdiction, client_type FROM "ob-poc".cbus ORDER BY created_at DESC"#
+    let rows = sqlx::query_as::<_, CbuSummary>(
+        r#"SELECT cbu_id, name, jurisdiction, client_type FROM "ob-poc".cbus ORDER BY created_at DESC"#,
     )
     .fetch_all(&state.pool)
     .await
@@ -796,18 +796,18 @@ async fn get_cbu(
     State(state): State<AppState>,
     Path(cbu_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let cbu = sqlx::query!(
+    let cbu = sqlx::query(
         r#"SELECT cbu_id, name, jurisdiction, client_type, description,
                   created_at, updated_at
            FROM "ob-poc".cbus WHERE cbu_id = $1"#,
-        cbu_id
     )
+    .bind(cbu_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     .ok_or((StatusCode::NOT_FOUND, "CBU not found".to_string()))?;
 
-    let entities = sqlx::query!(
+    let entities = sqlx::query(
         r#"SELECT e.entity_id, e.name, et.name as entity_type,
                   r.name as role_name
            FROM "ob-poc".cbu_entity_roles cer
@@ -815,25 +815,25 @@ async fn get_cbu(
            JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
            JOIN "ob-poc".roles r ON cer.role_id = r.role_id
            WHERE cer.cbu_id = $1"#,
-        cbu_id
     )
+    .bind(cbu_id)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let result = serde_json::json!({
-        "cbu_id": cbu.cbu_id,
-        "name": cbu.name,
-        "jurisdiction": cbu.jurisdiction,
-        "client_type": cbu.client_type,
-        "description": cbu.description,
-        "created_at": cbu.created_at,
-        "updated_at": cbu.updated_at,
+        "cbu_id": cbu.try_get::<Uuid, _>("cbu_id").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "name": cbu.try_get::<String, _>("name").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "jurisdiction": cbu.try_get::<Option<String>, _>("jurisdiction").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "client_type": cbu.try_get::<Option<String>, _>("client_type").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "description": cbu.try_get::<Option<String>, _>("description").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "created_at": cbu.try_get::<Option<DateTime<Utc>>, _>("created_at").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "updated_at": cbu.try_get::<Option<DateTime<Utc>>, _>("updated_at").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
         "entities": entities.iter().map(|e| serde_json::json!({
-            "entity_id": e.entity_id,
-            "name": e.name,
-            "entity_type": e.entity_type,
-            "role": e.role_name
+            "entity_id": e.try_get::<Uuid, _>("entity_id").ok(),
+            "name": e.try_get::<String, _>("name").ok(),
+            "entity_type": e.try_get::<Option<String>, _>("entity_type").ok().flatten(),
+            "role": e.try_get::<Option<String>, _>("role_name").ok().flatten()
         })).collect::<Vec<_>>()
     });
 
@@ -844,56 +844,56 @@ async fn get_kyc_case(
     State(state): State<AppState>,
     Path(case_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let case_row = sqlx::query!(
+    let case_row = sqlx::query(
         r#"SELECT case_id, cbu_id, status, case_type, risk_rating,
                   opened_at, closed_at
            FROM "ob-poc".cases WHERE case_id = $1"#,
-        case_id
     )
+    .bind(case_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     .ok_or((StatusCode::NOT_FOUND, "Case not found".to_string()))?;
 
-    let workstreams = sqlx::query!(
+    let workstreams = sqlx::query(
         r#"SELECT workstream_id, entity_id, status, is_ubo, risk_rating
            FROM "ob-poc".entity_workstreams WHERE case_id = $1"#,
-        case_id
     )
+    .bind(case_id)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let flags = sqlx::query!(
+    let flags = sqlx::query(
         r#"SELECT red_flag_id, flag_type, severity, status, description
            FROM "ob-poc".red_flags WHERE case_id = $1"#,
-        case_id
     )
+    .bind(case_id)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let result = serde_json::json!({
-        "case_id": case_row.case_id,
-        "cbu_id": case_row.cbu_id,
-        "status": case_row.status,
-        "case_type": case_row.case_type,
-        "risk_rating": case_row.risk_rating,
-        "opened_at": case_row.opened_at,
-        "closed_at": case_row.closed_at,
+        "case_id": case_row.try_get::<Uuid, _>("case_id").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "cbu_id": case_row.try_get::<Option<Uuid>, _>("cbu_id").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "status": case_row.try_get::<String, _>("status").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "case_type": case_row.try_get::<Option<String>, _>("case_type").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "risk_rating": case_row.try_get::<Option<String>, _>("risk_rating").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "opened_at": case_row.try_get::<Option<DateTime<Utc>>, _>("opened_at").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        "closed_at": case_row.try_get::<Option<DateTime<Utc>>, _>("closed_at").map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
         "workstreams": workstreams.iter().map(|w| serde_json::json!({
-            "workstream_id": w.workstream_id,
-            "entity_id": w.entity_id,
-            "status": w.status,
-            "is_ubo": w.is_ubo,
-            "risk_rating": w.risk_rating
+            "workstream_id": w.try_get::<Uuid, _>("workstream_id").ok(),
+            "entity_id": w.try_get::<Uuid, _>("entity_id").ok(),
+            "status": w.try_get::<String, _>("status").ok(),
+            "is_ubo": w.try_get::<Option<bool>, _>("is_ubo").ok().flatten(),
+            "risk_rating": w.try_get::<Option<String>, _>("risk_rating").ok().flatten()
         })).collect::<Vec<_>>(),
         "red_flags": flags.iter().map(|f| serde_json::json!({
-            "red_flag_id": f.red_flag_id,
-            "flag_type": f.flag_type,
-            "severity": f.severity,
-            "status": f.status,
-            "description": f.description
+            "red_flag_id": f.try_get::<Uuid, _>("red_flag_id").ok(),
+            "flag_type": f.try_get::<Option<String>, _>("flag_type").ok().flatten(),
+            "severity": f.try_get::<Option<String>, _>("severity").ok().flatten(),
+            "status": f.try_get::<Option<String>, _>("status").ok().flatten(),
+            "description": f.try_get::<Option<String>, _>("description").ok().flatten()
         })).collect::<Vec<_>>()
     });
 

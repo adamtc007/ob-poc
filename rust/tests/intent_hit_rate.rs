@@ -237,7 +237,7 @@ mod tests {
                     5,                           // limit
                     None,                        // allowed_verbs (no SemReg in test)
                     None,                        // entity_mention_spans
-                    None,                        // constellation_index (not available in offline test)
+                    None, // constellation_index (not available in offline test)
                 )
                 .await;
 

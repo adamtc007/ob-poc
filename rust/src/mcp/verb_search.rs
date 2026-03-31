@@ -141,13 +141,12 @@ impl From<&ResolvedRoute> for JourneyRoute {
             ResolvedRoute::Verb { verb_fqn } => JourneyRoute::Verb {
                 verb_fqn: verb_fqn.clone(),
             },
-            ResolvedRoute::NeedsVerbSelection {
-                select_on,
-                options,
-            } => JourneyRoute::NeedsVerbSelection {
-                select_on: select_on.clone(),
-                options: options.clone(),
-            },
+            ResolvedRoute::NeedsVerbSelection { select_on, options } => {
+                JourneyRoute::NeedsVerbSelection {
+                    select_on: select_on.clone(),
+                    options: options.clone(),
+                }
+            }
         }
     }
 }
@@ -545,7 +544,9 @@ impl HybridVerbSearcher {
         limit: usize,
         allowed_verbs: Option<&HashSet<String>>,
         entity_mention_spans: Option<&[(usize, usize)]>,
-        constellation_index: Option<&crate::agent::constellation_verb_index::ConstellationVerbIndex>,
+        constellation_index: Option<
+            &crate::agent::constellation_verb_index::ConstellationVerbIndex,
+        >,
     ) -> Result<Vec<VerbSearchResult>> {
         let mut results = Vec::new();
         let mut seen_verbs: HashSet<String> = HashSet::new();
@@ -969,10 +970,7 @@ impl HybridVerbSearcher {
                                 verb: vm.verb_fqn.clone(),
                                 score: 0.94,
                                 source: VerbSearchSource::ConstellationIndex,
-                                matched_phrase: format!(
-                                    "constellation:({},{})",
-                                    noun, action
-                                ),
+                                matched_phrase: format!("constellation:({},{})", noun, action),
                                 journey: None,
                                 description: None,
                             });
@@ -1373,7 +1371,7 @@ impl HybridVerbSearcher {
             for result in &mut results {
                 // Check if verb FQN's action part starts with the stem.
                 // E.g., stem "create" matches "cbu.create", "entity.create-placeholder"
-                let action_part = result.verb.split('.').last().unwrap_or("");
+                let action_part = result.verb.split('.').next_back().unwrap_or("");
                 if action_part == stem.as_str() || action_part.starts_with(&format!("{}-", stem)) {
                     result.score += boost;
                     boosted_count += 1;

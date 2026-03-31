@@ -240,9 +240,21 @@ impl CustomOperation for ClientGroupEntityManageOp {
 
         match action.as_str() {
             "add" => ClientGroupEntityAddOp.execute(verb_call, ctx, pool).await,
-            "remove" => ClientGroupEntityRemoveOp.execute(verb_call, ctx, pool).await,
-            "confirm" => ClientGroupConfirmEntityOp.execute(verb_call, ctx, pool).await,
-            "reject" => ClientGroupRejectEntityOp.execute(verb_call, ctx, pool).await,
+            "remove" => {
+                ClientGroupEntityRemoveOp
+                    .execute(verb_call, ctx, pool)
+                    .await
+            }
+            "confirm" => {
+                ClientGroupConfirmEntityOp
+                    .execute(verb_call, ctx, pool)
+                    .await
+            }
+            "reject" => {
+                ClientGroupRejectEntityOp
+                    .execute(verb_call, ctx, pool)
+                    .await
+            }
             other => Err(anyhow::anyhow!(
                 "Unknown entity-manage action '{}'. Valid: add, remove, confirm, reject",
                 other

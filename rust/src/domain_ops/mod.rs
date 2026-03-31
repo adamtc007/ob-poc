@@ -203,8 +203,8 @@ pub use attribute_ops::{
     DocumentCheckExtractionCoverageOp, DocumentListAttributesOp,
 };
 pub use cbu_ops::{
-    CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuLinkStructureOp, CbuListStructureLinksOp,
-    CbuInspectOp,
+    CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuInspectOp, CbuLinkStructureOp,
+    CbuListStructureLinksOp,
 };
 pub use cbu_role_ops::{
     CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOwnershipOp, CbuRoleAssignServiceOp,

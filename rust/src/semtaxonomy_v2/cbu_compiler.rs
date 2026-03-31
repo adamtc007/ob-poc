@@ -788,9 +788,7 @@ fn ensure_primary_binding(
 ) -> Result<()> {
     let required_binding = match verb {
         "entity.read" | "entity.update" => Some(("entity-id", "entity")),
-        "deal.read" | "deal.update" | "deal.update-status" => {
-            Some(("deal-id", "deal"))
-        }
+        "deal.read" | "deal.update" | "deal.update-status" => Some(("deal-id", "deal")),
         "contract.get" | "contract.update" | "contract.terminate" => {
             Some(("contract-id", "contract"))
         }

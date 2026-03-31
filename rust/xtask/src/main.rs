@@ -10,8 +10,6 @@ use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
 mod allianz_harness;
-mod instrument_harness;
-mod onboarding_harness;
 mod aviva_deal_harness;
 mod bpmn_lite;
 mod calibration;
@@ -25,7 +23,9 @@ mod gleif_test;
 mod governed_cache;
 mod governed_check;
 mod harness;
+mod instrument_harness;
 mod lexicon;
+mod onboarding_harness;
 mod replay_tuner;
 mod seed_allianz;
 mod sem_reg;
@@ -1326,8 +1326,8 @@ fn main() -> Result<()> {
         Command::OnboardingHarness { mode, verbose } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(async {
-                let db_url =
-                    std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+                let db_url = std::env::var("DATABASE_URL")
+                    .unwrap_or_else(|_| "postgresql:///data_designer".to_string());
                 let pool = sqlx::PgPool::connect(&db_url).await?;
                 onboarding_harness::run_onboarding_harness(&pool, &mode, verbose).await
             })
@@ -1335,8 +1335,8 @@ fn main() -> Result<()> {
         Command::InstrumentHarness { mode, verbose } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(async {
-                let db_url =
-                    std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+                let db_url = std::env::var("DATABASE_URL")
+                    .unwrap_or_else(|_| "postgresql:///data_designer".to_string());
                 let pool = sqlx::PgPool::connect(&db_url).await?;
                 instrument_harness::run_instrument_harness(&pool, &mode, verbose).await
             })
@@ -3110,10 +3110,7 @@ fn collect_constellation_verbs(
     }
 }
 
-fn collect_slot_verbs(
-    slots: &serde_yaml::Mapping,
-    verbs: &mut std::collections::HashSet<String>,
-) {
+fn collect_slot_verbs(slots: &serde_yaml::Mapping, verbs: &mut std::collections::HashSet<String>) {
     for (_slot_name, slot_def) in slots {
         if let Some(slot_map) = slot_def.as_mapping() {
             // Extract verbs from this slot

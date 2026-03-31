@@ -18,6 +18,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use sqlx::Row;
 use tokio::net::TcpListener;
 use tonic::transport::Server;
 use uuid::Uuid;
@@ -1659,7 +1660,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
     //    and find the dead-lettered one.
     //    Since list_active_for_instance only returns active, we use find_by_job_key
     //    indirectly. We'll poll the DB for frames with the dead_lettered status.
-    let row = sqlx::query!(
+    let row = sqlx::query(
         r#"
         SELECT job_key, status, attempts
         FROM "ob-poc".bpmn_job_frames
@@ -1667,19 +1668,22 @@ async fn e2e_13_dead_letter_queue_promotion() {
         ORDER BY activated_at DESC
         LIMIT 1
         "#,
-        process_instance_id,
     )
+    .bind(process_instance_id)
     .fetch_optional(&rig.pool)
     .await
     .expect("DB error");
 
     let row = row.expect("Expected at least one job frame");
+    let job_key: i64 = row.try_get("job_key").expect("job_key should be present");
+    let status: String = row.try_get("status").expect("status should be present");
+    let attempts: i32 = row.try_get("attempts").expect("attempts should be present");
     eprintln!(
         "Step 3: Frame job_key={}, status={}, attempts={}",
-        row.job_key, row.status, row.attempts
+        job_key, status, attempts
     );
     assert_eq!(
-        row.status, "dead_lettered",
+        status, "dead_lettered",
         "Job should be promoted to dead-letter queue after max_retries exceeded"
     );
 

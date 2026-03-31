@@ -509,16 +509,11 @@ impl ReplSessionV2 {
     pub fn hydrate_tos(&mut self, state_view: WorkspaceStateView) {
         if let Some(tos) = self.workspace_stack.last_mut() {
             // Build constellation verb index from hydrated slots (Tier -0.5 in verb search)
-            tos.constellation_verb_index = state_view
-                .hydrated_constellation
-                .as_ref()
-                .map(|c| {
-                    std::sync::Arc::new(
-                        crate::agent::constellation_verb_index::ConstellationVerbIndex::build(
-                            &c.slots,
-                        ),
-                    )
-                });
+            tos.constellation_verb_index = state_view.hydrated_constellation.as_ref().map(|c| {
+                std::sync::Arc::new(
+                    crate::agent::constellation_verb_index::ConstellationVerbIndex::build(&c.slots),
+                )
+            });
             tos.hydrated_state = Some(state_view);
             tos.stale = false;
             self.active_workspace = Some(tos.workspace.clone());

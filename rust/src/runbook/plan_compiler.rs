@@ -297,7 +297,10 @@ mod tests {
     fn compile_three_workspace_plan() {
         let inputs = vec![
             make_input(WorkspaceKind::Cbu, vec![("cbu.create", "Create CBU")]),
-            make_input(WorkspaceKind::Kyc, vec![("kyc-case.create", "Open KYC Case")]),
+            make_input(
+                WorkspaceKind::Kyc,
+                vec![("kyc-case.create", "Open KYC Case")],
+            ),
             make_input(WorkspaceKind::Deal, vec![("deal.create", "Create Deal")]),
         ];
         let plan = compile_runbook_plan(Uuid::nil(), &inputs, vec![]).unwrap();
@@ -311,7 +314,10 @@ mod tests {
     fn dag_ordering_has_dependencies() {
         let inputs = vec![
             make_input(WorkspaceKind::Cbu, vec![("cbu.create", "Create CBU")]),
-            make_input(WorkspaceKind::Kyc, vec![("kyc-case.create", "Open KYC Case")]),
+            make_input(
+                WorkspaceKind::Kyc,
+                vec![("kyc-case.create", "Open KYC Case")],
+            ),
         ];
         let plan = compile_runbook_plan(Uuid::nil(), &inputs, vec![]).unwrap();
         // Step 1 depends on step 0

@@ -240,15 +240,32 @@ async fn try_route_through_repl(
                 }
             } else if matches!(
                 trimmed.to_lowercase().as_str(),
-                "confirm" | "yes" | "go" | "do it" | "run it" | "run"
-                    | "execute" | "proceed" | "make it so" | "ok"
-                    | "yep" | "sure" | "approved" | "lgtm"
+                "confirm"
+                    | "yes"
+                    | "go"
+                    | "do it"
+                    | "run it"
+                    | "run"
+                    | "execute"
+                    | "proceed"
+                    | "make it so"
+                    | "ok"
+                    | "yep"
+                    | "sure"
+                    | "approved"
+                    | "lgtm"
             ) {
                 UserInputV2::Confirm
             } else if matches!(
                 trimmed.to_lowercase().as_str(),
-                "no" | "reject" | "cancel" | "nope" | "not that"
-                    | "wrong" | "try again" | "skip" | "back"
+                "no" | "reject"
+                    | "cancel"
+                    | "nope"
+                    | "not that"
+                    | "wrong"
+                    | "try again"
+                    | "skip"
+                    | "back"
             ) {
                 UserInputV2::Reject
             } else {

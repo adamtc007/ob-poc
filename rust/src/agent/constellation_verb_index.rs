@@ -181,7 +181,10 @@ impl ConstellationVerbIndex {
     /// Results are sorted by priority (1 = domain-prefix match first, 2 = slot-name fallback).
     pub fn lookup(&self, noun: &str, action: &str) -> Vec<&VerbMatch> {
         let key = (normalize(noun), normalize_action(action));
-        let mut matches: Vec<&VerbMatch> = self.forward.get(&key).map_or_else(Vec::new, |v| v.iter().collect());
+        let mut matches: Vec<&VerbMatch> = self
+            .forward
+            .get(&key)
+            .map_or_else(Vec::new, |v| v.iter().collect());
         matches.sort_by_key(|m| m.priority);
         matches
     }
@@ -261,7 +264,12 @@ impl ConstellationVerbIndex {
         pairs.sort_by(|((n1, a1), _), ((n2, a2), _)| (n1, a1).cmp(&(n2, a2)));
         for ((noun, action), matches) in &pairs {
             let verbs: Vec<_> = matches.iter().map(|m| m.verb_fqn.as_str()).collect();
-            out.push_str(&format!("  ({}, {}) → [{}]\n", noun, action, verbs.join(", ")));
+            out.push_str(&format!(
+                "  ({}, {}) → [{}]\n",
+                noun,
+                action,
+                verbs.join(", ")
+            ));
         }
 
         // Reverse
@@ -300,16 +308,11 @@ fn flatten_slots(slots: &[HydratedSlot]) -> Vec<&HydratedSlot> {
 /// `"entity-workstream.update-status"` → `"update"` (first segment before hyphen)
 /// `"screening.run"` → `"run"`
 fn extract_action_from_fqn(fqn: &str) -> String {
-    let action_part = fqn
-        .rsplit_once('.')
-        .map_or(fqn, |(_, action)| action);
+    let action_part = fqn.rsplit_once('.').map_or(fqn, |(_, action)| action);
 
     // Normalize compound actions: "update-status" → "update", "trace-chain" → "trace"
     // This aligns with how extract_action_stem produces single-word stems.
-    let stem = action_part
-        .split('-')
-        .next()
-        .unwrap_or(action_part);
+    let stem = action_part.split('-').next().unwrap_or(action_part);
 
     normalize_action(stem)
 }
@@ -641,8 +644,16 @@ mod tests {
     #[test]
     fn test_two_clue_lookup() {
         let slots = vec![
-            make_slot("kyc_case", "open", &["kyc-case.read", "kyc-case.update-status", "kyc-case.close"]),
-            make_slot("screening", "empty", &["screening.run", "screening.sanctions", "screening.pep"]),
+            make_slot(
+                "kyc_case",
+                "open",
+                &["kyc-case.read", "kyc-case.update-status", "kyc-case.close"],
+            ),
+            make_slot(
+                "screening",
+                "empty",
+                &["screening.run", "screening.sanctions", "screening.pep"],
+            ),
         ];
 
         let idx = ConstellationVerbIndex::build(&slots);
@@ -660,9 +671,11 @@ mod tests {
 
     #[test]
     fn test_by_noun_lookup() {
-        let slots = vec![
-            make_slot("kyc_case", "open", &["kyc-case.read", "kyc-case.close"]),
-        ];
+        let slots = vec![make_slot(
+            "kyc_case",
+            "open",
+            &["kyc-case.read", "kyc-case.close"],
+        )];
         let idx = ConstellationVerbIndex::build(&slots);
 
         let verbs = idx.lookup_by_noun("case");
@@ -685,9 +698,7 @@ mod tests {
 
     #[test]
     fn test_reverse_lookup() {
-        let slots = vec![
-            make_slot("kyc_case", "open", &["kyc-case.read"]),
-        ];
+        let slots = vec![make_slot("kyc_case", "open", &["kyc-case.read"])];
         let idx = ConstellationVerbIndex::build(&slots);
 
         let contexts = idx.slot_contexts("kyc-case.read");
@@ -699,9 +710,7 @@ mod tests {
     #[test]
     fn test_children_flattened() {
         let mut parent = make_slot("kyc_case", "open", &["kyc-case.read"]);
-        parent.children = vec![
-            make_slot("tollgate", "empty", &["tollgate.evaluate"]),
-        ];
+        parent.children = vec![make_slot("tollgate", "empty", &["tollgate.evaluate"])];
 
         let idx = ConstellationVerbIndex::build(&[parent]);
         assert_eq!(idx.stats().total_slots, 2);
@@ -724,9 +733,7 @@ mod tests {
     #[test]
     fn test_synonym_normalization() {
         // "show" and "read" should both resolve to "read"
-        let slots = vec![
-            make_slot("kyc_case", "open", &["kyc-case.read"]),
-        ];
+        let slots = vec![make_slot("kyc_case", "open", &["kyc-case.read"])];
         let idx = ConstellationVerbIndex::build(&slots);
 
         // lookup with "show" should find verbs whose action normalizes to "read"
@@ -801,10 +808,7 @@ mod tests {
         kyc_case.children = vec![make_slot(
             "tollgate",
             "empty",
-            &[
-                "tollgate.evaluate",
-                "tollgate.check-gate",
-            ],
+            &["tollgate.evaluate", "tollgate.check-gate"],
         )];
 
         let entity_ws = make_slot(
@@ -895,8 +899,8 @@ mod tests {
             ("kyc", "escalate"),
             ("pep", "run"),
             ("sanctions", "check"),
-            ("flag", "create"),   // will the stem "create" → "raise"? No — but "raise" isn't in stems
-            ("ubo", "trace"),     // not in this constellation — should be empty
+            ("flag", "create"), // will the stem "create" → "raise"? No — but "raise" isn't in stems
+            ("ubo", "trace"),   // not in this constellation — should be empty
         ];
 
         for (noun, action) in &queries {
@@ -922,29 +926,43 @@ mod tests {
     fn diag_lux_sicav() {
         // Simulate Lux UCITS SICAV at early lifecycle:
         // - CBU created, roles being assigned (placeholders)
-        let cbu = make_slot("cbu", "filled", &[
-            "cbu.create", "cbu.read", "cbu.inspect", "cbu.parties",
-        ]);
-        let manco = make_slot("management_company", "placeholder", &[
-            "cbu.assign-role", "party.search", "entity.resolve-placeholder",
-        ]);
-        let depositary = make_slot("depositary", "empty", &[
-            "entity.ensure-or-placeholder", "party.add",
-        ]);
-        let investment_mgr = make_slot("investment_manager", "empty", &[
-            "entity.ensure-or-placeholder", "entity.resolve-placeholder",
-        ]);
-        let ownership = make_slot("ownership_chain", "empty", &[
-            "ubo.discover", "ubo.allege",
-        ]);
-        let case = make_slot("case", "intake", &[
-            "case.open", "case.submit",
-        ]);
-        let mandate = make_slot("mandate", "empty", &[
-            "mandate.create",
-        ]);
+        let cbu = make_slot(
+            "cbu",
+            "filled",
+            &["cbu.create", "cbu.read", "cbu.inspect", "cbu.parties"],
+        );
+        let manco = make_slot(
+            "management_company",
+            "placeholder",
+            &[
+                "cbu.assign-role",
+                "party.search",
+                "entity.resolve-placeholder",
+            ],
+        );
+        let depositary = make_slot(
+            "depositary",
+            "empty",
+            &["entity.ensure-or-placeholder", "party.add"],
+        );
+        let investment_mgr = make_slot(
+            "investment_manager",
+            "empty",
+            &["entity.ensure-or-placeholder", "entity.resolve-placeholder"],
+        );
+        let ownership = make_slot("ownership_chain", "empty", &["ubo.discover", "ubo.allege"]);
+        let case = make_slot("case", "intake", &["case.open", "case.submit"]);
+        let mandate = make_slot("mandate", "empty", &["mandate.create"]);
 
-        let slots = vec![cbu, manco, depositary, investment_mgr, ownership, case, mandate];
+        let slots = vec![
+            cbu,
+            manco,
+            depositary,
+            investment_mgr,
+            ownership,
+            case,
+            mandate,
+        ];
         let idx = ConstellationVerbIndex::build(&slots);
 
         println!("\n{}", idx.dump());
@@ -955,13 +973,13 @@ mod tests {
             ("manco", "assign"),
             ("depositary", "create"),
             ("depositary", "add"),
-            ("ubo", "trace"),        // "discover" maps to "search", not "trace"
+            ("ubo", "trace"), // "discover" maps to "search", not "trace"
             ("ubo", "search"),
             ("ownership", "compute"),
             ("case", "create"),
             ("mandate", "create"),
             ("cbu", "read"),
-            ("custodian", "create"),  // synonym for depositary
+            ("custodian", "create"), // synonym for depositary
         ];
 
         for (noun, action) in &queries {

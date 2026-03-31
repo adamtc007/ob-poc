@@ -33,7 +33,6 @@ use ob_poc::dsl_v2::{compile, parse_program, DslExecutor, ExecutionContext, Exec
 const TEST_GROUP_NAME: &str = "Harness Test Corp";
 const TEST_MANCO_NAME: &str = "Harness ManCo Ltd";
 const TEST_DEPOSITARY_NAME: &str = "Harness Depositary Bank";
-const TEST_DIRECTOR_NAME: &str = "John Harness Director";
 const TEST_UBO_NAME: &str = "Jane Harness UBO";
 const TEST_FUND_NAME: &str = "Harness UCITS Fund";
 
@@ -186,10 +185,7 @@ impl OnboardingHarness {
             )
             .await?;
         self.state.manco_entity_id = Self::extract_uuid(&results);
-        println!(
-            "  ManCo created: {:?}",
-            self.state.manco_entity_id
-        );
+        println!("  ManCo created: {:?}", self.state.manco_entity_id);
 
         // Create depositary entity
         let results = self
@@ -345,41 +341,51 @@ impl OnboardingHarness {
     pub async fn phase_documents(&mut self) -> Result<()> {
         println!("\n=== Phase 4: Document Evidence ===");
 
-        let case_id = self.state.case_id.context("KYC case not created")?;
+        let _case_id = self.state.case_id.context("KYC case not created")?;
         let workstream_id = self.state.workstream_id.context("Workstream not created")?;
 
         // Create document request for passport
-        match self.exec(
-            "docs",
-            &format!(
-                r#"(document.create-request :workstream-id "{}" :doc-type "PASSPORT")"#,
-                workstream_id
-            ),
-        ).await {
+        match self
+            .exec(
+                "docs",
+                &format!(
+                    r#"(document.create-request :workstream-id "{}" :doc-type "PASSPORT")"#,
+                    workstream_id
+                ),
+            )
+            .await
+        {
             Ok(results) => {
                 let req_id = Self::extract_uuid(&results);
                 println!("  Document request created: {:?}", req_id);
 
                 // Mark as requested (sent to client)
                 if let Some(rid) = req_id {
-                    let _ = self.exec(
-                        "docs",
-                        &format!(r#"(document.mark-requested :request-id "{}")"#, rid),
-                    ).await;
+                    let _ = self
+                        .exec(
+                            "docs",
+                            &format!(r#"(document.mark-requested :request-id "{}")"#, rid),
+                        )
+                        .await;
                     println!("  Document marked as requested");
 
                     // Mark as received
-                    let _ = self.exec(
-                        "docs",
-                        &format!(r#"(document.mark-received :request-id "{}")"#, rid),
-                    ).await;
+                    let _ = self
+                        .exec(
+                            "docs",
+                            &format!(r#"(document.mark-received :request-id "{}")"#, rid),
+                        )
+                        .await;
                     println!("  Document marked as received");
 
                     // Verify the document
-                    match self.exec(
-                        "docs",
-                        &format!(r#"(document.verify-request :request-id "{}")"#, rid),
-                    ).await {
+                    match self
+                        .exec(
+                            "docs",
+                            &format!(r#"(document.verify-request :request-id "{}")"#, rid),
+                        )
+                        .await
+                    {
                         Ok(_) => println!("  Document verified ✓"),
                         Err(e) => println!("  Document verify skipped: {}", e),
                     }
@@ -387,31 +393,53 @@ impl OnboardingHarness {
             }
             Err(e) => {
                 println!("  Document request failed: {}", e);
-                self.state.errors.push(format!("document.create-request: {}", e));
+                self.state
+                    .errors
+                    .push(format!("document.create-request: {}", e));
             }
         }
 
         // Create a second document request (proof of address)
-        match self.exec(
-            "docs",
-            &format!(
-                r#"(document.create-request :workstream-id "{}" :doc-type "PROOF_OF_ADDRESS")"#,
-                workstream_id
-            ),
-        ).await {
+        match self
+            .exec(
+                "docs",
+                &format!(
+                    r#"(document.create-request :workstream-id "{}" :doc-type "PROOF_OF_ADDRESS")"#,
+                    workstream_id
+                ),
+            )
+            .await
+        {
             Ok(results) => {
                 let req_id = Self::extract_uuid(&results);
                 println!("  Second document request created: {:?}", req_id);
                 if let Some(rid) = req_id {
-                    let _ = self.exec("docs", &format!(r#"(document.mark-requested :request-id "{}")"#, rid)).await;
-                    let _ = self.exec("docs", &format!(r#"(document.mark-received :request-id "{}")"#, rid)).await;
-                    let _ = self.exec("docs", &format!(r#"(document.verify-request :request-id "{}")"#, rid)).await;
+                    let _ = self
+                        .exec(
+                            "docs",
+                            &format!(r#"(document.mark-requested :request-id "{}")"#, rid),
+                        )
+                        .await;
+                    let _ = self
+                        .exec(
+                            "docs",
+                            &format!(r#"(document.mark-received :request-id "{}")"#, rid),
+                        )
+                        .await;
+                    let _ = self
+                        .exec(
+                            "docs",
+                            &format!(r#"(document.verify-request :request-id "{}")"#, rid),
+                        )
+                        .await;
                     println!("  Second document verified ✓");
                 }
             }
             Err(e) => {
                 println!("  Second document failed: {}", e);
-                self.state.errors.push(format!("document.create-request(2): {}", e));
+                self.state
+                    .errors
+                    .push(format!("document.create-request(2): {}", e));
             }
         }
 
@@ -444,10 +472,13 @@ impl OnboardingHarness {
         let workstream_id = self.state.workstream_id.context("Workstream not created")?;
 
         // Run screening (creates PENDING records — no external provider call)
-        match self.exec(
-            "screening",
-            &format!(r#"(screening.run :workstream-id "{}")"#, workstream_id),
-        ).await {
+        match self
+            .exec(
+                "screening",
+                &format!(r#"(screening.run :workstream-id "{}")"#, workstream_id),
+            )
+            .await
+        {
             Ok(_) => println!("  Screening initiated (PENDING)"),
             Err(e) => {
                 println!("  Screening skipped: {}", e);
@@ -470,10 +501,16 @@ impl OnboardingHarness {
         let case_id = self.state.case_id.context("KYC case not created")?;
 
         // Run tollgate evaluation
-        match self.exec(
-            "tollgate",
-            &format!(r#"(tollgate.evaluate :case-id "{}" :evaluation-type "DISCOVERY_COMPLETE")"#, case_id),
-        ).await {
+        match self
+            .exec(
+                "tollgate",
+                &format!(
+                    r#"(tollgate.evaluate :case-id "{}" :evaluation-type "DISCOVERY_COMPLETE")"#,
+                    case_id
+                ),
+            )
+            .await
+        {
             Ok(results) => {
                 let eval_id = Self::extract_uuid(&results);
                 println!("  Tollgate evaluation: {:?}", eval_id);
@@ -487,10 +524,16 @@ impl OnboardingHarness {
         }
 
         // Check decision readiness
-        match self.exec(
-            "tollgate",
-            &format!(r#"(tollgate.get-decision-readiness :case-id "{}")"#, case_id),
-        ).await {
+        match self
+            .exec(
+                "tollgate",
+                &format!(
+                    r#"(tollgate.get-decision-readiness :case-id "{}")"#,
+                    case_id
+                ),
+            )
+            .await
+        {
             Ok(_) => println!("  Decision readiness checked"),
             Err(e) => println!("  Decision readiness skipped: {}", e),
         }
@@ -510,7 +553,10 @@ impl OnboardingHarness {
         // Delete CBU cascade (removes case, workstreams, screenings)
         if let Some(cbu_id) = self.state.cbu_id {
             match self
-                .exec("cleanup", &format!(r#"(cbu.delete-cascade :cbu-id "{}")"#, cbu_id))
+                .exec(
+                    "cleanup",
+                    &format!(r#"(cbu.delete-cascade :cbu-id "{}")"#, cbu_id),
+                )
                 .await
             {
                 Ok(_) => println!("  CBU deleted: {}", cbu_id),
@@ -573,10 +619,7 @@ impl OnboardingHarness {
         self.phase_tollgate().await?;
 
         println!("\n=== Summary ===");
-        println!(
-            "  Phases: {}",
-            self.state.phases_completed.join(" → ")
-        );
+        println!("  Phases: {}", self.state.phases_completed.join(" → "));
         println!("  Verbs executed: {}", self.state.verb_log.len());
         println!(
             "  Total time: {}ms",
@@ -611,18 +654,20 @@ impl OnboardingHarness {
 
     async fn load_existing_state(&mut self) -> Result<()> {
         // Find the test group by name
-        let row: Option<(Uuid,)> = sqlx::query_as(
-            r#"SELECT id FROM "ob-poc".client_group WHERE canonical_name = $1"#,
-        )
-        .bind(TEST_GROUP_NAME)
-        .fetch_optional(&self.pool)
-        .await?;
+        let row: Option<(Uuid,)> =
+            sqlx::query_as(r#"SELECT id FROM "ob-poc".client_group WHERE canonical_name = $1"#)
+                .bind(TEST_GROUP_NAME)
+                .fetch_optional(&self.pool)
+                .await?;
 
         if let Some((id,)) = row {
             self.state.group_id = Some(id);
             println!("  Found existing group: {}", id);
         } else {
-            anyhow::bail!("Test group '{}' not found — run setup first", TEST_GROUP_NAME);
+            anyhow::bail!(
+                "Test group '{}' not found — run setup first",
+                TEST_GROUP_NAME
+            );
         }
         Ok(())
     }
@@ -632,11 +677,7 @@ impl OnboardingHarness {
 // Entry Point (called from xtask main)
 // =============================================================================
 
-pub async fn run_onboarding_harness(
-    pool: &PgPool,
-    mode: &str,
-    verbose: bool,
-) -> Result<()> {
+pub async fn run_onboarding_harness(pool: &PgPool, mode: &str, verbose: bool) -> Result<()> {
     let mut harness = OnboardingHarness::new(pool.clone(), verbose).await?;
 
     match mode {

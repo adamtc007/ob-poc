@@ -177,7 +177,13 @@ impl WorkspaceKind {
             Self::Kyc => WorkspaceRegistryEntry {
                 workspace_id: self.clone(),
                 display_name: self.label(),
-                constellation_families: vec!["kyc_workspace", "ownership", "clearance", "delta_review", "screening"],
+                constellation_families: vec![
+                    "kyc_workspace",
+                    "ownership",
+                    "clearance",
+                    "delta_review",
+                    "screening",
+                ],
                 subject_kinds: vec![
                     SubjectKind::ClientGroup,
                     SubjectKind::Case,
@@ -191,8 +197,17 @@ impl WorkspaceKind {
             Self::InstrumentMatrix => WorkspaceRegistryEntry {
                 workspace_id: self.clone(),
                 display_name: self.label(),
-                constellation_families: vec!["instrument_workspace", "instrument_template", "trading_permission", "lifecycle"],
-                subject_kinds: vec![SubjectKind::Matrix, SubjectKind::Cbu, SubjectKind::ClientGroup],
+                constellation_families: vec![
+                    "instrument_workspace",
+                    "instrument_template",
+                    "trading_permission",
+                    "lifecycle",
+                ],
+                subject_kinds: vec![
+                    SubjectKind::Matrix,
+                    SubjectKind::Cbu,
+                    SubjectKind::ClientGroup,
+                ],
                 subject_required: false,
                 default_constellation_family: "trading_permission",
                 default_constellation_map: "cbu.trading.matrix",

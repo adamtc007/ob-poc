@@ -23,7 +23,6 @@ use ob_poc::dsl_v2::{compile, parse_program, DslExecutor, ExecutionContext, Exec
 // =============================================================================
 
 const TEST_CBU_NAME: &str = "Harness Trading Fund";
-const TEST_PRINCIPAL_NAME: &str = "Harness Booking Principal";
 
 // =============================================================================
 // State
@@ -150,7 +149,10 @@ impl InstrumentHarness {
             }
             Err(e) => {
                 // Profile already exists — try to get the active one
-                println!("  Trading profile create skipped ({}), trying get-active...", e);
+                println!(
+                    "  Trading profile create skipped ({}), trying get-active...",
+                    e
+                );
                 match self
                     .exec(
                         "setup",
@@ -172,7 +174,10 @@ impl InstrumentHarness {
         // Read trading profile
         if let Some(pid) = self.state.profile_id {
             match self
-                .exec("setup", &format!(r#"(trading-profile.read :profile-id "{}")"#, pid))
+                .exec(
+                    "setup",
+                    &format!(r#"(trading-profile.read :profile-id "{}")"#, pid),
+                )
                 .await
             {
                 Ok(_) => println!("  Trading profile read ✓"),
@@ -216,17 +221,16 @@ impl InstrumentHarness {
         match self
             .exec(
                 "custody",
-                &format!(
-                    r#"(cbu-custody.list-ssis :cbu-id "{}")"#,
-                    cbu_id
-                ),
+                &format!(r#"(cbu-custody.list-ssis :cbu-id "{}")"#, cbu_id),
             )
             .await
         {
             Ok(_) => println!("  SSIs listed ✓"),
             Err(e) => {
                 println!("  SSI list skipped: {}", e);
-                self.state.errors.push(format!("cbu-custody.list-ssis: {}", e));
+                self.state
+                    .errors
+                    .push(format!("cbu-custody.list-ssis: {}", e));
             }
         }
 
@@ -254,7 +258,7 @@ impl InstrumentHarness {
     pub async fn phase_booking(&mut self) -> Result<()> {
         println!("\n=== Phase 3: Booking Principal ===");
 
-        let cbu_id = self.state.cbu_id.context("CBU not created")?;
+        let _cbu_id = self.state.cbu_id.context("CBU not created")?;
 
         // Use seeded BNY Mellon SA/NV legal entity (booking_principal FK → legal_entity table)
         let legal_entity_id = "a1000000-0000-0000-0000-000000000001";
@@ -361,7 +365,9 @@ impl InstrumentHarness {
             Ok(_) => println!("  Event types listed ✓"),
             Err(e) => {
                 println!("  Event types skipped: {}", e);
-                self.state.errors.push(format!("corporate-action.list-event-types: {}", e));
+                self.state
+                    .errors
+                    .push(format!("corporate-action.list-event-types: {}", e));
             }
         }
 
@@ -425,7 +431,10 @@ impl InstrumentHarness {
 
         if let Some(cbu_id) = self.state.cbu_id {
             match self
-                .exec("cleanup", &format!(r#"(cbu.delete-cascade :cbu-id "{}")"#, cbu_id))
+                .exec(
+                    "cleanup",
+                    &format!(r#"(cbu.delete-cascade :cbu-id "{}")"#, cbu_id),
+                )
                 .await
             {
                 Ok(_) => println!("  CBU deleted: {}", cbu_id),
@@ -436,7 +445,10 @@ impl InstrumentHarness {
         // Delete custody entity
         if let Some(eid) = self.state.custody_id {
             match self
-                .exec("cleanup", &format!(r#"(entity.delete :entity-id "{}")"#, eid))
+                .exec(
+                    "cleanup",
+                    &format!(r#"(entity.delete :entity-id "{}")"#, eid),
+                )
                 .await
             {
                 Ok(_) => println!("  Custody entity deleted: {}", eid),
@@ -492,7 +504,10 @@ impl InstrumentHarness {
 
         // Create client group
         let results = self
-            .exec("template", r#"(client-group.create :canonical-name "Harness IM Group")"#)
+            .exec(
+                "template",
+                r#"(client-group.create :canonical-name "Harness IM Group")"#,
+            )
             .await?;
         let group_id = Self::extract_uuid(&results).context("Failed to create group")?;
         println!("  Group created: {}", group_id);
@@ -511,7 +526,9 @@ impl InstrumentHarness {
             }
             Err(e) => {
                 println!("  Template create failed: {}", e);
-                self.state.errors.push(format!("template create-draft: {}", e));
+                self.state
+                    .errors
+                    .push(format!("template create-draft: {}", e));
             }
         }
 
@@ -672,7 +689,12 @@ impl InstrumentHarness {
         println!("\n  Cleaning up...");
         // Delete entities
         for eid in [im_entity_id, ao_entity_id].iter().flatten() {
-            let _ = self.exec("cleanup", &format!(r#"(entity.delete :entity-id "{}")"#, eid)).await;
+            let _ = self
+                .exec(
+                    "cleanup",
+                    &format!(r#"(entity.delete :entity-id "{}")"#, eid),
+                )
+                .await;
         }
         // Delete group
         let _ = sqlx::query(r#"DELETE FROM "ob-poc".client_group WHERE id = $1"#)
@@ -689,11 +711,7 @@ impl InstrumentHarness {
 // Entry Point
 // =============================================================================
 
-pub async fn run_instrument_harness(
-    pool: &PgPool,
-    mode: &str,
-    verbose: bool,
-) -> Result<()> {
+pub async fn run_instrument_harness(pool: &PgPool, mode: &str, verbose: bool) -> Result<()> {
     let mut harness = InstrumentHarness::new(pool.clone(), verbose).await?;
 
     match mode {

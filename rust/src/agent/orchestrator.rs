@@ -2641,10 +2641,7 @@ fn build_journey_pipeline_result(
             );
             (dsl, PipelineOutcome::Ready, vec![note], None, None)
         }
-        JourneyRoute::NeedsVerbSelection {
-            select_on,
-            options,
-        } => {
+        JourneyRoute::NeedsVerbSelection { select_on, options } => {
             let note = format!(
                 "Tier -2 journey needs verb selection on '{}': {} options",
                 select_on,

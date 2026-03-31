@@ -375,7 +375,9 @@ pub fn extract_compound_signals(utterance: &str) -> CompoundSignals {
     // was detected but the vehicle type uniquely identifies one, infer it.
     if signals.jurisdiction.is_none() {
         if let Some(ref vt) = signals.vehicle_type {
-            if let Some((_, jur)) = VEHICLE_JURISDICTION_MAP.iter().find(|(v, _)| *v == vt.as_str())
+            if let Some((_, jur)) = VEHICLE_JURISDICTION_MAP
+                .iter()
+                .find(|(v, _)| *v == vt.as_str())
             {
                 signals.jurisdiction = Some(jur.to_string());
             }
@@ -891,25 +893,58 @@ mod tests {
 
     #[test]
     fn test_query_direction_upward() {
-        assert_eq!(extract_query_direction("who owns this company"), Some("upward".into()));
-        assert_eq!(extract_query_direction("show me the shareholders"), Some("upward".into()));
-        assert_eq!(extract_query_direction("who are the beneficial owners"), Some("upward".into()));
-        assert_eq!(extract_query_direction("identify ubos for this entity"), Some("upward".into()));
+        assert_eq!(
+            extract_query_direction("who owns this company"),
+            Some("upward".into())
+        );
+        assert_eq!(
+            extract_query_direction("show me the shareholders"),
+            Some("upward".into())
+        );
+        assert_eq!(
+            extract_query_direction("who are the beneficial owners"),
+            Some("upward".into())
+        );
+        assert_eq!(
+            extract_query_direction("identify ubos for this entity"),
+            Some("upward".into())
+        );
     }
 
     #[test]
     fn test_query_direction_downward() {
-        assert_eq!(extract_query_direction("what does Allianz own"), Some("downward".into()));
-        assert_eq!(extract_query_direction("show subsidiaries"), Some("downward".into()));
-        assert_eq!(extract_query_direction("list owned entities"), Some("downward".into()));
+        assert_eq!(
+            extract_query_direction("what does Allianz own"),
+            Some("downward".into())
+        );
+        assert_eq!(
+            extract_query_direction("show subsidiaries"),
+            Some("downward".into())
+        );
+        assert_eq!(
+            extract_query_direction("list owned entities"),
+            Some("downward".into())
+        );
     }
 
     #[test]
     fn test_query_direction_full() {
-        assert_eq!(extract_query_direction("show me the ownership structure"), Some("full".into()));
-        assert_eq!(extract_query_direction("build the control graph"), Some("full".into()));
-        assert_eq!(extract_query_direction("trace all chains"), Some("full".into()));
-        assert_eq!(extract_query_direction("analyze ownership gaps"), Some("full".into()));
+        assert_eq!(
+            extract_query_direction("show me the ownership structure"),
+            Some("full".into())
+        );
+        assert_eq!(
+            extract_query_direction("build the control graph"),
+            Some("full".into())
+        );
+        assert_eq!(
+            extract_query_direction("trace all chains"),
+            Some("full".into())
+        );
+        assert_eq!(
+            extract_query_direction("analyze ownership gaps"),
+            Some("full".into())
+        );
     }
 
     #[test]
@@ -922,15 +957,30 @@ mod tests {
 
     #[test]
     fn test_relationship_type_ownership() {
-        assert_eq!(extract_relationship_type("who owns this"), Some("ownership".into()));
-        assert_eq!(extract_relationship_type("show shareholding"), Some("ownership".into()));
+        assert_eq!(
+            extract_relationship_type("who owns this"),
+            Some("ownership".into())
+        );
+        assert_eq!(
+            extract_relationship_type("show shareholding"),
+            Some("ownership".into())
+        );
     }
 
     #[test]
     fn test_relationship_type_control() {
-        assert_eq!(extract_relationship_type("who controls this"), Some("control".into()));
-        assert_eq!(extract_relationship_type("show board members"), Some("control".into()));
-        assert_eq!(extract_relationship_type("list governance controllers"), Some("control".into()));
+        assert_eq!(
+            extract_relationship_type("who controls this"),
+            Some("control".into())
+        );
+        assert_eq!(
+            extract_relationship_type("show board members"),
+            Some("control".into())
+        );
+        assert_eq!(
+            extract_relationship_type("list governance controllers"),
+            Some("control".into())
+        );
     }
 
     #[test]
@@ -975,28 +1025,55 @@ mod tests {
     #[test]
     fn test_action_stem_create() {
         assert_eq!(extract_action_stem("create a fund"), Some("create".into()));
-        assert_eq!(extract_action_stem("set up a new CBU"), Some("create".into()));
-        assert_eq!(extract_action_stem("open a KYC case"), Some("create".into()));
-        assert_eq!(extract_action_stem("spin up a new entity"), Some("create".into()));
+        assert_eq!(
+            extract_action_stem("set up a new CBU"),
+            Some("create".into())
+        );
+        assert_eq!(
+            extract_action_stem("open a KYC case"),
+            Some("create".into())
+        );
+        assert_eq!(
+            extract_action_stem("spin up a new entity"),
+            Some("create".into())
+        );
     }
 
     #[test]
     fn test_action_stem_list() {
         assert_eq!(extract_action_stem("list all owners"), Some("list".into()));
-        assert_eq!(extract_action_stem("show me the shareholders"), Some("list".into()));
-        assert_eq!(extract_action_stem("display the requirements"), Some("list".into()));
+        assert_eq!(
+            extract_action_stem("show me the shareholders"),
+            Some("list".into())
+        );
+        assert_eq!(
+            extract_action_stem("display the requirements"),
+            Some("list".into())
+        );
     }
 
     #[test]
     fn test_action_stem_update() {
-        assert_eq!(extract_action_stem("update the entity address"), Some("update".into()));
-        assert_eq!(extract_action_stem("modify the trading profile"), Some("update".into()));
-        assert_eq!(extract_action_stem("change the risk rating"), Some("update".into()));
+        assert_eq!(
+            extract_action_stem("update the entity address"),
+            Some("update".into())
+        );
+        assert_eq!(
+            extract_action_stem("modify the trading profile"),
+            Some("update".into())
+        );
+        assert_eq!(
+            extract_action_stem("change the risk rating"),
+            Some("update".into())
+        );
     }
 
     #[test]
     fn test_action_stem_trace() {
-        assert_eq!(extract_action_stem("trace the ownership chain"), Some("trace".into()));
+        assert_eq!(
+            extract_action_stem("trace the ownership chain"),
+            Some("trace".into())
+        );
     }
 
     #[test]
@@ -1009,9 +1086,18 @@ mod tests {
     #[test]
     fn test_action_stem_practitioner_slang() {
         // "Chase" is practitioner slang for "solicit" (follow-up/remind)
-        assert_eq!(extract_action_stem("chase the passport"), Some("solicit".into()));
-        assert_eq!(extract_action_stem("follow up on the documents"), Some("solicit".into()));
-        assert_eq!(extract_action_stem("remind them about the cert"), Some("solicit".into()));
+        assert_eq!(
+            extract_action_stem("chase the passport"),
+            Some("solicit".into())
+        );
+        assert_eq!(
+            extract_action_stem("follow up on the documents"),
+            Some("solicit".into())
+        );
+        assert_eq!(
+            extract_action_stem("remind them about the cert"),
+            Some("solicit".into())
+        );
     }
 
     #[test]

@@ -22,6 +22,9 @@ pub enum AstDbError {
     #[error("CBU not found: {0}")]
     CbuNotFound(Uuid),
 
+    #[error("Profile has no CBU assigned: {0}")]
+    ProfileMissingCbu(Uuid),
+
     #[error("Profile is not in DRAFT status, cannot modify")]
     NotDraft,
 
@@ -360,7 +363,8 @@ pub async fn activate_profile(
         profile_id
     )
     .fetch_one(pool)
-    .await?;
+    .await?
+    .ok_or(AstDbError::ProfileMissingCbu(profile_id))?;
 
     // Supersede any existing ACTIVE profile for this CBU
     sqlx::query!(

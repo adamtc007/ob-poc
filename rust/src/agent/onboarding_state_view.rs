@@ -379,11 +379,7 @@ fn build_approval_layer(c: &GroupCompositeState) -> OnboardingLayer {
 
     let mut forward = filter_hints(
         &c.next_likely_verbs,
-        &[
-            "deal.request-onboarding",
-            "kyc-case.read",
-            "deal.read",
-        ],
+        &["deal.request-onboarding", "kyc-case.read", "deal.read"],
         VerbDirection::Query,
     );
 

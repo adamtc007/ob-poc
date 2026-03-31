@@ -547,7 +547,7 @@ async fn create_session_v2(
         runbook_summary: None,
         step_count: 0,
         session_feedback: None,
-            narration: None,
+        narration: None,
     };
 
     Ok(Json(CreateSessionResponseV2 {
