@@ -1,0 +1,580 @@
+# Instrument Matrix Macros
+#
+# Taxonomy-driven assembly macros for trading profile composition.
+# Each asset family macro expands to the primitive verbs for that
+# instrument type: add component + settlement chain + SSI + type-specific config.
+#
+# The 67 instrument classes collapse to 7 asset families. Most CBUs
+# use instrument.full-matrix-setup which chains all families.
+#
+# INVARIANTS:
+# - All macros require a trading profile to exist (create-draft first)
+# - Settlement chains and SSIs are per-market, not per-instrument
+# - OTC derivatives require ISDA; listed derivatives require exchange gateway
+
+# ============================================================================
+# Tier 1: Asset Family Setup Macros
+# ============================================================================
+
+instrument.setup-equity:
+  kind: macro
+
+  ui:
+    label: "Set Up Equity Trading"
+    description: "Add equity trading component — settlement chain, DVP SSIs, and booking rules for equities, ETFs, ADRs"
+    target-label: "Equity Component"
+
+  routing:
+    mode-tags: [trading, structure]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      market:
+        type: str
+        ui-label: "Market"
+        description: "Primary market MIC code (e.g., XLON, XPAR, XNYS)"
+    optional:
+      settlement-type:
+        type: str
+        ui-label: "Settlement Type"
+        default: "DVP"
+      currency:
+        type: str
+        ui-label: "Settlement Currency"
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.add-component
+      args:
+        component-type: "EQUITY"
+        market: "${arg.market}"
+    - verb: settlement-chain.create-chain
+      args:
+        name: "${arg.market}-EQUITY-DVP"
+        market: "${arg.market}"
+        currency: "${arg.currency}"
+    - verb: cbu-custody.derive-required-coverage
+      args: {}
+
+  aliases:
+    - "add equity trading"
+    - "set up equities"
+    - "configure equity settlement"
+    - "add equity component"
+    - "enable equity trading"
+
+instrument.setup-fixed-income:
+  kind: macro
+
+  ui:
+    label: "Set Up Fixed Income Trading"
+    description: "Add fixed income component — settlement chain, DVP SSIs for bonds, ABS, MBS"
+    target-label: "Fixed Income Component"
+
+  routing:
+    mode-tags: [trading, structure]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      market:
+        type: str
+        ui-label: "Market"
+    optional:
+      include-repo:
+        type: str
+        ui-label: "Include Repo Settlement"
+        default: "true"
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.add-component
+      args:
+        component-type: "FIXED_INCOME"
+        market: "${arg.market}"
+    - verb: settlement-chain.create-chain
+      args:
+        name: "${arg.market}-FI-DVP"
+        market: "${arg.market}"
+
+  aliases:
+    - "add fixed income"
+    - "set up bonds"
+    - "configure bond settlement"
+    - "add FI component"
+    - "enable fixed income trading"
+
+instrument.setup-otc-derivatives:
+  kind: macro
+
+  ui:
+    label: "Set Up OTC Derivatives Trading"
+    description: "Add OTC derivatives — ISDA agreement, CSA, trade gateway for swaps, CDS, FX derivatives"
+    target-label: "OTC Derivatives Component"
+
+  routing:
+    mode-tags: [trading, structure]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      counterparty:
+        type: str
+        ui-label: "Counterparty"
+        description: "ISDA counterparty name"
+      gateway-type:
+        type: str
+        ui-label: "Gateway Type"
+        default: "STANDARD"
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.add-component
+      args:
+        component-type: "OTC_DERIVATIVE"
+    - verb: isda.create
+      args: {}
+    - verb: trade-gateway.define-gateway
+      args:
+        gateway-type: "${arg.gateway-type}"
+
+  aliases:
+    - "add OTC derivatives"
+    - "set up swaps trading"
+    - "configure ISDA"
+    - "add derivatives component"
+    - "enable OTC trading"
+    - "set up IRS trading"
+    - "configure CDS"
+
+instrument.setup-listed-derivatives:
+  kind: macro
+
+  ui:
+    label: "Set Up Listed Derivatives Trading"
+    description: "Add listed derivatives — exchange gateway, settlement chain for futures and options"
+    target-label: "Listed Derivatives Component"
+
+  routing:
+    mode-tags: [trading, structure]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      market:
+        type: str
+        ui-label: "Exchange"
+        description: "Exchange MIC code"
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.add-component
+      args:
+        component-type: "LISTED_DERIVATIVE"
+        market: "${arg.market}"
+    - verb: trade-gateway.define-gateway
+      args:
+        gateway-type: "EXCHANGE"
+    - verb: settlement-chain.create-chain
+      args:
+        name: "${arg.market}-LISTED-DVP"
+        market: "${arg.market}"
+
+  aliases:
+    - "add listed derivatives"
+    - "set up futures trading"
+    - "configure exchange trading"
+    - "add futures and options"
+
+instrument.setup-fx:
+  kind: macro
+
+  ui:
+    label: "Set Up FX Trading"
+    description: "Add FX component — settlement chain, FX SSIs, netting configuration"
+    target-label: "FX Component"
+
+  routing:
+    mode-tags: [trading, structure]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      base-currency:
+        type: str
+        ui-label: "Base Currency"
+        default: "USD"
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.add-component
+      args:
+        component-type: "FX"
+    - verb: trading-profile.set-base-currency
+      args:
+        currency: "${arg.base-currency}"
+
+  aliases:
+    - "add FX trading"
+    - "set up foreign exchange"
+    - "configure FX settlement"
+    - "add currency trading"
+
+instrument.setup-money-market:
+  kind: macro
+
+  ui:
+    label: "Set Up Money Market Trading"
+    description: "Add money market component — settlement chain, SSIs for CP, CD, T-Bills, repo"
+    target-label: "Money Market Component"
+
+  routing:
+    mode-tags: [trading, structure]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      market:
+        type: str
+        ui-label: "Market"
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.add-component
+      args:
+        component-type: "MONEY_MARKET"
+        market: "${arg.market}"
+    - verb: settlement-chain.create-chain
+      args:
+        name: "${arg.market}-MM-DVP"
+        market: "${arg.market}"
+
+  aliases:
+    - "add money market"
+    - "set up money market trading"
+    - "configure T-bill settlement"
+    - "add repo trading"
+
+instrument.setup-funds:
+  kind: macro
+
+  ui:
+    label: "Set Up Fund Trading"
+    description: "Add fund component — subscription/redemption SSIs, TA links for CIS, UCITS, hedge funds"
+    target-label: "Fund Component"
+
+  routing:
+    mode-tags: [trading, structure]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      fund-type:
+        type: str
+        ui-label: "Fund Type"
+        default: "UCITS"
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.add-component
+      args:
+        component-type: "FUND"
+        fund-type: "${arg.fund-type}"
+
+  aliases:
+    - "add fund trading"
+    - "set up fund subscriptions"
+    - "configure fund settlement"
+    - "add UCITS trading"
+    - "set up hedge fund trading"
+
+# ============================================================================
+# Tier 2: Full Matrix Setup
+# ============================================================================
+
+instrument.full-matrix-setup:
+  kind: macro
+
+  ui:
+    label: "Full Instrument Matrix Setup"
+    description: "Complete instrument matrix — all asset families, settlement chains, SSIs, ISDA, and gateways"
+    target-label: "Complete Trading Matrix"
+
+  routing:
+    mode-tags: [trading, structure]
+    operator-domain: instrument
+
+  target:
+    operates-on: cbu-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      market:
+        type: str
+        ui-label: "Primary Market"
+        description: "Primary market MIC for settlement chains"
+    optional: {}
+
+  prereqs: []
+
+  expands-to:
+    - verb: trading-profile.create-draft
+      args: {}
+    - verb: trading-profile.add-component
+      args: { component-type: "EQUITY", market: "${arg.market}" }
+    - verb: trading-profile.add-component
+      args: { component-type: "FIXED_INCOME", market: "${arg.market}" }
+    - verb: trading-profile.add-component
+      args: { component-type: "OTC_DERIVATIVE" }
+    - verb: trading-profile.add-component
+      args: { component-type: "LISTED_DERIVATIVE", market: "${arg.market}" }
+    - verb: trading-profile.add-component
+      args: { component-type: "FX" }
+    - verb: trading-profile.add-component
+      args: { component-type: "MONEY_MARKET", market: "${arg.market}" }
+    - verb: trading-profile.add-component
+      args: { component-type: "FUND" }
+    - verb: settlement-chain.create-chain
+      args: { name: "${arg.market}-STANDARD", market: "${arg.market}" }
+    - verb: isda.create
+      args: {}
+    - verb: trading-profile.validate-go-live-ready
+      args: {}
+
+  aliases:
+    - "set up the full instrument matrix"
+    - "configure all trading"
+    - "complete instrument setup"
+    - "full trading configuration"
+    - "set up everything for trading"
+
+# ============================================================================
+# Tier 3: Operational Macros
+# ============================================================================
+
+instrument.review-coverage:
+  kind: macro
+
+  ui:
+    label: "Review Trading Coverage"
+    description: "Check universe coverage, booking coverage, and identify gaps across all components"
+    target-label: "Coverage Report"
+
+  routing:
+    mode-tags: [trading]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.validate-universe-coverage
+      args: {}
+    - verb: cbu-custody.validate-booking-coverage
+      args: {}
+    - verb: booking-principal.gap-report
+      args: {}
+
+  aliases:
+    - "review trading coverage"
+    - "check instrument coverage"
+    - "coverage gaps"
+    - "what's missing from the matrix"
+
+instrument.activate-profile:
+  kind: macro
+
+  ui:
+    label: "Activate Trading Profile"
+    description: "Validate, submit, approve and activate the trading profile for go-live"
+    target-label: "Profile Activation"
+
+  routing:
+    mode-tags: [trading]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.validate-go-live-ready
+      args: {}
+    - verb: trading-profile.submit
+      args: {}
+    - verb: trading-profile.approve
+      args: {}
+    - verb: trading-profile.activate
+      args: {}
+
+  aliases:
+    - "activate the trading profile"
+    - "go live with trading"
+    - "submit and approve profile"
+    - "make profile active"
+
+instrument.configure-corporate-actions:
+  kind: macro
+
+  ui:
+    label: "Configure Corporate Actions"
+    description: "Set up corporate action policies — election, notification, and event type enablement"
+    target-label: "CA Configuration"
+
+  routing:
+    mode-tags: [trading]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      election-policy:
+        type: str
+        ui-label: "Election Policy"
+        default: "MANUAL"
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.ca.set-election-policy
+      args:
+        policy: "${arg.election-policy}"
+    - verb: trading-profile.ca.set-notification-policy
+      args: {}
+    - verb: trading-profile.ca.enable-event-types
+      args: {}
+
+  aliases:
+    - "configure corporate actions"
+    - "set up CA policy"
+    - "corporate action configuration"
+    - "set election policy"
+
+instrument.clone-profile:
+  kind: macro
+
+  ui:
+    label: "Clone Trading Profile"
+    description: "Clone an existing trading profile to create a new version or copy to another CBU"
+    target-label: "Profile Clone"
+
+  routing:
+    mode-tags: [trading]
+    operator-domain: instrument
+
+  target:
+    operates-on: trading-profile-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      target-cbu:
+        type: str
+        ui-label: "Target CBU"
+        description: "CBU to clone to (leave blank for new version)"
+
+  prereqs:
+    - type: state_exists
+      key: trading_profile.exists
+
+  expands-to:
+    - verb: trading-profile.clone-to
+      args: {}
+
+  aliases:
+    - "clone the trading profile"
+    - "copy trading profile"
+    - "duplicate profile"
+    - "create profile version"

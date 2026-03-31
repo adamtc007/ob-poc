@@ -1,0 +1,273 @@
+# Instrument Matrix Journey Pack
+# Trading profile, settlement, custody, corporate actions, and instrument management
+
+id: instrument-matrix
+name: Instrument Matrix
+version: "1.0"
+description: >
+  Configure and manage the trading instrument matrix for a CBU.
+  Covers trading profiles, settlement chains, custody SSIs, booking
+  principals, corporate actions, ISDA, and trade gateways.
+
+invocation_phrases:
+  - "instrument matrix"
+  - "trading profile"
+  - "configure trading"
+  - "settlement setup"
+  - "custody setup"
+  - "SSI configuration"
+  - "booking principal"
+  - "trade gateway"
+  - "corporate actions"
+  - "matrix overlay"
+  - "cash sweep"
+
+required_context:
+  - client_group_id
+
+optional_context:
+  - default_cbu
+
+workspaces:
+  - instrument_matrix
+  - cbu
+
+allowed_verbs:
+  # Instrument macros (Tier 1-3)
+  - instrument.setup-equity
+  - instrument.setup-fixed-income
+  - instrument.setup-otc-derivatives
+  - instrument.setup-listed-derivatives
+  - instrument.setup-fx
+  - instrument.setup-money-market
+  - instrument.setup-funds
+  - instrument.full-matrix-setup
+  - instrument.review-coverage
+  - instrument.activate-profile
+  - instrument.configure-corporate-actions
+  - instrument.clone-profile
+  # Trading profile lifecycle
+  - trading-profile.import
+  - trading-profile.create-draft
+  - trading-profile.read
+  - trading-profile.get-active
+  - trading-profile.list-versions
+  - trading-profile.materialize
+  - trading-profile.activate
+  - trading-profile.diff
+  - trading-profile.clone-to
+  - trading-profile.create-new-version
+  - trading-profile.add-component
+  - trading-profile.remove-component
+  - trading-profile.set-base-currency
+  - trading-profile.link-csa-ssi
+  - trading-profile.update-im-scope
+  - trading-profile.submit
+  - trading-profile.approve
+  - trading-profile.reject
+  - trading-profile.archive
+  - trading-profile.validate-go-live-ready
+  - trading-profile.validate-universe-coverage
+  # Corporate action policy
+  - trading-profile.ca.get-policy
+  - trading-profile.ca.set-election-policy
+  - trading-profile.ca.set-notification-policy
+  - trading-profile.ca.add-cutoff-rule
+  - trading-profile.ca.remove-cutoff-rule
+  - trading-profile.ca.enable-event-types
+  - trading-profile.ca.disable-event-types
+  - trading-profile.ca.set-default-option
+  - trading-profile.ca.remove-default-option
+  - trading-profile.ca.link-proceeds-ssi
+  - trading-profile.ca.remove-proceeds-ssi
+  # Custody
+  - cbu-custody.setup-ssi
+  - cbu-custody.lookup-ssi
+  - cbu-custody.list-ssis
+  - cbu-custody.list-universe
+  - cbu-custody.list-booking-rules
+  - cbu-custody.list-agent-overrides
+  - cbu-custody.validate-booking-coverage
+  - cbu-custody.derive-required-coverage
+  # Settlement chain
+  - settlement-chain.create-chain
+  - settlement-chain.add-hop
+  - settlement-chain.remove-hop
+  - settlement-chain.list-chains
+  - settlement-chain.list-hops
+  - settlement-chain.deactivate-chain
+  - settlement-chain.define-location
+  - settlement-chain.list-locations
+  - settlement-chain.set-location-preference
+  - settlement-chain.list-location-preferences
+  - settlement-chain.set-cross-border
+  - settlement-chain.list-cross-border
+  - settlement-chain.deactivate-cross-border
+  # Entity settlement
+  - entity-settlement.add-ssi
+  - entity-settlement.remove-ssi
+  - entity-settlement.set-identity
+  # Booking principal
+  - booking-principal.create
+  - booking-principal.update
+  - booking-principal.retire
+  - booking-principal.evaluate
+  - booking-principal.select
+  - booking-principal.explain
+  - booking-principal.coverage-matrix
+  - booking-principal.gap-report
+  - booking-principal.impact-analysis
+  # Booking location
+  - booking-location.create
+  - booking-location.read
+  - booking-location.list
+  - booking-location.update
+  # Corporate actions
+  - corporate-action.define-event-type
+  - corporate-action.list-event-types
+  - corporate-action.set-preferences
+  - corporate-action.list-preferences
+  - corporate-action.remove-preference
+  - corporate-action.set-instruction-window
+  - corporate-action.list-instruction-windows
+  - corporate-action.link-ca-ssi
+  - corporate-action.list-ca-ssi-mappings
+  # Matrix overlay
+  - matrix-overlay.create
+  - matrix-overlay.read
+  - matrix-overlay.list
+  - matrix-overlay.update
+  - matrix-overlay.apply
+  - matrix-overlay.remove
+  - matrix-overlay.diff
+  - matrix-overlay.preview
+  - matrix-overlay.list-active
+  - matrix-overlay.add
+  - matrix-overlay.activate
+  - matrix-overlay.suspend
+  - matrix-overlay.list-by-subscription
+  - matrix-overlay.compare-products
+  - matrix-overlay.effective-matrix
+  - matrix-overlay.unified-gaps
+  # Cash sweep
+  - cash-sweep.configure
+  - cash-sweep.link-resource
+  - cash-sweep.list
+  - cash-sweep.update-threshold
+  - cash-sweep.update-timing
+  - cash-sweep.change-vehicle
+  - cash-sweep.suspend
+  - cash-sweep.reactivate
+  - cash-sweep.remove
+  # Trade gateway
+  - trade-gateway.define-gateway
+  - trade-gateway.enable-gateway
+  - trade-gateway.activate-gateway
+  - trade-gateway.suspend-gateway
+  - trade-gateway.read-gateway
+  - trade-gateway.list-gateways
+  - trade-gateway.list-cbu-gateways
+  - trade-gateway.add-routing-rule
+  - trade-gateway.remove-routing-rule
+  - trade-gateway.list-routing-rules
+  - trade-gateway.set-fallback
+  - trade-gateway.list-fallbacks
+  # ISDA
+  - isda.create
+  - isda.list
+  - isda.add-csa
+  - isda.remove-csa
+  - isda.add-coverage
+  - isda.remove-coverage
+  # Instruction profile
+  - instruction-profile.create-template
+  - instruction-profile.read-template
+  - instruction-profile.list-templates
+  - instruction-profile.define-message-type
+  - instruction-profile.list-message-types
+  - instruction-profile.list-assignments
+  - instruction-profile.list-field-overrides
+  # Tax config
+  - tax-config.define-jurisdiction
+  - tax-config.list-jurisdictions
+  - tax-config.set-tax-status
+  - tax-config.list-tax-status
+  - tax-config.set-treaty-rate
+  - tax-config.list-treaty-rates
+  - tax-config.set-reclaim-config
+  - tax-config.list-reclaim-configs
+  - tax-config.deactivate-reclaim
+  - tax-config.set-reporting
+  - tax-config.list-reporting
+  # Movement
+  - movement.subscribe
+  - movement.redeem
+  - movement.transfer-in
+  - movement.transfer-out
+  - movement.settle
+  - movement.confirm
+  - movement.cancel
+  - movement.fail
+  - movement.read
+  - movement.list-by-holding
+  - movement.capital-call
+  - movement.distribute
+  - movement.distribute-recallable
+  - movement.record-commitment
+  # Delivery
+  - delivery.create
+  - delivery.read
+  - delivery.list
+  # Reference data
+  - instrument-class.ensure
+  - instrument-class.list
+  - instrument-class.read
+  - security-type.ensure
+  - security-type.list
+  - subcustodian.ensure
+  - subcustodian.list-by-market
+  - subcustodian.lookup
+
+forbidden_verbs: []
+
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 5
+
+required_questions:
+  - field: cbu_name
+    prompt: "Which CBU is this for?"
+    answer_kind: entity_ref
+
+optional_questions:
+  - field: profile_action
+    prompt: "What would you like to do? (create profile / review / configure)"
+    answer_kind: enum
+    options_source: profile_actions
+    default: "review"
+
+pack_summary_template: >
+  Instrument Matrix for {{answers.cbu_name}}.
+
+section_layout:
+  - title: "Trading Profile"
+    verb_prefixes:
+      - "trading-profile."
+  - title: "Settlement & Custody"
+    verb_prefixes:
+      - "settlement-chain."
+      - "cbu-custody."
+      - "entity-settlement."
+      - "booking-principal."
+      - "booking-location."
+  - title: "Corporate Actions"
+    verb_prefixes:
+      - "corporate-action."
+  - title: "Configuration"
+    verb_prefixes:
+      - "matrix-overlay."
+      - "cash-sweep."
+      - "trade-gateway."
+      - "isda."
+      - "instruction-profile."
+      - "tax-config."
