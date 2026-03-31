@@ -1413,9 +1413,16 @@ impl CustomOperation for TradingProfileCreateDraftOp {
         // For templates: insert directly with group_id and is_template=true
         // For CBU instances: use existing create_draft path
         let profile_id = if is_template {
+            use ob_poc_types::trading_matrix::TradingMatrixDocument;
+
             let gid = group_id.unwrap();
             let pid = Uuid::new_v4();
-            let empty_doc = serde_json::json!({"components": [], "is_template": true});
+            // Create a proper TradingMatrixDocument with no CBU (group-level template)
+            let mut template_doc = TradingMatrixDocument::new("", "");
+            template_doc.cbu_id = None;
+            template_doc.cbu_name = None;
+            let doc_json = serde_json::to_value(&template_doc)
+                .map_err(|e| anyhow::anyhow!("Failed to serialize template: {}", e))?;
             let doc_hash = format!("template-{}", pid);
             sqlx::query(
                 r#"INSERT INTO "ob-poc".cbu_trading_profiles
@@ -1424,7 +1431,7 @@ impl CustomOperation for TradingProfileCreateDraftOp {
             )
             .bind(pid)
             .bind(gid)
-            .bind(&empty_doc)
+            .bind(&doc_json)
             .bind(&doc_hash)
             .execute(pool)
             .await

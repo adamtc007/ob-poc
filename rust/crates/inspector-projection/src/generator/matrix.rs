@@ -718,7 +718,9 @@ pub fn generate_from_trading_matrix(
         .map(MatrixNodeInput::from_trading_matrix_node)
         .collect();
 
-    MatrixGenerator::new().generate(&doc.cbu_id, &doc.cbu_name, &children, policy)
+    let cbu_id = doc.cbu_id.as_deref().unwrap_or("");
+    let cbu_name = doc.cbu_name.as_deref().unwrap_or("");
+    MatrixGenerator::new().generate(cbu_id, cbu_name, &children, policy)
 }
 
 #[cfg(test)]

@@ -1510,8 +1510,8 @@ mod tests {
     #[test]
     fn test_create_document() {
         let doc = create_document("cbu-123", "Test CBU");
-        assert_eq!(doc.cbu_id, "cbu-123");
-        assert_eq!(doc.cbu_name, "Test CBU");
+        assert_eq!(doc.cbu_id.as_deref(), Some("cbu-123"));
+        assert_eq!(doc.cbu_name.as_deref(), Some("Test CBU"));
         assert_eq!(doc.version, 1);
         assert_eq!(doc.status, DocumentStatus::Draft);
     }

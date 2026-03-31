@@ -262,8 +262,8 @@ pub async fn clone_to_draft(
     let cbu_name = get_cbu_name(pool, target_cbu_id).await?;
 
     // Update document for new CBU
-    doc.cbu_id = target_cbu_id.to_string();
-    doc.cbu_name = cbu_name;
+    doc.cbu_id = Some(target_cbu_id.to_string());
+    doc.cbu_name = Some(cbu_name);
     doc.status = DocumentStatus::Draft;
     doc.created_at = Some(chrono::Utc::now().to_rfc3339());
     doc.updated_at = doc.created_at.clone();

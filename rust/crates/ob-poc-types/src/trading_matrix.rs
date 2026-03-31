@@ -800,11 +800,13 @@ pub struct TradingMatrixMetadata {
 /// directly to the UI via the API. It IS the AST.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TradingMatrixDocument {
-    /// CBU UUID
-    pub cbu_id: String,
+    /// CBU UUID (None for group-level templates)
+    #[serde(default)]
+    pub cbu_id: Option<String>,
 
-    /// CBU name
-    pub cbu_name: String,
+    /// CBU name (None for group-level templates)
+    #[serde(default)]
+    pub cbu_name: Option<String>,
 
     /// Document version (incremented on each save)
     pub version: i32,
@@ -854,8 +856,8 @@ impl TradingMatrixDocument {
     /// Create a new empty document for a CBU
     pub fn new(cbu_id: impl Into<String>, cbu_name: impl Into<String>) -> Self {
         Self {
-            cbu_id: cbu_id.into(),
-            cbu_name: cbu_name.into(),
+            cbu_id: Some(cbu_id.into()),
+            cbu_name: Some(cbu_name.into()),
             version: 1,
             status: DocumentStatus::Draft,
             children: Vec::new(),
@@ -933,8 +935,8 @@ pub struct TradingMatrixResponse {
 impl From<TradingMatrixDocument> for TradingMatrixResponse {
     fn from(doc: TradingMatrixDocument) -> Self {
         Self {
-            cbu_id: doc.cbu_id,
-            cbu_name: doc.cbu_name,
+            cbu_id: doc.cbu_id.unwrap_or_default(),
+            cbu_name: doc.cbu_name.unwrap_or_default(),
             children: doc.children,
             total_leaf_count: doc.total_leaf_count,
         }
