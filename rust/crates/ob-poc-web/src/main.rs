@@ -369,12 +369,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // SEM_OS_MODE controls the wiring:
     //   "inprocess" (default) — InProcessClient wrapping CoreServiceImpl
     //   "http"                — HttpClient targeting standalone sem_os_server
-    //   unset / other         — None (direct sem_reg calls, legacy path)
+    //   "disabled"            — None (no governance, for isolated unit tests only)
+    // SemOS is a critical dependency — defaults to inprocess when not set.
     // =========================================================================
     // Shared CoreService — built once at startup, reused by MCP tool handlers.
     // Only available in inprocess mode.
     let sem_os_core_service: Option<Arc<dyn sem_os_core::service::CoreService>> = {
-        let mode = std::env::var("SEM_OS_MODE").unwrap_or_default();
+        let mode = std::env::var("SEM_OS_MODE").unwrap_or_else(|_| "inprocess".to_string());
         if mode == "inprocess" {
             use sem_os_core::service::CoreServiceImpl;
             use sem_os_postgres::PgStores;
@@ -399,7 +400,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>> = {
-        let mode = std::env::var("SEM_OS_MODE").unwrap_or_default();
+        let mode = std::env::var("SEM_OS_MODE").unwrap_or_else(|_| "inprocess".to_string());
         match mode.as_str() {
             "inprocess" => {
                 let service = sem_os_core_service
@@ -417,9 +418,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 tracing::info!("SemOsClient: HTTP mode (target: {})", url);
                 Some(Arc::new(client) as Arc<dyn sem_os_client::SemOsClient>)
             }
-            _ => {
-                tracing::info!(
-                    "SemOsClient: disabled (SEM_OS_MODE not set, using direct sem_reg calls)"
+            "disabled" => {
+                tracing::warn!(
+                    "SemOsClient: explicitly disabled (SEM_OS_MODE=disabled) — no governance"
+                );
+                None
+            }
+            other => {
+                tracing::error!(
+                    mode = other,
+                    "SemOsClient: unknown SEM_OS_MODE — defaulting to disabled"
                 );
                 None
             }
