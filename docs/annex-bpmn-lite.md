@@ -25,7 +25,7 @@ bpmn-lite/                              # Standalone Rust workspace
 │   ├── src/
 │   │   ├── vm.rs                       # Fiber execution engine (700+ lines)
 │   │   ├── engine.rs                   # BpmnLiteEngine facade (tick, compile, start, signal)
-│   │   ├── store.rs                    # ProcessStore trait (28 async methods)
+│   │   ├── store.rs                    # ProcessStore trait (33 async methods)
 │   │   ├── store_memory.rs             # In-memory implementation (testing)
 │   │   ├── store_postgres.rs           # PostgreSQL backend (production)
 │   │   ├── types.rs                    # Fiber, ProcessInstance, 18 Instr variants
@@ -37,7 +37,7 @@ bpmn-lite/                              # Standalone Rust workspace
 │   │       ├── publish.rs              # Atomic compile + persist
 │   │       ├── lints.rs                # Structural warnings
 │   │       └── registry.rs             # TemplateStore trait
-│   └── migrations/                     # 12 SQL migrations (001–012)
+│   └── migrations/                     # 13 SQL migrations (001–013)
 ├── bpmn-lite-server/
 │   ├── src/
 │   │   └── grpc.rs                     # BpmnLiteService impl (7 RPC methods)
@@ -269,26 +269,36 @@ Instr::JoinDynamic {
 
 ## PostgresProcessStore — Event Sourcing
 
-### 12 Migrations
+### 13 Migrations
 
 | Migration | Table | Purpose |
 |-----------|-------|---------|
 | 001 | `process_instances` | Instance snapshots (flags, counters, join_expected, state) |
 | 002 | `fibers` | Fiber snapshots (PC, stack, regs, wait state) |
 | 003 | `join_barriers` | Join barrier arrival counters |
-| 004 | `dedupe_cache` | Job completion cache (prevent re-execution) |
-| 005 | `program_store` | Compiled bytecode (keyed by SHA-256) |
-| 006 | `string_intern` | String pool |
-| 007 | `dead_letter_queue` | Messages with no waiting fiber |
+| 004 | `dedupe_cache` | Job completion cache (prevent re-execution, TTL-prunable via `created_at`) |
+| 005 | `job_queue` | External job queue (pending/claimed/completed, `claimed_at` for timeout reclaim) |
+| 006 | `compiled_programs` | Bytecode cache (keyed by SHA-256) |
+| 007 | `dead_letter_queue` | TTL-based message store |
 | 008 | `event_sequences` | Per-instance sequence counter |
 | 009 | `event_log` | Append-only audit trail |
 | 010 | `payload_history` | Payload versioning (PITR) |
 | 011 | `incidents` | Unrecoverable error states |
 | 012 | `updated_at_trigger` | Automatic timestamp maintenance |
+| 013 | `workflow_templates` | Published workflow templates |
 
-### ProcessStore Trait (28 methods)
+### ProcessStore Trait (33 methods)
 
 Key method groups: instance save/load/state-update, fiber CRUD, join barriers, dedupe cache, job queue, program store, dead-letter queue, event log, payload history, incidents.
+
+**Compound atomic methods** (added for crash safety):
+- `atomic_start(instance, root_fiber, event)` — atomically saves instance + root fiber + InstanceStarted event in one transaction
+- `atomic_complete(instance, completion)` — atomically saves instance + dedupe entry + payload version in one transaction
+
+**Housekeeping methods** (used by background tasks):
+- `reclaim_stale_jobs(timeout_ms)` — reclaims jobs stuck in `claimed` state past timeout
+- `prune_dedupe_cache(older_than_ms)` — prunes dedupe entries older than TTL
+- `list_running_instances()` — lists all non-terminal instance IDs for timer tick orchestration
 
 ### PITR (Point-in-Time Recovery)
 
@@ -522,16 +532,49 @@ pub struct CompiledProgram {
 
 ---
 
+## Durability & Crash Recovery (2026-04-02)
+
+### Transaction Atomicity
+
+Engine methods that perform multi-step state changes use compound atomic store methods:
+
+- **`atomic_start()`** — instance creation: saves ProcessInstance + root Fiber + InstanceStarted event in a single Postgres transaction. Prevents orphaned instances on crash.
+- **`atomic_complete()`** — job completion: saves updated ProcessInstance + dedupe cache entry + payload version in a single transaction. Prevents phantom jobs where ack completes but state isn't updated.
+
+In `MemoryStore`, atomicity is guaranteed by the single `RwLock` write guard.
+
+### Background Housekeeping Tasks (main.rs)
+
+Three `tokio::spawn` background loops run alongside the gRPC server:
+
+| Task | Interval | Purpose |
+|------|----------|---------|
+| **Job reclaim** | 60s | Reclaims jobs stuck in `claimed` state for >5 minutes (worker crash recovery) |
+| **Tick all** | 500ms | Ticks all `Running` instances — ensures timers fire without requiring explicit per-instance tick calls |
+| **Dedupe prune** | 1 hour | Prunes dedupe cache entries older than 24 hours (prevents unbounded growth) |
+
+### Job Claim Timeout
+
+The job queue uses a two-phase claim model: `pending` → `claimed` (with `claimed_at` timestamp) → deleted on `ack_job()`. If a worker crashes after claiming but before completing, `reclaim_stale_jobs()` moves the job back to `pending` after the configurable timeout (default 5 minutes). Uses `FOR UPDATE SKIP LOCKED` for concurrent worker safety.
+
+### Timer Tick Orchestrator
+
+`BpmnLiteEngine::tick_all()` queries all `Running` instances via `list_running_instances()` and ticks each. The background loop at 500ms ensures boundary timers, race conditions, and fiber promotions fire reliably at scale without requiring external orchestration.
+
+---
+
 ## Key Invariants
 
 | Invariant | Mechanism |
 |-----------|-----------|
 | Determinism | Bytecode-driven; same input = same trace |
 | Durability | Every state change appended to `event_log` |
+| Atomicity | `atomic_start()` + `atomic_complete()` — multi-step operations in single transactions |
 | Race safety | `WaitState::Race` + boundary timer promotion pass |
 | Bounded loops | `IncCounter` + `BrCounterLt`; verifier enforces presence |
-| Deduplications | Job keys stable per-iteration via `loop_epoch` |
+| Deduplications | Job keys stable per-iteration via `loop_epoch`; dedupe cache with TTL pruning |
 | Ghost signals | Dead-letter queue + `ParkedToken` registry |
+| Crash recovery | Job claim timeout (5min) + `tick_all` background poller (500ms) |
 | Incident recovery | Manual operator resolution; no auto-retry on ContractViolation |
 | Job worker resilience | Long-poll + `PendingDispatchWorker` (50 retries) |
 | Canonical payload | SHA-256 of canonical JSON = idempotency across retries |
