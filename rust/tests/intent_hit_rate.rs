@@ -44,13 +44,6 @@ struct TestCase {
     alt_verbs: Vec<String>,
     #[serde(default)]
     notes: Option<String>,
-    // ECIR (Entity-Centric Intent Resolution) fields
-    #[serde(default)]
-    expected_noun: Option<String>,
-    #[serde(default)]
-    expected_action: Option<String>,
-    #[serde(default)]
-    ecir_path: Option<String>,
     // Tier -2 (Scenario / MacroIndex) fields
     #[serde(default)]
     expected_tier: Option<String>,
@@ -306,7 +299,6 @@ mod tests {
 
         // Generate report
         print_summary_report(&results);
-        print_ecir_report(&results);
         print_tier2_report(&results);
         print_category_breakdown(&results);
         print_difficulty_breakdown(&results);
@@ -482,8 +474,7 @@ mod tests {
                 sv_rate, sv_first, sv_total
             );
 
-            // Baseline from ECIR: 36.8% first-attempt on 133 cases
-            // Use 35% as the non-regression floor
+            // Non-regression floor for first-attempt hit rate
             assert!(
                 sv_rate >= 35.0,
                 "Single-verb hit rate {:.1}% regressed below 35% baseline ({}/{})",
@@ -670,50 +661,6 @@ fn print_summary_report(results: &[TestResult]) {
         println!(
             "  {:30} {:>4} fired  {:>4} hit  ({:>5.1}% accuracy)",
             source, fired, hit, acc
-        );
-    }
-    println!();
-}
-
-fn print_ecir_report(results: &[TestResult]) {
-    // ECIR (NounIndex) has been removed from the pipeline.
-    // This report now only shows annotated test case counts for reference.
-
-    // Count annotated test cases
-    let annotated_total = results
-        .iter()
-        .filter(|r| r.case.ecir_path.is_some())
-        .count();
-    let annotated_deterministic = results
-        .iter()
-        .filter(|r| r.case.ecir_path.as_deref() == Some("deterministic"))
-        .count();
-    let annotated_narrow = results
-        .iter()
-        .filter(|r| r.case.ecir_path.as_deref() == Some("narrow"))
-        .count();
-    let annotated_fallthrough = results
-        .iter()
-        .filter(|r| r.case.ecir_path.as_deref() == Some("fallthrough"))
-        .count();
-
-    let ecir_expected = annotated_deterministic + annotated_narrow;
-
-    println!("  ECIR (removed — NounIndex no longer in pipeline)");
-    println!("  {:-<68}", "");
-    println!(
-        "  Annotated test cases:      {} / {}",
-        annotated_total,
-        results.len()
-    );
-    println!("    deterministic:           {}", annotated_deterministic);
-    println!("    narrow:                  {}", annotated_narrow);
-    println!("    fallthrough:             {}", annotated_fallthrough);
-    println!();
-    if ecir_expected > 0 {
-        println!(
-            "  (Legacy) annotated ECIR cases: {} (no longer resolved by NounIndex)",
-            ecir_expected,
         );
     }
     println!();
@@ -1212,7 +1159,6 @@ fn truncate(s: &str, max: usize) -> String {
 // ============================================================================
 
 async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridVerbSearcher {
-    use dsl_core::config::ConfigLoader;
     use ob_poc::agent::learning::embedder::CandleEmbedder;
     use ob_poc::agent::learning::embedder::Embedder;
     use ob_poc::agent::learning::warmup::LearningWarmup;

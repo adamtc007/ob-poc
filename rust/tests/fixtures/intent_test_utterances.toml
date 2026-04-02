@@ -19,9 +19,6 @@
 #   expert -- Domain expert language, abbreviations, implicit context
 #
 # ECIR Fields (optional):
-#   expected_noun   -- Expected noun extracted by NounIndex
-#   expected_action -- Expected action classification (create/list/get/update/delete/search/none)
-#   ecir_path       -- Expected ECIR resolution path: deterministic | narrow | fallthrough
 #
 # NOTE: All utterances are what a real custody bank onboarding analyst,
 # compliance officer, or relationship manager would actually say.
@@ -40,9 +37,6 @@ expected_domain_concept = "cbu"
 category = "natural"
 difficulty = "medium"
 notes = "Role assignment should resolve to the canonical cbu.assign-role verb"
-expected_noun = "cbu"
-expected_action = "assign"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "make State Street the transfer agent"
@@ -53,7 +47,6 @@ expected_domain_concept = "cbu"
 category = "natural"
 difficulty = "hard"
 notes = "Role assignment should prefer cbu.assign-role"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who are the parties on this CBU?"
@@ -63,7 +56,6 @@ expected_polarity = "write"
 expected_domain_concept = "cbu"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add custody services to this client"
@@ -73,7 +65,6 @@ expected_polarity = "write"
 expected_domain_concept = "cbu"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "delete the test CBU I just created"
@@ -83,9 +74,6 @@ expected_polarity = "write"
 expected_domain_concept = "cbu"
 category = "direct"
 difficulty = "easy"
-expected_noun = "cbu"
-expected_action = "delete"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "nuke everything under this CBU including all roles"
@@ -96,7 +84,6 @@ expected_domain_concept = "cbu"
 category = "natural"
 difficulty = "hard"
 notes = "Informal - 'nuke everything' implies cascade delete"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # ENTITY DOMAIN -- Legal Entity Management
@@ -110,7 +97,6 @@ expected_polarity = "write"
 expected_domain_concept = "entity"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a new company"
@@ -121,7 +107,6 @@ expected_polarity = "write"
 expected_domain_concept = "entity"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "register John Smith as a person"
@@ -132,7 +117,6 @@ expected_domain_concept = "entity"
 category = "natural"
 difficulty = "medium"
 notes = "Must distinguish company vs person entity type"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "I need to add a trust -- Cayman Islands discretionary trust"
@@ -144,7 +128,6 @@ expected_domain_concept = "entity"
 category = "natural"
 difficulty = "hard"
 notes = "Must pick trust-discretionary over limited-company"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a limited partnership for the GP structure"
@@ -155,7 +138,6 @@ expected_polarity = "write"
 expected_domain_concept = "entity"
 category = "natural"
 difficulty = "hard"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me all entities"
@@ -165,9 +147,6 @@ expected_polarity = "read"
 expected_domain_concept = "entity"
 category = "direct"
 difficulty = "easy"
-expected_noun = "entity"
-expected_action = "list"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "which entities haven't been verified yet?"
@@ -179,7 +158,6 @@ category = "indirect"
 difficulty = "hard"
 alt_verbs = ["entity.list-ghosts"]
 notes = "Could also be entity.list with filter"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "update the registered address for this entity"
@@ -189,9 +167,6 @@ expected_polarity = "write"
 expected_domain_concept = "entity"
 category = "direct"
 difficulty = "easy"
-expected_noun = "entity"
-expected_action = "update"
-ecir_path = "deterministic"
 
 [[test]]
 utterance = "resolve this placeholder to the real entity"
@@ -201,7 +176,6 @@ expected_polarity = "write"
 expected_domain_concept = "entity"
 category = "direct"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # SCREENING DOMAIN -- KYC Screening (Sanctions, PEP, Adverse Media)
@@ -215,7 +189,6 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "check if they're on any sanctions lists"
@@ -226,7 +199,6 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "is this person a PEP?"
@@ -236,7 +208,6 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "check for politically exposed persons"
@@ -246,7 +217,6 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "run a full screening -- sanctions, PEP, and adverse media"
@@ -258,7 +228,6 @@ category = "multi_intent"
 difficulty = "hard"
 alt_verbs = ["screening.sanctions", "screening.pep", "screening.adverse-media", "screening.run"]
 notes = "All three checks = screening.full macro"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "any negative news about this company?"
@@ -268,7 +237,6 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "do the AML checks"
@@ -280,7 +248,6 @@ category = "natural"
 difficulty = "hard"
 alt_verbs = ["screening.pep", "screening.adverse-media", "screening.run"]
 notes = "'AML checks' is vague - could be sanctions, PEP, or both"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "screen them"
@@ -292,7 +259,6 @@ category = "natural"
 difficulty = "hard"
 alt_verbs = ["screening.run", "screening.pep", "screening.adverse-media"]
 notes = "Very terse - needs context to disambiguate"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "has anyone flagged this entity before?"
@@ -304,7 +270,6 @@ category = "indirect"
 difficulty = "expert"
 alt_verbs = ["red-flag.list-by-case", "red-flag.list-by-entity", "screening.sanctions"]
 notes = "Requires understanding 'flagged' in screening context"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # UBO DOMAIN -- Beneficial Ownership
@@ -319,7 +284,6 @@ expected_domain_concept = "ubo"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["control.identify-ubos", "ubo.list-owners"]
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me the ownership structure"
@@ -331,7 +295,6 @@ category = "natural"
 difficulty = "medium"
 alt_verbs = ["ubo.list-owners", "control.build-graph", "ownership.trace-chain", "ownership.compute"]
 notes = "Scenario analyse-ubo routes: full + ownership = ubo.list-ubos"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add an ownership stake -- Vanguard holds 25% of this entity"
@@ -341,7 +304,6 @@ expected_polarity = "write"
 expected_domain_concept = "ubo"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who controls this company?"
@@ -353,7 +315,6 @@ category = "natural"
 difficulty = "hard"
 alt_verbs = ["ownership.find-controller", "control.list-controllers", "control.identify-ubos", "control.compute-controllers", "control.build-graph"]
 notes = "Major collision point between ubo/ownership/control domains"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a control relationship -- board appointment"
@@ -364,7 +325,6 @@ expected_domain_concept = "ubo"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["control.add"]
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "calculate the UBOs for this CBU"
@@ -376,7 +336,6 @@ expected_domain_concept = "ubo"
 category = "direct"
 difficulty = "easy"
 notes = "ubo.calculate merged into ubo.compute-chains; ubo.list-ubos is valid for 'calculate UBOs'"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "trace the ownership chain from the top entity down"
@@ -387,7 +346,6 @@ expected_domain_concept = "ubo"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["ownership.trace-chain"]
-ecir_path = "fallthrough"
 
 # ownership.trace-chain is the canonical verb now; control.trace-chain removed
 [[test]]
@@ -399,7 +357,6 @@ expected_domain_concept = "ubo"
 category = "indirect"
 difficulty = "expert"
 notes = "Implied action from factual statement"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "the settlor appointed a new trustee"
@@ -410,7 +367,6 @@ expected_domain_concept = "ubo"
 category = "indirect"
 difficulty = "expert"
 notes = "Trust-specific language - must understand settlor/trustee vocabulary"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "waive the ownership verification -- low risk client"
@@ -420,7 +376,6 @@ expected_polarity = "write"
 expected_domain_concept = "ubo"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "ownership was transferred from Parent Co to New Holdco"
@@ -431,7 +386,6 @@ expected_domain_concept = "ubo"
 category = "indirect"
 difficulty = "hard"
 alt_verbs = ["ubo.convergence-supersede"]
-ecir_path = "fallthrough"
 
 # ============================================================================
 # FUND DOMAIN -- Fund Structures
@@ -446,7 +400,6 @@ expected_polarity = "write"
 expected_domain_concept = "fund"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "set up a new subfund under the umbrella"
@@ -457,7 +410,6 @@ expected_polarity = "write"
 expected_domain_concept = "fund"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a share class -- accumulating, EUR denominated"
@@ -468,7 +420,6 @@ expected_polarity = "write"
 expected_domain_concept = "fund"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create a master-feeder structure"
@@ -480,7 +431,6 @@ category = "natural"
 difficulty = "hard"
 alt_verbs = ["fund.create-master", "fund.create"]
 notes = "Could mean either master or feeder creation"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "link the Cayman feeder to the Irish master"
@@ -490,7 +440,6 @@ expected_polarity = "write"
 expected_domain_concept = "fund"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what subfunds are in this umbrella?"
@@ -500,7 +449,6 @@ expected_polarity = "read"
 expected_domain_concept = "fund"
 category = "natural"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me all the share classes"
@@ -511,7 +459,6 @@ expected_polarity = "read"
 expected_domain_concept = "fund"
 category = "natural"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "BlackRock fund invests 30% NAV in the Vanguard fund"
@@ -522,7 +469,6 @@ expected_domain_concept = "fund"
 category = "indirect"
 difficulty = "expert"
 notes = "Must understand fund-of-funds cross-investment"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who invests in this fund?"
@@ -532,7 +478,6 @@ expected_polarity = "read"
 expected_domain_concept = "fund"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "create a standalone fund -- AIF, Jersey"
@@ -543,7 +488,6 @@ expected_polarity = "write"
 expected_domain_concept = "fund"
 category = "direct"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # DOCUMENT DOMAIN
@@ -557,7 +501,6 @@ expected_polarity = "read"
 expected_domain_concept = "document"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "request the certificate of incorporation"
@@ -568,9 +511,6 @@ expected_polarity = "write"
 expected_domain_concept = "document"
 category = "natural"
 difficulty = "medium"
-expected_noun = "document"
-expected_action = "create"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "upload the passport for John Smith"
@@ -580,7 +520,6 @@ expected_polarity = "write"
 expected_domain_concept = "document"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "verify this document"
@@ -590,9 +529,6 @@ expected_polarity = "write"
 expected_domain_concept = "document"
 category = "direct"
 difficulty = "easy"
-expected_noun = "document"
-expected_action = "update"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "reject the articles of association -- wrong entity name"
@@ -602,7 +538,6 @@ expected_polarity = "write"
 expected_domain_concept = "document"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "extract the data from this uploaded document"
@@ -612,7 +547,6 @@ expected_polarity = "write"
 expected_domain_concept = "document"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what type of documents do we collect for limited companies?"
@@ -623,7 +557,6 @@ expected_polarity = "write"
 expected_domain_concept = "document"
 category = "indirect"
 difficulty = "hard"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "send out the whole doc pack for this entity"
@@ -634,7 +567,6 @@ expected_domain_concept = "document"
 category = "natural"
 difficulty = "hard"
 notes = "'doc pack' -> solicit-batch (batch solicitation)"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # DEAL DOMAIN -- Deal Lifecycle
@@ -648,9 +580,6 @@ expected_polarity = "write"
 expected_domain_concept = "deal"
 category = "direct"
 difficulty = "easy"
-expected_noun = "deal"
-expected_action = "create"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "add BlackRock as a participant on this deal"
@@ -660,7 +589,6 @@ expected_polarity = "write"
 expected_domain_concept = "deal"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what's the status of the deal?"
@@ -671,7 +599,6 @@ expected_domain_concept = "deal"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["deal.read-summary"]
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me the deal timeline"
@@ -681,7 +608,6 @@ expected_polarity = "write"
 expected_domain_concept = "deal"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "set up the rate card for custody services"
@@ -691,7 +617,6 @@ expected_polarity = "write"
 expected_domain_concept = "deal"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a fee line -- 2bps on AUM, quarterly"
@@ -702,7 +627,6 @@ expected_domain_concept = "deal"
 category = "natural"
 difficulty = "hard"
 notes = "Must understand 'bps on AUM' = rate card line"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "propose the rate card to the client"
@@ -712,7 +636,6 @@ expected_polarity = "write"
 expected_domain_concept = "deal"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "the client wants to counter our pricing"
@@ -722,7 +645,6 @@ expected_polarity = "write"
 expected_domain_concept = "deal"
 category = "indirect"
 difficulty = "hard"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "move the deal to approved"
@@ -732,9 +654,6 @@ expected_polarity = "write"
 expected_domain_concept = "deal"
 category = "natural"
 difficulty = "medium"
-expected_noun = "deal"
-expected_action = "update"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "kick off onboarding for this deal's products"
@@ -744,7 +663,6 @@ expected_polarity = "write"
 expected_domain_concept = "deal"
 category = "natural"
 difficulty = "hard"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "cancel this deal -- client withdrew"
@@ -754,7 +672,6 @@ expected_polarity = "write"
 expected_domain_concept = "deal"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # GLEIF DOMAIN -- LEI / Corporate Hierarchy
@@ -768,9 +685,6 @@ expected_polarity = "read"
 expected_domain_concept = "gleif"
 category = "natural"
 difficulty = "medium"
-expected_noun = "gleif"
-expected_action = "search"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "import the corporate hierarchy from GLEIF"
@@ -780,9 +694,6 @@ expected_polarity = "write"
 expected_domain_concept = "gleif"
 category = "natural"
 difficulty = "medium"
-expected_noun = "gleif"
-expected_action = "import"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "who is the parent company according to GLEIF?"
@@ -793,7 +704,6 @@ expected_polarity = "read"
 expected_domain_concept = "gleif"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "import all the managed funds for this asset manager"
@@ -803,7 +713,6 @@ expected_polarity = "write"
 expected_domain_concept = "gleif"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "enrich the entity data from GLEIF"
@@ -813,7 +722,6 @@ expected_polarity = "write"
 expected_domain_concept = "gleif"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "pull in the LEI hierarchy for this client group"
@@ -823,7 +731,6 @@ expected_polarity = "write"
 expected_domain_concept = "gleif"
 category = "natural"
 difficulty = "hard"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # OWNERSHIP / CONTROL DOMAINS
@@ -837,7 +744,6 @@ expected_polarity = "read"
 expected_domain_concept = "ownership"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who ultimately controls this entity?"
@@ -849,7 +755,6 @@ category = "natural"
 difficulty = "medium"
 alt_verbs = ["control.build-graph", "control.compute-controllers", "control.identify-ubos", "ubo.list-ubos", "control.list-controllers"]
 notes = "Collision: ownership.find-controller vs ubo.list-ubos vs control.list-controllers"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "reconcile the ownership percentages"
@@ -860,7 +765,6 @@ expected_polarity = "write"
 expected_domain_concept = "ownership"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "trace the chain from Vanguard down to the subfund"
@@ -871,7 +775,6 @@ expected_domain_concept = "ownership"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["ubo.trace-chains"]
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "are there any gaps in the ownership structure?"
@@ -882,7 +785,6 @@ expected_polarity = "read"
 expected_domain_concept = "ownership"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who is the board-appointed controller?"
@@ -892,7 +794,6 @@ expected_polarity = "read"
 expected_domain_concept = "control"
 category = "natural"
 difficulty = "hard"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "import the PSC register data"
@@ -902,7 +803,6 @@ expected_polarity = "write"
 expected_domain_concept = "control"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # VIEW / SESSION DOMAIN -- Navigation
@@ -916,7 +816,6 @@ expected_polarity = "write"
 expected_domain_concept = "view"
 category = "natural"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "load the Allianz book"
@@ -928,7 +827,6 @@ category = "direct"
 difficulty = "easy"
 alt_verbs = ["view.book", "session.load-galaxy"]
 notes = "session.load-cluster is the canonical verb for loading a client book into scope"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "zoom into this node"
@@ -939,7 +837,6 @@ expected_polarity = "write"
 expected_domain_concept = "view"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "go back"
@@ -950,7 +847,6 @@ expected_domain_concept = "view"
 category = "natural"
 difficulty = "easy"
 alt_verbs = ["view.zoom-out", "view.surface", "session.undo"]
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "load the Allianz cluster"
@@ -960,7 +856,6 @@ expected_polarity = "write"
 expected_domain_concept = "session"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "switch to the BlackRock client"
@@ -970,7 +865,6 @@ expected_polarity = "write"
 expected_domain_concept = "session"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "filter to UK entities only"
@@ -981,7 +875,6 @@ expected_polarity = "write"
 expected_domain_concept = "session"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "load the deal"
@@ -991,7 +884,6 @@ expected_polarity = "write"
 expected_domain_concept = "session"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me the galaxy for Germany"
@@ -1001,7 +893,6 @@ expected_polarity = "write"
 expected_domain_concept = "session"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "I want to work as a compliance officer"
@@ -1011,7 +902,6 @@ expected_polarity = "write"
 expected_domain_concept = "session"
 category = "indirect"
 difficulty = "hard"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # CLIENT GROUP DOMAIN
@@ -1025,7 +915,6 @@ expected_polarity = "read"
 expected_domain_concept = "client-group"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "start the discovery process for this group"
@@ -1035,7 +924,6 @@ expected_polarity = "write"
 expected_domain_concept = "client-group"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "confirm this entity belongs to the group"
@@ -1045,7 +933,6 @@ expected_polarity = "write"
 expected_domain_concept = "client-group"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show me the relationships in this group"
@@ -1055,7 +942,6 @@ expected_polarity = "read"
 expected_domain_concept = "client-group"
 category = "natural"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "who are the parties in this group?"
@@ -1066,7 +952,6 @@ expected_domain_concept = "client-group"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["cbu.parties"]
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "search for entities matching 'Vanguard' in this group"
@@ -1076,7 +961,6 @@ expected_polarity = "read"
 expected_domain_concept = "client-group"
 category = "natural"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # ADVERSARIAL / COLLISION TESTS
@@ -1094,7 +978,6 @@ category = "adversarial"
 difficulty = "hard"
 alt_verbs = ["client-group.list-roles"]
 notes = "Ambiguous without entity context -- CBU vs client group roles"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add a relationship"
@@ -1106,7 +989,6 @@ category = "adversarial"
 difficulty = "hard"
 alt_verbs = ["ubo.add-ownership", "control.add"]
 notes = "Extremely vague -- relationship could be ownership, control, or group"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "verify it"
@@ -1118,7 +1000,6 @@ category = "adversarial"
 difficulty = "expert"
 alt_verbs = ["entity.verify", "ownership.reconcile", "cbu.verify-evidence"]
 notes = "'it' = anaphoric reference requiring session context"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "run the check"
@@ -1130,7 +1011,6 @@ category = "adversarial"
 difficulty = "expert"
 alt_verbs = ["screening.sanctions", "screening.pep", "ownership.reconcile", "cbu.parties"]
 notes = "Extremely vague -- 'check' is overloaded; screening.run is the best generic match"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "show the structure"
@@ -1142,7 +1022,6 @@ category = "adversarial"
 difficulty = "hard"
 alt_verbs = ["fund.list-subfunds", "client-group.list-relationships", "ownership.compute", "graph.view", "cbu.inspect", "control.build-graph"]
 notes = "'structure' = ownership? fund? corporate?"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "import the data"
@@ -1154,7 +1033,6 @@ category = "adversarial"
 difficulty = "expert"
 alt_verbs = ["gleif.enrich", "control.import-psc-register", "bods.sync-from-gleif", "research.sources.fetch", "bods.import"]
 notes = "'import data' could be any external data source"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # EXPERT DOMAIN LANGUAGE
@@ -1171,7 +1049,6 @@ expected_domain_concept = "bods"
 category = "natural"
 difficulty = "expert"
 notes = "BODS = Beneficial Ownership Data Standard"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "run the RBA assessment"
@@ -1183,7 +1060,6 @@ expected_domain_concept = "screening"
 category = "indirect"
 difficulty = "expert"
 notes = "RBA = Risk Based Approach -- implies full screening suite"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "check the PSC register"
@@ -1194,7 +1070,6 @@ expected_domain_concept = "control"
 category = "natural"
 difficulty = "expert"
 notes = "PSC = Persons with Significant Control (UK)"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "set up the NAV calc service"
@@ -1205,7 +1080,6 @@ expected_domain_concept = "cbu"
 category = "indirect"
 difficulty = "expert"
 notes = "NAV calculation is a product/service -- maps to add-product"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "add the TA and fund accounting"
@@ -1216,7 +1090,6 @@ expected_domain_concept = "cbu"
 category = "indirect"
 difficulty = "expert"
 notes = "TA = Transfer Agent -- a product/service"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "compute the 25% threshold test"
@@ -1228,7 +1101,6 @@ expected_domain_concept = "ubo"
 category = "indirect"
 difficulty = "expert"
 notes = "25% threshold = UBO determination threshold under 4AMLD/5AMLD; ubo.calculate merged into compute-chains"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "flag the circular ownership"
@@ -1240,7 +1112,6 @@ category = "indirect"
 difficulty = "expert"
 alt_verbs = ["ubo.trace-chains", "ownership.analyze-gaps"]
 notes = "Circular ownership detection is part of reconciliation"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "check for OFAC hits"
@@ -1251,7 +1122,6 @@ expected_domain_concept = "screening"
 category = "natural"
 difficulty = "expert"
 notes = "OFAC = US sanctions body -- maps to sanctions screening"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "KYC refresh for this entity"
@@ -1263,7 +1133,6 @@ category = "indirect"
 difficulty = "expert"
 alt_verbs = ["screening.pep", "screening.adverse-media", "document.missing-for-entity", "kyc-case.reopen", "fund-investor.update-kyc-status"]
 notes = "KYC refresh = re-run all screenings + check doc currency"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "nominee structure -- need to pierce the veil"
@@ -1274,7 +1143,6 @@ expected_domain_concept = "ubo"
 category = "indirect"
 difficulty = "expert"
 notes = "Piercing the veil = looking through nominee to find real UBO"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "where's the CDD pack for this client?"
@@ -1285,7 +1153,6 @@ expected_domain_concept = "document"
 category = "indirect"
 difficulty = "expert"
 notes = "CDD = Customer Due Diligence pack = document collection for entity"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # AGENT / META COMMANDS
@@ -1299,7 +1166,6 @@ expected_polarity = "write"
 expected_domain_concept = "agent"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "undo"
@@ -1309,7 +1175,6 @@ expected_polarity = "write"
 expected_domain_concept = "session"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what tools do you have?"
@@ -1319,7 +1184,6 @@ expected_polarity = "read"
 expected_domain_concept = "agent"
 category = "natural"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "switch to research mode"
@@ -1330,7 +1194,6 @@ expected_domain_concept = "agent"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["agent.set-execution-mode"]
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "confirm"
@@ -1341,7 +1204,6 @@ expected_polarity = "write"
 expected_domain_concept = "agent"
 category = "direct"
 difficulty = "easy"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "no, go back"
@@ -1352,7 +1214,6 @@ expected_domain_concept = "agent"
 category = "natural"
 difficulty = "medium"
 alt_verbs = ["view.surface", "view.navigate-back-to", "view.zoom-out", "session.undo"]
-ecir_path = "fallthrough"
 
 # ============================================================================
 # CONTRACT / BILLING DOMAINS
@@ -1366,9 +1227,6 @@ expected_polarity = "write"
 expected_domain_concept = "contract"
 category = "natural"
 difficulty = "medium"
-expected_noun = "contract"
-expected_action = "create"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "add a billing schedule -- monthly in arrears"
@@ -1379,7 +1237,6 @@ expected_domain_concept = "billing"
 category = "natural"
 difficulty = "medium"
 notes = "billing.create-period is the closest verb for creating billing cycles"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "what's the fee for custody on this product?"
@@ -1390,7 +1247,6 @@ expected_domain_concept = "deal"
 category = "indirect"
 difficulty = "hard"
 notes = "Fee inquiry maps to rate card lines on the deal"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # BOOKING PRINCIPAL DOMAIN
@@ -1404,7 +1260,6 @@ expected_polarity = "write"
 expected_domain_concept = "booking-principal"
 category = "direct"
 difficulty = "medium"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "which booking entity handles custody for Ireland?"
@@ -1415,7 +1270,6 @@ expected_domain_concept = "booking-principal"
 category = "natural"
 difficulty = "hard"
 notes = "Query about principal coverage by jurisdiction maps to coverage-matrix"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # SCENARIO DOMAIN (Tier -2A: Compound journey-level utterances)
@@ -1434,7 +1288,6 @@ expected_tier = "scenario"
 expected_scenario_id = "assemble-cbu"
 expected_route_target = "struct.lux.ucits.sicav"
 notes = "Compound action (onboard) + jurisdiction (LU) + structure (SICAV) → scenario"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Onboard this Luxembourg SICAV with three sub-funds"
@@ -1448,7 +1301,6 @@ expected_tier = "scenario"
 expected_scenario_id = "assemble-cbu"
 expected_route_target = "struct.lux.ucits.sicav"
 notes = "Compound with quantifier — same scenario as without"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up an Irish ICAV fund"
@@ -1461,7 +1313,6 @@ difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "assemble-cbu"
 expected_route_target = "struct.ie.ucits.icav"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Establish a UK OEIC structure"
@@ -1474,7 +1325,6 @@ difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "assemble-cbu"
 expected_route_target = "struct.uk.authorised.oeic"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up a US 40-Act fund"
@@ -1487,7 +1337,6 @@ difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "assemble-cbu"
 expected_route_target = "struct.us.40act.open-end"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up a Luxembourg PE structure"
@@ -1500,7 +1349,6 @@ difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "assemble-cbu"
 expected_route_target = "struct.lux.pe.scsp"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Onboard a Luxembourg RAIF"
@@ -1513,7 +1361,6 @@ difficulty = "medium"
 expected_tier = "scenario"
 expected_scenario_id = "assemble-cbu"
 expected_route_target = "struct.lux.aif.raif"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Run full screening on this entity"
@@ -1527,7 +1374,6 @@ expected_tier = "scenario"
 expected_scenario_id = "full-screening"
 expected_route_target = "screening.full"
 notes = "Full screening scenario routes to screening.full macro"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Screen this party for PEP, sanctions, and adverse media"
@@ -1542,7 +1388,6 @@ expected_tier = "scenario"
 expected_scenario_id = "full-screening"
 expected_route_target = "screening.full"
 notes = "Multi-noun screening workflow — may match screening.run"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Do the complete KYC review on this party"
@@ -1557,7 +1402,6 @@ expected_tier = "scenario"
 expected_scenario_id = "full-kyc-review"
 expected_route_target = "kyc.full-review"
 notes = "Compound action + KYC nouns → full-kyc-review scenario"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Run KYC screening and collect all documents"
@@ -1572,7 +1416,6 @@ expected_tier = "scenario"
 expected_scenario_id = "full-kyc-review"
 expected_route_target = "kyc.full-review"
 notes = "Multi-noun workflow — may resolve to screening or doc collection macro"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Collect KYC documents from this party"
@@ -1586,7 +1429,6 @@ expected_tier = "scenario"
 expected_scenario_id = "kyc-doc-collection"
 expected_route_target = "kyc.collect-documents"
 notes = "Document collection action + KYC nouns → doc-collection scenario"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Request identity documents for due diligence"
@@ -1601,7 +1443,6 @@ expected_tier = "scenario"
 expected_scenario_id = "kyc-doc-collection"
 expected_route_target = "kyc.collect-documents"
 notes = "Indirect phrasing — may resolve to document.solicit-batch"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up a cross-border hedge fund"
@@ -1615,7 +1456,6 @@ expected_tier = "scenario"
 expected_scenario_id = "hedge-cross-border-setup"
 expected_route_target = "struct.hedge.cross-border"
 notes = "Cross-border hedge fund → hedge-cross-border-setup scenario"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Launch a cross-border PE fund structure"
@@ -1629,7 +1469,6 @@ expected_tier = "scenario"
 expected_scenario_id = "pe-cross-border-setup"
 expected_route_target = "struct.pe.cross-border"
 notes = "Cross-border PE → pe-cross-border-setup scenario"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "I need to onboard a new fund in Ireland"
@@ -1643,7 +1482,6 @@ expected_tier = "scenario"
 expected_scenario_id = "assemble-cbu"
 expected_route_target = "struct.ie.ucits.icav"
 notes = "Natural language compound with indirect structure noun"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Can you help me set up a Lux UCITS SICAV structure?"
@@ -1657,7 +1495,6 @@ expected_tier = "scenario"
 expected_scenario_id = "assemble-cbu"
 expected_route_target = "struct.lux.ucits.sicav"
 notes = "Polite phrasing with compound action"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # MACRO MATCH DOMAIN (Tier -2B: Operator-friendly macro utterances)
@@ -1675,7 +1512,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "struct.lux.ucits.sicav"
 notes = "Direct macro label match without compound action word"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create an Irish ICAV"
@@ -1687,7 +1523,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "struct.ie.ucits.icav"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Open a new KYC case"
@@ -1700,7 +1535,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "kyc-case.create"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create a trading mandate"
@@ -1712,7 +1546,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "mandate.create"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Add a new party"
@@ -1724,7 +1557,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "party.add"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Lux RAIF setup"
@@ -1736,7 +1568,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "struct.lux.aif.raif"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "UK OEIC structure"
@@ -1750,7 +1581,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "struct.uk.authorised.oeic"
 notes = "3-word utterance too short for ScenarioIndex; needs workspace context gating to resolve correctly"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Run full screening"
@@ -1763,7 +1593,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "screening.full"
 notes = "Direct macro label match for screening.full"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "PEP check"
@@ -1776,7 +1605,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "screening.pep-check"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Sanctions check"
@@ -1789,7 +1617,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "screening.sanctions-check"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Adverse media check"
@@ -1802,7 +1629,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "screening.media-check"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Collect documents for KYC"
@@ -1814,7 +1640,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "kyc.collect-documents"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Full KYC review"
@@ -1826,7 +1651,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "kyc.full-review"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Check case readiness"
@@ -1838,7 +1662,6 @@ category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "kyc.check-readiness"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # TIER -2 BLOCKER TESTS (Single-verb utterances NOT intercepted by Tier -2)
@@ -1854,11 +1677,8 @@ expected_polarity = "write"
 expected_domain_concept = "fund"
 category = "tier2_blocker"
 difficulty = "medium"
-expected_tier = "ecir"
+
 notes = "Single-verb intent — must NOT be intercepted by scenario/macro tiers"
-expected_noun = "fund"
-expected_action = "create"
-ecir_path = "deterministic"
 
 [[test]]
 utterance = "Run sanctions screening"
@@ -1869,11 +1689,8 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "tier2_blocker"
 difficulty = "easy"
-expected_tier = "ecir"
+
 notes = "Single-verb screening — may also match case-screening.run macro"
-expected_noun = "screening"
-expected_action = "run"
-ecir_path = "deterministic"
 
 [[test]]
 utterance = "Add a role to this entity"
@@ -1883,11 +1700,8 @@ expected_polarity = "write"
 expected_domain_concept = "role"
 category = "tier2_blocker"
 difficulty = "medium"
-expected_tier = "ecir"
+
 notes = "Single-verb role assignment — not a party.assign macro"
-expected_noun = "role"
-expected_action = "assign"
-ecir_path = "narrow"
 
 [[test]]
 utterance = "Check KYC case status"
@@ -1898,11 +1712,8 @@ expected_polarity = "read"
 expected_domain_concept = "kyc"
 category = "tier2_blocker"
 difficulty = "easy"
-expected_tier = "ecir"
+
 notes = "Single-verb query — not a case management scenario"
-expected_noun = "kyc"
-expected_action = "check"
-ecir_path = "narrow"
 
 # ============================================================================
 # MACRO SEQUENCE SCENARIOS — Multi-macro KYC workflows
@@ -1921,7 +1732,6 @@ expected_tier = "scenario"
 expected_scenario_id = "full-kyc-onboarding"
 expected_route_target = "screening.full"
 notes = "Full KYC onboarding sequence — ScenarioIndex may resolve to first macro or review"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Complete the KYC process including case screening and document collection"
@@ -1936,7 +1746,6 @@ expected_tier = "scenario"
 expected_scenario_id = "full-kyc-onboarding"
 expected_route_target = "kyc-case.create"
 notes = "Alternative phrasing for full KYC onboarding sequence"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Do the full KYC onboarding for this client"
@@ -1951,7 +1760,6 @@ expected_tier = "scenario"
 expected_scenario_id = "full-kyc-onboarding"
 expected_route_target = "kyc-case.create"
 notes = "Concise phrasing for full KYC onboarding"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Open a KYC case and run full screening"
@@ -1966,7 +1774,6 @@ expected_tier = "scenario"
 expected_scenario_id = "kyc-case-screening"
 expected_route_target = "screening.full"
 notes = "Case + screening sequence (no documents)"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create a new KYC case with screening for this party"
@@ -1981,7 +1788,6 @@ expected_tier = "scenario"
 expected_scenario_id = "kyc-case-screening"
 expected_route_target = "kyc-case.create"
 notes = "Alternative phrasing for case + screening sequence"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Open a case and collect the KYC documents"
@@ -1996,7 +1802,6 @@ expected_tier = "scenario"
 expected_scenario_id = "kyc-case-documents"
 expected_route_target = "kyc-case.create"
 notes = "Case + document collection sequence"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up a new case and request identity documents"
@@ -2011,7 +1816,6 @@ expected_tier = "scenario"
 expected_scenario_id = "kyc-case-documents"
 expected_route_target = "kyc-case.create"
 notes = "Alternative phrasing for case + document collection"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # WORKSPACE-TAGGED UTTERANCE TESTS (2026-03-28)
@@ -2998,7 +2802,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "struct.uk.authorised.aut"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create a UK contractual scheme"
@@ -3009,7 +2812,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "struct.uk.authorised.acs"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up a UK long-term asset fund"
@@ -3020,7 +2822,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "struct.uk.authorised.ltaf"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create a UK manager LLP"
@@ -3031,7 +2832,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "struct.uk.manager.llp"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up a UK private equity LP"
@@ -3042,7 +2842,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "struct.uk.private-equity.lp"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create a US closed-end fund"
@@ -3053,7 +2852,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "struct.us.40act.closed-end"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up a US ETF"
@@ -3064,7 +2862,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "struct.us.etf.40act"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create a Delaware LP private fund"
@@ -3075,7 +2872,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "struct.us.private-fund.delaware-lp"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set up an Irish AIF ICAV"
@@ -3086,7 +2882,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "struct.ie.aif.icav"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Create an Irish hedge fund ICAV"
@@ -3097,7 +2892,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "struct.ie.hedge.icav"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 # ── Structure generic macros ─────────────────────────────────────────────
 
@@ -3110,7 +2904,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "structure.list"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Select a structure to work on"
@@ -3121,7 +2914,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "structure.select"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Show roles for this structure"
@@ -3132,7 +2924,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "structure.roles"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Assign a role to the structure"
@@ -3143,7 +2934,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "structure.assign-role"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 # ── Product suite macros ─────────────────────────────────────────────────
 
@@ -3156,7 +2946,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "structure.product-suite-custody-fa-ta"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Add the full product suite"
@@ -3167,7 +2956,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "structure.product-suite-full"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Remove all products from the CBU"
@@ -3178,7 +2966,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "structure.remove-all-products"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 # ── Case macros ──────────────────────────────────────────────────────────
 
@@ -3191,7 +2978,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "case.add-party"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Request a document from the party"
@@ -3202,7 +2988,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "case.solicit-document"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Submit the case for review"
@@ -3213,7 +2998,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "case.submit"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Approve the KYC case"
@@ -3224,7 +3008,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "case.approve"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Reject the case"
@@ -3235,7 +3018,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "case.reject"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Request more information on the case"
@@ -3246,7 +3028,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "case.request-info"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "List KYC cases"
@@ -3257,7 +3038,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "case.list"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Select a case to work on"
@@ -3268,7 +3048,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "case.select"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 # ── KYC workstream macros ────────────────────────────────────────────────
 
@@ -3281,7 +3060,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "kyc-workstream.add"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Update workstream status"
@@ -3292,7 +3070,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "kyc-workstream.update-status"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Close the workstream"
@@ -3303,7 +3080,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "kyc-workstream.close"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 # ── Screening-ops macros (workstream-level) ──────────────────────────────
 
@@ -3316,7 +3092,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "screening-ops.run"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Review the screening hit"
@@ -3327,7 +3102,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "screening-ops.review-hit"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Bulk refresh all screenings"
@@ -3338,7 +3112,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "screening-ops.bulk-refresh"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 # ── UBO macros (missing: expire) ─────────────────────────────────────────
 
@@ -3351,7 +3124,6 @@ difficulty = "hard"
 expected_tier = "macro_index"
 expected_route_target = "ubo.expire"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 # ── Evidence macros ──────────────────────────────────────────────────────
 
@@ -3364,7 +3136,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "evidence.require"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Link a document to the evidence requirement"
@@ -3375,7 +3146,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "evidence.link"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Verify the evidence"
@@ -3386,7 +3156,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "evidence.verify"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Reject the evidence item"
@@ -3397,7 +3166,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "evidence.reject"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Waive the evidence requirement"
@@ -3408,7 +3176,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "evidence.waive"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 # ── Document request macros ──────────────────────────────────────────────
 
@@ -3421,7 +3188,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "doc-request.create"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Send the document request"
@@ -3432,7 +3198,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "doc-request.send"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Record a document response"
@@ -3443,7 +3208,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "doc-request.respond"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Verify the document request"
@@ -3454,7 +3218,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "doc-request.verify"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Reject the submitted document"
@@ -3465,7 +3228,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "doc-request.reject"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 # ── Red flag macros ──────────────────────────────────────────────────────
 
@@ -3478,7 +3240,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "red-flag.raise"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Resolve the risk flag"
@@ -3489,7 +3250,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "red-flag.resolve"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Escalate the risk flag"
@@ -3500,7 +3260,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "red-flag.escalate"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 # ── Tollgate macros ──────────────────────────────────────────────────────
 
@@ -3513,7 +3272,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "tollgate.evaluate"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Override the tollgate decision"
@@ -3524,7 +3282,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "tollgate.override"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 # ── Party macros (missing) ───────────────────────────────────────────────
 
@@ -3537,7 +3294,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "party.add-person"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Add a company"
@@ -3548,7 +3304,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "party.add-company"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "View party details"
@@ -3559,7 +3314,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "party.details"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Update the party information"
@@ -3570,7 +3324,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "party.update"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "List all parties"
@@ -3581,7 +3334,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "party.list"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Add an identifier to the party"
@@ -3592,7 +3344,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "party.assign-identifier"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set the party address"
@@ -3603,7 +3354,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "party.set-address"
 workspace = "kyc"
-ecir_path = "fallthrough"
 
 # ── Mandate macros (missing) ─────────────────────────────────────────────
 
@@ -3616,7 +3366,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "mandate.add-product"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set permitted instruments for the mandate"
@@ -3627,7 +3376,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "mandate.set-instruments"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Set permitted markets for the mandate"
@@ -3638,7 +3386,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "mandate.set-markets"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "List mandates for this structure"
@@ -3649,7 +3396,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "mandate.list"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Select a mandate"
@@ -3660,7 +3406,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "mandate.select"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Show mandate details"
@@ -3671,7 +3416,6 @@ difficulty = "easy"
 expected_tier = "macro_index"
 expected_route_target = "mandate.details"
 workspace = "cbu"
-ecir_path = "fallthrough"
 
 # ── Governance macros ────────────────────────────────────────────────────
 
@@ -3685,7 +3429,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "governance.bootstrap-attribute-registry"
 workspace = "sem_os_maintenance"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Define the service resource dictionary"
@@ -3697,7 +3440,6 @@ difficulty = "hard"
 expected_tier = "macro_index"
 expected_route_target = "governance.define-service-dictionary"
 workspace = "sem_os_maintenance"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Run the full publish pipeline"
@@ -3709,7 +3451,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "governance.full-publish-pipeline"
 workspace = "sem_os_maintenance"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Reconcile the registry"
@@ -3720,7 +3461,6 @@ difficulty = "medium"
 expected_tier = "macro_index"
 expected_route_target = "governance.reconcile-registry"
 workspace = "sem_os_maintenance"
-ecir_path = "fallthrough"
 
 # ── Attribute seed macros ────────────────────────────────────────────────
 
@@ -3733,7 +3473,6 @@ difficulty = "hard"
 expected_tier = "macro_index"
 expected_route_target = "attribute.seed-domain"
 workspace = "sem_os_maintenance"
-ecir_path = "fallthrough"
 
 [[test]]
 utterance = "Seed derived attributes"
@@ -3744,7 +3483,6 @@ difficulty = "hard"
 expected_tier = "macro_index"
 expected_route_target = "attribute.seed-derived"
 workspace = "sem_os_maintenance"
-ecir_path = "fallthrough"
 
 # ============================================================================
 # CONTEXTUAL QUERY TESTS (ADR 043 Phase 2)
