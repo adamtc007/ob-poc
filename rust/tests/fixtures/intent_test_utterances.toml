@@ -18,7 +18,6 @@
 #   hard   -- Requires LLM classifier or contextual boost
 #   expert -- Domain expert language, abbreviations, implicit context
 #
-# ECIR Fields (optional):
 #
 # NOTE: All utterances are what a real custody bank onboarding analyst,
 # compliance officer, or relationship manager would actually say.
@@ -1665,7 +1664,7 @@ expected_route_target = "kyc.check-readiness"
 
 # ============================================================================
 # TIER -2 BLOCKER TESTS (Single-verb utterances NOT intercepted by Tier -2)
-# These must resolve at ECIR or embedding tiers, NOT scenario/macro.
+# These must resolve at embedding tiers, NOT scenario/macro.
 # ============================================================================
 
 [[test]]

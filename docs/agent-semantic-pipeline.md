@@ -115,7 +115,7 @@ pub enum SessionInputResponse {
 **5-step deterministic pre-classification:**
 1. ObservationPlane from session context
 2. IntentPolarity from clue words (read vs write)
-3. Domain hints from NounIndex
+3. Domain hints from compound signals
 4. Action family classification
 5. Confidence scoring
 
@@ -261,7 +261,7 @@ pub struct ChatResponse {
 **VerbMatchSource variants:**
 `UserLearnedExact`, `UserLearnedSemantic`, `LearnedExact`, `GlobalLearned`,
 `PatternEmbedding`, `Phonetic`, `Macro`, `LexiconExact`, `LexiconToken`,
-`NounTaxonomy`, `MacroIndex`, `ScenarioIndex`, `DirectDsl`
+`ConstellationIndex`, `MacroIndex`, `ScenarioIndex`, `DirectDsl`
 
 ---
 
