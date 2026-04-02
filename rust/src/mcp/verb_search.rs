@@ -53,7 +53,6 @@ use crate::entity_kind::canonicalize as canonicalize_entity_kind;
 use crate::lexicon::LexiconService;
 use crate::mcp::compound_intent::extract_compound_signals;
 use crate::mcp::macro_index::{MacroIndex, MacroResolveOutcome};
-use crate::mcp::noun_index::{NounIndex, ResolutionPath};
 use crate::mcp::scenario_index::{ResolvedRoute, ScenarioIndex, ScenarioResolveOutcome};
 
 /// Shared lexicon service type alias
@@ -173,8 +172,6 @@ pub enum VerbSearchSource {
     LexiconExact,
     /// Lexicon token overlap match (lexical search lane)
     LexiconToken,
-    /// Noun taxonomy deterministic match (Tier -1, ECIR - highest priority)
-    NounTaxonomy,
     /// Constellation state-aware index match (Tier -0.5)
     ConstellationIndex,
     /// MacroIndex deterministic scored match (Tier -2B)
@@ -365,8 +362,6 @@ pub struct HybridVerbSearcher {
     macro_registry: Option<Arc<MacroRegistry>>,
     /// Lexicon service for fast lexical search (runs BEFORE semantic embedding)
     lexicon: Option<SharedLexicon>,
-    /// Noun taxonomy index for deterministic Tier -1 ECIR resolution
-    noun_index: Option<Arc<NounIndex>>,
     /// Macro index for deterministic Tier -2B macro search (replaces search_macros)
     macro_index: Option<Arc<MacroIndex>>,
     /// Scenario index for journey-level Tier -2A resolution
@@ -387,7 +382,6 @@ impl Clone for HybridVerbSearcher {
             embedder: self.embedder.clone(),
             macro_registry: self.macro_registry.clone(),
             lexicon: self.lexicon.clone(),
-            noun_index: self.noun_index.clone(),
             macro_index: self.macro_index.clone(),
             scenario_index: self.scenario_index.clone(),
             semantic_threshold: self.semantic_threshold,
@@ -413,7 +407,6 @@ impl HybridVerbSearcher {
             embedder: None,       // Embedder added separately via with_embedder
             macro_registry: None, // Macro registry added separately via with_macro_registry
             lexicon: None,        // Lexicon added separately via with_lexicon
-            noun_index: None,     // Noun index added separately via with_noun_index
             macro_index: None,    // Macro index added separately via with_macro_index
             scenario_index: None, // Scenario index added separately via with_scenario_index
             // BGE asymmetric mode thresholds (query→target is lower than target→target)
@@ -431,7 +424,6 @@ impl HybridVerbSearcher {
             embedder: None,
             macro_registry: None,
             lexicon: None,
-            noun_index: None,
             macro_index: None,
             scenario_index: None,
             // BGE asymmetric mode thresholds
@@ -462,12 +454,6 @@ impl HybridVerbSearcher {
     /// Add lexicon service for fast lexical search (runs BEFORE semantic embedding)
     pub fn with_lexicon(mut self, lexicon: SharedLexicon) -> Self {
         self.lexicon = Some(lexicon);
-        self
-    }
-
-    /// Add noun taxonomy index for deterministic Tier -1 ECIR resolution
-    pub fn with_noun_index(mut self, noun_index: Arc<NounIndex>) -> Self {
-        self.noun_index = Some(noun_index);
         self
     }
 
@@ -543,7 +529,7 @@ impl HybridVerbSearcher {
         entity_kind: Option<&str>,
         limit: usize,
         allowed_verbs: Option<&HashSet<String>>,
-        entity_mention_spans: Option<&[(usize, usize)]>,
+        _entity_mention_spans: Option<&[(usize, usize)]>,
         constellation_index: Option<
             &crate::agent::constellation_verb_index::ConstellationVerbIndex,
         >,
@@ -603,7 +589,7 @@ impl HybridVerbSearcher {
             }
         };
 
-        // ── Feature extraction: compound signals (shared by Tier -2A and ECIR gate) ──
+        // ── Feature extraction: compound signals (shared by Tier -2A and CVI) ──
         let compound_signals = extract_compound_signals(&normalized);
         let has_compound = compound_signals.has_any();
         if has_compound {
@@ -612,116 +598,14 @@ impl HybridVerbSearcher {
                 action = ?compound_signals.compound_action,
                 jurisdiction = ?compound_signals.jurisdiction,
                 structure_nouns = ?compound_signals.structure_nouns,
-                "Compound signals detected — Tier -2A eligible, ECIR short-circuit suppressed"
+                "Compound signals detected — Tier -2A eligible"
             );
-        }
-
-        // ── Tier -1: ECIR Noun Taxonomy (deterministic, before all embedding tiers) ──
-        // For narrow/large candidate sets, ECIR candidates are saved for post-boost
-        // after embedding tiers run (domain knowledge helps break ties without
-        // overriding embedding verb selection).
-        let mut ecir_boost_set: HashSet<String> = HashSet::new();
-        let mut ecir_domain: Option<String> = None; // Domain identified by ECIR for scoped embedding
-        if let Some(ref noun_index) = self.noun_index {
-            let nouns = if let Some(spans) = entity_mention_spans {
-                noun_index.extract_with_exclusions(&normalized, spans)
-            } else {
-                noun_index.extract(&normalized)
-            };
-            if !nouns.is_empty() {
-                let action = NounIndex::classify_action(&normalized);
-                let resolution = noun_index.resolve(&nouns, action, Some(&normalized));
-
-                // Capture ECIR-identified domain for scoped embedding search.
-                // Only set on ExplicitMapping (high confidence) to avoid over-constraining.
-                // NounKeyMatch/SubjectKindMatch are too broad and may derive the wrong domain.
-                if matches!(resolution.resolution_path, ResolutionPath::ExplicitMapping)
-                    && !resolution.candidates.is_empty()
-                {
-                    // Extract domain prefix from first candidate verb FQN
-                    if let Some(dot_pos) = resolution.candidates[0].find('.') {
-                        ecir_domain = Some(resolution.candidates[0][..dot_pos].to_string());
-                    }
-                }
-
-                match resolution.candidates.len() {
-                    0 => {
-                        // No verb candidates from noun — fall through to embedding
-                        // but ecir_domain is set for scoped search
-                        tracing::debug!(
-                            noun = %resolution.noun_key,
-                            ecir_domain = ?ecir_domain,
-                            "ECIR: noun matched but no verb candidates, falling through with domain hint"
-                        );
-                    }
-                    1 => {
-                        let fqn = &resolution.candidates[0];
-                        if has_compound {
-                            // Compound signals present — suppress ECIR short-circuit.
-                            // Save the single candidate for post-boost and let Tier -2A/B
-                            // attempt journey-level resolution first.
-                            tracing::info!(
-                                verb = %fqn,
-                                noun = %resolution.noun_key,
-                                "ECIR: single candidate BUT compound signals present — suppressing short-circuit, deferring to Tier -2A"
-                            );
-                            if allowed_verbs.is_none_or(|av| av.contains(fqn)) {
-                                ecir_boost_set.insert(fqn.clone());
-                            }
-                        } else if self.matches_domain(fqn, domain_filter)
-                            && self.matches_entity_kind(fqn, entity_kind)
-                            && allowed_verbs.is_none_or(|av| av.contains(fqn))
-                            && !seen_verbs.contains(fqn)
-                        {
-                            // No compound signals — deterministic single-verb resolution
-                            tracing::info!(
-                                verb = %fqn,
-                                noun = %resolution.noun_key,
-                                path = ?resolution.resolution_path,
-                                "ECIR: deterministic single-verb resolution"
-                            );
-                            seen_verbs.insert(fqn.clone());
-                            results.push(VerbSearchResult {
-                                verb: fqn.clone(),
-                                score: 0.95,
-                                source: VerbSearchSource::NounTaxonomy,
-                                matched_phrase: format!("noun:{}", resolution.noun_key),
-                                journey: None,
-                                description: noun_index
-                                    .verb_index
-                                    .by_fqn
-                                    .get(fqn)
-                                    .map(|s| s.description.clone()),
-                            });
-                            // SHORT-CIRCUIT: return immediately, skip all embedding tiers
-                            return Ok(normalize_candidates(results, limit));
-                        }
-                    }
-                    _ => {
-                        // 2+ candidates — ECIR identified the domain but can't pick
-                        // the specific verb. Save candidates for post-boost after
-                        // embedding tiers run. This uses ECIR's domain knowledge
-                        // to boost relevant embedding results without overriding them.
-                        tracing::debug!(
-                            candidates = resolution.candidates.len(),
-                            noun = %resolution.noun_key,
-                            action = ?resolution.action,
-                            "ECIR: multi-candidate set, saving for post-boost"
-                        );
-                        for fqn in &resolution.candidates {
-                            if allowed_verbs.is_none_or(|av| av.contains(fqn)) {
-                                ecir_boost_set.insert(fqn.clone());
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         // ── Tier -2A: ScenarioIndex journey-level resolution ─────────────────
         // Fires when compound signals are present OR always (scenarios with
         // `any_of: [phrase_match]` gates handle their own phrase matching).
-        // Score 0.97 — higher than MacroIndex (0.96) and ECIR (0.95).
+        // Score 0.97 — higher than MacroIndex (0.96).
         {
             if let Some(ref scenario_idx) = self.scenario_index {
                 let outcome = scenario_idx.resolve(
@@ -865,7 +749,7 @@ impl HybridVerbSearcher {
                                 },
                             }),
                         });
-                        // MacroIndex match at 0.96 — return early (higher than ECIR 0.95)
+                        // MacroIndex match at 0.96 — return early
                         return Ok(normalize_candidates(results, limit));
                     }
                 }
@@ -940,22 +824,12 @@ impl HybridVerbSearcher {
         // ── Tier -0.5: ConstellationVerbIndex (state-aware, deterministic) ──────
         // Uses the live hydrated constellation's available verbs, keyed by
         // (noun, action_stem). Two clues = direct resolution; one clue = boost set.
-        // Score 0.94 — below ECIR (0.95) but above all embedding tiers.
+        // Score 0.94 — above all embedding tiers.
         if let Some(cvi) = constellation_index {
             let action_stem = compound_signals.action_stem.as_deref();
 
-            // Extract nouns via NounIndex (same extraction ECIR used above)
-            let cvi_nouns: Vec<String> = if let Some(ref noun_index) = self.noun_index {
-                let noun_matches = if let Some(spans) = entity_mention_spans {
-                    noun_index.extract_with_exclusions(&normalized, spans)
-                } else {
-                    noun_index.extract(&normalized)
-                };
-                noun_matches.iter().map(|m| m.noun.key.clone()).collect()
-            } else {
-                // Fallback: use phase_nouns from compound_signals
-                compound_signals.phase_nouns.clone()
-            };
+            // Use phase_nouns from compound_signals for noun extraction
+            let cvi_nouns: Vec<String> = compound_signals.phase_nouns.clone();
 
             let mut cvi_matches: Vec<VerbSearchResult> = Vec::new();
 
@@ -979,19 +853,11 @@ impl HybridVerbSearcher {
                 }
             }
 
-            // Single-clue fallback: by-noun only (boost set, not short-circuit)
+            // Single-clue fallback: by-noun only (logged, no boost)
             if cvi_matches.is_empty() && !cvi_nouns.is_empty() {
-                for noun in &cvi_nouns {
-                    for fqn in cvi.lookup_by_noun(noun) {
-                        if allowed_verbs.is_none_or(|av| av.contains(fqn)) {
-                            ecir_boost_set.insert(fqn.clone());
-                        }
-                    }
-                }
                 tracing::debug!(
                     nouns = ?cvi_nouns,
-                    boost_count = ecir_boost_set.len(),
-                    "ConstellationIndex: noun-only match, added to boost set"
+                    "ConstellationIndex: noun-only match, no two-clue resolution"
                 );
             }
 
@@ -1139,8 +1005,8 @@ impl HybridVerbSearcher {
 
         // 2.5 Exact pattern match from dsl_verbs arrays (yaml_intent_patterns + intent_patterns).
         // Fallback for phrases not yet migrated to phrase_bank.
-        // Always runs — ECIR results from a different domain must not suppress
-        // exact matches for the user's actual intent.
+        // Always runs — results from other tiers must not suppress exact matches
+        // for the user's actual intent.
         if let Some(ref verb_service) = self.verb_service {
             let allowed_vec =
                 allowed_verbs.map(|verbs| verbs.iter().cloned().collect::<Vec<String>>());
@@ -1157,7 +1023,7 @@ impl HybridVerbSearcher {
                     for matched in exact_matches {
                         // Exact invocation phrase matches bypass domain_filter —
                         // the user typed exactly what the verb expects, so domain
-                        // hints from ECIR/pack context must not suppress it.
+                        // hints from pack context must not suppress it.
                         if seen_verbs.contains(&matched.verb) {
                             continue;
                         }
@@ -1232,7 +1098,6 @@ impl HybridVerbSearcher {
             );
             if let Some(ref embedding) = query_embedding {
                 tracing::debug!(
-                    ecir_domain = ?ecir_domain,
                     allowed_verbs_count = allowed_verbs.map(|a| a.len()),
                     "VerbSearch: calling search_global_semantic_with_embedding..."
                 );
@@ -1240,7 +1105,7 @@ impl HybridVerbSearcher {
                     .search_global_semantic_with_embedding(
                         embedding,
                         limit - results.len(),
-                        ecir_domain.as_deref(),
+                        None,
                         allowed_verbs,
                         effective_fallback_threshold,
                     )
@@ -1338,29 +1203,6 @@ impl HybridVerbSearcher {
             }
         }
 
-        // ── ECIR Post-Boost: boost embedding results that match ECIR candidates ──
-        // When ECIR identified a domain (noun) but had multiple verb candidates,
-        // boost any embedding results that match those candidates. This helps
-        // break ties in favor of domain-relevant verbs without overriding
-        // embedding verb selection (unlike the old 0.80 narrow score approach).
-        if !ecir_boost_set.is_empty() {
-            let boost = 0.10_f32;
-            let mut boosted_count = 0u32;
-            for result in &mut results {
-                if ecir_boost_set.contains(&result.verb) {
-                    result.score = (result.score + boost).min(0.95);
-                    boosted_count += 1;
-                }
-            }
-            if boosted_count > 0 {
-                tracing::debug!(
-                    boosted = boosted_count,
-                    ecir_candidates = ecir_boost_set.len(),
-                    "ECIR: post-boosted embedding results matching noun candidates"
-                );
-            }
-        }
-
         // ── Action stem boost ──────────────────────────────────────────────────
         // When an action stem is detected (e.g., "create" from "create a fund"),
         // boost embedding results whose verb FQN contains that stem as the action
@@ -1435,7 +1277,7 @@ impl HybridVerbSearcher {
     /// # Examples
     /// ```ignore
     /// let results = searcher
-    ///     .search_embeddings_only("request identity documents", 5, None, Some(&allowed_verbs))
+    ///     .search_embeddings_only("request identity documents", 5, Some(&allowed_verbs))
     ///     .await?;
     /// assert!(results.len() <= 5);
     /// # Ok::<(), anyhow::Error>(())
@@ -1444,7 +1286,6 @@ impl HybridVerbSearcher {
         &self,
         query: &str,
         limit: usize,
-        ecir_domain: Option<&str>,
         allowed_verbs: Option<&HashSet<String>>,
     ) -> Result<Vec<VerbSearchResult>> {
         if !self.has_semantic_search() {
@@ -1490,7 +1331,7 @@ impl HybridVerbSearcher {
         self.search_global_semantic_with_embedding(
             &query_embedding,
             limit,
-            ecir_domain,
+            None,
             allowed_verbs,
             effective_fallback_threshold,
         )
@@ -1583,23 +1424,20 @@ impl HybridVerbSearcher {
     /// Uses `fallback_threshold` (0.55) instead of hardcoded 0.5.
     ///
     /// Issue I fix: Also fetches from agent.invocation_phrases (learned) and unions.
-    /// Search embedding space with 3-strategy selection:
+    /// Search embedding space with 2-strategy selection:
     ///
     /// 1. **Constrained** (best): If `allowed_verbs` is provided with ≤100 verbs,
     ///    search ONLY patterns for those verbs (`verb_name = ANY($verbs)`).
     ///    This is the SemOS-scoped resolution path — 40-100x search space reduction.
     ///
-    /// 2. **Domain-scoped**: If ECIR identified a domain, search that domain's patterns
-    ///    (`verb_name LIKE 'domain.%'`).
-    ///
-    /// 3. **Full-space** (fallback): Search all ~23K patterns.
+    /// 2. **Full-space** (fallback): Search all ~23K patterns.
     ///
     /// Each strategy falls back to the next if no results exceed `semantic_threshold`.
     async fn search_global_semantic_with_embedding(
         &self,
         query_embedding: &[f32],
         limit: usize,
-        ecir_domain: Option<&str>,
+        _domain: Option<&str>,
         allowed_verbs: Option<&HashSet<String>>,
         fallback_threshold: f32,
     ) -> Result<Vec<VerbSearchResult>> {
@@ -1637,42 +1475,12 @@ impl HybridVerbSearcher {
                 }
                 tracing::debug!(
                     allowed_count = allowed.len(),
-                    "VerbSearch: SemOS-constrained search found nothing above threshold, trying domain/full"
+                    "VerbSearch: SemOS-constrained search found nothing above threshold, falling back to full space"
                 );
             }
         }
 
-        // Strategy 2: Domain-scoped search (if ECIR identified a domain)
-        if let Some(domain) = ecir_domain {
-            let scoped_results = self
-                .search_patterns_directly_scoped(
-                    verb_service,
-                    query_embedding,
-                    limit,
-                    Some(domain),
-                    fallback_threshold,
-                )
-                .await?;
-
-            let has_good_result = scoped_results
-                .iter()
-                .any(|r| r.score >= self.semantic_threshold);
-            if has_good_result {
-                tracing::info!(
-                    domain = domain,
-                    results = scoped_results.len(),
-                    top_score = scoped_results.first().map(|r| r.score),
-                    "VerbSearch: domain-scoped embedding search succeeded"
-                );
-                return Ok(scoped_results);
-            }
-            tracing::debug!(
-                domain = domain,
-                "VerbSearch: domain-scoped search found nothing above threshold, falling back to full space"
-            );
-        }
-
-        // Strategy 3: Full-space search (fallback)
+        // Strategy 2: Full-space search (fallback)
         self.search_patterns_directly_scoped(
             verb_service,
             query_embedding,

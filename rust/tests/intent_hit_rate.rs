@@ -76,7 +76,7 @@ struct TestResult {
     top_candidates: Vec<(String, f32)>,
     latency: Duration,
     pipeline_outcome: String, // Ready, NeedsClarification, NoMatch, etc.
-    /// Source of the top candidate (e.g., "NounTaxonomy", "GlobalSemantic", etc.)
+    /// Source of the top candidate (e.g., "GlobalSemantic", "MacroIndex", etc.)
     top_source: Option<String>,
 }
 
@@ -676,24 +676,8 @@ fn print_summary_report(results: &[TestResult]) {
 }
 
 fn print_ecir_report(results: &[TestResult]) {
-    // Count ECIR-sourced results (NounTaxonomy tier)
-    let ecir_hits: Vec<&TestResult> = results
-        .iter()
-        .filter(|r| {
-            r.top_source
-                .as_ref()
-                .is_some_and(|s| s.contains("NounTaxonomy"))
-        })
-        .collect();
-
-    let deterministic = ecir_hits
-        .iter()
-        .filter(|r| r.selected_score == Some(0.95))
-        .count();
-    let narrow = ecir_hits
-        .iter()
-        .filter(|r| r.selected_score == Some(0.80))
-        .count();
+    // ECIR (NounIndex) has been removed from the pipeline.
+    // This report now only shows annotated test case counts for reference.
 
     // Count annotated test cases
     let annotated_total = results
@@ -713,48 +697,10 @@ fn print_ecir_report(results: &[TestResult]) {
         .filter(|r| r.case.ecir_path.as_deref() == Some("fallthrough"))
         .count();
 
-    // ECIR accuracy on annotated cases
-    let ecir_correct = results
-        .iter()
-        .filter(|r| {
-            let is_ecir = r
-                .top_source
-                .as_ref()
-                .is_some_and(|s| s.contains("NounTaxonomy"));
-            let expected_ecir = matches!(
-                r.case.ecir_path.as_deref(),
-                Some("deterministic") | Some("narrow")
-            );
-            // Correct if: ECIR fired AND expected to fire AND got right verb
-            is_ecir && expected_ecir && r.outcome.is_first_attempt_hit()
-        })
-        .count();
     let ecir_expected = annotated_deterministic + annotated_narrow;
 
-    // ECIR false positives (fired but wasn't expected)
-    let ecir_false_pos = results
-        .iter()
-        .filter(|r| {
-            let is_ecir = r
-                .top_source
-                .as_ref()
-                .is_some_and(|s| s.contains("NounTaxonomy"));
-            let expected_fallthrough = r.case.ecir_path.as_deref() == Some("fallthrough");
-            is_ecir && expected_fallthrough
-        })
-        .count();
-
-    println!("  ECIR (Entity-Centric Intent Resolution)");
+    println!("  ECIR (removed — NounIndex no longer in pipeline)");
     println!("  {:-<68}", "");
-    println!(
-        "  Total ECIR resolutions:    {} / {} ({:.1}%)",
-        ecir_hits.len(),
-        results.len(),
-        ecir_hits.len() as f64 / results.len() as f64 * 100.0
-    );
-    println!("    Deterministic (0.95):    {}", deterministic);
-    println!("    Narrow set (0.80):       {}", narrow);
-    println!();
     println!(
         "  Annotated test cases:      {} / {}",
         annotated_total,
@@ -766,37 +712,9 @@ fn print_ecir_report(results: &[TestResult]) {
     println!();
     if ecir_expected > 0 {
         println!(
-            "  ECIR accuracy (annotated): {} / {} ({:.1}%)",
-            ecir_correct,
+            "  (Legacy) annotated ECIR cases: {} (no longer resolved by NounIndex)",
             ecir_expected,
-            ecir_correct as f64 / ecir_expected as f64 * 100.0
         );
-    }
-    if ecir_false_pos > 0 {
-        println!(
-            "  ECIR false positives:      {} (fired on fallthrough cases)",
-            ecir_false_pos
-        );
-    }
-
-    // Show individual ECIR-resolved cases
-    if !ecir_hits.is_empty() {
-        println!();
-        println!("  ECIR-resolved utterances:");
-        for r in &ecir_hits {
-            let mark = if r.outcome.is_first_attempt_hit() {
-                "✓"
-            } else {
-                "✗"
-            };
-            println!(
-                "    {} \"{}\" → {} ({:.2})",
-                mark,
-                truncate(&r.case.utterance, 45),
-                r.selected_verb.as_deref().unwrap_or("?"),
-                r.selected_score.unwrap_or(0.0),
-            );
-        }
     }
     println!();
 }
@@ -815,19 +733,11 @@ fn print_tier2_report(results: &[TestResult]) {
         .iter()
         .filter(|r| r.top_source.as_ref().is_some_and(|s| s == "MacroIndex"))
         .count();
-    let ecir_count = results
-        .iter()
-        .filter(|r| {
-            r.top_source
-                .as_ref()
-                .is_some_and(|s| s.contains("NounTaxonomy"))
-        })
-        .count();
     let macro_count = results
         .iter()
         .filter(|r| r.top_source.as_ref().is_some_and(|s| s == "Macro"))
         .count();
-    let other_count = results.len() - tier2a_count - tier2b_count - ecir_count - macro_count;
+    let other_count = results.len() - tier2a_count - tier2b_count - macro_count;
 
     println!("  TIER -2 (Scenario-Based Intent Resolution)");
     println!("  {:-<68}", "");
@@ -841,11 +751,6 @@ fn print_tier2_report(results: &[TestResult]) {
         "    Tier -2B (MacroIndex):      {:3} ({:.1}%)",
         tier2b_count,
         tier2b_count as f64 / results.len() as f64 * 100.0
-    );
-    println!(
-        "    Tier -1  (ECIR/NounTax):    {:3} ({:.1}%)",
-        ecir_count,
-        ecir_count as f64 / results.len() as f64 * 100.0
     );
     println!(
         "    Tier  0  (Macro exact):     {:3} ({:.1}%)",
@@ -1314,7 +1219,6 @@ async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridV
     use ob_poc::database::verb_service::VerbService;
     use ob_poc::dsl_v2::macros::load_macro_registry_from_dir;
     use ob_poc::mcp::macro_index::MacroIndex;
-    use ob_poc::mcp::noun_index::{NounIndex, VerbContractIndex};
     use ob_poc::mcp::scenario_index::ScenarioIndex;
     use ob_poc::mcp::verb_search::HybridVerbSearcher;
     use std::path::Path;
@@ -1346,56 +1250,6 @@ async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridV
         "  Warmup: {} phrases, {} entity aliases loaded",
         stats.invocation_phrases_loaded, stats.entity_aliases_loaded
     );
-
-    // Build VerbContractIndex from verb YAML config (needed for NounIndex ECIR)
-    let verb_contract_index = {
-        let config_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/config");
-        let loader = ConfigLoader::new(config_dir);
-        match loader.load_verbs() {
-            Ok(verbs_config) => {
-                let vci = VerbContractIndex::from_verbs_config(&verbs_config);
-                println!("  VerbContractIndex: {} verbs indexed", vci.len());
-                Some(vci)
-            }
-            Err(e) => {
-                eprintln!("  VerbContractIndex: failed to load verbs config: {}", e);
-                None
-            }
-        }
-    };
-
-    // Load NounIndex for ECIR (Tier -1 deterministic resolution)
-    let noun_index = {
-        let yaml_paths = [
-            concat!(env!("CARGO_MANIFEST_DIR"), "/config/noun_index.yaml"),
-            "config/noun_index.yaml",
-        ];
-        let mut loaded = None;
-        if let Some(vci) = verb_contract_index {
-            for path in &yaml_paths {
-                if let Ok(content) = std::fs::read_to_string(path) {
-                    match NounIndex::from_yaml(&content, vci.clone()) {
-                        Ok(ni) => {
-                            println!(
-                                "  NounIndex: loaded {} nouns from {}",
-                                ni.canonical_count(),
-                                path
-                            );
-                            loaded = Some(Arc::new(ni));
-                            break;
-                        }
-                        Err(e) => {
-                            eprintln!("  NounIndex: failed to parse {}: {}", path, e);
-                        }
-                    }
-                }
-            }
-        }
-        if loaded.is_none() {
-            println!("  NounIndex: not found (ECIR disabled in test)");
-        }
-        loaded
-    };
 
     // Load MacroRegistry + MacroIndex (Tier -2B)
     let macro_index = {
@@ -1462,9 +1316,6 @@ async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridV
     let mut searcher =
         HybridVerbSearcher::new(verb_service, Some(learned_data)).with_embedder(dyn_embedder);
 
-    if let Some(ni) = noun_index {
-        searcher = searcher.with_noun_index(ni);
-    }
     if let Some(mi) = macro_index {
         searcher = searcher.with_macro_index(mi);
     }

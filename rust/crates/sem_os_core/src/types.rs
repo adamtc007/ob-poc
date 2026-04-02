@@ -20,6 +20,18 @@ pub enum GovernanceTier {
     Operational,
 }
 
+/// Attribute visibility — external (client-facing, governed) or internal (system/implementation).
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum AttributeVisibility {
+    #[default]
+    External,
+    Internal,
+}
+
 /// Trust class — graduated trust levels for registry objects.
 /// Invariant: `Proof` is only valid when `governance_tier = Governed`.
 #[derive(

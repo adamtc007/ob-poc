@@ -87,6 +87,7 @@ fn attribute_from_fqn(fqn: &str, domain: &str, required: bool) -> AttributeDefBo
         group_id: None,
         is_derived: None,
         derivation_spec_fqn: None,
+        visibility: None,
     }
 }
 

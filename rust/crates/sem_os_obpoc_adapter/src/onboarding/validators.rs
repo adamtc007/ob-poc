@@ -215,6 +215,7 @@ mod tests {
             group_id: None,
             is_derived: None,
             derivation_spec_fqn: None,
+            visibility: None,
         };
         let mut req = minimal_request();
         req.attributes = vec![attr.clone(), attr];
@@ -242,6 +243,7 @@ mod tests {
             group_id: None,
             is_derived: None,
             derivation_spec_fqn: None,
+            visibility: None,
         };
         let mut req = minimal_request();
         req.attributes = vec![attr];

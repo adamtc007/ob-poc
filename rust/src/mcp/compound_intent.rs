@@ -6,7 +6,6 @@
 //!
 //! Used by:
 //! - ScenarioIndex (Tier -2A): gate G1 requires compound signals present
-//! - ECIR short-circuit: suppressed when compound signals detected
 //! - MacroIndex (Tier -2B): jurisdiction/structure hints improve scoring
 
 use std::collections::HashSet;
@@ -283,7 +282,7 @@ impl CompoundSignals {
     /// Returns true if ANY compound signal is present.
     ///
     /// This is the gate G1 check for the ScenarioIndex — if no compound
-    /// signals exist, the utterance should be resolved at ECIR (single verb).
+    /// signals exist, the utterance should be resolved at lower tiers (single verb).
     pub fn has_any(&self) -> bool {
         self.has_compound_action
             || self.has_jurisdiction_structure_pair
@@ -292,7 +291,7 @@ impl CompoundSignals {
     }
 
     /// Strength score for compound signals (higher = more likely composite).
-    /// Used to decide whether to suppress ECIR short-circuit.
+    /// Used to decide whether compound resolution (scenario/macro) should take priority.
     pub fn strength(&self) -> u32 {
         let mut s = 0u32;
         if self.has_compound_action {

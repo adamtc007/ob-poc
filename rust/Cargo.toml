@@ -198,10 +198,6 @@ path = "src/bin/batch_test_harness.rs"
 required-features = ["database", "cli"]
 
 [[bin]]
-name = "audit_subject_kinds"
-path = "src/bin/audit_subject_kinds.rs"
-
-[[bin]]
 name = "sem_os_footprint_audit"
 path = "src/bin/sem_os_footprint_audit.rs"
 

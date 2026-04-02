@@ -768,69 +768,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .unwrap_or_else(|_| MacroRegistry::new()),
                     );
 
-                    // 5b. Load NounIndex for deterministic Tier -1 ECIR resolution
-                    let noun_index: Option<Arc<ob_poc::mcp::noun_index::NounIndex>> = {
-                        let config_loader_for_ni = ConfigLoader::from_env();
-                        match config_loader_for_ni.load_verbs() {
-                            Ok(verbs_cfg) => {
-                                let vi =
-                                    ob_poc::mcp::noun_index::VerbContractIndex::from_verbs_config(
-                                        &verbs_cfg,
-                                    );
-                                let yaml_paths = [
-                                    std::path::Path::new("rust/config/noun_index.yaml"),
-                                    std::path::Path::new("config/noun_index.yaml"),
-                                    std::path::Path::new("../rust/config/noun_index.yaml"),
-                                ];
-                                let mut loaded = None;
-                                for path in &yaml_paths {
-                                    if path.exists() {
-                                        match ob_poc::mcp::noun_index::NounIndex::load(
-                                            path,
-                                            vi.clone(),
-                                        ) {
-                                            Ok(ni) => {
-                                                tracing::info!(
-                                                    "NounIndex loaded: {} canonical aliases, {} verb summaries",
-                                                    ni.canonical_count(),
-                                                    vi.len()
-                                                );
-                                                loaded = Some(Arc::new(ni));
-                                                break;
-                                            }
-                                            Err(e) => {
-                                                tracing::warn!(
-                                                    "Failed to load noun_index.yaml from {}: {}",
-                                                    path.display(),
-                                                    e
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                                if loaded.is_none() {
-                                    tracing::info!("NounIndex not found (ECIR disabled). Looked in: rust/config/, config/, ../rust/config/");
-                                }
-                                loaded
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    "Failed to load verbs config for NounIndex: {}. ECIR disabled.",
-                                    e
-                                );
-                                None
-                            }
-                        }
-                    };
-
-                    // 5c. Build MacroIndex for deterministic Tier -2B macro search
+                    // 5b. Build MacroIndex for deterministic Tier -2B macro search
                     let macro_index: Option<Arc<MacroIndex>> = {
                         let mi = MacroIndex::from_registry(&macro_reg, None);
                         tracing::info!("MacroIndex built: {} entries from MacroRegistry", mi.len());
                         Some(Arc::new(mi))
                     };
 
-                    // 5d. Load ScenarioIndex for journey-level Tier -2A resolution
+                    // 5c. Load ScenarioIndex for journey-level Tier -2A resolution
                     let scenario_index: Option<Arc<ScenarioIndex>> = {
                         let search_paths = [
                             "rust/config/scenario_index.yaml",
@@ -876,7 +821,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         learned_data,
                         macro_reg,
                         lexicon,
-                        noun_index.clone(),
                         macro_index,
                         scenario_index,
                     ));

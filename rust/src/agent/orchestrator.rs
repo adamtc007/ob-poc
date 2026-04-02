@@ -1726,8 +1726,8 @@ pub async fn legacy_handle_utterance(
         }
     }
 
-    // Extract entity mention spans from the lookup result so the ECIR noun
-    // scanner in IntentPipeline can skip entity names (entity-first parsing PR 3).
+    // Extract entity mention spans from the lookup result so verb search
+    // noun extraction in IntentPipeline can skip entity names (entity-first parsing PR 3).
     let entity_mention_spans: Vec<(usize, usize)> = lookup_result
         .as_ref()
         .map(|lr| lr.entities.iter().map(|e| e.mention_span).collect())
@@ -1802,7 +1802,7 @@ pub async fn legacy_handle_utterance(
     };
 
     // If constrained resolution succeeded, narrow allowed_verbs to just that verb
-    // so the open search pipeline (ECIR + embedding) is focused. This preserves
+    // so the verb search pipeline is focused. This preserves
     // all normal post-processing (entity resolution, DSL generation, etc.) while
     // giving the correct verb a massive advantage in the search results.
     if let Some(ref constrained_verb) = constrained_verb_result {
@@ -2355,7 +2355,7 @@ fn build_sage_fast_path_result(
         verb_candidates: vec![VerbSearchResult {
             verb: coder_result.verb_fqn.clone(),
             score,
-            source: VerbSearchSource::NounTaxonomy,
+            source: VerbSearchSource::PatternEmbedding,
             matched_phrase: utterance.to_string(),
             description: Some("sage_fast_path".to_string()),
             journey: None,

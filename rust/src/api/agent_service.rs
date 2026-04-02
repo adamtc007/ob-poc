@@ -114,7 +114,6 @@ use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
 #[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::graph::GraphScope;
 use crate::mcp::macro_index::MacroIndex;
-use crate::mcp::noun_index::NounIndex;
 use crate::mcp::scenario_index::ScenarioIndex;
 // VerbSearchResult/VerbSearchSource: removed with process_chat
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
@@ -381,8 +380,6 @@ pub struct AgentService {
     policy_gate: Arc<crate::policy::PolicyGate>,
     /// Semantic OS client — when set, routes sem_reg calls through DI boundary
     sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
-    /// NounIndex for deterministic Tier -1 ECIR noun→verb resolution
-    noun_index: Option<Arc<NounIndex>>,
     /// MacroIndex for deterministic Tier -2B macro search parity
     macro_index: Option<Arc<MacroIndex>>,
     /// ScenarioIndex for journey-level Tier -2A compound intent resolution
@@ -476,7 +473,6 @@ impl AgentService {
             entity_linker: None,
             policy_gate: Arc::new(crate::policy::PolicyGate::from_env()),
             sem_os_client: None,
-            noun_index: None,
             macro_index: None,
             scenario_index: None,
             macro_registry: None,
@@ -496,12 +492,6 @@ impl AgentService {
     /// Set Semantic OS client for routing sem_reg calls through DI boundary
     pub fn with_sem_os_client(mut self, client: Arc<dyn sem_os_client::SemOsClient>) -> Self {
         self.sem_os_client = Some(client);
-        self
-    }
-
-    /// Set NounIndex for deterministic Tier -1 ECIR noun→verb resolution
-    pub fn with_noun_index(mut self, ni: Arc<NounIndex>) -> Self {
-        self.noun_index = Some(ni);
         self
     }
 
@@ -646,7 +636,7 @@ impl AgentService {
 
     /// Build the verb searcher with all search indices.
     ///
-    /// Uses cached MacroRegistry, NounIndex, MacroIndex, and ScenarioIndex
+    /// Uses cached MacroRegistry, MacroIndex, and ScenarioIndex
     /// (loaded once at startup) instead of reloading from disk on every call.
     fn build_verb_searcher(&self) -> crate::mcp::verb_search::HybridVerbSearcher {
         let dyn_embedder: Arc<dyn crate::agent::learning::embedder::Embedder> =
@@ -673,7 +663,6 @@ impl AgentService {
             self.learned_data.clone(),
             macro_reg,
             self.lexicon.clone(),
-            self.noun_index.clone(),
             self.macro_index.clone(),
             self.scenario_index.clone(),
         )

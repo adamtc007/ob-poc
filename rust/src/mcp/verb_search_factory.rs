@@ -27,7 +27,6 @@ use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::mcp::macro_index::MacroIndex;
-use crate::mcp::noun_index::NounIndex;
 use crate::mcp::scenario_index::ScenarioIndex;
 use crate::mcp::verb_search::{HybridVerbSearcher, SharedLexicon};
 
@@ -47,14 +46,13 @@ impl VerbSearcherFactory {
     /// * `learned_data` - In-memory cache of learned invocation phrases (from warmup)
     /// * `macro_registry` - Operator macro registry for business vocabulary
     /// * `lexicon` - Optional lexicon service for fast lexical matching (runs before semantic)
-    /// * `noun_index` - Optional noun taxonomy index for deterministic Tier -1 ECIR resolution
     /// * `macro_index` - Optional macro index for deterministic Tier -2B macro scoring
     /// * `scenario_index` - Optional scenario index for journey-level Tier -2A resolution
     ///
     /// # Returns
     ///
     /// A `HybridVerbSearcher` with:
-    /// - All search channels enabled (scenario index, noun taxonomy, macro index, lexicon, macro, learned exact/semantic, pattern embedding, phonetic)
+    /// - All search channels enabled (scenario index, macro index, lexicon, macro, learned exact/semantic, pattern embedding, phonetic)
     /// - Proper threshold configuration for BGE asymmetric mode
     /// - user_id support for per-user learned phrases
     #[allow(clippy::too_many_arguments)]
@@ -64,7 +62,6 @@ impl VerbSearcherFactory {
         learned_data: Option<SharedLearnedData>,
         macro_registry: Arc<MacroRegistry>,
         lexicon: Option<SharedLexicon>,
-        noun_index: Option<Arc<NounIndex>>,
         macro_index: Option<Arc<MacroIndex>>,
         scenario_index: Option<Arc<ScenarioIndex>>,
     ) -> HybridVerbSearcher {
@@ -76,10 +73,6 @@ impl VerbSearcherFactory {
 
         if let Some(lex) = lexicon {
             searcher = searcher.with_lexicon(lex);
-        }
-
-        if let Some(ni) = noun_index {
-            searcher = searcher.with_noun_index(ni);
         }
 
         if let Some(mi) = macro_index {
@@ -112,7 +105,6 @@ mod tests {
             _learned_data: Option<SharedLearnedData>,
             _macro_registry: Arc<MacroRegistry>,
             _lexicon: Option<SharedLexicon>,
-            _noun_index: Option<Arc<NounIndex>>,
             _macro_index: Option<Arc<MacroIndex>>,
             _scenario_index: Option<Arc<ScenarioIndex>>,
         ) -> HybridVerbSearcher {

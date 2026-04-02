@@ -72,7 +72,7 @@ pub struct MatchContext {
 
     /// Constellation verb index: two-way (noun, action) → verb lookup built
     /// from the live hydrated constellation's state-gated available verbs.
-    /// Consulted at Tier -0.5 in HybridVerbSearcher (after ECIR, before embeddings).
+    /// Consulted at Tier -0.5 in HybridVerbSearcher.
     #[serde(skip)]
     pub constellation_verb_index:
         Option<std::sync::Arc<crate::agent::constellation_verb_index::ConstellationVerbIndex>>,

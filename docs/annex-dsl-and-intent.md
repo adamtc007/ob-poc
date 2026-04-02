@@ -1,7 +1,7 @@
 # DSL Pipeline, Verb Search & Intent Resolution — Detailed Annex
 
 > This annex covers the DSL pipeline, verb search tiers, embeddings, intent resolution,
-> disambiguation, teaching/promotion, scenarios, ECIR, AffinityGraph, and discovery.
+> disambiguation, teaching/promotion, scenarios, AffinityGraph, and discovery.
 > For the high-level overview see the root `CLAUDE.md`.
 
 ---
@@ -31,7 +31,6 @@ User Utterance
 | `rust/src/mcp/verb_search.rs` | `HybridVerbSearcher`, `VerbSearchResult`, `VerbSearchOutcome` |
 | `rust/src/agent/sem_os_context_envelope.rs` | `SemOsContextEnvelope`, `PrunedVerb`, `PruneReason` |
 | `rust/src/agent/verb_surface.rs` | `SessionVerbSurface`, `SurfaceVerb`, `VerbSurfaceFailPolicy` |
-| `rust/src/mcp/noun_index.rs` | ECIR Tier -1: `NounIndex`, `NounResolution`, `ResolutionPath` |
 | `rust/src/mcp/scenario_index.rs` | Tier -2A: `ScenarioIndex`, `ScenarioDefYaml`, `ResolvedRoute` |
 | `rust/src/mcp/macro_index.rs` | Tier -2B: `MacroIndex`, `MacroResolveOutcome` |
 | `rust/src/mcp/compound_intent.rs` | `CompoundSignals` (11 signal types) |
@@ -84,16 +83,16 @@ OBPOC_ALLOW_RAW_EXECUTE=false       # Block direct DSL bypass
 ## 10-Tier Search Priority
 
 ```
-Tier -2A:  ScenarioIndex          score 0.97   journey-level compound intent
-Tier -2B:  MacroIndex             score 0.96   operator macro search
-Tier -1:   ECIR / NounIndex       score 0.95   deterministic noun→verb
-Tier  0:   Operator Macros        score 1.0 exact / 0.95 fuzzy
-Tier  1:   User Learned Exact     score 1.0
-Tier  2:   Global Learned Exact   score 1.0
-Tier  3:   User Learned Semantic  pgvector + BGE (threshold 0.80)
-Tier  5:   Blocklist Filter       semantic collision detection (threshold 0.80)
-Tier  6:   Global Semantic        UNION learned + cold-start patterns (threshold 0.65)
-Tier  7:   Phonetic Fallback      dmetaphone (score 0.80)
+Tier -2A:  ScenarioIndex              score 0.97   journey-level compound intent
+Tier -2B:  MacroIndex                 score 0.96   operator macro search
+Tier -0.5: ConstellationVerbIndex     state-gated noun+action lookup from live constellation
+Tier  0:   Operator Macros            score 1.0 exact / 0.95 fuzzy
+Tier  1:   User Learned Exact         score 1.0
+Tier  2:   Global Learned Exact       score 1.0
+Tier  3:   User Learned Semantic      pgvector + BGE (threshold 0.80)
+Tier  5:   Blocklist Filter           semantic collision detection (threshold 0.80)
+Tier  6:   Global Semantic            UNION learned + cold-start patterns (threshold 0.65)
+Tier  7:   Phonetic Fallback          dmetaphone (score 0.80)
 ```
 
 ### HybridVerbSearcher
@@ -105,7 +104,6 @@ pub struct HybridVerbSearcher {
     embedder: Option<SharedEmbedder>,        // CandleEmbedder BGE-small-en-v1.5
     macro_registry: Option<Arc<MacroRegistry>>,
     lexicon: Option<SharedLexicon>,          // fast lexical search (runs before semantic)
-    noun_index: Option<Arc<NounIndex>>,      // Tier -1 ECIR
     macro_index: Option<Arc<MacroIndex>>,    // Tier -2B
     scenario_index: Option<Arc<ScenarioIndex>>,  // Tier -2A
     semantic_threshold: f32,    // 0.65
@@ -116,7 +114,7 @@ pub struct HybridVerbSearcher {
 
 **Builder chain:**
 `.new()` → `.with_embedder()` → `.with_macro_registry()` → `.with_lexicon()`
-→ `.with_noun_index()` → `.with_macro_index()` → `.with_scenario_index()`
+→ `.with_macro_index()` → `.with_scenario_index()`
 
 **Ambiguity detection:** if `(top.score - runner_up.score) < 0.05` → `Ambiguous`
 
@@ -132,36 +130,13 @@ pub enum VerbSearchOutcome {
 
 ---
 
-## ECIR — Entity-Centric Intent Resolution (Tier -1)
+## ConstellationVerbIndex (Tier -0.5)
 
-**File:** `rust/src/mcp/noun_index.rs`
-**Config:** `rust/config/noun_index.yaml` (120+ nouns)
+**Replaced:** ECIR / NounIndex (Tier -1) — removed in favor of ConstellationVerbIndex.
 
-**Types:**
-```rust
-pub struct NounEntry {
-    pub key: String,                              // e.g. "cbu", "entity", "fund"
-    pub entity_type_fqn: Option<String>,
-    pub noun_keys: Vec<String>,                   // maps to metadata.noun on verbs
-    pub action_verbs: HashMap<String, Vec<String>>, // action→verb FQN
-}
+The ConstellationVerbIndex provides a two-way (noun, action_stem) to verb lookup built from the live hydrated constellation's state-gated available verbs. It is consulted at Tier -0.5 in HybridVerbSearcher, after scenario/macro tiers but before embedding tiers. Unlike the old static NounIndex, this index reflects the actual constellation state and workspace pack constraints.
 
-pub enum ActionCategory { Create, List, Update, Delete, Assign, Compute, Import, Search }
-
-pub enum ResolutionPath {
-    ExplicitMapping,   // action_verbs[action] → verb FQN (highest priority)
-    NounKeyMatch,      // noun_keys → metadata.noun match
-    SubjectKindMatch,  // entity_type_fqn → subject_kinds match
-    NoMatch,
-}
-```
-
-**Three-case branching:**
-1. **0 candidates** → fallthrough to next tier
-2. **1 candidate** → deterministic at score 0.95, short-circuits embedding tiers
-3. **2+ candidates** → post-boost (+0.05 to matching embedding results)
-
-**CompoundSignals suppress ECIR short-circuit** — compound utterances (onboard, set up, establish + structure noun + jurisdiction) skip ECIR to allow Tier -2A to trigger.
+**Key file:** `rust/src/agent/constellation_verb_index.rs`
 
 ---
 
@@ -234,7 +209,7 @@ Mismatch penalty:    -999
 - Phase nouns: `kyc`, `screening`, `due diligence`, `onboarding`, `compliance`, `aml`, `cdd`, `edd`
 - Quantifier patterns: `three`, `four`, `multiple`, `several`, `all`, `each`, `every`, `both`
 
-Signals are extracted before tier routing. A compound signal suppresses the ECIR Tier -1 short-circuit so Tier -2A can evaluate first.
+Signals are extracted before tier routing. When compound signals are present, Tier -2A (ScenarioIndex) evaluates first.
 
 ---
 
@@ -506,7 +481,6 @@ pub enum GovernanceLevel {
 
 | File | Purpose | Entries |
 |------|---------|---------|
-| `rust/config/noun_index.yaml` | 120+ domain nouns with action→verb mappings | ECIR database |
 | `rust/config/scenario_index.yaml` | 16 journey scenarios | Tier -2A routes |
 | `rust/config/verb_schemas/macros/screening.yaml` | 4 party-level screening macros (ad-hoc, pre-workstream) | Tier -2B candidates |
 | `rust/config/verb_schemas/macros/screening-ops.yaml` | 3 workstream-level screening macros (KYC case context) | Tier -2B candidates |
@@ -519,12 +493,12 @@ pub enum GovernanceLevel {
 
 | File | Purpose |
 |------|---------|
-| `rust/tests/fixtures/intent_test_utterances.toml` | ECIR test corpus (133 cases) |
+| `rust/tests/fixtures/intent_test_utterances.toml` | Intent test corpus (133 cases) |
 | `rust/tests/fixtures/tier2_test_cases.toml` | Tier -2 cases (43: 17 scenario + 14 macro_match + 5 blocker + 7 sequence) |
 
 **Intent hit rate (current):**
-- First-attempt: 52.1% (ECIR target: 35% ✅)
-- Two-attempt: 85.3% (ECIR target: 55% ✅)
+- First-attempt: 78.2%
+- Two-attempt: 99.4%
 
 **Scenario harness:**
 ```bash

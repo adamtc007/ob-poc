@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::EvidenceGrade;
+use crate::types::{AttributeVisibility, EvidenceGrade};
 
 fn default_attribute_evidence_grade() -> EvidenceGrade {
     EvidenceGrade::None
@@ -55,6 +55,9 @@ pub struct AttributeDefBody {
     /// FQN of the governing derivation spec (required when `is_derived = true`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub derivation_spec_fqn: Option<String>,
+    /// Whether this attribute is externally meaningful or internal/system-only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<AttributeVisibility>,
 }
 
 /// Supported attribute data types.
@@ -234,6 +237,7 @@ mod tests {
             group_id: Some("jurisdiction".into()),
             is_derived: Some(false),
             derivation_spec_fqn: None,
+            visibility: None,
         };
         let json = serde_json::to_value(&val).unwrap();
         // Check Enum variant serialization

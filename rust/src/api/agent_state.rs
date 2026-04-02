@@ -254,60 +254,6 @@ impl AgentState {
             }),
         );
 
-        // Load NounIndex for deterministic Tier -1 ECIR noun→verb resolution
-        let noun_index: Option<Arc<crate::mcp::noun_index::NounIndex>> = {
-            use crate::dsl_v2::ConfigLoader;
-            let config_loader = ConfigLoader::from_env();
-            match config_loader.load_verbs() {
-                Ok(verbs_cfg) => {
-                    let vi =
-                        crate::mcp::noun_index::VerbContractIndex::from_verbs_config(&verbs_cfg);
-                    let yaml_paths = [
-                        std::path::Path::new("rust/config/noun_index.yaml"),
-                        std::path::Path::new("config/noun_index.yaml"),
-                        std::path::Path::new("../rust/config/noun_index.yaml"),
-                    ];
-                    let mut loaded = None;
-                    for path in &yaml_paths {
-                        if path.exists() {
-                            match crate::mcp::noun_index::NounIndex::load(path, vi.clone()) {
-                                Ok(ni) => {
-                                    tracing::info!(
-                                        aliases = ni.canonical_count(),
-                                        verb_summaries = vi.len(),
-                                        "NounIndex loaded for Chat API (ECIR Tier -1)"
-                                    );
-                                    loaded = Some(Arc::new(ni));
-                                    break;
-                                }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "Failed to load noun_index.yaml from {}: {}",
-                                        path.display(),
-                                        e
-                                    );
-                                }
-                            }
-                        }
-                    }
-                    if loaded.is_none() {
-                        tracing::info!(
-                            "NounIndex not found (ECIR disabled for Chat API). \
-                             Looked in: rust/config/, config/, ../rust/config/"
-                        );
-                    }
-                    loaded
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to load verbs config for NounIndex: {}. ECIR disabled for Chat API.",
-                        e
-                    );
-                    None
-                }
-            }
-        };
-
         // Build MacroIndex for deterministic Tier -2B macro search
         let macro_index: Option<Arc<crate::mcp::macro_index::MacroIndex>> = {
             let mi = crate::mcp::macro_index::MacroIndex::from_registry(&macro_registry, None);
@@ -369,10 +315,7 @@ impl AgentState {
         .with_macro_registry(macro_registry)
         .with_sage_engine(sage_engine);
 
-        // Wire search indices for ECIR, MacroIndex, and ScenarioIndex
-        if let Some(ni) = noun_index {
-            agent_service = agent_service.with_noun_index(ni);
-        }
+        // Wire search indices for MacroIndex and ScenarioIndex
         if let Some(mi) = macro_index {
             agent_service = agent_service.with_macro_index(mi);
         }

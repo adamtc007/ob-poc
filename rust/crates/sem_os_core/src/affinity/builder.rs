@@ -607,6 +607,7 @@ mod tests {
             group_id: None,
             is_derived: None,
             derivation_spec_fqn: None,
+            visibility: None,
         })
         .unwrap();
 
@@ -889,6 +890,7 @@ mod tests {
             group_id: None,
             is_derived: None,
             derivation_spec_fqn: None,
+            visibility: None,
         })
         .unwrap();
 

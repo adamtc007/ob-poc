@@ -2127,6 +2127,78 @@ category = "direct"
 difficulty = "easy"
 workspace = "semos_maintenance"
 
+[[test]]
+utterance = "create system flag attribute"
+expected_verb = "attribute.define-internal"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+notes = "Exact invocation phrase match"
+
+[[test]]
+utterance = "add a system processing flag for routing"
+expected_verb = "attribute.define-internal"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "register an internal system attribute for operations"
+expected_verb = "attribute.define-internal"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "provision internal processing marker"
+expected_verb = "attribute.define-internal"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "new internal attribute for system use"
+expected_verb = "attribute.define-internal"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "define an operational system marker attribute"
+expected_verb = "attribute.define-internal"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "patch system flag rules"
+expected_verb = "attribute.update-internal"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+notes = "Exact invocation phrase match"
+
+[[test]]
+utterance = "change the system flag requirements"
+expected_verb = "attribute.update-internal"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "modify internal attribute constraints"
+expected_verb = "attribute.update-internal"
+category = "direct"
+difficulty = "easy"
+workspace = "semos_maintenance"
+
+[[test]]
+utterance = "adjust internal system attribute settings"
+expected_verb = "attribute.update-internal"
+category = "natural"
+difficulty = "medium"
+workspace = "semos_maintenance"
+
 # ── Deal ───────────────────────────────────────────────────────────────────
 
 [[test]]

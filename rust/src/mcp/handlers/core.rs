@@ -203,8 +203,6 @@ pub struct ToolHandlers {
     pub(super) macro_registry: Option<Arc<MacroRegistry>>,
     /// Lexicon service for fast in-memory lexical verb search (Phase A of 072)
     pub(super) lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
-    /// Noun taxonomy index for deterministic Tier -1 ECIR resolution
-    pub(super) noun_index: Option<Arc<crate::mcp::noun_index::NounIndex>>,
     /// Macro index for deterministic Tier -2B macro search
     pub(super) macro_index: Option<Arc<crate::mcp::macro_index::MacroIndex>>,
     /// Scenario index for journey-level Tier -2A resolution
@@ -235,7 +233,6 @@ impl ToolHandlers {
             feedback_service: None,
             macro_registry: None,
             lexicon: None,
-            noun_index: None,
             macro_index: None,
             scenario_index: None,
             sem_os_client: None,
@@ -253,12 +250,6 @@ impl ToolHandlers {
     /// Set the lexicon service for fast in-memory lexical verb search
     pub fn with_lexicon(mut self, lexicon: crate::mcp::verb_search::SharedLexicon) -> Self {
         self.lexicon = Some(lexicon);
-        self
-    }
-
-    /// Set the noun taxonomy index for deterministic Tier -1 ECIR resolution
-    pub fn with_noun_index(mut self, noun_index: Arc<crate::mcp::noun_index::NounIndex>) -> Self {
-        self.noun_index = Some(noun_index);
         self
     }
 
@@ -342,7 +333,6 @@ impl ToolHandlers {
                 self.learned_data.clone(),
                 macro_registry.clone(),
                 self.lexicon.clone(),
-                self.noun_index.clone(),
                 self.macro_index.clone(),
                 self.scenario_index.clone(),
             )
@@ -354,7 +344,6 @@ impl ToolHandlers {
                 self.learned_data.clone(),
                 Arc::new(MacroRegistry::new()),
                 self.lexicon.clone(),
-                self.noun_index.clone(),
                 None,
                 None,
             )

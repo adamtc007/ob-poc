@@ -17,10 +17,12 @@ use crate::sem_reg::derivation_spec::{
     DerivationExpression, DerivationInput, DerivationSpecBody, FreshnessRule, NullSemantics,
 };
 use crate::sem_reg::store::SnapshotStore;
-use crate::sem_reg::types::{ChangeType, ObjectType, SnapshotMeta, SnapshotRow, SnapshotStatus};
+use crate::sem_reg::types::{
+    ChangeType, GovernanceTier, ObjectType, SnapshotMeta, SnapshotRow, SnapshotStatus, TrustClass,
+};
 use crate::services::attribute_identity_service::AttributeIdentityService;
 use sem_os_core::attribute_def::{AttributeDataType, AttributeDefBody, AttributeSource};
-use sem_os_core::types::EvidenceGrade;
+use sem_os_core::types::{AttributeVisibility, EvidenceGrade};
 
 #[cfg(feature = "database")]
 use sqlx::{PgPool, Postgres, Row, Transaction};
@@ -920,6 +922,7 @@ fn build_attribute_def_body(
     validation_rules: Option<serde_json::Value>,
     applicability: Option<serde_json::Value>,
     derivation_spec_fqn: Option<String>,
+    visibility: Option<AttributeVisibility>,
 ) -> Result<AttributeDefBody> {
     Ok(AttributeDefBody {
         fqn: semantic_id.to_string(),
@@ -945,6 +948,7 @@ fn build_attribute_def_body(
         group_id: None,
         is_derived: Some(derived),
         derivation_spec_fqn,
+        visibility,
     })
 }
 
@@ -1156,6 +1160,10 @@ async fn materialize_to_store(
     let category = definition.get("category").and_then(|v| v.as_str());
     let validation_rules = definition.get("validation_rules").cloned();
     let applicability = definition.get("applicability").cloned();
+    let visibility = definition
+        .get("visibility")
+        .and_then(|v| v.as_str())
+        .unwrap_or("external");
 
     let semos_metadata = json!({
         "snapshot_id": snapshot_id,
@@ -1169,7 +1177,7 @@ async fn materialize_to_store(
             id, uuid, display_name, category, value_type, domain,
             validation_rules, applicability, evidence_grade,
             is_derived, derivation_spec_fqn, sem_reg_snapshot_id,
-            metadata
+            metadata, visibility
         )
         VALUES (
             $1, $2, $3, $4, $5, $6,
@@ -1179,7 +1187,8 @@ async fn materialize_to_store(
             $10,
             $11,
             $12,
-            jsonb_build_object('sem_os', $13::jsonb)
+            jsonb_build_object('sem_os', $13::jsonb),
+            $14
         )
         ON CONFLICT (id) DO UPDATE SET
             display_name = EXCLUDED.display_name,
@@ -1198,6 +1207,7 @@ async fn materialize_to_store(
                 COALESCE("ob-poc".attribute_registry.metadata->'sem_os', '{}'::jsonb) || $13::jsonb,
                 true
             ),
+            visibility = EXCLUDED.visibility,
             updated_at = NOW()
         RETURNING uuid
         "#,
@@ -1215,6 +1225,7 @@ async fn materialize_to_store(
     .bind(derivation_spec_fqn) // $11
     .bind(snapshot_id)        // $12
     .bind(semos_metadata)     // $13
+    .bind(visibility)         // $14
     .fetch_one(&mut **tx)
     .await?;
 
@@ -1443,6 +1454,7 @@ impl CustomOperation for AttributeDefineGovernedOp {
             validation_rules,
             applicability,
             None, // not derived
+            None, // visibility (default External)
         )?;
         let definition = serde_json::to_value(&body)?;
 
@@ -1504,6 +1516,262 @@ impl CustomOperation for AttributeDefineGovernedOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("attribute.define requires database"))
+    }
+}
+
+/// Define or update an internal/system attribute with lightweight governance.
+///
+/// Auto-sets `governance_tier = Operational`, `evidence_grade = Prohibited`,
+/// `trust_class = Convenience`, `visibility = Internal`. No changeset ceremony.
+#[register_custom_op]
+pub struct AttributeDefineInternalOp;
+
+#[async_trait]
+impl CustomOperation for AttributeDefineInternalOp {
+    fn domain(&self) -> &'static str {
+        "attribute"
+    }
+
+    fn verb(&self) -> &'static str {
+        "define-internal"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Lightweight internal attribute definition — operational tier, auto-approved"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let raw_id = string_arg(verb_call, "id")?;
+        let display_name = string_arg(verb_call, "display-name")?;
+        let category = string_arg(verb_call, "category")?;
+        let value_type = string_arg(verb_call, "value-type")?;
+        let domain = optional_string_arg(verb_call, "domain");
+        let semantic_id = normalize_attribute_id(&raw_id, domain.as_deref());
+        let description = effective_description(
+            &display_name,
+            optional_string_arg(verb_call, "semos-description"),
+        );
+        let validation_rules = parse_json_arg(verb_call, "validation-rules")?;
+        let applicability = parse_json_arg(verb_call, "applicability")?;
+
+        let object_id = crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, &semantic_id);
+
+        let body = build_attribute_def_body(
+            &semantic_id,
+            &display_name,
+            description,
+            domain.clone().unwrap_or_else(|| {
+                semantic_id
+                    .split('.')
+                    .next()
+                    .unwrap_or("attribute")
+                    .to_string()
+            }),
+            &value_type,
+            EvidenceGrade::Prohibited, // internal attributes cannot be evidence
+            false,
+            Some(category),
+            validation_rules,
+            applicability,
+            None, // not derived
+            Some(AttributeVisibility::Internal),
+        )?;
+        let definition = serde_json::to_value(&body)?;
+
+        let predecessor =
+            SnapshotStore::resolve_active(pool, ObjectType::AttributeDef, object_id).await?;
+
+        let mut tx = pool.begin().await?;
+
+        let snapshot_id = if hashes_match(predecessor.as_ref(), &definition) {
+            predecessor
+                .as_ref()
+                .map(|row| row.snapshot_id)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Failed to resolve existing AttributeDef snapshot for {}",
+                        semantic_id
+                    )
+                })?
+        } else {
+            let mut meta = next_meta_from_predecessor(
+                predecessor.as_ref(),
+                ObjectType::AttributeDef,
+                object_id,
+                ctx.audit_user
+                    .as_deref()
+                    .unwrap_or("attribute.define-internal"),
+                if predecessor.is_some() {
+                    ChangeType::NonBreaking
+                } else {
+                    ChangeType::Created
+                },
+                None,
+                SnapshotStatus::Active,
+            );
+            // Force operational governance — lightweight, auto-approved
+            meta.governance_tier = GovernanceTier::Operational;
+            meta.trust_class = TrustClass::Convenience;
+            meta.approved_by = Some("auto".to_string());
+            publish_snapshot_in_tx(&mut tx, &meta, &definition).await?
+        };
+
+        let registry_uuid = materialize_to_store(
+            &mut tx,
+            &semantic_id,
+            object_id,
+            snapshot_id,
+            &definition,
+            false,
+            None,
+        )
+        .await?;
+
+        tx.commit().await?;
+        ctx.bind("attribute", registry_uuid);
+        Ok(ExecutionResult::Uuid(registry_uuid))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("attribute.define-internal requires database"))
+    }
+}
+
+/// Update metadata on an internal/system attribute with lightweight governance.
+///
+/// Creates a new `NonBreaking` snapshot version — immutable model preserved.
+/// Refuses to update external/governed attributes.
+#[register_custom_op]
+pub struct AttributeUpdateInternalOp;
+
+#[async_trait]
+impl CustomOperation for AttributeUpdateInternalOp {
+    fn domain(&self) -> &'static str {
+        "attribute"
+    }
+
+    fn verb(&self) -> &'static str {
+        "update-internal"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Lightweight metadata update for internal attributes — no changeset ceremony"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let id = string_arg(verb_call, "id")?;
+
+        // ── Step 1: Load active attribute context ──
+        let attr_ctx = load_active_attribute_context(pool, &id).await?;
+        let active_snapshot = attr_ctx
+            .active_snapshot
+            .as_ref()
+            .ok_or_else(|| anyhow!("No active SemOS snapshot for attribute '{}'", id))?;
+
+        // ── Step 2: Deserialize and guard visibility ──
+        let mut body: AttributeDefBody =
+            serde_json::from_value(active_snapshot.definition.clone())?;
+
+        let vis = body.visibility.unwrap_or(AttributeVisibility::External);
+        if vis != AttributeVisibility::Internal {
+            return Err(anyhow!(
+                "Cannot update external attributes via update-internal — use the changeset path"
+            ));
+        }
+
+        // ── Step 3: Merge provided fields into existing body ──
+        if let Ok(Some(val)) = parse_json_arg(verb_call, "validation-rules") {
+            body.validation_rules = Some(val);
+        }
+        if let Ok(Some(val)) = parse_json_arg(verb_call, "applicability") {
+            body.applicability = Some(val);
+        }
+        if let Some(v) = optional_string_arg(verb_call, "is-required") {
+            body.is_required = Some(v.parse::<bool>().unwrap_or(false));
+        }
+        if let Some(v) = optional_string_arg(verb_call, "default-value") {
+            body.default_value = Some(v);
+        }
+        if let Some(v) = optional_string_arg(verb_call, "group-id") {
+            body.group_id = Some(v);
+        }
+
+        let definition = serde_json::to_value(&body)?;
+
+        // ── Step 4: Check if anything actually changed ──
+        if hashes_match(Some(active_snapshot), &definition) {
+            return Ok(ExecutionResult::Record(serde_json::json!({
+                "status": "unchanged",
+                "attribute_id": attr_ctx.registry_id,
+                "snapshot_id": active_snapshot.snapshot_id,
+            })));
+        }
+
+        // ── Step 5: Publish new NonBreaking snapshot ──
+        let mut meta = next_meta_from_predecessor(
+            Some(active_snapshot),
+            ObjectType::AttributeDef,
+            attr_ctx.registry_uuid,
+            ctx.audit_user
+                .as_deref()
+                .unwrap_or("attribute.update-internal"),
+            ChangeType::NonBreaking,
+            Some("Internal attribute metadata update".to_string()),
+            SnapshotStatus::Active,
+        );
+        meta.governance_tier = GovernanceTier::Operational;
+        meta.trust_class = TrustClass::Convenience;
+        meta.approved_by = Some("auto".to_string());
+
+        let mut tx = pool.begin().await?;
+        let snapshot_id = publish_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+
+        // ── Step 6: Project to store ──
+        let registry_uuid = materialize_to_store(
+            &mut tx,
+            &attr_ctx.registry_id,
+            attr_ctx.registry_uuid,
+            snapshot_id,
+            &definition,
+            body.is_derived.unwrap_or(false),
+            body.derivation_spec_fqn.as_deref(),
+        )
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "status": "updated",
+            "attribute_id": attr_ctx.registry_id,
+            "snapshot_id": snapshot_id,
+            "registry_uuid": registry_uuid,
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("attribute.update-internal requires database"))
     }
 }
 
@@ -1571,6 +1839,7 @@ impl CustomOperation for AttributeDefineDerivedOp {
             None,                      // no validation_rules for derived
             None,                      // no applicability for derived
             Some(semantic_id.clone()), // derivation_spec_fqn
+            None,                      // visibility (default External)
         )?;
         let derivation_body = build_derivation_spec_body(
             &semantic_id,
@@ -2180,7 +2449,8 @@ impl CustomOperation for AttributeBridgeToSemosOp {
                 Some(category.clone()),
                 validation_rules.clone(),
                 applicability.clone(),
-                None,
+                None, // not derived
+                None, // visibility (default External)
             )?;
             let definition = serde_json::to_value(&body)?;
 

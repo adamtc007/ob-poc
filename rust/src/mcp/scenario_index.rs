@@ -425,7 +425,7 @@ impl ScenarioIndex {
     }
 
     /// Extract compound signals from an utterance (delegates to compound_intent).
-    /// Exposed for use by verb_search.rs to check before ECIR short-circuit.
+    /// Exposed for use by verb_search.rs.
     pub fn extract_signals(utterance: &str) -> CompoundSignals {
         extract_compound_signals(utterance)
     }

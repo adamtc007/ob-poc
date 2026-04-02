@@ -100,8 +100,8 @@ pub trait EntityLinkingService: Send + Sync {
     /// Extract raw mention spans from the utterance without full resolution.
     ///
     /// Returns `(start, end)` byte-offset pairs for each detected entity
-    /// mention. These spans can be fed to `NounIndex::extract_with_exclusions`
-    /// to mask out entity names before the ECIR noun scan.
+    /// mention. These spans can be used to mask out entity names before
+    /// keyword-based noun extraction.
     ///
     /// Default implementation returns an empty vec (safe for stubs).
     fn extract_mention_spans(&self, utterance: &str) -> Vec<(usize, usize)> {

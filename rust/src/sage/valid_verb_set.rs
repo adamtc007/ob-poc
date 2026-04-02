@@ -1926,7 +1926,7 @@ mod tests {
             } else {
                 fallthrough += 1;
                 let scoped_results = searcher
-                    .search_embeddings_only(&tc.utterance, 3, None, Some(&valid.to_allowed_set()))
+                    .search_embeddings_only(&tc.utterance, 3, Some(&valid.to_allowed_set()))
                     .await?;
                 if let Some(top) = scoped_results.first() {
                     let margin = top.score

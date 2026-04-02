@@ -49,6 +49,8 @@ allowed_verbs:
   - registry.search
   - attribute.define
   - attribute.define-derived
+  - attribute.define-internal
+  - attribute.update-internal
   - attribute.inspect
   - attribute.classify
   - attribute.set-evidence-grade

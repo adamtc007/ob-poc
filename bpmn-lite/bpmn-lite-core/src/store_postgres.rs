@@ -983,14 +983,14 @@ mod tests {
         }
 
         // Dequeue 2
-        let batch1 = store.dequeue_jobs(&[task_type.clone()], 2).await.unwrap();
+        let batch1 = store.dequeue_jobs(std::slice::from_ref(&task_type), 2).await.unwrap();
         assert_eq!(batch1.len(), 2);
 
         // Ack one
         store.ack_job(&batch1[0].job_key).await.unwrap();
 
         // Dequeue remaining
-        let batch2 = store.dequeue_jobs(&[task_type.clone()], 10).await.unwrap();
+        let batch2 = store.dequeue_jobs(std::slice::from_ref(&task_type), 10).await.unwrap();
         assert_eq!(batch2.len(), 1);
     }
 

@@ -212,6 +212,7 @@ async fn seed_attribute_def(pool: &PgPool, candidate: &AttributeCandidate) -> Re
         group_id: None,
         is_derived: None,
         derivation_spec_fqn: None,
+        visibility: None,
     };
 
     publish_idempotent(pool, ObjectType::AttributeDef, &fqn, &body).await

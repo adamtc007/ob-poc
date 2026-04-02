@@ -221,6 +221,122 @@ domains:
           type: uuid
           capture: true
 
+      define-internal:
+        description: "Define an internal/system attribute with lightweight governance"
+        metadata:
+          tier: intent
+          source_of_truth: sem_reg
+          scope: global
+          noun: attribute
+          tags: [data-management, governance, internal]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        invocation_phrases:
+          - "create system flag attribute"
+          - "add system processing flag"
+          - "register internal system attribute"
+          - "define operational system marker"
+          - "provision internal processing marker"
+          - "create internal operational indicator"
+          - "add system-only attribute no governance"
+          - "register platform system flag"
+          - "new internal attribute for system use"
+          - "define system attribute lightweight"
+          - "add internal system field"
+          - "create operational attribute auto-approved"
+          - "register system routing attribute"
+          - "define internal platform attribute"
+          - "add system indicator attribute"
+        behavior: plugin
+        handler: attribute_define_internal
+        args:
+          - name: id
+            type: string
+            required: true
+            description: "Semantic ID (e.g., system.routing_flag)"
+          - name: display-name
+            type: string
+            required: true
+            description: "Human-readable display name"
+          - name: category
+            type: string
+            required: true
+            valid_values: [identity, financial, compliance, document, risk, contact, address, tax, employment, product, entity, ubo, isda, resource, cbu, trust, fund, partnership]
+          - name: value-type
+            type: string
+            required: true
+            valid_values: [string, integer, number, boolean, date, datetime, email, phone, address, currency, percentage, tax_id, json]
+          - name: domain
+            type: string
+            required: false
+            description: "Domain prefix (inferred from id if omitted)"
+          - name: semos-description
+            type: string
+            required: false
+            description: "Rich description for SemOS governance"
+          - name: validation-rules
+            type: json
+            required: false
+            description: "Business-level validation rules (JSONB)"
+          - name: applicability
+            type: json
+            required: false
+            description: "Conditional applicability rules (JSONB)"
+        returns:
+          type: uuid
+          capture: true
+
+      update-internal:
+        description: "Update metadata on an internal/system attribute (lightweight, no changeset)"
+        metadata:
+          tier: intent
+          source_of_truth: sem_reg
+          scope: global
+          noun: attribute
+          tags: [data-management, governance, internal]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        invocation_phrases:
+          - "patch system flag rules"
+          - "update system attribute validation"
+          - "modify internal attribute constraints"
+          - "change system flag requirements"
+          - "adjust internal system attribute settings"
+          - "update operational attribute rules"
+          - "reconfigure internal processing marker"
+          - "modify system attribute metadata"
+          - "patch internal attribute defaults"
+          - "change system indicator rules"
+        behavior: plugin
+        handler: attribute_update_internal
+        args:
+          - name: id
+            type: string
+            required: true
+            description: "Attribute semantic ID to update"
+          - name: validation-rules
+            type: json
+            required: false
+            description: "Updated business-level validation rules (JSONB)"
+          - name: applicability
+            type: json
+            required: false
+            description: "Updated conditional applicability rules (JSONB)"
+          - name: is-required
+            type: boolean
+            required: false
+            description: "Whether the attribute is required by default"
+          - name: default-value
+            type: string
+            required: false
+            description: "Default value (serialized as text)"
+          - name: group-id
+            type: string
+            required: false
+            description: "Logical grouping identifier"
+        returns:
+          type: record
+
       classify:
         description: "Assign or reassign taxonomy category for an attribute"
         metadata:

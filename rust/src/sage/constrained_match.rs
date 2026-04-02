@@ -846,7 +846,7 @@ pub async fn resolve_constrained_hybrid(
     }
 
     let scoped_results = searcher
-        .search_embeddings_only(utterance, 5, None, Some(&allowed_verbs))
+        .search_embeddings_only(utterance, 5, Some(&allowed_verbs))
         .await?;
 
     let Some(mut top) = scoped_results.first().cloned() else {

@@ -207,10 +207,10 @@ All user input routes through `POST /api/session/:id/input` → `ReplOrchestrato
 ALL DSL generation goes through: **User → verb_search → dsl_generate (LLM extracts args as JSON) → deterministic DSL assembly → dsl_execute**
 
 ```
-Search Priority (10-tier):
+Search Priority (9-tier):
 -2A. ScenarioIndex (journey-level compound intent, score 0.97)
 -2B. MacroIndex (macro search parity, score 0.96)
- -1. ECIR noun taxonomy (deterministic, score 0.95)
+-0.5. ConstellationVerbIndex (state-gated noun+action lookup)
   0. Operator macros (1.0 exact / 0.95 fuzzy)
   1-2. Learned exact (1.0)
   3. User semantic (pgvector, BGE asymmetric)
@@ -227,7 +227,7 @@ Search Priority (10-tier):
 
 **LLM removed from semantic loop:** Verb discovery is pure Rust (5-15ms via Candle). LLM used only for arg extraction (200-500ms).
 
-**Key files:** `rust/src/agent/orchestrator.rs`, `rust/src/mcp/verb_search.rs`, `rust/src/mcp/intent_pipeline.rs`, `rust/src/agent/sem_os_context_envelope.rs`, `rust/src/agent/verb_surface.rs`, `rust/src/mcp/noun_index.rs`, `rust/src/mcp/scenario_index.rs`, `rust/src/mcp/macro_index.rs`
+**Key files:** `rust/src/agent/orchestrator.rs`, `rust/src/mcp/verb_search.rs`, `rust/src/mcp/intent_pipeline.rs`, `rust/src/agent/sem_os_context_envelope.rs`, `rust/src/agent/verb_surface.rs`, `rust/src/mcp/scenario_index.rs`, `rust/src/mcp/macro_index.rs`
 
 > **Full details:** `docs/annex-dsl-and-intent.md`
 
@@ -361,7 +361,6 @@ ob-poc/
 │   ├── config/verbs/           # 103 YAML verb definitions
 │   ├── config/packs/           # 5 V2 REPL journey packs (onboarding, book-setup, kyc-case, deal-lifecycle, product-service-taxonomy)
 │   ├── config/sem_os_seeds/    # Domain metadata, constellation maps, state machines
-│   ├── config/noun_index.yaml  # 99-noun ECIR taxonomy
 │   ├── config/scenario_index.yaml  # Journey scenarios (assemble-cbu + KYC + cross-border + SemOS + product)
 │   ├── crates/
 │   │   ├── dsl-core/           # Parser, AST, compiler (no DB)
@@ -519,7 +518,7 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 
 | When working on... | Read this annex |
 |--------------------|-----------------|
-| DSL pipeline, verb search, embeddings, intent resolution, disambiguation, teaching, promotion, scenarios, ECIR, AffinityGraph, discovery | `docs/annex-dsl-and-intent.md` |
+| DSL pipeline, verb search, embeddings, intent resolution, disambiguation, teaching, promotion, scenarios, AffinityGraph, discovery | `docs/annex-dsl-and-intent.md` |
 | Semantic OS, SemReg, context resolution, ABAC, stewardship, governed authoring, CCIR, verb surface, scanner | `docs/annex-sem-os.md` |
 | BPMN-Lite service, fiber VM, race semantics, gRPC, orchestration, bpmn_integration | `docs/annex-bpmn-lite.md` |
 | V2 REPL, packs, scoring, preconditions, context stack, golden corpus, replay tuner | `docs/annex-repl-v2.md` |
@@ -575,7 +574,7 @@ When you see these in a task, read the corresponding annex first:
 | "embeddings", "Candle", "BGE", "populate_embeddings" | `docs/annex-dsl-and-intent.md` |
 | "promotion", "teaching", "learning", "phrase", "blocklist" | `docs/annex-dsl-and-intent.md` |
 | "disambiguation", "VerbOption", "intent tier", "clarification" | `docs/annex-dsl-and-intent.md` |
-| "ScenarioIndex", "MacroIndex", "CompoundSignals", "ECIR", "NounIndex" | `docs/annex-dsl-and-intent.md` |
+| "ScenarioIndex", "MacroIndex", "CompoundSignals", "ConstellationVerbIndex" | `docs/annex-dsl-and-intent.md` |
 | "AffinityGraph", "DiagramModel", "MermaidRenderer", "DomainMetadata" | `docs/annex-dsl-and-intent.md` |
 | "discovery", "registry.discover-dsl", "schema.generate" | `docs/annex-dsl-and-intent.md` |
 | "semantic registry", "sem_reg", "semantic os", "context resolution" | `docs/annex-sem-os.md` |

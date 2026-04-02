@@ -47,7 +47,6 @@ pub mod handlers;
 pub mod intent_pipeline;
 pub mod macro_index;
 pub mod macro_integration;
-pub mod noun_index;
 pub mod protocol;
 pub mod resolution;
 pub mod resources_sem_reg;

@@ -466,6 +466,7 @@ pub fn infer_attributes_from_verbs(
                     group_id: None,
                     is_derived: None,
                     derivation_spec_fqn: None,
+                    visibility: None,
                 });
             }
         }

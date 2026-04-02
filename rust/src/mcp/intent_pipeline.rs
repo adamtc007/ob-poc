@@ -198,7 +198,7 @@ pub struct IntentPipeline {
     /// When set, verb search only considers verbs in this set.
     allowed_verbs: Option<std::collections::HashSet<String>>,
     /// Entity mention spans from entity linking (PR 2 entity-first parsing).
-    /// When set, the ECIR noun scanner skips these character ranges so that
+    /// When set, verb search noun extraction skips these character ranges so that
     /// entity names (e.g., "Goldman Sachs") don't pollute domain noun matching.
     entity_mention_spans: Option<Vec<(usize, usize)>>,
 }
@@ -238,7 +238,7 @@ impl IntentPipeline {
     }
 
     /// Set entity mention spans from entity linking (entity-first parsing).
-    /// When set, the ECIR noun scanner skips these character ranges so that
+    /// When set, verb search noun extraction skips these character ranges so that
     /// entity names don't pollute domain noun matching.
     pub fn with_entity_mention_spans(mut self, spans: Vec<(usize, usize)>) -> Self {
         if !spans.is_empty() {
@@ -523,7 +523,7 @@ impl IntentPipeline {
         // Step 1: Find verb candidates via semantic search
         // Domain filter narrows results to relevant verbs (e.g., "session" domain for "set session...")
         // When allowed_verbs is set (Phase 3 CCIR), search is pre-constrained to SemReg-approved verbs.
-        // When entity_mention_spans is set (entity-first parsing), the ECIR noun scanner skips entity names.
+        // When entity_mention_spans is set (entity-first parsing), verb search noun extraction skips entity names.
         let spans_ref = self.entity_mention_spans.as_deref();
         let candidates = self
             .verb_searcher

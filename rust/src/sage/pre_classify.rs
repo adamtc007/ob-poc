@@ -3,7 +3,7 @@
 //! Three signals, computed in order:
 //! 1. ObservationPlane — from session context (stage_focus, goals)
 //! 2. IntentPolarity — from clue word prefix scan of the raw utterance
-//! 3. Domain hints — from NounIndex noun extraction on the raw utterance
+//! 3. Domain hints — from keyword scan on the raw utterance
 //!
 //! All three are deterministic and O(n) in utterance length. No embedding search,
 //! no database access, no LLM calls.
@@ -187,8 +187,8 @@ fn is_uuid_pattern(s: &str) -> bool {
 
 /// Extract domain noun hints from the utterance using a lightweight keyword scan.
 ///
-/// This is a fast heuristic — not the full NounIndex scan (that's too heavy for
-/// the Sage's pre-classification phase). We extract the most common domain nouns.
+/// This is a fast heuristic — we extract the most common domain nouns via
+/// lightweight keyword scan.
 fn classify_polarity(utterance: &str, domain_hints: &[String]) -> (IntentPolarity, Option<String>) {
     let (base_polarity, base_clue) = IntentPolarity::from_utterance(utterance);
     if base_polarity == IntentPolarity::Write {

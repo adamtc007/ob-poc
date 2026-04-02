@@ -84,6 +84,7 @@ mod invariants {
                 group_id: None,
                 is_derived: None,
                 derivation_spec_fqn: None,
+                visibility: None,
             };
             let sid =
                 RegistryService::publish_attribute_def(&self.pool, &meta, &body, None).await?;
@@ -474,6 +475,7 @@ mod invariants {
             group_id: None,
             is_derived: None,
             derivation_spec_fqn: None,
+            visibility: None,
         };
         let sid = RegistryService::publish_attribute_def(&db.pool, &meta, &body, None).await?;
         assert_ne!(sid, Uuid::nil(), "Should get a valid snapshot_id");

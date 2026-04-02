@@ -104,6 +104,7 @@ mod integration {
                 group_id: None,
                 is_derived: None,
                 derivation_spec_fqn: None,
+                visibility: None,
             };
             let sid =
                 RegistryService::publish_attribute_def(&self.pool, &meta, &body, None).await?;
@@ -627,6 +628,7 @@ mod integration {
             group_id: None,
             is_derived: None,
             derivation_spec_fqn: None,
+            visibility: None,
         };
         let v2_sid =
             RegistryService::publish_attribute_def(&db.pool, &meta_v2, &body_v2, None).await?;
@@ -1079,6 +1081,7 @@ mod integration {
             group_id: None,
             is_derived: None,
             derivation_spec_fqn: None,
+            visibility: None,
         };
 
         // Build a synthetic SnapshotRow for extended gate evaluation
@@ -1153,6 +1156,7 @@ mod integration {
             group_id: None,
             is_derived: None,
             derivation_spec_fqn: None,
+            visibility: None,
         };
 
         let row_b = SnapshotRow {
