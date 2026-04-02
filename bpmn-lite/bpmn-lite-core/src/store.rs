@@ -96,4 +96,34 @@ pub trait ProcessStore: Send + Sync {
 
     async fn save_incident(&self, incident: &Incident) -> Result<()>;
     async fn load_incidents(&self, instance_id: Uuid) -> Result<Vec<Incident>>;
+
+    // ── Atomic compound operations ──
+
+    /// Atomically start an instance: save instance + root fiber + InstanceStarted event.
+    /// Returns the event sequence number.
+    async fn atomic_start(
+        &self,
+        instance: &ProcessInstance,
+        root_fiber: &Fiber,
+        event: &RuntimeEvent,
+    ) -> Result<u64>;
+
+    /// Atomically complete a job: save instance + dedupe + payload version.
+    /// `ack_job` is NOT included because on the race path, ack happens separately.
+    async fn atomic_complete(
+        &self,
+        instance: &ProcessInstance,
+        completion: &JobCompletion,
+    ) -> Result<()>;
+
+    // ── Durability maintenance ──
+
+    /// Reclaim jobs stuck in 'claimed' state past timeout. Returns count reclaimed.
+    async fn reclaim_stale_jobs(&self, timeout_ms: u64) -> Result<u32>;
+
+    /// Prune dedupe entries older than the given age. Returns count pruned.
+    async fn prune_dedupe_cache(&self, older_than_ms: u64) -> Result<u32>;
+
+    /// List all running (non-terminal) instance IDs.
+    async fn list_running_instances(&self) -> Result<Vec<Uuid>>;
 }

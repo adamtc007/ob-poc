@@ -762,6 +762,230 @@ impl ProcessStore for PostgresProcessStore {
         }
         Ok(incidents)
     }
+
+    // ── Atomic compound operations ──
+
+    async fn atomic_start(
+        &self,
+        instance: &ProcessInstance,
+        root_fiber: &Fiber,
+        event: &RuntimeEvent,
+    ) -> Result<u64> {
+        let mut tx = self.pool.begin().await?;
+
+        // 1. INSERT process_instances
+        let flags = serde_json::to_value(&instance.flags)?;
+        let counters = serde_json::to_value(&instance.counters)?;
+        let join_expected = serde_json::to_value(&instance.join_expected)?;
+        let state = serde_json::to_value(&instance.state)?;
+        let created_at = epoch_ms_to_datetime(instance.created_at);
+
+        sqlx::query(
+            r#"
+            INSERT INTO process_instances (
+                instance_id, process_key, bytecode_version, domain_payload,
+                domain_payload_hash, flags, counters, join_expected, state,
+                correlation_id, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            "#,
+        )
+        .bind(instance.instance_id)
+        .bind(&instance.process_key)
+        .bind(&instance.bytecode_version[..])
+        .bind(&instance.domain_payload)
+        .bind(&instance.domain_payload_hash[..])
+        .bind(&flags)
+        .bind(&counters)
+        .bind(&join_expected)
+        .bind(&state)
+        .bind(&instance.correlation_id)
+        .bind(created_at)
+        .execute(&mut *tx)
+        .await?;
+
+        // 2. INSERT fiber
+        let stack = serde_json::to_value(&root_fiber.stack)?;
+        let regs = serde_json::to_value(&root_fiber.regs)?;
+        let wait_state = serde_json::to_value(&root_fiber.wait)?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO fibers (instance_id, fiber_id, pc, stack, regs, wait_state, loop_epoch)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "#,
+        )
+        .bind(instance.instance_id)
+        .bind(root_fiber.fiber_id)
+        .bind(root_fiber.pc as i32)
+        .bind(&stack)
+        .bind(&regs)
+        .bind(&wait_state)
+        .bind(root_fiber.loop_epoch as i32)
+        .execute(&mut *tx)
+        .await?;
+
+        // 3. Append event (sequence + log)
+        let event_json = serde_json::to_value(event)?;
+
+        let row = sqlx::query(
+            r#"
+            WITH seq AS (
+                INSERT INTO event_sequences (instance_id, next_seq)
+                VALUES ($1, 1)
+                ON CONFLICT (instance_id) DO UPDATE
+                    SET next_seq = event_sequences.next_seq + 1
+                RETURNING next_seq
+            )
+            INSERT INTO event_log (instance_id, seq, event)
+            SELECT $1, seq.next_seq, $2
+            FROM seq
+            RETURNING seq
+            "#,
+        )
+        .bind(instance.instance_id)
+        .bind(&event_json)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        use sqlx::Row;
+        let seq: i64 = row.get("seq");
+
+        tx.commit().await?;
+        Ok(seq as u64)
+    }
+
+    async fn atomic_complete(
+        &self,
+        instance: &ProcessInstance,
+        completion: &JobCompletion,
+    ) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+
+        // 1. UPSERT process_instances
+        let flags = serde_json::to_value(&instance.flags)?;
+        let counters = serde_json::to_value(&instance.counters)?;
+        let join_expected = serde_json::to_value(&instance.join_expected)?;
+        let state = serde_json::to_value(&instance.state)?;
+        let created_at = epoch_ms_to_datetime(instance.created_at);
+
+        sqlx::query(
+            r#"
+            INSERT INTO process_instances (
+                instance_id, process_key, bytecode_version, domain_payload,
+                domain_payload_hash, flags, counters, join_expected, state,
+                correlation_id, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ON CONFLICT (instance_id) DO UPDATE SET
+                process_key = EXCLUDED.process_key,
+                bytecode_version = EXCLUDED.bytecode_version,
+                domain_payload = EXCLUDED.domain_payload,
+                domain_payload_hash = EXCLUDED.domain_payload_hash,
+                flags = EXCLUDED.flags,
+                counters = EXCLUDED.counters,
+                join_expected = EXCLUDED.join_expected,
+                state = EXCLUDED.state,
+                correlation_id = EXCLUDED.correlation_id
+            "#,
+        )
+        .bind(instance.instance_id)
+        .bind(&instance.process_key)
+        .bind(&instance.bytecode_version[..])
+        .bind(&instance.domain_payload)
+        .bind(&instance.domain_payload_hash[..])
+        .bind(&flags)
+        .bind(&counters)
+        .bind(&join_expected)
+        .bind(&state)
+        .bind(&instance.correlation_id)
+        .bind(created_at)
+        .execute(&mut *tx)
+        .await?;
+
+        // 2. INSERT dedupe_cache ON CONFLICT
+        let completion_json = serde_json::to_value(completion)?;
+        sqlx::query(
+            r#"
+            INSERT INTO dedupe_cache (job_key, completion)
+            VALUES ($1, $2)
+            ON CONFLICT (job_key) DO UPDATE SET completion = EXCLUDED.completion
+            "#,
+        )
+        .bind(&completion.job_key)
+        .bind(&completion_json)
+        .execute(&mut *tx)
+        .await?;
+
+        // 3. INSERT payload_history ON CONFLICT
+        sqlx::query(
+            r#"
+            INSERT INTO payload_history (instance_id, payload_hash, domain_payload)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (instance_id, payload_hash) DO NOTHING
+            "#,
+        )
+        .bind(instance.instance_id)
+        .bind(&completion.domain_payload_hash[..])
+        .bind(&completion.domain_payload)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    // ── Durability maintenance ──
+
+    async fn reclaim_stale_jobs(&self, timeout_ms: u64) -> Result<u32> {
+        let row = sqlx::query(
+            r#"
+            WITH reclaimed AS (
+                UPDATE job_queue SET status = 'pending', claimed_at = NULL
+                WHERE status = 'claimed'
+                  AND claimed_at < now() - make_interval(secs => $1::float / 1000.0)
+                RETURNING job_key
+            )
+            SELECT count(*) AS cnt FROM reclaimed
+            "#,
+        )
+        .bind(timeout_ms as f64)
+        .fetch_one(&self.pool)
+        .await?;
+
+        use sqlx::Row;
+        let cnt: i64 = row.get("cnt");
+        Ok(cnt as u32)
+    }
+
+    async fn prune_dedupe_cache(&self, older_than_ms: u64) -> Result<u32> {
+        let row = sqlx::query(
+            r#"
+            WITH deleted AS (
+                DELETE FROM dedupe_cache
+                WHERE created_at < now() - make_interval(secs => $1::float / 1000.0)
+                RETURNING job_key
+            )
+            SELECT count(*) AS cnt FROM deleted
+            "#,
+        )
+        .bind(older_than_ms as f64)
+        .fetch_one(&self.pool)
+        .await?;
+
+        use sqlx::Row;
+        let cnt: i64 = row.get("cnt");
+        Ok(cnt as u32)
+    }
+
+    async fn list_running_instances(&self) -> Result<Vec<Uuid>> {
+        let rows = sqlx::query(
+            r#"SELECT instance_id FROM process_instances WHERE state = '"Running"'::jsonb"#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        use sqlx::Row;
+        Ok(rows.iter().map(|r| r.get("instance_id")).collect())
+    }
 }
 
 #[cfg(all(test, feature = "postgres"))]

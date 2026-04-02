@@ -187,17 +187,15 @@ impl BpmnLiteEngine {
             correlation_id: correlation_id.to_string(),
             created_at: now_ms(),
         };
-        self.store.save_instance(&instance).await?;
-
         // Create root fiber at pc=0
         let fiber_id = Uuid::now_v7();
         let root_fiber = Fiber::new(fiber_id, 0);
-        self.store.save_fiber(instance_id, &root_fiber).await?;
 
-        // Emit InstanceStarted event
+        // Atomically persist instance + root fiber + InstanceStarted event
         self.store
-            .append_event(
-                instance_id,
+            .atomic_start(
+                &instance,
+                &root_fiber,
                 &RuntimeEvent::InstanceStarted {
                     instance_id,
                     bytecode_version,
@@ -206,6 +204,19 @@ impl BpmnLiteEngine {
             .await?;
 
         Ok(instance_id)
+    }
+
+    /// Tick all running instances. Returns count ticked.
+    pub async fn tick_all(&self) -> Result<u32> {
+        let ids = self.store.list_running_instances().await?;
+        let mut ticked = 0u32;
+        for id in ids {
+            if let Err(e) = self.tick_instance(id).await {
+                tracing::warn!(instance_id = %id, error = %e, "tick_all: instance tick failed");
+            }
+            ticked += 1;
+        }
+        Ok(ticked)
     }
 
     /// Advance all runnable fibers for a specific instance.
@@ -712,19 +723,9 @@ impl BpmnLiteEngine {
         };
 
         if resumed {
-            // Mutation ownership: engine applies completion + persists
+            // Mutation ownership: engine applies completion + persists atomically
             apply_completion(&mut instance, &completion);
-            self.store.save_instance(&instance).await?;
-            self.store
-                .dedupe_put(&completion.job_key, &completion)
-                .await?;
-            self.store
-                .save_payload_version(
-                    instance_id,
-                    &completion.domain_payload_hash,
-                    &completion.domain_payload,
-                )
-                .await?;
+            self.store.atomic_complete(&instance, &completion).await?;
         } else {
             // No fiber matched — ghost signal
             self.emit_late(

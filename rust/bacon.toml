@@ -289,6 +289,15 @@ need_stdout = false
 command = ["cargo", "test", "-p", "sem_os_core", "-p", "sem_os_server", "--color", "always"]
 need_stdout = true
 
+# governed_query_proc (proc-macro)
+[jobs.check-governed-query]
+command = ["cargo", "check", "-p", "governed_query_proc", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-governed-query]
+command = ["cargo", "clippy", "-p", "governed_query_proc", "--color", "always"]
+need_stdout = false
+
 # =============================================================================
 # XTASK
 # =============================================================================
@@ -300,6 +309,22 @@ need_stdout = false
 [jobs.clippy-xtask]
 command = ["cargo", "clippy", "-p", "xtask", "--color", "always"]
 need_stdout = false
+
+# =============================================================================
+# BPMN-LITE (separate workspace at bpmn-lite/)
+# =============================================================================
+
+[jobs.check-bpmn]
+command = ["cargo", "check", "--manifest-path", "../bpmn-lite/Cargo.toml", "--workspace", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy-bpmn]
+command = ["cargo", "clippy", "--manifest-path", "../bpmn-lite/Cargo.toml", "--workspace", "--all-targets", "--all-features", "--color", "always"]
+need_stdout = false
+
+[jobs.test-bpmn]
+command = ["cargo", "test", "--manifest-path", "../bpmn-lite/Cargo.toml", "--workspace", "--color", "always"]
+need_stdout = true
 
 # =============================================================================
 # DEFAULTS AND KEYBINDINGS
@@ -329,6 +354,9 @@ L = "job:clippy-lsp"
 
 # Semantic OS
 S = "job:clippy-sem-all"
+
+# BPMN-Lite
+B = "job:clippy-bpmn"
 
 [settings]
 on_change_strategy = "restart"

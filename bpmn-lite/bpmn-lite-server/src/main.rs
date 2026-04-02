@@ -41,7 +41,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let engine = Arc::new(BpmnLiteEngine::new(store));
+    let engine = Arc::new(BpmnLiteEngine::new(store.clone()));
+
+    // Background: reclaim stale claimed jobs (every 60s, 5min timeout)
+    let reclaim_store = store.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            match reclaim_store.reclaim_stale_jobs(5 * 60 * 1000).await {
+                Ok(n) if n > 0 => tracing::warn!(reclaimed = n, "Reclaimed stale jobs"),
+                Err(e) => tracing::error!(error = %e, "Job reclaim failed"),
+                _ => {}
+            }
+        }
+    });
+
+    // Background: tick all running instances (every 500ms)
+    let tick_engine = engine.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            if let Err(e) = tick_engine.tick_all().await {
+                tracing::error!(error = %e, "tick_all failed");
+            }
+        }
+    });
+
+    // Background: prune dedupe cache (hourly, 24h TTL)
+    let prune_store = store.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+            match prune_store.prune_dedupe_cache(24 * 3600 * 1000).await {
+                Ok(n) if n > 0 => tracing::info!(pruned = n, "Pruned dedupe cache"),
+                Err(e) => tracing::error!(error = %e, "Dedupe prune failed"),
+                _ => {}
+            }
+        }
+    });
 
     tracing::info!("BPMN-Lite gRPC server listening on {}", addr);
 

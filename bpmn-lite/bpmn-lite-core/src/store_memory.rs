@@ -4,6 +4,7 @@ use crate::types::*;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::time::Instant;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -11,10 +12,10 @@ struct Inner {
     instances: HashMap<Uuid, ProcessInstance>,
     fibers: HashMap<(Uuid, Uuid), Fiber>,
     join_counters: HashMap<(Uuid, JoinId), u16>,
-    dedupe: HashMap<String, JobCompletion>,
+    dedupe: HashMap<String, (JobCompletion, Instant)>,
     job_queue: VecDeque<JobActivation>,
     /// Jobs that have been dequeued but not yet acked.
-    inflight_jobs: HashMap<String, JobActivation>,
+    inflight_jobs: HashMap<String, (JobActivation, Instant)>,
     programs: HashMap<[u8; 32], CompiledProgram>,
     dead_letter: HashMap<(u32, String), (Vec<u8>, u64)>,
     events: HashMap<Uuid, Vec<(u64, RuntimeEvent)>>,
@@ -180,12 +181,13 @@ impl ProcessStore for MemoryStore {
 
     async fn dedupe_get(&self, key: &str) -> Result<Option<JobCompletion>> {
         let r = self.inner.read().await;
-        Ok(r.dedupe.get(key).cloned())
+        Ok(r.dedupe.get(key).map(|(c, _)| c.clone()))
     }
 
     async fn dedupe_put(&self, key: &str, completion: &JobCompletion) -> Result<()> {
         let mut w = self.inner.write().await;
-        w.dedupe.insert(key.to_string(), completion.clone());
+        w.dedupe
+            .insert(key.to_string(), (completion.clone(), Instant::now()));
         Ok(())
     }
 
@@ -204,7 +206,8 @@ impl ProcessStore for MemoryStore {
 
         while let Some(job) = w.job_queue.pop_front() {
             if result.len() < max && task_types.contains(&job.task_type) {
-                w.inflight_jobs.insert(job.job_key.clone(), job.clone());
+                w.inflight_jobs
+                    .insert(job.job_key.clone(), (job.clone(), Instant::now()));
                 result.push(job);
             } else {
                 remaining.push_back(job);
@@ -239,7 +242,7 @@ impl ProcessStore for MemoryStore {
         let inflight_keys: Vec<String> = w
             .inflight_jobs
             .iter()
-            .filter(|(_, job)| job.process_instance_id == instance_id)
+            .filter(|(_, (job, _))| job.process_instance_id == instance_id)
             .map(|(key, _)| key.clone())
             .collect();
         for key in inflight_keys {
@@ -352,6 +355,90 @@ impl ProcessStore for MemoryStore {
     async fn load_incidents(&self, instance_id: Uuid) -> Result<Vec<Incident>> {
         let r = self.inner.read().await;
         Ok(r.incidents.get(&instance_id).cloned().unwrap_or_default())
+    }
+
+    // ── Atomic compound operations ──
+
+    async fn atomic_start(
+        &self,
+        instance: &ProcessInstance,
+        root_fiber: &Fiber,
+        event: &RuntimeEvent,
+    ) -> Result<u64> {
+        let mut w = self.inner.write().await;
+        // save instance
+        w.instances.insert(instance.instance_id, instance.clone());
+        // save fiber
+        w.fibers
+            .insert((instance.instance_id, root_fiber.fiber_id), root_fiber.clone());
+        // append event
+        let seq = w.event_seq.entry(instance.instance_id).or_insert(0);
+        *seq += 1;
+        let current_seq = *seq;
+        w.events
+            .entry(instance.instance_id)
+            .or_default()
+            .push((current_seq, event.clone()));
+        Ok(current_seq)
+    }
+
+    async fn atomic_complete(
+        &self,
+        instance: &ProcessInstance,
+        completion: &JobCompletion,
+    ) -> Result<()> {
+        let mut w = self.inner.write().await;
+        // save instance (upsert)
+        w.instances.insert(instance.instance_id, instance.clone());
+        // dedupe put
+        w.dedupe
+            .insert(completion.job_key.clone(), (completion.clone(), Instant::now()));
+        // save payload version
+        w.payload_history.insert(
+            (instance.instance_id, completion.domain_payload_hash),
+            completion.domain_payload.clone(),
+        );
+        Ok(())
+    }
+
+    // ── Durability maintenance ──
+
+    async fn reclaim_stale_jobs(&self, timeout_ms: u64) -> Result<u32> {
+        let mut w = self.inner.write().await;
+        let timeout = std::time::Duration::from_millis(timeout_ms);
+        let now = Instant::now();
+        let stale_keys: Vec<String> = w
+            .inflight_jobs
+            .iter()
+            .filter(|(_, (_, claimed_at))| now.duration_since(*claimed_at) > timeout)
+            .map(|(key, _)| key.clone())
+            .collect();
+        let count = stale_keys.len() as u32;
+        for key in stale_keys {
+            if let Some((job, _)) = w.inflight_jobs.remove(&key) {
+                w.job_queue.push_back(job);
+            }
+        }
+        Ok(count)
+    }
+
+    async fn prune_dedupe_cache(&self, older_than_ms: u64) -> Result<u32> {
+        let mut w = self.inner.write().await;
+        let threshold = std::time::Duration::from_millis(older_than_ms);
+        let now = Instant::now();
+        let before = w.dedupe.len();
+        w.dedupe
+            .retain(|_, (_, created_at)| now.duration_since(*created_at) <= threshold);
+        Ok((before - w.dedupe.len()) as u32)
+    }
+
+    async fn list_running_instances(&self) -> Result<Vec<Uuid>> {
+        let r = self.inner.read().await;
+        Ok(r.instances
+            .iter()
+            .filter(|(_, inst)| !inst.state.is_terminal())
+            .map(|(id, _)| *id)
+            .collect())
     }
 }
 
