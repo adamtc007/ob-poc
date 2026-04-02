@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict imbKdNxZV59Q9DsuUjQrLMxRdB1HK6gqFI6NBlqCgbgAIJRop6V8sAdGUUR38s5
+\restrict w31KkePdY7TRF1G7jfLpckt5KbhKcnxi3eZSflDBsRNPdzXhsGA6mmbALLHcr7a
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -7032,6 +7032,27 @@ COMMENT ON VIEW "ob-poc".active_issues IS 'Issues needing attention, prioritized
 
 
 --
+-- Name: appointment_rights; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".appointment_rights (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    target_entity_id uuid NOT NULL,
+    holder_entity_id uuid NOT NULL,
+    right_type character varying(30) NOT NULL,
+    max_appointments integer,
+    is_active boolean DEFAULT true NOT NULL,
+    effective_from date,
+    effective_to date,
+    source character varying(50) DEFAULT 'manual'::character varying NOT NULL,
+    source_document_ref character varying(255),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT appt_rights_chk_type CHECK (((right_type)::text = ANY ((ARRAY['APPOINT'::character varying, 'REMOVE'::character varying, 'APPOINT_AND_REMOVE'::character varying, 'VETO_APPOINTMENT'::character varying, 'OBSERVER'::character varying])::text[])))
+);
+
+
+--
 -- Name: attribute_observations; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -7125,10 +7146,12 @@ CREATE TABLE "ob-poc".attribute_registry (
     is_derived boolean DEFAULT false NOT NULL,
     derivation_spec_fqn text,
     evidence_grade text DEFAULT 'none'::text NOT NULL,
+    visibility text DEFAULT 'external'::text NOT NULL,
     CONSTRAINT check_category CHECK ((category = ANY (ARRAY['identity'::text, 'financial'::text, 'compliance'::text, 'document'::text, 'risk'::text, 'contact'::text, 'address'::text, 'tax'::text, 'employment'::text, 'product'::text, 'entity'::text, 'ubo'::text, 'isda'::text, 'resource'::text, 'cbu'::text, 'trust'::text, 'fund'::text, 'partnership'::text]))),
     CONSTRAINT check_value_type CHECK ((value_type = ANY (ARRAY['string'::text, 'integer'::text, 'number'::text, 'decimal'::text, 'boolean'::text, 'date'::text, 'datetime'::text, 'timestamp'::text, 'uuid'::text, 'email'::text, 'phone'::text, 'address'::text, 'currency'::text, 'percentage'::text, 'tax_id'::text, 'json'::text, 'enum'::text]))),
     CONSTRAINT chk_derived_has_spec CHECK ((((NOT is_derived) AND (derivation_spec_fqn IS NULL)) OR (is_derived AND (derivation_spec_fqn IS NOT NULL)))),
-    CONSTRAINT chk_evidence_grade CHECK ((evidence_grade = ANY (ARRAY['none'::text, 'prohibited'::text, 'allowed_with_constraints'::text, 'regulatory_evidence'::text])))
+    CONSTRAINT chk_evidence_grade CHECK ((evidence_grade = ANY (ARRAY['none'::text, 'prohibited'::text, 'allowed_with_constraints'::text, 'regulatory_evidence'::text]))),
+    CONSTRAINT chk_visibility CHECK ((visibility = ANY (ARRAY['external'::text, 'internal'::text])))
 );
 
 
@@ -7244,6 +7267,28 @@ CREATE TABLE "ob-poc".audit_log (
 --
 
 COMMENT ON TABLE "ob-poc".audit_log IS 'Full audit trail of all state transitions';
+
+
+--
+-- Name: board_compositions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".board_compositions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    person_entity_id uuid NOT NULL,
+    role_id uuid NOT NULL,
+    appointed_by_entity_id uuid,
+    appointment_date date,
+    resignation_date date,
+    is_active boolean DEFAULT true NOT NULL,
+    source character varying(50) DEFAULT 'manual'::character varying NOT NULL,
+    source_document_ref character varying(255),
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT board_comp_no_self_appointment CHECK ((entity_id <> person_entity_id))
+);
 
 
 --
@@ -7855,7 +7900,7 @@ CREATE TABLE "ob-poc".cbu_attr_values (
     as_of timestamp with time zone DEFAULT now() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT cbu_attr_values_source_check CHECK ((source = ANY (ARRAY['derived'::text, 'entity'::text, 'cbu'::text, 'document'::text, 'manual'::text, 'external'::text])))
+    CONSTRAINT cbu_attr_values_source_check CHECK ((source = ANY (ARRAY['derived'::text, 'entity'::text, 'cbu'::text, 'document'::text, 'manual'::text, 'external'::text, 'system'::text])))
 );
 
 
@@ -9080,7 +9125,7 @@ COMMENT ON TABLE "ob-poc".cbu_tax_status IS 'CBU tax status per jurisdiction';
 
 CREATE TABLE "ob-poc".cbu_trading_profiles (
     profile_id uuid DEFAULT uuidv7() NOT NULL,
-    cbu_id uuid NOT NULL,
+    cbu_id uuid,
     version integer DEFAULT 1 NOT NULL,
     status character varying(20) DEFAULT 'DRAFT'::character varying NOT NULL,
     document jsonb NOT NULL,
@@ -9104,6 +9149,9 @@ CREATE TABLE "ob-poc".cbu_trading_profiles (
     rejection_reason text,
     superseded_at timestamp with time zone,
     superseded_by_version integer,
+    group_id uuid,
+    is_template boolean DEFAULT false NOT NULL,
+    template_id uuid,
     CONSTRAINT cbu_trading_profiles_status_check CHECK (((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('VALIDATED'::character varying)::text, ('PENDING_REVIEW'::character varying)::text, ('ACTIVE'::character varying)::text, ('SUPERSEDED'::character varying)::text, ('ARCHIVED'::character varying)::text])))
 );
 
@@ -9133,6 +9181,27 @@ COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.document_hash IS 'SHA-256 hash o
 
 
 --
+-- Name: COLUMN cbu_trading_profiles.group_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.group_id IS 'Client group ID for group-level templates (NULL for CBU instances)';
+
+
+--
+-- Name: COLUMN cbu_trading_profiles.is_template; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.is_template IS 'True for group-level templates, false for CBU-specific instances';
+
+
+--
+-- Name: COLUMN cbu_trading_profiles.template_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.template_id IS 'Source template profile_id when this instance was cloned from a template';
+
+
+--
 -- Name: cbu_unified_attr_requirements; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -9146,7 +9215,7 @@ CREATE TABLE "ob-poc".cbu_unified_attr_requirements (
     conflict jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT cbu_unified_attr_requirements_preferred_source_check CHECK ((preferred_source = ANY (ARRAY['derived'::text, 'entity'::text, 'cbu'::text, 'document'::text, 'manual'::text, 'external'::text]))),
+    CONSTRAINT cbu_unified_attr_requirements_preferred_source_check CHECK ((preferred_source = ANY (ARRAY['derived'::text, 'entity'::text, 'cbu'::text, 'document'::text, 'manual'::text, 'external'::text, 'system'::text]))),
     CONSTRAINT cbu_unified_attr_requirements_requirement_strength_check CHECK ((requirement_strength = ANY (ARRAY['required'::text, 'optional'::text, 'conditional'::text])))
 );
 
@@ -17091,6 +17160,25 @@ CREATE TABLE "ob-poc".tollgate_evaluations (
 
 
 --
+-- Name: tollgate_thresholds; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".tollgate_thresholds (
+    threshold_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    threshold_name character varying(100) NOT NULL,
+    metric_type character varying(50) NOT NULL,
+    comparison character varying(10) DEFAULT 'gte'::character varying NOT NULL,
+    threshold_value numeric(10,2),
+    is_blocking boolean DEFAULT true NOT NULL,
+    weight numeric(5,2),
+    applies_to_case_types text[],
+    description text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT tollgate_thresholds_chk_comparison CHECK (((comparison)::text = ANY ((ARRAY['eq'::character varying, 'neq'::character varying, 'gt'::character varying, 'gte'::character varying, 'lt'::character varying, 'lte'::character varying])::text[])))
+);
+
+
+--
 -- Name: trading_profile_materializations; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -21818,6 +21906,14 @@ ALTER TABLE ONLY "ob-poc".access_review_items
 
 
 --
+-- Name: appointment_rights appointment_rights_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".appointment_rights
+    ADD CONSTRAINT appointment_rights_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: attribute_observations attribute_observations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -21847,6 +21943,14 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed
 
 ALTER TABLE ONLY "ob-poc".audit_log
     ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: board_compositions board_compositions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".board_compositions
+    ADD CONSTRAINT board_compositions_pkey PRIMARY KEY (id);
 
 
 --
@@ -25266,6 +25370,14 @@ ALTER TABLE ONLY "ob-poc".tollgate_evaluations
 
 
 --
+-- Name: tollgate_thresholds tollgate_thresholds_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".tollgate_thresholds
+    ADD CONSTRAINT tollgate_thresholds_pkey PRIMARY KEY (threshold_id);
+
+
+--
 -- Name: trading_profile_materializations trading_profile_materializations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -25943,6 +26055,13 @@ CREATE UNIQUE INDEX entity_proper_persons_id_doc_uniq ON "ob-poc".entity_proper_
 
 
 --
+-- Name: entity_relationships_upsert_key; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX entity_relationships_upsert_key ON "ob-poc".entity_relationships USING btree (from_entity_id, to_entity_id, relationship_type) WHERE (effective_to IS NULL);
+
+
+--
 -- Name: entity_workstreams_idx_workstreams_case; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -26083,6 +26202,20 @@ CREATE INDEX idx_analysis_type_date ON "ob-poc".intent_feedback_analysis USING b
 
 
 --
+-- Name: idx_appt_rights_holder; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_appt_rights_holder ON "ob-poc".appointment_rights USING btree (holder_entity_id) WHERE (is_active = true);
+
+
+--
+-- Name: idx_appt_rights_target; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_appt_rights_target ON "ob-poc".appointment_rights USING btree (target_entity_id) WHERE (is_active = true);
+
+
+--
 -- Name: idx_assertion_log_case; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -26199,6 +26332,20 @@ CREATE INDEX idx_audit_failure_id ON "ob-poc".audit_log USING btree (failure_id)
 --
 
 CREATE INDEX idx_audit_instance ON "ob-poc".workflow_audit_log USING btree (instance_id, transitioned_at DESC);
+
+
+--
+-- Name: idx_board_comp_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_board_comp_entity ON "ob-poc".board_compositions USING btree (entity_id) WHERE (is_active = true);
+
+
+--
+-- Name: idx_board_comp_person; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_board_comp_person ON "ob-poc".board_compositions USING btree (person_entity_id) WHERE (is_active = true);
 
 
 --
@@ -27039,6 +27186,20 @@ CREATE INDEX idx_cbu_tax_status_cbu ON "ob-poc".cbu_tax_status USING btree (cbu_
 --
 
 CREATE INDEX idx_cbu_tax_status_jurisdiction ON "ob-poc".cbu_tax_status USING btree (tax_jurisdiction_id);
+
+
+--
+-- Name: idx_cbu_trading_profiles_group_template; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_trading_profiles_group_template ON "ob-poc".cbu_trading_profiles USING btree (group_id) WHERE (is_template = true);
+
+
+--
+-- Name: idx_cbu_trading_profiles_template_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_trading_profiles_template_id ON "ob-poc".cbu_trading_profiles USING btree (template_id) WHERE (template_id IS NOT NULL);
 
 
 --
@@ -30661,6 +30822,13 @@ CREATE INDEX idx_trading_profiles_cbu_version ON "ob-poc".cbu_trading_profiles U
 
 
 --
+-- Name: idx_trading_profiles_group_template; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_trading_profiles_group_template ON "ob-poc".cbu_trading_profiles USING btree (group_id) WHERE (is_template = true);
+
+
+--
 -- Name: idx_trading_profiles_one_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -30672,6 +30840,13 @@ CREATE UNIQUE INDEX idx_trading_profiles_one_active ON "ob-poc".cbu_trading_prof
 --
 
 CREATE UNIQUE INDEX idx_trading_profiles_one_working_version ON "ob-poc".cbu_trading_profiles USING btree (cbu_id) WHERE ((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('VALIDATED'::character varying)::text, ('PENDING_REVIEW'::character varying)::text]));
+
+
+--
+-- Name: idx_trading_profiles_template_source; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_trading_profiles_template_source ON "ob-poc".cbu_trading_profiles USING btree (template_id) WHERE (template_id IS NOT NULL);
 
 
 --
@@ -32253,6 +32428,22 @@ ALTER TABLE ONLY "ob-poc".access_review_items
 
 
 --
+-- Name: appointment_rights appointment_rights_holder_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".appointment_rights
+    ADD CONSTRAINT appointment_rights_holder_entity_id_fkey FOREIGN KEY (holder_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: appointment_rights appointment_rights_target_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".appointment_rights
+    ADD CONSTRAINT appointment_rights_target_entity_id_fkey FOREIGN KEY (target_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: attribute_observations attribute_observations_attribute_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -32314,6 +32505,38 @@ ALTER TABLE ONLY "ob-poc".attribute_values_typed
 
 ALTER TABLE ONLY "ob-poc".audit_log
     ADD CONSTRAINT audit_log_failure_id_fkey FOREIGN KEY (failure_id) REFERENCES "ob-poc".failures(id) ON DELETE CASCADE;
+
+
+--
+-- Name: board_compositions board_compositions_appointed_by_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".board_compositions
+    ADD CONSTRAINT board_compositions_appointed_by_entity_id_fkey FOREIGN KEY (appointed_by_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: board_compositions board_compositions_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".board_compositions
+    ADD CONSTRAINT board_compositions_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: board_compositions board_compositions_person_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".board_compositions
+    ADD CONSTRAINT board_compositions_person_entity_id_fkey FOREIGN KEY (person_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: board_compositions board_compositions_role_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".board_compositions
+    ADD CONSTRAINT board_compositions_role_id_fkey FOREIGN KEY (role_id) REFERENCES "ob-poc".roles(role_id);
 
 
 --
@@ -33285,11 +33508,27 @@ ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
 
 
 --
+-- Name: cbu_trading_profiles cbu_trading_profiles_group_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
+    ADD CONSTRAINT cbu_trading_profiles_group_id_fkey FOREIGN KEY (group_id) REFERENCES "ob-poc".client_group(id);
+
+
+--
 -- Name: cbu_trading_profiles cbu_trading_profiles_source_document_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
     ADD CONSTRAINT cbu_trading_profiles_source_document_id_fkey FOREIGN KEY (source_document_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
+-- Name: cbu_trading_profiles cbu_trading_profiles_template_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_trading_profiles
+    ADD CONSTRAINT cbu_trading_profiles_template_id_fkey FOREIGN KEY (template_id) REFERENCES "ob-poc".cbu_trading_profiles(profile_id);
 
 
 --
@@ -36568,5 +36807,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict imbKdNxZV59Q9DsuUjQrLMxRdB1HK6gqFI6NBlqCgbgAIJRop6V8sAdGUUR38s5
+\unrestrict w31KkePdY7TRF1G7jfLpckt5KbhKcnxi3eZSflDBsRNPdzXhsGA6mmbALLHcr7a
 

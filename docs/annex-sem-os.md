@@ -741,6 +741,30 @@ All user input now routes through `ReplOrchestratorV2.process()` with mandatory 
 
 ---
 
+## Two-Tier Attribute Model (2026-04-02)
+
+Attributes are classified by `AttributeVisibility` (External | Internal):
+
+| | Above the Line (External) | Below the Line (Internal) |
+|---|---|---|
+| **Governance** | Governed — full changeset ceremony | Operational — auto-approved |
+| **Evidence grade** | Any (including regulatory_evidence) | Forced to `prohibited` |
+| **Trust class** | Can be `Proof` | Forced to `Convenience` |
+| **Visibility** | `External` (default) | `Internal` |
+| **Create verb** | `attribute.define` | `attribute.define-internal` |
+| **Update verb** | Changeset path (compose → refine → publish) | `attribute.update-internal` (lightweight, no changeset) |
+| **Derived variant** | `attribute.define-derived` | `attribute.define-derived` (with `is_derived=true`) |
+
+**Internal attributes** are system flags, routing indicators, BNY implementation-specific classification codes — no relevance to external entities/clients. Engineering creates these frequently with minimal governance overhead.
+
+**Guard:** `attribute.update-internal` refuses to update External/governed attributes — returns error directing to the changeset path.
+
+**Schema:** `attribute_registry.visibility` column (text, CHECK: 'external'/'internal', default 'external'). Migration 130.
+
+**Source type:** `cbu_attr_values.source` CHECK constraint extended with `'system'` for internal attribute values.
+
+---
+
 ## Governance & Attribute Macros
 
 The SemOS Maintenance workspace uses operator macros for multi-step governance workflows. Full macro system documentation is in `docs/annex-macros.md`.
@@ -761,4 +785,4 @@ The SemOS Maintenance workspace uses operator macros for multi-step governance w
 | `attribute.seed-domain` | 1 | Generate attribute.define calls for a verb domain |
 | `attribute.seed-derived` | 1 | Generate attribute.define-derived calls for a derivation domain |
 
-All 6 macros are wired into the `semos-maintenance` pack (`allowed_verbs`) and available only in the `sem_os_maintenance` workspace. Mode tags: `stewardship` / `governance`.
+All 6 macros are wired into the `semos-maintenance` pack (`allowed_verbs`) and the `semos_workspace` constellation map (6 slots under `# ── Governance macros`). Available only in the `sem_os_maintenance` workspace. Mode tags: `stewardship` / `governance`.
