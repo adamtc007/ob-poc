@@ -1432,6 +1432,7 @@ domains:
                 reads_from: vec![],
                 writes_to: vec![],
                 outputs: vec![],
+                produces_shared_facts: vec![],
             },
             VerbContractBody {
                 fqn: "cbu.create".into(),
@@ -1458,6 +1459,7 @@ domains:
                 reads_from: vec![],
                 writes_to: vec![],
                 outputs: vec![],
+                produces_shared_facts: vec![],
             },
         ];
 
@@ -1502,6 +1504,7 @@ domains:
             reads_from: vec![],
             writes_to: vec![],
             outputs: vec![],
+            produces_shared_facts: vec![],
         }];
 
         enrich_verb_contracts(&mut contracts, &meta);
