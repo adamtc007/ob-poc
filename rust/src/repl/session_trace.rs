@@ -51,14 +51,48 @@ pub struct FrameRef {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum TraceOp {
-    StackPush { workspace: WorkspaceKind },
-    StackPop { workspace: WorkspaceKind },
+    StackPush {
+        workspace: WorkspaceKind,
+    },
+    StackPop {
+        workspace: WorkspaceKind,
+    },
     StackCommit,
-    VerbExecuted { verb_fqn: String, step_id: Uuid },
-    RunbookCompiled { runbook_id: String },
-    RunbookApproved { runbook_id: String },
-    StateTransition { from: String, to: String },
-    Input { utterance_hash: String },
+    VerbExecuted {
+        verb_fqn: String,
+        step_id: Uuid,
+    },
+    RunbookCompiled {
+        runbook_id: String,
+    },
+    RunbookApproved {
+        runbook_id: String,
+    },
+    StateTransition {
+        from: String,
+        to: String,
+    },
+    Input {
+        utterance_hash: String,
+    },
+    /// A shared fact was superseded (cross-workspace consistency).
+    SharedFactSuperseded {
+        atom_path: String,
+        entity_id: Uuid,
+        new_version: i32,
+    },
+    /// A consuming constellation was replayed after shared fact change.
+    ConstellationReplayed {
+        workspace: String,
+        constellation_family: String,
+        outcome: String,
+    },
+    /// A remediation event changed state.
+    RemediationStateChange {
+        remediation_id: Uuid,
+        from_status: String,
+        to_status: String,
+    },
 }
 
 // ---------------------------------------------------------------------------

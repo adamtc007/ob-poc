@@ -1,0 +1,8 @@
+shared_atom:
+  path: "entity.jurisdiction"
+  display_name: "Domicile Jurisdiction"
+  owner:
+    workspace: kyc
+    constellation_family: kyc_workspace
+  validation:
+    allowed_values: [IE, LU, UK, US, DE, FR, CH, SG, HK, JP, KY, BM, JE, GG, LI, NL, BE, AT, IT, ES]

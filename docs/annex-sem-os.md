@@ -811,7 +811,10 @@ When a shared fact (LEI, jurisdiction, fund structure type) is mutated in its ow
 | P4 | ✅ | SQL staleness propagation trigger (three-stage) |
 | P5 | ✅ | `RebuildContext` type, `replay-constellation` + `acknowledge-shared-update` verbs |
 | P6 | ✅ | `remediation_events` table, FSM, 4 remediation verbs |
-| P7-P10 | Pending | External call idempotency, provider capabilities, compensation records, YAML seeds |
+| P7 | ✅ | `external_call_log` table, idempotency check + record_call |
+| P8 | ✅ | `provider_capabilities` table with 8 seed entries |
+| P9 | ✅ | `compensation_records` table, 3 TraceOp variants |
+| P10 | ✅ | 5 shared atom YAML seeds, platform DAG derivation (3 unit tests) |
 
 **New tables (4 migrations):**
 - `shared_atom_registry` — atom declarations with lifecycle status

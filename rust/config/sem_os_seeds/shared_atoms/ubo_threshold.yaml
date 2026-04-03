@@ -1,0 +1,8 @@
+shared_atom:
+  path: "entity.ubo_threshold"
+  display_name: "UBO Beneficial Ownership Threshold"
+  owner:
+    workspace: kyc
+    constellation_family: kyc_workspace
+  validation:
+    format: "^\\d+(\\.\\d+)?$"

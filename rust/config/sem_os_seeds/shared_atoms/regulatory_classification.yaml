@@ -1,0 +1,8 @@
+shared_atom:
+  path: "entity.regulatory_classification"
+  display_name: "Regulatory Classification"
+  owner:
+    workspace: kyc
+    constellation_family: kyc_workspace
+  validation:
+    allowed_values: [UCITS, AIFMD, MiFID, SEC_RIA, EXEMPT, RETAIL, PROFESSIONAL, ELECTIVE_PROFESSIONAL]

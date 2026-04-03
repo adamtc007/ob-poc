@@ -1,0 +1,9 @@
+shared_atom:
+  path: "entity.lei"
+  display_name: "Legal Entity Identifier"
+  owner:
+    workspace: kyc
+    constellation_family: kyc_workspace
+  validation:
+    format: "^[0-9A-Z]{20}$"
+    gleif_verification: required

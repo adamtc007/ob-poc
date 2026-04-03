@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 49BAzJ8Q6Q49UZEo33HwcEe99KbViIXoJPKofeOxlqa5GnlOgvE38Rhg9XhLSeW
+\restrict IlqSqY2qfwwgRi0wlL86YIVkrtnWdWA4S8Wvl450yOXUxQb0tbwuRFrOa9ZWsl0
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -9902,6 +9902,35 @@ CREATE TABLE "ob-poc".commitments (
 
 
 --
+-- Name: compensation_records; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".compensation_records (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    remediation_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    provider text NOT NULL,
+    original_call_id uuid,
+    correction_call_id uuid,
+    correction_type text NOT NULL,
+    changed_fields jsonb,
+    outcome text DEFAULT 'pending'::text NOT NULL,
+    confirmed_at timestamp with time zone,
+    confirmed_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_compensation_outcome CHECK ((outcome = ANY (ARRAY['success'::text, 'pending'::text, 'failed'::text]))),
+    CONSTRAINT chk_correction_type CHECK ((correction_type = ANY (ARRAY['amend'::text, 'cancel_recreate'::text, 'correction_filing'::text, 'manual'::text])))
+);
+
+
+--
+-- Name: TABLE compensation_records; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".compensation_records IS 'Regulatory audit trail for every external correction triggered by constellation replay. Primary evidence table for compliance review.';
+
+
+--
 -- Name: compiled_runbook_events; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -12693,6 +12722,34 @@ COMMENT ON COLUMN "ob-poc".expansion_reports.invocations IS 'Template invocation
 
 
 --
+-- Name: external_call_log; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".external_call_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    verb_fqn text NOT NULL,
+    provider text NOT NULL,
+    operation text NOT NULL,
+    external_ref text,
+    request_hash bigint NOT NULL,
+    request_snapshot jsonb,
+    response_snapshot jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    superseded_by uuid,
+    is_current boolean DEFAULT true NOT NULL,
+    CONSTRAINT chk_external_call_superseded CHECK ((NOT (is_current AND (superseded_by IS NOT NULL))))
+);
+
+
+--
+-- Name: TABLE external_call_log; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".external_call_log IS 'Records every third-party system interaction. Enables idempotency checks on constellation replay — same request_hash = skip, different = amend per provider capability.';
+
+
+--
 -- Name: fee_billing_account_targets; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -14895,6 +14952,28 @@ CREATE TABLE "ob-poc".proofs (
 --
 
 COMMENT ON TABLE "ob-poc".proofs IS 'Evidence documents that prove ownership/control assertions';
+
+
+--
+-- Name: provider_capabilities; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".provider_capabilities (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    provider text NOT NULL,
+    operation text NOT NULL,
+    capability text NOT NULL,
+    amend_details jsonb,
+    notes text,
+    CONSTRAINT chk_provider_capability CHECK ((capability = ANY (ARRAY['amendable'::text, 'cancel_and_recreate'::text, 'immutable'::text, 'manual'::text])))
+);
+
+
+--
+-- Name: TABLE provider_capabilities; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".provider_capabilities IS 'Reference data: per-provider, per-operation correction classification for replay behaviour (amendable, cancel_and_recreate, immutable, manual).';
 
 
 --
@@ -23096,6 +23175,14 @@ ALTER TABLE ONLY "ob-poc".commitments
 
 
 --
+-- Name: compensation_records compensation_records_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".compensation_records
+    ADD CONSTRAINT compensation_records_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: compiled_runbook_events compiled_runbook_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24024,6 +24111,14 @@ ALTER TABLE ONLY "ob-poc".expansion_reports
 
 
 --
+-- Name: external_call_log external_call_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".external_call_log
+    ADD CONSTRAINT external_call_log_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: failures failures_fingerprint_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24757,6 +24852,14 @@ ALTER TABLE ONLY "ob-poc".products
 
 ALTER TABLE ONLY "ob-poc".proofs
     ADD CONSTRAINT proofs_pkey PRIMARY KEY (proof_id);
+
+
+--
+-- Name: provider_capabilities provider_capabilities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".provider_capabilities
+    ADD CONSTRAINT provider_capabilities_pkey PRIMARY KEY (id);
 
 
 --
@@ -27774,6 +27877,20 @@ CREATE INDEX idx_companies_reg_number ON "ob-poc".entity_limited_companies USING
 
 
 --
+-- Name: idx_compensation_records_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_compensation_records_entity ON "ob-poc".compensation_records USING btree (entity_id);
+
+
+--
+-- Name: idx_compensation_records_remediation; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_compensation_records_remediation ON "ob-poc".compensation_records USING btree (remediation_id);
+
+
+--
 -- Name: idx_compiled_runbook_events_runbook; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -29125,6 +29242,13 @@ CREATE INDEX idx_expansion_reports_source_digest ON "ob-poc".expansion_reports U
 
 
 --
+-- Name: idx_external_call_log_current; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_external_call_log_current ON "ob-poc".external_call_log USING btree (entity_id, verb_fqn, provider) WHERE (is_current = true);
+
+
+--
 -- Name: idx_failures_fingerprint; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -30263,6 +30387,13 @@ CREATE INDEX idx_proper_persons_id_document ON "ob-poc".entity_proper_persons US
 --
 
 CREATE INDEX idx_proper_persons_nationality ON "ob-poc".entity_proper_persons USING btree (nationality);
+
+
+--
+-- Name: idx_provider_capabilities_unique; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_provider_capabilities_unique ON "ob-poc".provider_capabilities USING btree (provider, operation);
 
 
 --
@@ -34159,6 +34290,30 @@ ALTER TABLE ONLY "ob-poc".commitments
 
 
 --
+-- Name: compensation_records compensation_records_correction_call_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".compensation_records
+    ADD CONSTRAINT compensation_records_correction_call_id_fkey FOREIGN KEY (correction_call_id) REFERENCES "ob-poc".external_call_log(id);
+
+
+--
+-- Name: compensation_records compensation_records_original_call_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".compensation_records
+    ADD CONSTRAINT compensation_records_original_call_id_fkey FOREIGN KEY (original_call_id) REFERENCES "ob-poc".external_call_log(id);
+
+
+--
+-- Name: compensation_records compensation_records_remediation_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".compensation_records
+    ADD CONSTRAINT compensation_records_remediation_id_fkey FOREIGN KEY (remediation_id) REFERENCES "ob-poc".remediation_events(id);
+
+
+--
 -- Name: compiled_runbook_events compiled_runbook_events_compiled_runbook_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -35020,6 +35175,14 @@ ALTER TABLE ONLY "ob-poc".escalations
 
 ALTER TABLE ONLY "ob-poc".escalations
     ADD CONSTRAINT escalations_session_id_fkey FOREIGN KEY (session_id) REFERENCES "ob-poc".client_portal_sessions(session_id);
+
+
+--
+-- Name: external_call_log external_call_log_superseded_by_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".external_call_log
+    ADD CONSTRAINT external_call_log_superseded_by_fkey FOREIGN KEY (superseded_by) REFERENCES "ob-poc".external_call_log(id);
 
 
 --
@@ -37186,5 +37349,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 49BAzJ8Q6Q49UZEo33HwcEe99KbViIXoJPKofeOxlqa5GnlOgvE38Rhg9XhLSeW
+\unrestrict IlqSqY2qfwwgRi0wlL86YIVkrtnWdWA4S8Wvl450yOXUxQb0tbwuRFrOa9ZWsl0
 

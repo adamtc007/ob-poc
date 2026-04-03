@@ -165,6 +165,12 @@ fn apply_trace_op(
             // happens through verb execution
             Ok(())
         }
+        TraceOp::SharedFactSuperseded { .. }
+        | TraceOp::ConstellationReplayed { .. }
+        | TraceOp::RemediationStateChange { .. } => {
+            // Cross-workspace consistency events are informational during replay
+            Ok(())
+        }
     }
 }
 

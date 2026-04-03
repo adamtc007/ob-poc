@@ -1,0 +1,8 @@
+shared_atom:
+  path: "cbu.fund_structure_type"
+  display_name: "Fund Structure Type"
+  owner:
+    workspace: cbu
+    constellation_family: cbu_workspace
+  validation:
+    allowed_values: [SICAV, ICAV, OEIC, FCP, ETF, PE, TRUST, LLC, LP, SPC]
