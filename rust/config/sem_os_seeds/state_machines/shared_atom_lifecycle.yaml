@@ -1,0 +1,31 @@
+state_machine: shared_atom_lifecycle
+description: Shared atom lifecycle — governs cross-workspace state consistency enforcement
+states: [draft, active, deprecated, retired]
+initial: draft
+transitions:
+  - from: draft
+    to: active
+    verbs: [shared-atom.activate]
+  - from: active
+    to: deprecated
+    verbs: [shared-atom.deprecate]
+  - from: deprecated
+    to: active
+    verbs: [shared-atom.reactivate]
+  - from: deprecated
+    to: retired
+    verbs: [shared-atom.retire]
+reducer:
+  overlay_sources: {}
+  conditions:
+    has_consumers:
+      expr: "shared_atom_consumers_count > 0"
+  rules:
+    - state: retired
+      requires: []
+    - state: deprecated
+      requires: []
+    - state: active
+      requires: []
+    - state: draft
+      requires: []

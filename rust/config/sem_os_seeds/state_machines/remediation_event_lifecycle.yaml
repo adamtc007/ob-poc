@@ -1,0 +1,41 @@
+state_machine: remediation_event_lifecycle
+description: Remediation event lifecycle — tracks resolution of cross-workspace state drift from shared attribute supersession
+states: [detected, replaying, resolved, escalated, deferred]
+initial: detected
+transitions:
+  - from: detected
+    to: replaying
+    verbs: [shared-atom.replay-constellation]
+  - from: replaying
+    to: resolved
+    verbs: []
+  - from: replaying
+    to: escalated
+    verbs: []
+  - from: escalated
+    to: resolved
+    verbs: [remediation.resolve]
+  - from: escalated
+    to: deferred
+    verbs: [remediation.defer]
+  - from: deferred
+    to: detected
+    verbs: [remediation.revoke-deferral]
+reducer:
+  overlay_sources: {}
+  conditions:
+    replay_succeeded:
+      expr: "replay_result.outcome = 'resolved'"
+    replay_failed:
+      expr: "replay_result.outcome = 'escalated'"
+  rules:
+    - state: deferred
+      requires: []
+    - state: escalated
+      requires: []
+    - state: resolved
+      requires: []
+    - state: replaying
+      requires: []
+    - state: detected
+      requires: []

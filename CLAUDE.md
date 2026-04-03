@@ -287,7 +287,7 @@ npm run build && npm run typecheck && npm run lint
 
 **Complete (✅):** React Migration (077), V2 REPL (7-state, 320 tests), Runbook Compilation, Candle Semantic Pipeline, Agent Pipeline + PolicyGate, Solar Navigation (038), Promotion Pipeline (043), Teaching (044), Client Group Resolver (048), Workflow Task Queue (049), Transactional Execution (050), CustomOp Auto-Registration (051), Client Group Research (055), REPL Viewport Feedback (056), Verb Disambiguation UI (057), Unified Architecture (058), Playbook System (059), LSP (060/063), CBU Structure Macros (064), Unified Lookup (074), Lexicon (072), Entity Linking (073), Clarification UX (075), Inspector-First (076), Deal Record & Fee Billing (067), BPMN-Lite (all phases incl. Phase 4 PostgresProcessStore + Phase 5A Inclusive Gateway), BPMN-Lite Integration (Phase B), BPMN-Lite Authoring (Phases B-D), KYC/UBO Skeleton (S1-S2), Semantic OS (Phases 0-9 + Standalone v1.1 + Stewardship Phase 0-1), Governed Registry Authoring (v0.4, migrations 099-102), CCIR + SessionVerbSurface, Loopback Calibration (v0.3), Onboarding State View, Verb Disambiguation UX, Constellation Orphan Remediation, SemOS Grounded Action Surface, Pipeline Leak Remediation, Sage Intent Skeleton (Phase 1), Entity-First Utterance Parsing, Coder Rewrite (Phase 2), Sage-Primary Chat Narration, SemTaxonomy Three-Step, NLCI CBU Cutover, CBU Role Surface Reconciliation, Phase 0 Vocabulary Rationalization (Batches 1-3), Schema Consolidation (115-121), Domain Metadata Coverage (306/306 tables), Scenario-Based Intent Resolution (Phases 0.5-5), AffinityGraph & Diagram Generation, Discovery Pipeline (Phase 2), Utterance API Coverage Harness, Unified Session Input Cutover, Workspace-Scoped REPL Navigation, SemOS Attribute DSL + Schema Cleanup, SemOS Footprint Hydration S6, SemOS Document Governance Bootstrap (122-123), StateGraph Pipeline (Phase 0-3 substrate), Session Stack Machine Runbook Architecture (R1-R9, migrations 125-128), Unified Session Pipeline (ADR 040 — tollgates enforced, 149/149 tests, response adapter, dead code removal -4,480 lines), Derived Attribute Persistence (D0-D12 — canonical two-table model, staleness propagation, CBU projection view), SemOS-First Hub Implementation (Phases 1-7 — AttributeDefBody complete, SemOS-first write path, materialization trigger, identity resolution inverted, 7 new verbs, SemOS Maintenance workspace), Sage Proactive Narration (ADR 043 — NarrationEngine, contextual query intercept, post-execution narration, NarrationPanel React component, narration boost signal, end-to-end wiring), Verb/Noun Separation (S-expression aligned — assemble-cbu macro_selector, analyse-ubo verb_selector, action stem extractor), Instrument Matrix Two-Stage (group template + CBU instance), Session Recovery (resume with fresh scope), Two-Tier Attribute Model (AttributeVisibility External/Internal, attribute.define-internal + attribute.update-internal, migration 130, operational-tier auto-approved), BPMN-Lite Durability Fixes (transaction atomicity via atomic_start/atomic_complete, job claim timeout + reclaim, tick_all orchestrator, dedupe cache TTL pruning, 3 background housekeeping tasks)
 
-**In Progress / Parked (⚠️):** Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), StateGraph Phase 1 reconciliation (parked pending external correction table)
+**In Progress / Parked (⚠️):** Cross-Workspace State Consistency (P1-P6 of 10 complete — shared atom registry, fact versioning, staleness propagation, constellation replay types, remediation events; P7-P10 pending: external call idempotency, provider capabilities, compensation records, YAML seeds + platform DAG), Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), StateGraph Phase 1 reconciliation (parked pending external correction table)
 
 **Removed (❌):** V1 Staged Runbook (054), ESPER Navigation Crates (065 — retained for reference), ECIR / NounIndex (Tier -1 noun taxonomy — replaced by ConstellationVerbIndex + workspace pack constraints)
 
@@ -389,6 +389,7 @@ ob-poc/
 │   │   ├── mcp/                # MCP tools, handlers, verb search, intent pipeline
 │   │   ├── bpmn_integration/   # ob-poc ↔ bpmn-lite wiring (12 files)
 │   │   ├── calibration/        # Loopback calibration (11 modules)
+│   │   ├── cross_workspace/   # Cross-workspace state consistency (10 modules)
 │   │   └── api/                # REST routes
 │   ├── tests/                  # Integration tests + golden corpus
 │   └── scenarios/suites/       # 10 suites, 48 agentic test scenarios
@@ -514,6 +515,8 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 | `schema` | 5 | Schema introspection |
 | `agent` | 4+ | Agent mode/policy, telemetry |
 | `sem_reg.*` | ~32 | Semantic Registry MCP tools |
+| `shared-atom` | 8 | Cross-workspace shared atom registry, replay, acknowledge |
+| `remediation` | 4 | Remediation event lifecycle (defer, revoke, confirm) |
 
 ---
 
@@ -590,6 +593,8 @@ When you see these in a task, read the corresponding annex first:
 | "SessionVerbSurface", "verb surface", "FailClosed", "safe-harbor" | `docs/annex-sem-os.md` |
 | "GroundedActionSurface", "pipeline leak", "TOCTOU recheck" | `docs/annex-sem-os.md` |
 | "scanner", "drift detection", "bootstrap", "seed bundle" | `docs/annex-sem-os.md` |
+| "shared atom", "cross-workspace", "staleness propagation", "constellation replay", "remediation event" | `docs/architecture/cross-workspace-state-consistency-v0.4.md` |
+| "RebuildContext", "shared fact version", "workspace fact ref", "produces_shared_facts" | `rust/src/cross_workspace/` |
 | "BPMN", "bpmn-lite", "fiber VM", "orchestration", "durable workflow" | `docs/annex-bpmn-lite.md` |
 | "race", "boundary timer", "cancel", "ghost signal", "terminate" | `docs/annex-bpmn-lite.md` |
 | "WorkflowDispatcher", "JobWorker", "EventBridge", "correlation", "parked token" | `docs/annex-bpmn-lite.md` |

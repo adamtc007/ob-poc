@@ -92,6 +92,9 @@ pub mod sem_os_runtime;
 #[cfg(feature = "database")]
 pub mod derived_attributes;
 
+// Cross-workspace state consistency: shared atom registry, staleness, replay
+pub mod cross_workspace;
+
 // Loopback calibration harness
 #[cfg(feature = "database")]
 pub mod calibration;

@@ -376,6 +376,7 @@ mod tests {
             reads_from: vec![],
             writes_to: vec![],
             outputs: vec![],
+            produces_shared_facts: vec![],
         }
     }
 

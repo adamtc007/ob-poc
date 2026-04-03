@@ -441,6 +441,8 @@ pub enum VerbTier {
     Diagnostics,
     /// Multi-table orchestration verbs
     Composite,
+    /// Governed lifecycle operations (changeset ceremony, SemOS maintenance)
+    Governance,
 }
 
 /// Source of truth for data

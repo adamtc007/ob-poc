@@ -639,6 +639,12 @@ impl ReplSessionV2 {
             None
         };
         let available_workspaces = workspace_hints();
+        let stale_shared_facts = self
+            .workspace_stack
+            .last()
+            .map(|tos| tos.stale_shared_facts.clone())
+            .unwrap_or_default();
+        let has_stale_shared_facts = !stale_shared_facts.is_empty();
         SessionFeedback {
             stack_depth: self.workspace_stack.len(),
             tos: hydrated.clone(),
@@ -649,7 +655,8 @@ impl ReplSessionV2 {
                     .map(|frame| frame.is_peek)
                     .unwrap_or(false),
             previous_workspace,
-            stale_warning,
+            stale_warning: stale_warning || has_stale_shared_facts,
+            stale_shared_facts,
             scoped_verb_surface: hydrated.scoped_verb_surface.clone(),
             available_workspaces,
             pending_verb: self.pending_verb.clone(),

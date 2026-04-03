@@ -48,6 +48,7 @@ fn verb_contracts() -> Vec<VerbContractBody> {
             reads_from: vec![],
             writes_to: vec![],
             outputs: vec![],
+            produces_shared_facts: vec![],
         },
         VerbContractBody {
             fqn: "entity.create".to_owned(),
@@ -87,6 +88,7 @@ fn verb_contracts() -> Vec<VerbContractBody> {
             reads_from: vec![],
             writes_to: vec!["ob-poc.entities".to_owned()],
             outputs: vec![],
+            produces_shared_facts: vec![],
         },
     ]
 }

@@ -195,6 +195,7 @@ pub fn verb_config_to_contract(
                 description: o.description.clone(),
             })
             .collect(),
+        produces_shared_facts: vec![],
     }
 }
 

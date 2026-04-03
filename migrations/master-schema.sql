@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict w31KkePdY7TRF1G7jfLpckt5KbhKcnxi3eZSflDBsRNPdzXhsGA6mmbALLHcr7a
+\restrict 49BAzJ8Q6Q49UZEo33HwcEe99KbViIXoJPKofeOxlqa5GnlOgvE38Rhg9XhLSeW
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -3994,6 +3994,55 @@ $$;
 
 
 --
+-- Name: propagate_shared_fact_staleness(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".propagate_shared_fact_staleness() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_atom_lifecycle TEXT;
+    v_stale_count INTEGER;
+BEGIN
+    -- Only propagate for Active or Deprecated atoms
+    SELECT lifecycle_status INTO v_atom_lifecycle
+    FROM "ob-poc".shared_atom_registry
+    WHERE id = NEW.atom_id;
+
+    IF v_atom_lifecycle IS NULL OR v_atom_lifecycle NOT IN ('active', 'deprecated') THEN
+        RETURN NEW;
+    END IF;
+
+    -- Mark all consumer refs stale where held_version < new version
+    UPDATE "ob-poc".workspace_fact_refs
+    SET status = 'stale',
+        stale_since = COALESCE(stale_since, now())
+    WHERE atom_id = NEW.atom_id
+      AND entity_id = NEW.entity_id
+      AND status = 'current'
+      AND held_version < NEW.version;
+
+    GET DIAGNOSTICS v_stale_count = ROW_COUNT;
+
+    -- Log propagation (useful for debugging, low overhead at O(50) atoms)
+    IF v_stale_count > 0 THEN
+        RAISE NOTICE 'Shared fact staleness propagated: atom_id=%, entity_id=%, new_version=%, stale_consumers=%',
+            NEW.atom_id, NEW.entity_id, NEW.version, v_stale_count;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION propagate_shared_fact_staleness(); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".propagate_shared_fact_staleness() IS 'Stage 2 of three-stage staleness propagation: marks workspace_fact_refs as stale when a new shared fact version supersedes a prior version. Only fires for Active/Deprecated atoms.';
+
+
+--
 -- Name: propagate_spec_staleness(text, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -5523,6 +5572,26 @@ BEGIN
     IF OLD.status IS DISTINCT FROM NEW.status THEN
         NEW.status_changed_at = NOW();
     END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: trg_shared_fact_version_supersede(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".trg_shared_fact_version_supersede() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Clear is_current on all prior versions for the same atom × entity
+    UPDATE "ob-poc".shared_fact_versions
+    SET is_current = false
+    WHERE atom_id = NEW.atom_id
+      AND entity_id = NEW.entity_id
+      AND id != NEW.id
+      AND is_current = true;
     RETURN NEW;
 END;
 $$;
@@ -15098,6 +15167,44 @@ CREATE TABLE "ob-poc".regulators (
 
 
 --
+-- Name: remediation_events; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".remediation_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    source_atom_id uuid NOT NULL,
+    source_workspace text NOT NULL,
+    prior_version integer NOT NULL,
+    new_version integer NOT NULL,
+    affected_workspace text NOT NULL,
+    affected_constellation_family text NOT NULL,
+    status text DEFAULT 'detected'::text NOT NULL,
+    failed_at_step text,
+    failure_reason text,
+    deferral_reason text,
+    resolved_at timestamp with time zone,
+    resolved_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_remediation_status CHECK ((status = ANY (ARRAY['detected'::text, 'replaying'::text, 'resolved'::text, 'escalated'::text, 'deferred'::text])))
+);
+
+
+--
+-- Name: TABLE remediation_events; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".remediation_events IS 'Lifecycle entity tracking cross-workspace state drift caused by a superseded shared attribute version. FSM: Detected → Replaying → Resolved | Escalated → Resolved | Deferred.';
+
+
+--
+-- Name: COLUMN remediation_events.status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".remediation_events.status IS 'detected = staleness found; replaying = constellation replay in progress; resolved = replay complete; escalated = replay failed, human review; deferred = divergence explicitly accepted.';
+
+
+--
 -- Name: repl_invocation_records; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -16473,6 +16580,91 @@ COMMENT ON COLUMN "ob-poc".share_classes.instrument_type IS 'UNITS, SHARES, LP_I
 --
 
 COMMENT ON COLUMN "ob-poc".share_classes.compartment_id IS 'Optional link to fund compartment (for umbrella funds with compartment-specific share classes)';
+
+
+--
+-- Name: shared_atom_registry; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".shared_atom_registry (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    atom_path text NOT NULL,
+    display_name text NOT NULL,
+    owner_workspace text NOT NULL,
+    owner_constellation_family text NOT NULL,
+    lifecycle_status text DEFAULT 'draft'::text NOT NULL,
+    validation_rule jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    activated_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_lifecycle_status CHECK ((lifecycle_status = ANY (ARRAY['draft'::text, 'active'::text, 'deprecated'::text, 'retired'::text])))
+);
+
+
+--
+-- Name: TABLE shared_atom_registry; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".shared_atom_registry IS 'Declares shared atoms whose values are owned by one workspace but consumed by others. Governed SemOS entity with lifecycle FSM (Draft → Active → Deprecated → Retired).';
+
+
+--
+-- Name: COLUMN shared_atom_registry.atom_path; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".shared_atom_registry.atom_path IS 'Dot-notation attribute path, e.g. entity.lei, entity.jurisdiction';
+
+
+--
+-- Name: COLUMN shared_atom_registry.lifecycle_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".shared_atom_registry.lifecycle_status IS 'Draft = declared but not enforced; Active = full propagation; Deprecated = enforced but no new consumers; Retired = historical only';
+
+
+--
+-- Name: COLUMN shared_atom_registry.validation_rule; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".shared_atom_registry.validation_rule IS 'Optional validation: {format, allowed_values, gleif_verification, ...}. Always read/written through typed SharedAtomValidation struct.';
+
+
+--
+-- Name: shared_fact_versions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".shared_fact_versions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    atom_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    value jsonb NOT NULL,
+    mutated_by_verb text,
+    mutated_by_user uuid,
+    mutated_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_current boolean DEFAULT true NOT NULL
+);
+
+
+--
+-- Name: TABLE shared_fact_versions; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".shared_fact_versions IS 'Versioned fact store for shared atoms. One row per entity × atom × version. The is_current flag denotes the latest version; superseded versions are retained for audit.';
+
+
+--
+-- Name: COLUMN shared_fact_versions.version; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".shared_fact_versions.version IS 'Monotonically increasing version number per (atom_id, entity_id) pair.';
+
+
+--
+-- Name: COLUMN shared_fact_versions.is_current; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".shared_fact_versions.is_current IS 'Denormalized flag: true for the latest version only. Maintained by trigger.';
 
 
 --
@@ -20728,6 +20920,44 @@ COMMENT ON COLUMN "ob-poc".workflow_instances.blockers IS 'JSON array of current
 
 
 --
+-- Name: workspace_fact_refs; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".workspace_fact_refs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    atom_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    consumer_workspace text NOT NULL,
+    held_version integer NOT NULL,
+    status text DEFAULT 'current'::text NOT NULL,
+    stale_since timestamp with time zone,
+    remediation_id uuid,
+    CONSTRAINT chk_workspace_fact_ref_status CHECK ((status = ANY (ARRAY['current'::text, 'stale'::text, 'deferred'::text])))
+);
+
+
+--
+-- Name: TABLE workspace_fact_refs; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".workspace_fact_refs IS 'Consumption-state projection — tracks which shared fact version each consuming workspace last acknowledged. A stale row means the consumer is operating against a superseded attribute version.';
+
+
+--
+-- Name: COLUMN workspace_fact_refs.held_version; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".workspace_fact_refs.held_version IS 'The version number from shared_fact_versions that this workspace last operated against.';
+
+
+--
+-- Name: COLUMN workspace_fact_refs.status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".workspace_fact_refs.status IS 'current = up to date; stale = superseded attribute exists; deferred = divergence explicitly accepted.';
+
+
+--
 -- Name: _sqlx_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -24570,6 +24800,14 @@ ALTER TABLE ONLY "ob-poc".regulators
 
 
 --
+-- Name: remediation_events remediation_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".remediation_events
+    ADD CONSTRAINT remediation_events_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: repl_invocation_records repl_invocation_records_correlation_key_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -25066,6 +25304,22 @@ ALTER TABLE ONLY "ob-poc".share_classes
 
 
 --
+-- Name: shared_atom_registry shared_atom_registry_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".shared_atom_registry
+    ADD CONSTRAINT shared_atom_registry_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: shared_fact_versions shared_fact_versions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".shared_fact_versions
+    ADD CONSTRAINT shared_fact_versions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: sheet_execution_audit sheet_execution_audit_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -25514,6 +25768,14 @@ ALTER TABLE ONLY "ob-poc".issuer_control_config
 
 
 --
+-- Name: shared_fact_versions uq_shared_fact_version; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".shared_fact_versions
+    ADD CONSTRAINT uq_shared_fact_version UNIQUE (atom_id, entity_id, version);
+
+
+--
 -- Name: special_rights uq_special_rights_holder_issuer_type_class; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -25631,6 +25893,14 @@ ALTER TABLE ONLY "ob-poc".workflow_definitions
 
 ALTER TABLE ONLY "ob-poc".workflow_instances
     ADD CONSTRAINT workflow_instances_pkey PRIMARY KEY (instance_id);
+
+
+--
+-- Name: workspace_fact_refs workspace_fact_refs_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workspace_fact_refs
+    ADD CONSTRAINT workspace_fact_refs_pkey PRIMARY KEY (id);
 
 
 --
@@ -30129,6 +30399,20 @@ CREATE INDEX idx_rel_history_to_entity ON "ob-poc".entity_relationships_history 
 
 
 --
+-- Name: idx_remediation_events_entity_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_remediation_events_entity_status ON "ob-poc".remediation_events USING btree (entity_id, status);
+
+
+--
+-- Name: idx_remediation_events_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_remediation_events_status ON "ob-poc".remediation_events USING btree (status) WHERE (status <> ALL (ARRAY['resolved'::text, 'deferred'::text]));
+
+
+--
 -- Name: idx_repl_invocations_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -30588,6 +30872,34 @@ CREATE INDEX idx_share_classes_isin ON "ob-poc".share_classes USING btree (isin)
 --
 
 CREATE INDEX idx_share_classes_parent ON "ob-poc".entity_share_classes USING btree (parent_fund_id);
+
+
+--
+-- Name: idx_shared_atom_registry_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_shared_atom_registry_active ON "ob-poc".shared_atom_registry USING btree (lifecycle_status) WHERE (lifecycle_status = 'active'::text);
+
+
+--
+-- Name: idx_shared_atom_registry_path; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_shared_atom_registry_path ON "ob-poc".shared_atom_registry USING btree (atom_path);
+
+
+--
+-- Name: idx_shared_fact_versions_current; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_shared_fact_versions_current ON "ob-poc".shared_fact_versions USING btree (atom_id, entity_id) WHERE (is_current = true);
+
+
+--
+-- Name: idx_shared_fact_versions_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_shared_fact_versions_entity ON "ob-poc".shared_fact_versions USING btree (entity_id);
 
 
 --
@@ -31225,6 +31537,27 @@ CREATE INDEX idx_workflow_subject ON "ob-poc".workflow_instances USING btree (su
 --
 
 CREATE INDEX idx_workflow_updated ON "ob-poc".workflow_instances USING btree (updated_at DESC);
+
+
+--
+-- Name: idx_workspace_fact_refs_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_workspace_fact_refs_entity ON "ob-poc".workspace_fact_refs USING btree (entity_id, status);
+
+
+--
+-- Name: idx_workspace_fact_refs_stale; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_workspace_fact_refs_stale ON "ob-poc".workspace_fact_refs USING btree (consumer_workspace, status) WHERE (status = 'stale'::text);
+
+
+--
+-- Name: idx_workspace_fact_refs_unique; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_workspace_fact_refs_unique ON "ob-poc".workspace_fact_refs USING btree (atom_id, entity_id, consumer_workspace);
 
 
 --
@@ -32285,6 +32618,13 @@ CREATE TRIGGER trg_propagate_observation_staleness AFTER INSERT OR UPDATE OF val
 
 
 --
+-- Name: shared_fact_versions trg_propagate_shared_fact_staleness; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_propagate_shared_fact_staleness AFTER INSERT ON "ob-poc".shared_fact_versions FOR EACH ROW EXECUTE FUNCTION "ob-poc".propagate_shared_fact_staleness();
+
+
+--
 -- Name: provisioning_events trg_provisioning_events_immutable; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -32317,6 +32657,13 @@ CREATE TRIGGER trg_sdm_updated BEFORE UPDATE ON "ob-poc".service_delivery_map FO
 --
 
 CREATE TRIGGER trg_service_intents_updated BEFORE UPDATE ON "ob-poc".service_intents FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_service_intents_timestamp();
+
+
+--
+-- Name: shared_fact_versions trg_shared_fact_version_supersede; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_shared_fact_version_supersede AFTER INSERT ON "ob-poc".shared_fact_versions FOR EACH ROW EXECUTE FUNCTION "ob-poc".trg_shared_fact_version_supersede();
 
 
 --
@@ -34932,6 +35279,14 @@ ALTER TABLE ONLY "ob-poc".ubo_registry
 
 
 --
+-- Name: workspace_fact_refs fk_workspace_fact_refs_remediation; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workspace_fact_refs
+    ADD CONSTRAINT fk_workspace_fact_refs_remediation FOREIGN KEY (remediation_id) REFERENCES "ob-poc".remediation_events(id);
+
+
+--
 -- Name: fund_compartments fund_compartments_compartment_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -35700,6 +36055,14 @@ ALTER TABLE ONLY "ob-poc".red_flags
 
 
 --
+-- Name: remediation_events remediation_events_source_atom_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".remediation_events
+    ADD CONSTRAINT remediation_events_source_atom_id_fkey FOREIGN KEY (source_atom_id) REFERENCES "ob-poc".shared_atom_registry(id);
+
+
+--
 -- Name: repl_invocation_records repl_invocation_records_session_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -36065,6 +36428,14 @@ ALTER TABLE ONLY "ob-poc".share_classes
 
 ALTER TABLE ONLY "ob-poc".share_classes
     ADD CONSTRAINT share_classes_issuer_entity_id_fkey FOREIGN KEY (issuer_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: shared_fact_versions shared_fact_versions_atom_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".shared_fact_versions
+    ADD CONSTRAINT shared_fact_versions_atom_id_fkey FOREIGN KEY (atom_id) REFERENCES "ob-poc".shared_atom_registry(id);
 
 
 --
@@ -36596,6 +36967,14 @@ ALTER TABLE ONLY "ob-poc".workflow_audit_log
 
 
 --
+-- Name: workspace_fact_refs workspace_fact_refs_atom_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".workspace_fact_refs
+    ADD CONSTRAINT workspace_fact_refs_atom_id_fkey FOREIGN KEY (atom_id) REFERENCES "ob-poc".shared_atom_registry(id);
+
+
+--
 -- Name: basis_claims basis_claims_basis_id_fkey; Type: FK CONSTRAINT; Schema: sem_reg; Owner: -
 --
 
@@ -36807,5 +37186,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict w31KkePdY7TRF1G7jfLpckt5KbhKcnxi3eZSflDBsRNPdzXhsGA6mmbALLHcr7a
+\unrestrict 49BAzJ8Q6Q49UZEo33HwcEe99KbViIXoJPKofeOxlqa5GnlOgvE38Rhg9XhLSeW
 

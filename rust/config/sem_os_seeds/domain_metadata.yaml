@@ -3117,3 +3117,86 @@ domains:
       state.list-overrides:
         reads:
           - state_overrides
+
+  # ---------------------------------------------------------------------------
+  # SHARED ATOM — Cross-Workspace State Consistency
+  # ---------------------------------------------------------------------------
+  shared-atom:
+    description: "Cross-workspace shared atom registry — declares attributes owned by one workspace and consumed by others, with lifecycle governance and staleness propagation"
+    tables:
+      shared_atom_registry:
+        description: "Declares shared atoms, their ownership, lifecycle status, and validation rules"
+        governance_tier: governed
+        classification: internal
+        pii: false
+    verb_data_footprint:
+      shared-atom.register:
+        reads: []
+        writes:
+          - shared_atom_registry
+      shared-atom.activate:
+        reads:
+          - shared_atom_registry
+        writes:
+          - shared_atom_registry
+      shared-atom.deprecate:
+        reads:
+          - shared_atom_registry
+        writes:
+          - shared_atom_registry
+      shared-atom.retire:
+        reads:
+          - shared_atom_registry
+        writes:
+          - shared_atom_registry
+      shared-atom.list:
+        reads:
+          - shared_atom_registry
+      shared-atom.list-consumers:
+        reads:
+          - shared_atom_registry
+      shared-atom.replay-constellation:
+        reads:
+          - shared_atom_registry
+          - shared_fact_versions
+          - workspace_fact_refs
+        writes:
+          - workspace_fact_refs
+      shared-atom.acknowledge-shared-update:
+        reads:
+          - shared_atom_registry
+          - shared_fact_versions
+        writes:
+          - workspace_fact_refs
+
+  # ---------------------------------------------------------------------------
+  # REMEDIATION — Cross-Workspace Remediation Lifecycle
+  # ---------------------------------------------------------------------------
+  remediation:
+    description: "Cross-workspace remediation event lifecycle — tracks resolution of shared attribute supersession across workspaces"
+    tables:
+      remediation_events:
+        description: "Lifecycle entities tracking cross-workspace state drift resolution"
+        governance_tier: governed
+        classification: internal
+        pii: false
+    verb_data_footprint:
+      remediation.list-open:
+        reads:
+          - remediation_events
+          - shared_atom_registry
+      remediation.defer:
+        reads:
+          - remediation_events
+        writes:
+          - remediation_events
+      remediation.revoke-deferral:
+        reads:
+          - remediation_events
+        writes:
+          - remediation_events
+      remediation.confirm-external-correction:
+        reads:
+          - remediation_events
+        writes:
+          - remediation_events

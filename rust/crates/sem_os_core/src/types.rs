@@ -22,7 +22,18 @@ pub enum GovernanceTier {
 
 /// Attribute visibility — external (client-facing, governed) or internal (system/implementation).
 #[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumString, AsRefStr,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    Display,
+    EnumString,
+    AsRefStr,
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
@@ -103,6 +114,7 @@ pub enum ObjectType {
     ObservationDef,
     DerivationSpec,
     PhraseMapping,
+    SharedAtom,
 }
 
 // ── Security label ────────────────────────────────────────────

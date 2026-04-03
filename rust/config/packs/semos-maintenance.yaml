@@ -76,6 +76,20 @@ allowed_verbs:
   # Attribute seed macros
   - attribute.seed-derived
   - attribute.seed-domain
+  # Cross-workspace shared atom registry
+  - shared-atom.register
+  - shared-atom.activate
+  - shared-atom.deprecate
+  - shared-atom.retire
+  - shared-atom.list
+  - shared-atom.list-consumers
+  - shared-atom.replay-constellation
+  - shared-atom.acknowledge-shared-update
+  # Cross-workspace remediation lifecycle
+  - remediation.list-open
+  - remediation.defer
+  - remediation.revoke-deferral
+  - remediation.confirm-external-correction
 
 forbidden_verbs: []
 
@@ -101,6 +115,12 @@ section_layout:
   - title: "Phrase Authoring"
     verb_prefixes:
       - "phrase."
+  - title: "Shared Atoms"
+    verb_prefixes:
+      - "shared-atom."
+  - title: "Remediation"
+    verb_prefixes:
+      - "remediation."
   - title: "Registry"
     verb_prefixes:
       - "registry."

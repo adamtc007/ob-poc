@@ -69,6 +69,7 @@ mod phrase_ops;
 mod refdata_loader;
 mod refdata_ops;
 mod regulatory_ops;
+mod remediation_ops;
 mod request_ops;
 mod requirement_ops;
 mod research_normalize_ops;
@@ -87,6 +88,7 @@ mod sem_os_schema_ops;
 mod semantic_ops;
 mod service_pipeline_ops;
 mod session_ops;
+mod shared_atom_ops;
 pub(crate) mod skeleton_build_ops;
 mod state_ops;
 #[cfg(feature = "database")]

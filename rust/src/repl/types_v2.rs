@@ -446,6 +446,12 @@ pub struct WorkspaceFrame {
     #[serde(skip)]
     pub constellation_verb_index:
         Option<std::sync::Arc<crate::agent::constellation_verb_index::ConstellationVerbIndex>>,
+
+    /// Cached stale shared fact refs for this workspace frame.
+    /// Populated during hydration, used by pre-REPL staleness check and narration.
+    /// Transient (not serialized).
+    #[serde(skip)]
+    pub stale_shared_facts: Vec<crate::cross_workspace::fact_refs::StaleSharedFactRef>,
 }
 
 impl WorkspaceFrame {
@@ -480,6 +486,7 @@ impl WorkspaceFrame {
             is_peek: false,
             narration_hot_verbs: Vec::new(),
             constellation_verb_index: None,
+            stale_shared_facts: Vec::new(),
         }
     }
 }
@@ -529,6 +536,10 @@ pub struct SessionFeedback {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_workspace: Option<WorkspaceKind>,
     pub stale_warning: bool,
+    /// Stale shared fact references in the current workspace (cross-workspace consistency).
+    /// Non-empty when the workspace is operating against superseded shared attribute versions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub stale_shared_facts: Vec<crate::cross_workspace::fact_refs::StaleSharedFactRef>,
     #[serde(default)]
     pub scoped_verb_surface: Vec<VerbRef>,
     #[serde(default)]

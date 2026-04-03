@@ -786,3 +786,49 @@ The SemOS Maintenance workspace uses operator macros for multi-step governance w
 | `attribute.seed-derived` | 1 | Generate attribute.define-derived calls for a derivation domain |
 
 All 6 macros are wired into the `semos-maintenance` pack (`allowed_verbs`) and the `semos_workspace` constellation map (6 slots under `# ── Governance macros`). Available only in the `sem_os_maintenance` workspace. Mode tags: `stewardship` / `governance`.
+
+---
+
+## Cross-Workspace State Consistency
+
+**Architecture doc:** `docs/architecture/cross-workspace-state-consistency-v0.4.md`
+
+When a shared fact (LEI, jurisdiction, fund structure type) is mutated in its owning workspace, consuming workspaces silently drift. The cross-workspace consistency mechanism detects drift, propagates staleness, and enables constellation replay.
+
+**Key concepts:**
+- **Shared Atom** — attribute owned by one workspace, consumed by others. Governed SemOS entity with lifecycle FSM (Draft → Active → Deprecated → Retired).
+- **Superseded Attribute Version** — a shared fact version replaced by a newer one. Canonical origin of all downstream staleness (INV-1).
+- **Constellation Replay** — full re-execution of a consuming constellation from the top. Upsert semantics = no-op for unchanged state.
+- **Remediation Event** — lifecycle entity tracking the resolution of a supersession (Detected → Replaying → Resolved / Escalated → Resolved / Deferred).
+
+**Implementation status (P1-P6 of 10):**
+
+| Phase | Status | Deliverable |
+|-------|--------|-------------|
+| P1 | ✅ | `shared_atom_registry` table, 6 registry verbs, lifecycle FSM |
+| P2 | ✅ | `shared_fact_versions` table, `produces_shared_facts` on VerbContractBody |
+| P3 | ✅ | `workspace_fact_refs` table, pre-REPL staleness check, NarrationEngine blockers |
+| P4 | ✅ | SQL staleness propagation trigger (three-stage) |
+| P5 | ✅ | `RebuildContext` type, `replay-constellation` + `acknowledge-shared-update` verbs |
+| P6 | ✅ | `remediation_events` table, FSM, 4 remediation verbs |
+| P7-P10 | Pending | External call idempotency, provider capabilities, compensation records, YAML seeds |
+
+**New tables (4 migrations):**
+- `shared_atom_registry` — atom declarations with lifecycle status
+- `shared_fact_versions` — versioned fact store (source of truth)
+- `workspace_fact_refs` — consumption-state projection (consumer-held pointers)
+- `remediation_events` — lifecycle entities for drift resolution
+
+**New module:** `rust/src/cross_workspace/` (types, repository, fact_versions, fact_refs, replay, remediation)
+
+**New verbs (12):**
+- `shared-atom.*` (8): register, activate, deprecate, retire, list, list-consumers, replay-constellation, acknowledge-shared-update
+- `remediation.*` (4): list-open, defer, revoke-deferral, confirm-external-correction
+
+**Key invariants:**
+- INV-1: Canonical unit of drift = shared attribute version
+- INV-2: Consumer state is projection; shared fact version is source of truth
+- INV-3: Replay scope = consuming constellation (not individual vertices)
+- INV-4: Replay routes through existing runbook execution gate
+- INV-5: Replay is controlled re-evaluation, not mechanical rerun
+- INV-6: If shared, always enforced (no soft constraints)

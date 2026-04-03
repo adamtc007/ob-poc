@@ -59,6 +59,10 @@ pub struct VerbContractBody {
     /// Typed output declarations for forward-reference resolution in runbook plans.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub outputs: Vec<VerbOutput>,
+    /// Shared atom paths this verb produces/mutates (cross-workspace consistency).
+    /// When non-empty, successful execution triggers shared fact version recording.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub produces_shared_facts: Vec<String>,
 }
 
 /// Safety tier for routing and confirmation policy.
@@ -262,6 +266,7 @@ mod tests {
                 entity_kind: Some("cbu".into()),
                 description: Some("ID of the newly created CBU".into()),
             }],
+            produces_shared_facts: vec![],
         };
         let json = serde_json::to_value(&val).unwrap();
         // Check #[serde(rename = "type")] on returns and produces

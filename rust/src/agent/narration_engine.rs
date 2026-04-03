@@ -446,6 +446,33 @@ fn compute_blockers(post_slots: &[HydratedSlot]) -> Vec<NarrationBlocker> {
 }
 
 // ---------------------------------------------------------------------------
+// Cross-workspace staleness → blockers
+// ---------------------------------------------------------------------------
+
+/// Convert stale shared fact refs into NarrationBlockers.
+///
+/// Called by the orchestrator when building the response, to merge
+/// cross-workspace staleness blockers into the narration payload.
+pub fn blockers_from_stale_shared_facts(
+    stale_facts: &[crate::cross_workspace::fact_refs::StaleSharedFactRef],
+) -> Vec<NarrationBlocker> {
+    stale_facts
+        .iter()
+        .map(|sf| NarrationBlocker {
+            blocked_verb: format!("(all verbs reading {})", sf.atom_path),
+            reason: format!(
+                "Shared fact '{}' has been superseded in {} workspace (held v{}, current v{})",
+                sf.atom_path, sf.owner_workspace, sf.held_version, sf.current_version
+            ),
+            unblock_hint: format!(
+                "Run shared-atom.acknowledge-shared-update for '{}'",
+                sf.atom_path
+            ),
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

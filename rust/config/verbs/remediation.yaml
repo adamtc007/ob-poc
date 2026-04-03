@@ -1,0 +1,135 @@
+domains:
+  remediation:
+    description: Cross-workspace remediation event lifecycle — tracks resolution of shared attribute supersession
+    invocation_hints:
+    - list remediations
+    - defer remediation
+    - open remediations
+    verbs:
+      list-open:
+        description: List unresolved remediation events, optionally filtered by entity or workspace
+        behavior: plugin
+        handler: RemediationListOpenOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: sem_reg
+          scope: global
+          noun: remediation_event
+          subject_kinds: []
+          phase_tags:
+          - monitoring
+          - governance
+          side_effects: facts_only
+          harm_class: read_only
+          action_class: list
+        args:
+        - name: entity-id
+          type: uuid
+          required: false
+          description: Filter by entity ID
+        - name: workspace
+          type: string
+          required: false
+          description: Filter by affected workspace
+        returns:
+          type: record_set
+          capture: false
+        invocation_phrases:
+        - list open remediations
+        - show remediation events
+        - what remediations are pending
+        - stale workspace status
+
+      defer:
+        description: Explicitly accept divergence from a superseded shared attribute version
+        behavior: plugin
+        handler: RemediationDeferOp
+        metadata:
+          tier: governance
+          source_of_truth: sem_reg
+          scope: global
+          noun: remediation_event
+          subject_kinds: []
+          phase_tags:
+          - governance
+          side_effects: state_write
+          harm_class: irreversible
+          action_class: update
+        args:
+        - name: remediation-id
+          type: uuid
+          required: true
+          description: Remediation event ID to defer
+        - name: reason
+          type: string
+          required: true
+          description: Compliance-auditable reason for accepting divergence
+        returns:
+          type: record
+          capture: false
+        invocation_phrases:
+        - defer remediation
+        - accept divergence
+        - waive remediation
+        - defer stale state
+
+      revoke-deferral:
+        description: Re-open a previously deferred remediation event
+        behavior: plugin
+        handler: RemediationRevokeDeferralOp
+        metadata:
+          tier: governance
+          source_of_truth: sem_reg
+          scope: global
+          noun: remediation_event
+          subject_kinds: []
+          phase_tags:
+          - governance
+          side_effects: state_write
+          harm_class: reversible
+          action_class: update
+        args:
+        - name: remediation-id
+          type: uuid
+          required: true
+          description: Remediation event ID to re-open
+        returns:
+          type: record
+          capture: false
+        invocation_phrases:
+        - revoke deferral
+        - re-open remediation
+        - undo defer
+
+      confirm-external-correction:
+        description: Record that a manual external correction has been confirmed by the provider
+        behavior: plugin
+        handler: RemediationConfirmExternalOp
+        metadata:
+          tier: governance
+          source_of_truth: sem_reg
+          scope: global
+          noun: remediation_event
+          subject_kinds: []
+          phase_tags:
+          - governance
+          - remediation
+          side_effects: state_write
+          harm_class: irreversible
+          action_class: update
+        args:
+        - name: remediation-id
+          type: uuid
+          required: true
+          description: Remediation event ID
+        - name: provider-ref
+          type: string
+          required: true
+          description: Provider reference confirming the correction
+        returns:
+          type: record
+          capture: false
+        invocation_phrases:
+        - confirm external correction
+        - provider confirmed correction
+        - manual correction done

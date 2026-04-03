@@ -241,6 +241,7 @@ mod tests {
                 reads_from: vec![],
                 writes_to: vec![],
                 outputs: vec![],
+                produces_shared_facts: vec![],
             },
             VerbContractBody {
                 fqn: "cbu.create".into(),
@@ -267,6 +268,7 @@ mod tests {
                 reads_from: vec![],
                 writes_to: vec![],
                 outputs: vec![],
+                produces_shared_facts: vec![],
             },
         ]);
 
