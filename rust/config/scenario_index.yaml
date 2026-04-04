@@ -545,6 +545,43 @@ scenarios:
     explain:
       summary: "Deprecate (block new consumers) then retire from active enforcement"
 
+  - id: semos-detect-and-remediate
+    title: "Detect & Remediate Stale Constellation"
+    modes: [stewardship]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [detect, remediate, fix, replay, resolve]
+      nouns_any: [stale, constellation, remediation, drift, divergence, "cross-workspace"]
+      phrases_any:
+        - "detect and remediate stale constellation"
+        - "replay stale constellation"
+        - "fix cross-workspace drift"
+        - "remediate shared fact change"
+    routes:
+      kind: macro
+      macro_fqn: shared-atom.detect-and-remediate
+    explain:
+      summary: "Replay affected constellation after shared fact supersession, list remaining remediations"
+
+  - id: semos-batch-replay
+    title: "Batch Constellation Replay"
+    modes: [stewardship]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [batch, replay, bulk, remediate]
+      nouns_any: [constellations, entities, stale, batch]
+      phrases_any:
+        - "batch replay constellations"
+        - "replay all stale constellations"
+        - "bulk remediate"
+    routes:
+      kind: macro
+      macro_fqn: shared-atom.batch-replay
+    explain:
+      summary: "Replay constellation for multiple entities using foreach iteration"
+
   # ── Onboarding Product Assignment ──────────────────────────────────────
   - id: onboard-standard-product-suite
     title: "Standard Product Suite Assignment"

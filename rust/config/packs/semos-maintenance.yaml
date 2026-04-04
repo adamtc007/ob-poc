@@ -96,6 +96,9 @@ allowed_verbs:
   - shared-atom.deprecate-and-retire
   - remediation.defer-with-audit-trail
   - remediation.resolve-with-confirmation
+  - shared-atom.detect-and-remediate
+  - shared-atom.batch-replay
+  - shared-atom.acknowledge-batch
 
 forbidden_verbs: []
 

@@ -146,3 +146,6 @@ slots:
       macro_deprecate_retire: { verb: shared-atom.deprecate-and-retire, when: filled }
       macro_defer_audit: { verb: remediation.defer-with-audit-trail, when: filled }
       macro_resolve_confirm: { verb: remediation.resolve-with-confirmation, when: filled }
+      macro_detect_remediate: { verb: shared-atom.detect-and-remediate, when: filled }
+      macro_batch_replay: { verb: shared-atom.batch-replay, when: filled }
+      macro_batch_acknowledge: { verb: shared-atom.acknowledge-batch, when: filled }

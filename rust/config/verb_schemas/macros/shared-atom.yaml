@@ -165,3 +165,179 @@ shared-atom.deprecate-and-retire:
       value: true
 
   unlocks: []
+
+# ── P1 Macros: End-to-End Cross-Workspace Workflows ──────────────────
+
+shared-atom.detect-and-remediate:
+  kind: macro
+
+  aliases:
+    - "detect and remediate stale constellation"
+    - "replay stale constellation"
+    - "fix cross-workspace drift"
+    - "remediate shared fact change"
+    - "detect stale state and fix it"
+
+  ui:
+    label: "Detect & Remediate Stale Constellation"
+    description: >
+      End-to-end remediation after a shared fact supersession: check for
+      stale consumers, replay the affected constellation from the top,
+      and list any remaining open remediations.
+    target-label: "Remediation Report"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: shared-atom
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: uuid
+        ui-label: "Entity ID"
+        description: "The entity whose constellation is stale"
+      constellation-family:
+        type: str
+        ui-label: "Constellation Family"
+        description: "The consuming constellation family (e.g. onboarding_workspace)"
+      atom-path:
+        type: str
+        ui-label: "Atom Path"
+        description: "The shared atom that was superseded (e.g. entity.lei)"
+    optional: {}
+
+  prereqs: []
+
+  expands-to:
+    - verb: shared-atom.replay-constellation
+      args:
+        entity-id: "${arg.entity-id}"
+        constellation-family: "${arg.constellation-family}"
+        atom-path: "${arg.atom-path}"
+    - verb: remediation.list-open
+      args:
+        entity-id: "${arg.entity-id}"
+      depends-on: [0]
+
+  sets-state:
+    - key: remediation.${arg.entity-id}.replayed
+      value: true
+
+  unlocks: []
+
+shared-atom.batch-replay:
+  kind: macro
+
+  aliases:
+    - "batch replay constellations"
+    - "replay all stale constellations"
+    - "bulk remediate"
+    - "replay multiple entities"
+
+  ui:
+    label: "Batch Constellation Replay"
+    description: >
+      Replay a constellation for multiple entities after a shared fact
+      supersession. Iterates over provided entity IDs and replays each.
+    target-label: "Batch Replay Report"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: shared-atom
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      entity-ids:
+        type: str
+        ui-label: "Entity IDs"
+        description: "Comma-separated list of entity UUIDs to replay"
+      constellation-family:
+        type: str
+        ui-label: "Constellation Family"
+        description: "The consuming constellation family"
+      atom-path:
+        type: str
+        ui-label: "Atom Path"
+        description: "The shared atom that was superseded"
+    optional: {}
+
+  prereqs: []
+
+  expands-to:
+    - foreach: entity
+      in: "${arg.entity-ids}"
+      do:
+        - verb: shared-atom.replay-constellation
+          args:
+            entity-id: "${entity}"
+            constellation-family: "${arg.constellation-family}"
+            atom-path: "${arg.atom-path}"
+
+  sets-state:
+    - key: batch-replay.completed
+      value: true
+
+  unlocks: []
+
+shared-atom.acknowledge-batch:
+  kind: macro
+
+  aliases:
+    - "acknowledge shared update for multiple entities"
+    - "batch acknowledge"
+    - "acknowledge all stale"
+
+  ui:
+    label: "Batch Acknowledge Shared Update"
+    description: >
+      Acknowledge a shared fact supersession for multiple in-flight entities,
+      advancing all consumer refs to the current version.
+    target-label: "Batch Acknowledgement Report"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: shared-atom
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      entity-ids:
+        type: str
+        ui-label: "Entity IDs"
+        description: "Comma-separated list of entity UUIDs"
+      atom-path:
+        type: str
+        ui-label: "Atom Path"
+        description: "The shared atom to acknowledge"
+    optional: {}
+
+  prereqs: []
+
+  expands-to:
+    - foreach: entity
+      in: "${arg.entity-ids}"
+      do:
+        - verb: shared-atom.acknowledge-shared-update
+          args:
+            entity-id: "${entity}"
+            atom-path: "${arg.atom-path}"
+
+  sets-state:
+    - key: batch-acknowledge.completed
+      value: true
+
+  unlocks: []
