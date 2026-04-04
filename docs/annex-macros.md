@@ -561,3 +561,61 @@ structure.setup/select → sets: structure.exists
        └→ case.submit (requires: case.exists) → sets: case.submitted
             └→ case.approve/reject (requires: case.submitted)
 ```
+
+---
+
+## Cross-Workspace State Consistency Macros
+
+**YAML files:** `macros/shared-atom.yaml` (8 macros), `macros/remediation.yaml` (2 macros)
+
+These macros govern the cross-workspace state consistency lifecycle — from shared atom registration through staleness detection, constellation replay, and remediation.
+
+### Shared Atom Macros (8)
+
+| Macro | Steps | Purpose |
+|-------|-------|---------|
+| `shared-atom.register-and-activate` | 2 (DAG) | Register + activate in one flow |
+| `shared-atom.full-consistency-check` | 2 | List active atoms + open remediations |
+| `shared-atom.deprecate-and-retire` | 2 (DAG) | Deprecate then retire from enforcement |
+| `shared-atom.detect-and-remediate` | 2 (DAG) | Replay constellation + list remaining remediations |
+| `shared-atom.batch-replay` | foreach | Replay constellation for multiple entities |
+| `shared-atom.acknowledge-batch` | foreach | Acknowledge supersession for multiple in-flight entities |
+
+### Remediation Macros (2)
+
+| Macro | Steps | Purpose |
+|-------|-------|---------|
+| `remediation.defer-with-audit-trail` | 1 | Guided deferral with compliance reason template |
+| `remediation.resolve-with-confirmation` | 1 | Confirm external provider correction + resolve |
+
+### Scenario Routes (6)
+
+All routes in `scenario_index.yaml` under `# Cross-Workspace State Consistency`:
+
+| Scenario ID | Macro | Triggers |
+|-------------|-------|----------|
+| `semos-register-activate-atom` | `shared-atom.register-and-activate` | "register shared atom", "create shared atom" |
+| `semos-consistency-check` | `shared-atom.full-consistency-check` | "consistency check", "check shared atom health" |
+| `semos-defer-remediation` | `remediation.defer-with-audit-trail` | "defer remediation", "accept divergence" |
+| `semos-deprecate-retire-atom` | `shared-atom.deprecate-and-retire` | "sunset shared atom", "decommission" |
+| `semos-detect-and-remediate` | `shared-atom.detect-and-remediate` | "replay stale constellation", "fix drift" |
+| `semos-batch-replay` | `shared-atom.batch-replay` | "batch replay", "bulk remediate" |
+
+### Constellation Map Slots
+
+All 24 slots added to `semos_workspace.yaml` under:
+- `# Shared atom registry` (8 verb slots)
+- `# Remediation lifecycle` (4 verb slots)
+- `# Cross-workspace macros` (8 macro slots + 3 batch macro slots = 11 remaining from 5+3 added in two commits)
+
+### State DAG (Cross-Workspace)
+
+```
+shared-atom.register-and-activate → sets: shared-atom.<path>.active
+  └→ shared-atom.full-consistency-check → sets: consistency.last_scan
+  └→ shared-atom.detect-and-remediate → sets: remediation.<entity>.replayed
+       ├→ remediation.defer-with-audit-trail → sets: remediation.deferred
+       │    └→ remediation.revoke-deferral (unlocked by defer)
+       └→ remediation.resolve-with-confirmation → sets: remediation.resolved
+  └→ shared-atom.deprecate-and-retire → sets: shared-atom.<path>.retired
+```

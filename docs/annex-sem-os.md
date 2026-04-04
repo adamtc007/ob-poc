@@ -828,6 +828,12 @@ When a shared fact (LEI, jurisdiction, fund structure type) is mutated in its ow
 - `shared-atom.*` (8): register, activate, deprecate, retire, list, list-consumers, replay-constellation, acknowledge-shared-update
 - `remediation.*` (4): list-open, defer, revoke-deferral, confirm-external-correction
 
+**New macros (10):**
+- `shared-atom.*` (8): register-and-activate, full-consistency-check, deprecate-and-retire, detect-and-remediate, batch-replay, acknowledge-batch
+- `remediation.*` (2): defer-with-audit-trail, resolve-with-confirmation
+- Batch macros use `foreach:` for iteration over entity ID lists
+- 6 scenario routes in `scenario_index.yaml`, 24 constellation map slots in `semos_workspace.yaml`
+
 **Key invariants:**
 - INV-1: Canonical unit of drift = shared attribute version
 - INV-2: Consumer state is projection; shared fact version is source of truth
