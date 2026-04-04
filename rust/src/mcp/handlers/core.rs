@@ -179,6 +179,15 @@ tool_name_enum! {
     TeachPhrase             => "teach_phrase",
     UnteachPhrase           => "unteach_phrase",
     TeachingStatus          => "teaching_status",
+    // Cross-workspace state consistency
+    SharedAtomList          => "shared_atom_list",
+    SharedAtomConsumers     => "shared_atom_consumers",
+    StalenessCheck          => "staleness_check",
+    RemediationListOpen     => "remediation_list_open",
+    RemediationStatus       => "remediation_status",
+    ProviderCapabilities    => "provider_capabilities",
+    CompensationAudit       => "compensation_audit",
+    SharedFactHistory       => "shared_fact_history",
 }
 
 /// Tool handlers with database access, EntityGateway client, and UI session store
@@ -509,6 +518,15 @@ impl ToolHandlers {
             ToolName::TeachPhrase => self.teach_phrase(args).await,
             ToolName::UnteachPhrase => self.unteach_phrase(args).await,
             ToolName::TeachingStatus => self.teaching_status(args).await,
+            // Cross-workspace state consistency
+            ToolName::SharedAtomList => self.shared_atom_list(args).await,
+            ToolName::SharedAtomConsumers => self.shared_atom_consumers(args).await,
+            ToolName::StalenessCheck => self.staleness_check(args).await,
+            ToolName::RemediationListOpen => self.remediation_list_open(args).await,
+            ToolName::RemediationStatus => self.remediation_status(args).await,
+            ToolName::ProviderCapabilities => self.provider_capabilities(args).await,
+            ToolName::CompensationAudit => self.compensation_audit(args).await,
+            ToolName::SharedFactHistory => self.shared_fact_history(args).await,
         }
     }
 

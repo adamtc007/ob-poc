@@ -2726,6 +2726,129 @@ Use to check what's been taught and whether patterns are active."#.into(),
                 }
             }),
         },
+        // ── Cross-Workspace State Consistency ────────────────────────
+        Tool {
+            name: "shared_atom_list".into(),
+            description: "List shared atoms in the cross-workspace registry. These are attributes owned by one workspace but consumed by others (e.g., LEI, jurisdiction, fund structure type).".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "Filter by lifecycle status: draft, active, deprecated, retired",
+                        "enum": ["draft", "active", "deprecated", "retired"]
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "shared_atom_consumers".into(),
+            description: "Show which workspaces consume a shared atom. Returns atom details and owner workspace.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "atom_path": {
+                        "type": "string",
+                        "description": "Dot-notation attribute path (e.g., 'entity.lei')"
+                    }
+                },
+                "required": ["atom_path"]
+            }),
+        },
+        Tool {
+            name: "staleness_check".into(),
+            description: "Check for stale shared fact references in a workspace. Returns consumer refs where the held version is behind the current version.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "workspace": {
+                        "type": "string",
+                        "description": "Consumer workspace to check (e.g., 'onboarding')"
+                    },
+                    "entity_id": {
+                        "type": "string",
+                        "description": "Optional: filter to a specific entity UUID"
+                    }
+                },
+                "required": ["workspace"]
+            }),
+        },
+        Tool {
+            name: "remediation_list_open".into(),
+            description: "List unresolved remediation events — cross-workspace state drift from shared attribute supersession. Filter by entity or workspace.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "entity_id": {
+                        "type": "string",
+                        "description": "Optional: filter by entity UUID"
+                    },
+                    "workspace": {
+                        "type": "string",
+                        "description": "Optional: filter by affected workspace"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "remediation_status".into(),
+            description: "Get details of a single remediation event including status, failure info, and deferral reason.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "remediation_id": {
+                        "type": "string",
+                        "description": "Remediation event UUID"
+                    }
+                },
+                "required": ["remediation_id"]
+            }),
+        },
+        Tool {
+            name: "provider_capabilities".into(),
+            description: "List third-party provider correction capabilities (amendable, cancel_and_recreate, immutable, manual). Used during constellation replay to determine how external calls are corrected.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": "Optional: filter to a specific provider"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "compensation_audit".into(),
+            description: "Query the regulatory audit trail of external corrections triggered by constellation replay. Returns compensation records for a remediation event.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "remediation_id": {
+                        "type": "string",
+                        "description": "Remediation event UUID to query compensation records for"
+                    }
+                },
+                "required": ["remediation_id"]
+            }),
+        },
+        Tool {
+            name: "shared_fact_history".into(),
+            description: "Get the version history of a shared fact for an entity. Shows all versions including superseded ones, with mutation timestamps and verb provenance.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "atom_path": {
+                        "type": "string",
+                        "description": "Shared atom path (e.g., 'entity.lei')"
+                    },
+                    "entity_id": {
+                        "type": "string",
+                        "description": "Entity UUID"
+                    }
+                },
+                "required": ["atom_path", "entity_id"]
+            }),
+        },
     ];
 
     // Append Semantic Registry tools

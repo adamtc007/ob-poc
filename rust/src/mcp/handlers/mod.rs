@@ -19,6 +19,7 @@
 
 mod batch_tools;
 mod core;
+mod cross_workspace_tools;
 mod learning_tools;
 mod navigation_tools;
 mod session_tools;

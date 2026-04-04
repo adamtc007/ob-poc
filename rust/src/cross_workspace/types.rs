@@ -27,6 +27,17 @@ pub enum SharedAtomLifecycle {
 }
 
 impl SharedAtomLifecycle {
+    /// Parse from string.
+    pub fn try_from_str(s: &str) -> anyhow::Result<Self> {
+        match s {
+            "draft" => Ok(Self::Draft),
+            "active" => Ok(Self::Active),
+            "deprecated" => Ok(Self::Deprecated),
+            "retired" => Ok(Self::Retired),
+            other => Err(anyhow::anyhow!("Unknown lifecycle status: {other}")),
+        }
+    }
+
     /// Returns whether this lifecycle state triggers staleness propagation.
     pub fn triggers_propagation(&self) -> bool {
         matches!(self, Self::Active | Self::Deprecated)
