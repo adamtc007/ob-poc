@@ -121,8 +121,8 @@ function ObjectView({ data }: { data: Record<string, unknown> | undefined }) {
             {String(obj.fqn ?? obj.object_type ?? `Object ${i}`)}
           </summary>
           <div className="mt-1 ml-2 space-y-0.5">
-            {obj.definition &&
-              Object.entries(
+            {obj.definition
+              ? Object.entries(
                 obj.definition as Record<string, unknown>,
               ).map(([k, v]) => (
                 <div key={k} className="flex gap-2">
@@ -133,7 +133,8 @@ function ObjectView({ data }: { data: Record<string, unknown> | undefined }) {
                     {String(v)}
                   </span>
                 </div>
-              ))}
+              ))
+              : null}
           </div>
         </details>
       ))}
@@ -191,11 +192,11 @@ function GatesView({ data }: { data: Record<string, unknown> | undefined }) {
           <div className="text-[var(--text-secondary)]">
             {String(g.message)}
           </div>
-          {g.remediation && (
+          {g.remediation ? (
             <div className="mt-1 text-[var(--text-muted)]">
               Fix: {String(g.remediation)}
             </div>
-          )}
+          ) : null}
         </div>
       ))}
     </div>

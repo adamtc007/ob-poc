@@ -1,8 +1,9 @@
 /**
  * ConstellationCanvas — embeds the egui WASM canvas inside React.
  *
- * Calls start_canvas(), set_scene(), set_view_level(), on_action()
- * from the observatory-wasm package.
+ * Loads the WASM module at runtime from /observatory/pkg/ (served by the
+ * Rust server). Uses dynamic script injection to avoid Rollup/Vite trying
+ * to resolve the import at build time.
  */
 
 import { useEffect, useRef } from "react";
@@ -19,16 +20,70 @@ interface Props {
 }
 
 // Module-level WASM state (singleton — canvas is initialized once)
-let wasmModule: {
-  default: () => Promise<void>;
-  start_canvas: (id: string) => Promise<void>;
-  set_scene: (json: string) => void;
-  set_view_level: (level: string) => void;
-  on_action: (callback: (json: string) => void) => void;
-} | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let wasmModule: any = null;
 let wasmReady = false;
+let wasmLoading = false;
 
-export function ConstellationCanvas({ graphScene, viewLevel, onAction }: Props) {
+/** Load the WASM module via dynamic script injection (bypasses Vite bundler). */
+async function loadWasmModule(): Promise<any> {
+  if (wasmModule) return wasmModule;
+  if (wasmLoading) {
+    // Wait for the in-flight load
+    return new Promise((resolve) => {
+      const check = setInterval(() => {
+        if (wasmModule) {
+          clearInterval(check);
+          resolve(wasmModule);
+        }
+      }, 50);
+    });
+  }
+
+  wasmLoading = true;
+
+  // Load the JS glue via a module script element so it registers on globalThis
+  const script = document.createElement("script");
+  script.type = "module";
+  script.textContent = `
+    import init, * as wasm from '/observatory/pkg/observatory_wasm.js';
+    await init();
+    window.__observatory_wasm = wasm;
+    window.dispatchEvent(new Event('observatory-wasm-ready'));
+  `;
+
+  return new Promise((resolve, reject) => {
+    const onReady = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      wasmModule = (window as any).__observatory_wasm;
+      wasmLoading = false;
+      window.removeEventListener("observatory-wasm-ready", onReady);
+      resolve(wasmModule);
+    };
+    window.addEventListener("observatory-wasm-ready", onReady);
+
+    script.onerror = (e) => {
+      wasmLoading = false;
+      reject(new Error(`Failed to load WASM: ${e}`));
+    };
+
+    document.head.appendChild(script);
+
+    // Timeout after 15s
+    setTimeout(() => {
+      if (!wasmModule) {
+        wasmLoading = false;
+        reject(new Error("WASM load timeout"));
+      }
+    }, 15000);
+  });
+}
+
+export function ConstellationCanvas({
+  graphScene,
+  viewLevel,
+  onAction,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const actionCallbackRef = useRef(onAction);
   actionCallbackRef.current = onAction;
@@ -40,12 +95,7 @@ export function ConstellationCanvas({ graphScene, viewLevel, onAction }: Props) 
     async function init() {
       if (wasmReady) return;
       try {
-        const wasm = await import(
-          /* webpackIgnore: true */ "/observatory/pkg/observatory_wasm.js"
-        );
-        await wasm.default();
-        wasmModule = wasm;
-
+        const wasm = await loadWasmModule();
         if (cancelled) return;
 
         await wasm.start_canvas("observatory_canvas");
