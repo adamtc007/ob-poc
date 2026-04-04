@@ -8,13 +8,18 @@ import type {
   OrientationContract,
   ActionDescriptor,
 } from "../../../types/observatory";
+import { TaxonomyTree } from "./viewports/TaxonomyTree";
+import { ImpactGraph } from "./viewports/ImpactGraph";
+import { ActionSurface } from "./viewports/ActionSurface";
+import { CoverageMap } from "./viewports/CoverageMap";
 
 interface Props {
   showPacket: unknown;
   orientation: OrientationContract | null;
+  sessionId?: string;
 }
 
-export function ViewportRenderer({ showPacket, orientation }: Props) {
+export function ViewportRenderer({ showPacket, orientation, sessionId }: Props) {
   if (!showPacket) {
     return (
       <div className="p-3 text-xs text-[var(--text-secondary)]">
@@ -30,18 +35,35 @@ export function ViewportRenderer({ showPacket, orientation }: Props) {
   return (
     <div className="flex flex-col gap-2 p-3">
       {viewports.map((vp, i) => (
-        <ViewportCard key={i} viewport={vp} />
+        <ViewportCard key={i} viewport={vp} sessionId={sessionId} />
       ))}
       {actions.length > 0 && <ActionPalette actions={actions} />}
     </div>
   );
 }
 
-function ViewportCard({ viewport }: { viewport: Record<string, unknown> }) {
+function ViewportCard({
+  viewport,
+  sessionId,
+}: {
+  viewport: Record<string, unknown>;
+  sessionId?: string;
+}) {
   const kind = (viewport.kind as string) ?? "unknown";
   const title =
     kind.charAt(0).toUpperCase() + kind.slice(1).replace(/_/g, " ");
   const data = viewport.data as Record<string, unknown> | undefined;
+
+  const KNOWN_KINDS = [
+    "focus",
+    "object",
+    "diff",
+    "gates",
+    "taxonomy",
+    "impact",
+    "action_surface",
+    "coverage",
+  ];
 
   return (
     <div className="rounded border border-[var(--border-secondary)] bg-[var(--bg-secondary)]">
@@ -53,7 +75,13 @@ function ViewportCard({ viewport }: { viewport: Record<string, unknown> }) {
         {kind === "object" && <ObjectView data={data} />}
         {kind === "diff" && <DiffView data={data} />}
         {kind === "gates" && <GatesView data={data} />}
-        {!["focus", "object", "diff", "gates"].includes(kind) && (
+        {kind === "taxonomy" && <TaxonomyTree data={data} />}
+        {kind === "impact" && <ImpactGraph data={data} />}
+        {kind === "action_surface" && (
+          <ActionSurface data={data} sessionId={sessionId} />
+        )}
+        {kind === "coverage" && <CoverageMap data={data} />}
+        {!KNOWN_KINDS.includes(kind) && (
           <pre className="whitespace-pre-wrap text-[10px]">
             {JSON.stringify(data, null, 2)}
           </pre>

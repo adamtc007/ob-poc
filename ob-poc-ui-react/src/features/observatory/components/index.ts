@@ -3,3 +3,8 @@ export { Breadcrumbs } from "./Breadcrumbs";
 export { ViewportRenderer } from "./ViewportRenderer";
 export { MissionControl } from "./MissionControl";
 export { ConstellationCanvas } from "./ConstellationCanvas";
+export { MermaidPanel } from "./MermaidPanel";
+export { TaxonomyTree } from "./viewports/TaxonomyTree";
+export { ImpactGraph } from "./viewports/ImpactGraph";
+export { ActionSurface } from "./viewports/ActionSurface";
+export { CoverageMap } from "./viewports/CoverageMap";

@@ -17,14 +17,39 @@ pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
     let (response, painter) =
         ui.allocate_painter(available, egui::Sense::click_and_drag());
 
-    // ── Background (depth-encoded) ──
-    let depth_t = app.current_level as usize as f32 / 5.0;
+    // ── Background (depth-encoded, with transition blending) ──
     let colors = ob_poc_types::galaxy::DepthColors::default();
-    let (r, g, b) = colors.color_at(depth_t);
-    painter.rect_filled(response.rect, 0.0, egui::Color32::from_rgb(r, g, b));
+    if let Some(ref trans) = app.transition {
+        // Blend between from_level and to_level colors during transition
+        let from_t = trans.from_level as usize as f32 / 5.0;
+        let to_t = trans.to_level as usize as f32 / 5.0;
+        let t = trans.t();
+        let (fr, fg, fb) = colors.color_at(from_t);
+        let (tr, tg, tb) = colors.color_at(to_t);
+        let r = (fr as f32 + (tr as f32 - fr as f32) * t) as u8;
+        let g = (fg as f32 + (tg as f32 - fg as f32) * t) as u8;
+        let b = (fb as f32 + (tb as f32 - fb as f32) * t) as u8;
+        painter.rect_filled(response.rect, 0.0, egui::Color32::from_rgb(r, g, b));
+    } else {
+        let depth_t = app.current_level as usize as f32 / 5.0;
+        let (r, g, b) = colors.color_at(depth_t);
+        painter.rect_filled(response.rect, 0.0, egui::Color32::from_rgb(r, g, b));
+    }
 
-    // ── World-to-screen transform ──
-    let transform = world_to_screen(&app.camera, &response.rect);
+    // ── World-to-screen transform (with transition zoom interpolation) ──
+    let transform = if let Some(ref trans) = app.transition {
+        // Smoothly interpolate camera zoom toward the drill target during transition
+        let t = trans.t();
+        let from_zoom = app.camera.zoom;
+        // Target zoom: scale by level distance (deeper = more zoomed in)
+        let level_delta = trans.to_level as usize as f32 - trans.from_level as usize as f32;
+        let zoom_factor = 1.0 + level_delta * 0.3 * t;
+        let mut cam = app.camera.clone();
+        cam.zoom = (from_zoom * zoom_factor).clamp(0.05, 10.0);
+        world_to_screen(&cam, &response.rect)
+    } else {
+        world_to_screen(&app.camera, &response.rect)
+    };
 
     // ── Paint scene by level ──
     if let Some(ref scene) = app.scene {
@@ -86,12 +111,30 @@ pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
         }
     }
 
+    // Middle-click → anchor / clear anchor
+    if response.middle_clicked() {
+        if let Some(pointer_pos) = response.hover_pos() {
+            let world_pos = transform.inverse().transform_pos(pointer_pos);
+            if let Some(ref scene) = app.scene {
+                if let Some(node_id) = hit_test(scene, world_pos) {
+                    // Middle-click on a node: anchor to it
+                    action = Some(ObservatoryAction::AnchorNode { node_id });
+                } else {
+                    // Middle-click on empty space: clear anchor
+                    action = Some(ObservatoryAction::ClearAnchor);
+                }
+            } else {
+                action = Some(ObservatoryAction::ClearAnchor);
+            }
+        }
+    }
+
     action
 }
 
 /// Compute world-to-screen transform from camera state.
 /// Uses RectTransform — not manual matrix math.
-fn world_to_screen(
+pub(crate) fn world_to_screen(
     camera: &crate::state::ObservationFrame,
     canvas_rect: &egui::Rect,
 ) -> egui::emath::RectTransform {
@@ -128,7 +171,7 @@ fn hit_test(
 
 /// Compute node positions using the same orbital algorithm as the level renderers.
 /// First node at center, remaining in concentric rings.
-fn compute_node_positions(nodes: &[ob_poc_types::graph_scene::SceneNode]) -> Vec<(f32, f32)> {
+pub(crate) fn compute_node_positions(nodes: &[ob_poc_types::graph_scene::SceneNode]) -> Vec<(f32, f32)> {
     use std::f32::consts::TAU;
     let mut positions = Vec::with_capacity(nodes.len());
 

@@ -32,11 +32,11 @@ export const observatoryApi = {
     );
   },
 
-  /** Fetch navigation history (breadcrumbs) */
+  /** Fetch navigation history with cursor (breadcrumbs) */
   async getNavigationHistory(
     sessionId: string,
-  ): Promise<OrientationContract[]> {
-    return api.get<OrientationContract[]>(
+  ): Promise<{ entries: OrientationContract[]; cursor: number }> {
+    return api.get<{ entries: OrientationContract[]; cursor: number }>(
       `/observatory/session/${sessionId}/navigation-history`,
     );
   },
@@ -44,6 +44,18 @@ export const observatoryApi = {
   /** Fetch observatory health metrics */
   async getHealth(): Promise<HealthMetrics> {
     return api.get<HealthMetrics>(`/observatory/health`);
+  },
+
+  /** Execute a navigation verb and return updated orientation + graph scene */
+  async navigate(
+    sessionId: string,
+    verb: string,
+    args: Record<string, unknown>,
+  ): Promise<{ orientation: OrientationContract; graph_scene: GraphSceneModel }> {
+    return api.post<{
+      orientation: OrientationContract;
+      graph_scene: GraphSceneModel;
+    }>(`/observatory/session/${sessionId}/navigate`, { verb, args });
   },
 
   /** Fetch a diagram by type (e.g. mermaid) */

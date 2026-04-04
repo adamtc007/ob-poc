@@ -63,6 +63,37 @@ pub struct InteractionState {
     pub selected_node: Option<String>,
 }
 
+// ── View Transition ──
+
+/// Active level transition — drives cross-fade and camera interpolation.
+#[derive(Debug, Clone)]
+pub struct ActiveTransition {
+    pub from_level: ViewLevel,
+    pub to_level: ViewLevel,
+    pub elapsed: f32,
+    pub duration: f32,
+}
+
+impl ActiveTransition {
+    pub fn new(from_level: ViewLevel, to_level: ViewLevel) -> Self {
+        Self {
+            from_level,
+            to_level,
+            elapsed: 0.0,
+            duration: 0.6,
+        }
+    }
+
+    /// Progress ratio clamped to [0, 1].
+    pub fn t(&self) -> f32 {
+        (self.elapsed / self.duration).clamp(0.0, 1.0)
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.elapsed >= self.duration
+    }
+}
+
 // ── Canvas App (eframe::App) ──
 
 /// Minimal eframe::App — just the constellation canvas.
@@ -72,6 +103,7 @@ pub struct CanvasApp {
     pub current_level: ViewLevel,
     pub camera: ObservationFrame,
     pub interaction: InteractionState,
+    pub transition: Option<ActiveTransition>,
 }
 
 impl Default for CanvasApp {
@@ -81,6 +113,7 @@ impl Default for CanvasApp {
             current_level: ViewLevel::default(),
             camera: ObservationFrame::default(),
             interaction: InteractionState::default(),
+            transition: None,
         }
     }
 }
@@ -95,12 +128,26 @@ impl eframe::App for CanvasApp {
         });
         LEVEL_MAILBOX.with(|m| {
             if let Some(level) = m.borrow_mut().take() {
-                self.current_level = level;
+                if level != self.current_level && self.transition.is_none() {
+                    // Start a transition — don't update current_level yet
+                    self.transition = Some(ActiveTransition::new(self.current_level, level));
+                }
             }
         });
 
-        // ── 2. Tick camera animation ──
+        // ── 1b. Tick view-level transition ──
         let dt = ctx.input(|i| i.predicted_dt);
+        if let Some(ref mut trans) = self.transition {
+            trans.elapsed += dt;
+            if trans.is_complete() {
+                self.current_level = trans.to_level;
+                self.transition = None;
+            } else {
+                ctx.request_repaint(); // Keep animating every frame
+            }
+        }
+
+        // ── 2. Tick camera animation ──
         let lerp = 8.0 * dt;
         self.camera.pan_x += (self.camera.target_pan_x - self.camera.pan_x) * lerp;
         self.camera.pan_y += (self.camera.target_pan_y - self.camera.pan_y) * lerp;
