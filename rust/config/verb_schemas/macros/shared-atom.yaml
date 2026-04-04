@@ -1,0 +1,167 @@
+# Shared Atom Domain Macros
+#
+# Compound workflows for cross-workspace state consistency.
+# These macros wrap shared-atom/remediation verbs into
+# deterministic multi-step sequences.
+#
+# Matched at Tier -2B (MacroIndex, score 0.96) before semantic search.
+
+shared-atom.register-and-activate:
+  kind: macro
+
+  aliases:
+    - "register and activate shared atom"
+    - "declare and activate shared atom"
+    - "create shared atom"
+    - "add cross-workspace attribute"
+    - "enable shared atom enforcement"
+
+  ui:
+    label: "Register & Activate Shared Atom"
+    description: "Declare a new cross-workspace attribute and immediately promote to Active enforcement"
+    target-label: "Shared Atom Activation Report"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: shared-atom
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      atom-path:
+        type: str
+        ui-label: "Atom Path"
+        description: "Dot-notation attribute path (e.g. entity.lei)"
+      display-name:
+        type: str
+        ui-label: "Display Name"
+        description: "Human-readable name for the shared atom"
+      owner-workspace:
+        type: str
+        ui-label: "Owner Workspace"
+        description: "Workspace that owns this atom (e.g. kyc)"
+      owner-constellation-family:
+        type: str
+        ui-label: "Owner Constellation Family"
+        description: "Constellation family in the owner workspace"
+    optional: {}
+
+  prereqs: []
+
+  expands-to:
+    - verb: shared-atom.register
+      args:
+        atom-path: "${arg.atom-path}"
+        display-name: "${arg.display-name}"
+        owner-workspace: "${arg.owner-workspace}"
+        owner-constellation-family: "${arg.owner-constellation-family}"
+    - verb: shared-atom.activate
+      args:
+        atom-path: "${arg.atom-path}"
+      depends-on: [0]
+
+  sets-state:
+    - key: shared-atom.${arg.atom-path}.active
+      value: true
+
+  unlocks: []
+
+shared-atom.full-consistency-check:
+  kind: macro
+
+  aliases:
+    - "cross-workspace consistency check"
+    - "check shared atom health"
+    - "scan shared atoms"
+    - "list stale workspaces"
+    - "cross-workspace health check"
+
+  ui:
+    label: "Full Cross-Workspace Consistency Check"
+    description: "List all active shared atoms and any open remediation events across workspaces"
+    target-label: "Consistency Report"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: shared-atom
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      workspace:
+        type: str
+        ui-label: "Workspace Filter"
+        description: "Limit report to a specific workspace"
+
+  prereqs: []
+
+  expands-to:
+    - verb: shared-atom.list
+      args:
+        status: "active"
+    - verb: remediation.list-open
+      args:
+        workspace: "${arg.workspace}"
+
+  sets-state:
+    - key: consistency.last_scan
+      value: now
+
+  unlocks: []
+
+shared-atom.deprecate-and-retire:
+  kind: macro
+
+  aliases:
+    - "deprecate and retire shared atom"
+    - "sunset shared atom"
+    - "remove shared atom from enforcement"
+    - "decommission shared atom"
+
+  ui:
+    label: "Deprecate & Retire Shared Atom"
+    description: "Deprecate a shared atom (block new consumers) then retire it from active enforcement"
+    target-label: "Retirement Report"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: shared-atom
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      atom-path:
+        type: str
+        ui-label: "Atom Path"
+        description: "Dot-notation attribute path to retire"
+    optional: {}
+
+  prereqs: []
+
+  expands-to:
+    - verb: shared-atom.deprecate
+      args:
+        atom-path: "${arg.atom-path}"
+    - verb: shared-atom.retire
+      args:
+        atom-path: "${arg.atom-path}"
+      depends-on: [0]
+
+  sets-state:
+    - key: shared-atom.${arg.atom-path}.retired
+      value: true
+
+  unlocks: []

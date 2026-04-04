@@ -119,6 +119,20 @@ slots:
       attrs_populate: { verb: attributes.populate, when: filled }
       attrs_rollup: { verb: attributes.rollup, when: filled }
       attrs_set: { verb: attributes.set, when: filled }
+      # ── Shared atom registry ────────────────────────────────────────
+      shared_atom_register: { verb: shared-atom.register, when: [empty, filled] }
+      shared_atom_activate: { verb: shared-atom.activate, when: filled }
+      shared_atom_deprecate: { verb: shared-atom.deprecate, when: filled }
+      shared_atom_retire: { verb: shared-atom.retire, when: filled }
+      shared_atom_list: shared-atom.list
+      shared_atom_list_consumers: shared-atom.list-consumers
+      shared_atom_replay: { verb: shared-atom.replay-constellation, when: filled }
+      shared_atom_acknowledge: { verb: shared-atom.acknowledge-shared-update, when: filled }
+      # ── Remediation lifecycle ──────────────────────────────────────
+      remediation_list_open: remediation.list-open
+      remediation_defer: { verb: remediation.defer, when: filled }
+      remediation_revoke: { verb: remediation.revoke-deferral, when: filled }
+      remediation_confirm: { verb: remediation.confirm-external-correction, when: filled }
       # ── Governance macros ─────────────────────────────────────────
       macro_bootstrap_registry: { verb: governance.bootstrap-attribute-registry, when: [empty, filled] }
       macro_define_dictionary: { verb: governance.define-service-dictionary, when: filled }
@@ -126,3 +140,9 @@ slots:
       macro_reconcile: { verb: governance.reconcile-registry, when: [empty, filled] }
       macro_seed_domain: { verb: attribute.seed-domain, when: [empty, filled] }
       macro_seed_derived: { verb: attribute.seed-derived, when: [empty, filled] }
+      # ── Cross-workspace macros ─────────────────────────────────────
+      macro_register_activate: { verb: shared-atom.register-and-activate, when: [empty, filled] }
+      macro_consistency_check: { verb: shared-atom.full-consistency-check, when: [empty, filled] }
+      macro_deprecate_retire: { verb: shared-atom.deprecate-and-retire, when: filled }
+      macro_defer_audit: { verb: remediation.defer-with-audit-trail, when: filled }
+      macro_resolve_confirm: { verb: remediation.resolve-with-confirmation, when: filled }

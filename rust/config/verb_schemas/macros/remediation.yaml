@@ -1,0 +1,111 @@
+# Remediation Domain Macros
+#
+# Compound workflows for cross-workspace remediation lifecycle.
+# These macros wrap remediation verbs into auditable sequences.
+#
+# Matched at Tier -2B (MacroIndex, score 0.96) before semantic search.
+
+remediation.defer-with-audit-trail:
+  kind: macro
+
+  aliases:
+    - "defer remediation with reason"
+    - "accept divergence"
+    - "defer stale state"
+    - "accept and document divergence"
+    - "waive remediation with justification"
+
+  ui:
+    label: "Defer Remediation with Audit Trail"
+    description: "Explicitly accept divergence from a superseded shared attribute version with a compliance-auditable reason"
+    target-label: "Deferral Record"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: remediation
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      remediation-id:
+        type: uuid
+        ui-label: "Remediation Event ID"
+        description: "The remediation event to defer"
+      reason:
+        type: str
+        ui-label: "Deferral Reason"
+        description: >
+          Compliance-auditable reason for accepting divergence. Examples:
+          - Regulatory reporting cycle closed on prior value
+          - Sub-custodian confirmed prior value operationally acceptable
+          - Correction queued for scheduled maintenance window
+          - Legal opinion: prior value is binding record
+    optional: {}
+
+  prereqs: []
+
+  expands-to:
+    - verb: remediation.defer
+      args:
+        remediation-id: "${arg.remediation-id}"
+        reason: "${arg.reason}"
+
+  sets-state:
+    - key: remediation.deferred
+      value: true
+
+  unlocks:
+    - remediation.revoke-deferral
+
+remediation.resolve-with-confirmation:
+  kind: macro
+
+  aliases:
+    - "resolve remediation with external confirmation"
+    - "confirm provider correction and resolve"
+    - "manual correction confirmed"
+    - "close remediation with provider reference"
+
+  ui:
+    label: "Resolve Remediation with External Confirmation"
+    description: "Confirm a manual external correction from a provider and resolve the remediation event"
+    target-label: "Resolution Record"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: remediation
+
+  target:
+    operates-on: null
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      remediation-id:
+        type: uuid
+        ui-label: "Remediation Event ID"
+        description: "The escalated remediation event to resolve"
+      provider-ref:
+        type: str
+        ui-label: "Provider Reference"
+        description: "External reference from the provider confirming the correction"
+    optional: {}
+
+  prereqs: []
+
+  expands-to:
+    - verb: remediation.confirm-external-correction
+      args:
+        remediation-id: "${arg.remediation-id}"
+        provider-ref: "${arg.provider-ref}"
+
+  sets-state:
+    - key: remediation.resolved
+      value: true
+
+  unlocks: []

@@ -466,6 +466,85 @@ scenarios:
     explain:
       summary: "Bridge ungoverned, sync SRDEFs, recompute stale derived values"
 
+  # ── Cross-Workspace State Consistency ──────────────────────────────────
+  - id: semos-register-activate-atom
+    title: "Register & Activate Shared Atom"
+    modes: [stewardship]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [register, create, declare, activate, enable, add]
+      nouns_any: ["shared atom", atom, "cross-workspace attribute", "shared fact"]
+      phrases_any:
+        - "register and activate shared atom"
+        - "create shared atom"
+        - "declare cross-workspace attribute"
+        - "add shared atom"
+        - "enable shared atom enforcement"
+    routes:
+      kind: macro
+      macro_fqn: shared-atom.register-and-activate
+    explain:
+      summary: "Declare a new cross-workspace attribute and immediately activate enforcement"
+
+  - id: semos-consistency-check
+    title: "Cross-Workspace Consistency Check"
+    modes: [stewardship]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [check, scan, audit, verify, list]
+      nouns_any: [consistency, "shared atoms", stale, remediation, "cross-workspace", health]
+      phrases_any:
+        - "cross-workspace consistency check"
+        - "check shared atom health"
+        - "scan stale workspaces"
+        - "list open remediations"
+        - "cross-workspace health"
+    routes:
+      kind: macro
+      macro_fqn: shared-atom.full-consistency-check
+    explain:
+      summary: "List active shared atoms and open remediation events across workspaces"
+
+  - id: semos-defer-remediation
+    title: "Defer Remediation with Audit Trail"
+    modes: [stewardship]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [defer, accept, waive, document]
+      nouns_any: [remediation, divergence, "stale state", deferral]
+      phrases_any:
+        - "defer remediation"
+        - "accept divergence"
+        - "waive remediation"
+        - "defer stale state with reason"
+    routes:
+      kind: macro
+      macro_fqn: remediation.defer-with-audit-trail
+    explain:
+      summary: "Accept divergence from superseded shared attribute with compliance-auditable reason"
+
+  - id: semos-deprecate-retire-atom
+    title: "Deprecate & Retire Shared Atom"
+    modes: [stewardship]
+    requires:
+      all_of: [compound_action]
+    signals:
+      actions: [deprecate, retire, sunset, decommission, remove]
+      nouns_any: ["shared atom", atom, "cross-workspace attribute"]
+      phrases_any:
+        - "deprecate and retire shared atom"
+        - "sunset shared atom"
+        - "decommission shared atom"
+        - "remove shared atom from enforcement"
+    routes:
+      kind: macro
+      macro_fqn: shared-atom.deprecate-and-retire
+    explain:
+      summary: "Deprecate (block new consumers) then retire from active enforcement"
+
   # ── Onboarding Product Assignment ──────────────────────────────────────
   - id: onboard-standard-product-suite
     title: "Standard Product Suite Assignment"

@@ -90,6 +90,12 @@ allowed_verbs:
   - remediation.defer
   - remediation.revoke-deferral
   - remediation.confirm-external-correction
+  # Cross-workspace macros
+  - shared-atom.register-and-activate
+  - shared-atom.full-consistency-check
+  - shared-atom.deprecate-and-retire
+  - remediation.defer-with-audit-trail
+  - remediation.resolve-with-confirmation
 
 forbidden_verbs: []
 
