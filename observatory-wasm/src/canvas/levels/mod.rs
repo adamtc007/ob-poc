@@ -8,7 +8,7 @@ use egui::Painter;
 use ob_poc_types::galaxy::ViewLevel;
 use ob_poc_types::graph_scene::GraphSceneModel;
 
-use crate::state::ObservatoryState;
+use crate::state::CanvasApp;
 
 mod cluster;
 mod core;
@@ -21,24 +21,24 @@ pub fn paint(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     scene: &GraphSceneModel,
-    state: &ObservatoryState,
+    app: &CanvasApp,
 ) {
     match scene.level {
-        ViewLevel::Universe => universe::paint(painter, transform, scene, state),
-        ViewLevel::Cluster => cluster::paint(painter, transform, scene, state),
-        ViewLevel::System => system::paint(painter, transform, scene, state),
-        ViewLevel::Planet => planet::paint(painter, transform, scene, state),
+        ViewLevel::Universe => universe::paint(painter, transform, scene, app),
+        ViewLevel::Cluster => cluster::paint(painter, transform, scene, app),
+        ViewLevel::System => system::paint(painter, transform, scene, app),
+        ViewLevel::Planet => planet::paint(painter, transform, scene, app),
         ViewLevel::Surface => {
             // Surface is structured panels, not canvas — show indicator
             let center = transform.transform_pos(egui::Pos2::ZERO);
             painter.text(
                 center,
                 egui::Align2::CENTER_CENTER,
-                "Surface — see viewport panels →",
+                "Surface — see viewport panels",
                 egui::FontId::proportional(14.0),
                 egui::Color32::from_rgb(148, 163, 184),
             );
         }
-        ViewLevel::Core => core::paint(painter, transform, scene, state),
+        ViewLevel::Core => core::paint(painter, transform, scene, app),
     }
 }

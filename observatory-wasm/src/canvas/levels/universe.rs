@@ -7,14 +7,14 @@ use egui::{Color32, Painter, Pos2, Stroke, Vec2};
 
 use ob_poc_types::graph_scene::{GraphSceneModel, SceneNodeType};
 
-use crate::state::ObservatoryState;
+use crate::state::CanvasApp;
 
 /// Paint Universe-level: cluster bubbles with cross-cluster edges.
 pub fn paint(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     scene: &GraphSceneModel,
-    state: &ObservatoryState,
+    app: &CanvasApp,
 ) {
     // Paint edges first (below nodes)
     for edge in &scene.edges {
@@ -42,8 +42,8 @@ pub fn paint(
             _ => 12.0,
         };
 
-        let is_selected = state.interaction.selected_node.as_deref() == Some(&node.id);
-        let is_hovered = state.interaction.hovered_node.as_deref() == Some(&node.id);
+        let is_selected = app.interaction.selected_node.as_deref() == Some(&node.id);
+        let is_hovered = app.interaction.hovered_node.as_deref() == Some(&node.id);
         let radius = if is_hovered { base_radius * 1.1 } else { base_radius };
 
         // Bubble fill

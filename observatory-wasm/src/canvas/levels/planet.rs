@@ -7,14 +7,14 @@ use egui::{Color32, Painter, Pos2, Stroke, Vec2};
 
 use ob_poc_types::graph_scene::GraphSceneModel;
 
-use crate::state::ObservatoryState;
+use crate::state::CanvasApp;
 
 /// Paint Planet-level: entity center + relationship nodes.
 pub fn paint(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     scene: &GraphSceneModel,
-    state: &ObservatoryState,
+    app: &CanvasApp,
 ) {
     // Edges
     for edge in &scene.edges {
@@ -52,7 +52,7 @@ pub fn paint(
 
         let is_center = i == 0;
         let radius = if is_center { 28.0 } else { 14.0 };
-        let is_selected = state.interaction.selected_node.as_deref() == Some(&node.id);
+        let is_selected = app.interaction.selected_node.as_deref() == Some(&node.id);
 
         let fill = if is_center {
             Color32::from_rgb(139, 92, 246)

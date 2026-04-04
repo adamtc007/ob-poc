@@ -6,18 +6,18 @@ use egui::{Color32, Painter, Pos2, Stroke, Vec2};
 
 use ob_poc_types::graph_scene::{GraphSceneModel, SceneNodeType};
 
-use crate::state::ObservatoryState;
+use crate::state::CanvasApp;
 
 /// Paint Cluster-level: CBU nodes within a constrained boundary.
 pub fn paint(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     scene: &GraphSceneModel,
-    state: &ObservatoryState,
+    app: &CanvasApp,
 ) {
     // Boundary circle
     let center = transform.transform_pos(Pos2::ZERO);
-    let boundary_radius = 400.0 * state.camera.zoom;
+    let boundary_radius = 400.0 * app.camera.zoom;
     painter.circle_stroke(
         center,
         boundary_radius,
@@ -51,7 +51,7 @@ pub fn paint(
             _ => 12.0,
         };
 
-        let is_selected = state.interaction.selected_node.as_deref() == Some(&node.id);
+        let is_selected = app.interaction.selected_node.as_deref() == Some(&node.id);
         let color = match node.node_type {
             SceneNodeType::Cbu => Color32::from_rgb(139, 92, 246),
             _ => Color32::from_rgb(71, 85, 105),

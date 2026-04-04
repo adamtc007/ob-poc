@@ -1,47 +1,70 @@
-//! Observatory WASM — full egui/eframe application for SemOS visual rendering.
+//! Observatory WASM — egui constellation canvas, embedded in React shell.
 //!
-//! Served in a separate browser tab at /observatory/:sessionId.
-//! Consumes OrientationContract, ShowPacket, GraphSceneModel from REST API.
-//! Depends on ob-poc-types only (no sem_os_core — avoids tokio/prost blockers).
+//! React owns structural UI (viewports, headers, dashboard).
+//! egui owns the constellation canvas (60fps, same Rust types, no translation).
+//! Communication: React pushes scene via set_scene(), egui fires actions via callback.
 
 pub mod actions;
-pub mod app;
 pub mod canvas;
-pub mod fetch;
-pub mod panels;
-pub mod shell;
 pub mod state;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-/// WASM entry point — called when the module loads.
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(start)]
-pub fn main() {
-    eframe::WebLogger::init(log::LevelFilter::Info).ok();
-    log::info!("Observatory WASM module loaded");
-}
-
-/// Start the Observatory application on the page.
-/// Called from the hosting HTML after the WASM module is loaded.
+/// Start the constellation canvas on the given HTML canvas element.
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub async fn start_observatory() -> Result<(), wasm_bindgen::JsValue> {
+pub async fn start_canvas(canvas_id: &str) -> Result<(), JsValue> {
+    eframe::WebLogger::init(log::LevelFilter::Info).ok();
+
     let web_options = eframe::WebOptions::default();
 
     let canvas = web_sys::window()
         .and_then(|w: web_sys::Window| w.document())
-        .and_then(|d: web_sys::Document| d.get_element_by_id("observatory_canvas"))
+        .and_then(|d: web_sys::Document| d.get_element_by_id(canvas_id))
         .and_then(|e: web_sys::Element| e.dyn_into::<web_sys::HtmlCanvasElement>().ok())
-        .ok_or_else(|| JsValue::from_str("Canvas element 'observatory_canvas' not found"))?;
+        .ok_or_else(|| JsValue::from_str(&format!("Canvas '{}' not found", canvas_id)))?;
 
     eframe::WebRunner::new()
         .start(
             canvas,
             web_options,
-            Box::new(|cc| Ok(Box::new(app::ObservatoryApp::new(cc)))),
+            Box::new(|_cc| Ok(Box::new(crate::state::CanvasApp::default()))),
         )
         .await
         .map_err(|e| JsValue::from_str(&format!("Failed to start: {e:?}")))
+}
+
+/// Push a new GraphSceneModel to the canvas (called by React).
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn set_scene(json: &str) {
+    if let Ok(scene) = serde_json::from_str::<ob_poc_types::graph_scene::GraphSceneModel>(json) {
+        state::SCENE_MAILBOX.with(|m| {
+            *m.borrow_mut() = Some(scene);
+        });
+    }
+}
+
+/// Push the current view level (called by React when orientation changes).
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn set_view_level(level: &str) {
+    if let Ok(vl) =
+        serde_json::from_str::<ob_poc_types::galaxy::ViewLevel>(&format!("\"{level}\""))
+    {
+        state::LEVEL_MAILBOX.with(|m| {
+            *m.borrow_mut() = Some(vl);
+        });
+    }
+}
+
+/// Register a JS callback for canvas actions (drill, select, zoom, etc.).
+/// React calls this once after start_canvas(). The callback receives JSON-serialized ObservatoryAction.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn on_action(callback: js_sys::Function) {
+    state::ACTION_CALLBACK.with(|cb| {
+        *cb.borrow_mut() = Some(callback);
+    });
 }

@@ -1,30 +1,32 @@
-//! ObservatoryAction — all UI actions returned from panels/canvas.
+//! ObservatoryAction — all UI actions returned from the canvas.
 //!
-//! Rule: panels return Option<ObservatoryAction>. Never callbacks.
-//! The app loop processes actions — panels don't know what happens next.
+//! Rule: the canvas returns Option<ObservatoryAction>. Never callbacks.
+//! The app loop processes actions — the canvas doesn't know what happens next.
+//! All actions are serialized to JSON and forwarded to React via the on_action callback.
 
 use ob_poc_types::galaxy::ViewLevel;
+use serde::Serialize;
 
-/// All possible UI actions.
-/// Semantic actions require server round-trip.
-/// Observation actions are local-only.
-#[derive(Debug, Clone)]
+/// All possible canvas actions.
+/// Semantic actions require React to trigger a server round-trip.
+/// Observation actions are handled locally by the canvas app.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ObservatoryAction {
-    // ── Semantic (server round-trip required) ─────────────────
-    /// Drill into a node — opens deeper level. Server returns new orientation + scene.
-    Drill { node_id: String, target_level: ViewLevel },
-    /// Semantic zoom out — go up one level. NOT visual zoom.
+    // ── Semantic (forwarded to React for server round-trip) ────
+    /// Drill into a node — opens deeper level.
+    Drill {
+        node_id: String,
+        target_level: ViewLevel,
+    },
+    /// Semantic zoom out — go up one level.
     SemanticZoomOut,
-    /// Navigate to a history entry (server-authored OrientationContract).
+    /// Navigate to a history entry.
     NavigateHistory { index: usize },
     /// Invoke a maintenance or navigation verb.
     InvokeVerb { verb_fqn: String },
-    /// Change lens (overlay, depth probe, cluster mode).
-    SetLens { overlay_draft: Option<String> },
-    /// Refresh all data from server.
-    RefreshData,
 
-    // ── Observation frame (local only, no server) ────────────
+    // ── Observation frame (local only, no server) ─────────────
     /// Visual zoom — camera scale only. NOT semantic.
     VisualZoom { delta: f32 },
     /// Pan camera.
@@ -39,16 +41,4 @@ pub enum ObservatoryAction {
     ClearAnchor,
     /// Reset camera to default position.
     ResetView,
-
-    // ── UI mode ──────────────────────────────────────────────
-    /// Switch tab (Observe / Mission Control).
-    SwitchTab { tab: Tab },
-}
-
-/// Active tab in the observatory.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Tab {
-    #[default]
-    Observe,
-    MissionControl,
 }

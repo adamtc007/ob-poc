@@ -70,40 +70,9 @@ fn observatory_wasm_dir() -> String {
     format!("{}/../../observatory-wasm/pkg", manifest_dir)
 }
 
-/// Serve the Observatory HTML host page.
-/// The HTML loads the WASM module from /observatory/pkg/.
-async fn serve_observatory_html() -> impl axum::response::IntoResponse {
-    let html = r#"<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Observatory — SemOS</title>
-    <style>
-        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0f172a; }
-        canvas { width: 100%; height: 100%; }
-        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #94a3b8; font-family: system-ui, sans-serif; font-size: 16px; }
-    </style>
-</head>
-<body>
-    <div id="loading">Loading Observatory...</div>
-    <canvas id="observatory_canvas"></canvas>
-    <script type="module">
-        import init, { start_observatory } from '/observatory/pkg/observatory_wasm.js';
-        async function main() {
-            await init();
-            document.getElementById('loading').remove();
-            await start_observatory();
-        }
-        main().catch(e => {
-            document.getElementById('loading').textContent = 'Failed to load: ' + e;
-            console.error(e);
-        });
-    </script>
-</body>
-</html>"#;
-    axum::response::Html(html)
-}
+// Observatory HTML host page removed — egui canvas is now embedded in the React shell.
+// React route `/observatory/:sessionId` loads the WASM module via ConstellationCanvas component.
+// WASM assets are still served at /observatory/pkg/ (see below).
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -1080,9 +1049,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/observatory/pkg",
             ServeDir::new(observatory_wasm_dir()),
         )
-        // Observatory HTML host (separate browser tab)
-        .route("/observatory", get(serve_observatory_html))
-        .route("/observatory/:session_id", get(serve_observatory_html))
+        // Observatory route handled by React SPA (fallback serves index.html)
         // Index.html at root (React app)
         .route("/", get(routes::static_files::serve_index))
         // SPA fallback: serve index.html for client-side routing

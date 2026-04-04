@@ -482,18 +482,17 @@ The Observatory renders as a standalone egui/eframe WASM application in a separa
 | `domain_ops/navigation_ops.rs` | 7 nav.* verb handlers (plugin ops) |
 | `config/verbs/navigation.yaml` | 7 nav.* verb YAML definitions |
 
-### egui WASM Application (Phases 2-3)
+### Architecture: React Shell + egui Canvas
 
-**Crate:** `observatory-wasm/` (repo root, not under `rust/`)
-**Build:** `cd observatory-wasm && wasm-pack build --target web --release`
-**Depends on:** `ob-poc-types` only (no sem_os_core — avoids tokio/prost WASM blockers)
+**React shell** (`ob-poc-ui-react/src/features/observatory/`): LocationHeader, Breadcrumbs, ViewportRenderer (Focus/Object/Diff/Gates), ActionPalette, MissionControl, ConstellationCanvas wrapper. All typed via `types/observatory.ts`.
 
-Architecture: three-layer state separation:
-- **Semantic state** (server-authoritative): OrientationContract, ShowPacket, GraphSceneModel — fetched via REST
-- **Observation frame** (client-owned): camera (zoom, pan, target), anchor node — local spring interpolation
-- **Interaction state** (ephemeral): hovered/selected nodes — per-frame only
+**egui canvas** (`observatory-wasm/`, repo root): constellation renderer only, embedded in React via `<canvas>` element + wasm-bindgen.
+- **Build:** `cd observatory-wasm && wasm-pack build --target web --release`
+- **Depends on:** `ob-poc-types` only (no sem_os_core — avoids tokio/prost WASM blockers)
+- **API:** `start_canvas(id)`, `set_scene(json)`, `set_view_level(level)`, `on_action(callback)`
+- React pushes GraphSceneModel → egui renders → egui fires ObservatoryAction → React handles
 
-5 level renderers: Universe (force-directed clusters), Cluster (bounded CBU nodes), System (deterministic orbital), Planet (entity relationship graph), Core (tree/DAG ownership chains).
+5 level renderers: Universe (force-directed clusters), Cluster (bounded CBU nodes), System (deterministic orbital with edge rendering), Planet (entity relationship graph), Core (tree/DAG ownership chains).
 
 ### ShowPacket.orientation
 

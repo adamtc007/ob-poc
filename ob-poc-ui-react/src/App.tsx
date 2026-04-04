@@ -7,6 +7,7 @@ import { DealPage } from "./features/deal/DealPage";
 import { InspectorPage } from "./features/inspector/InspectorPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ViewportPage } from "./features/viewport/ViewportPage";
+import { ObservatoryPage } from "./features/observatory/ObservatoryPage";
 
 function App() {
   return (
@@ -74,6 +75,14 @@ function App() {
                 element={
                   <ErrorBoundary>
                     <DealPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="observatory/:sessionId"
+                element={
+                  <ErrorBoundary>
+                    <ObservatoryPage />
                   </ErrorBoundary>
                 }
               />

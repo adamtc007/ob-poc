@@ -10,14 +10,14 @@ use egui::{Color32, Painter, Pos2, Stroke, Vec2};
 
 use ob_poc_types::graph_scene::{GraphSceneModel, SceneEdge, SceneNode, SceneNodeType};
 
-use crate::state::ObservatoryState;
+use crate::state::CanvasApp;
 
 /// Paint System-level constellation: central CBU + orbital entity slots.
 pub fn paint(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     scene: &GraphSceneModel,
-    state: &ObservatoryState,
+    app: &CanvasApp,
 ) {
     let nodes = &scene.nodes;
     let edges = &scene.edges;
@@ -31,19 +31,19 @@ pub fn paint(
 
     // ── Paint edges first (below nodes) ──
     for edge in edges {
-        paint_edge(painter, transform, edge, &positions);
+        paint_edge(painter, transform, edge, nodes, &positions);
     }
 
     // ── Paint nodes ──
     for (i, node) in nodes.iter().enumerate() {
         let (x, y) = positions[i];
         let screen_pos = transform.transform_pos(Pos2::new(x, y));
-        let is_selected = state
+        let is_selected = app
             .interaction
             .selected_node
             .as_deref()
             == Some(&node.id);
-        let is_hovered = state
+        let is_hovered = app
             .interaction
             .hovered_node
             .as_deref()
@@ -164,13 +164,44 @@ fn paint_edge(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     edge: &SceneEdge,
+    nodes: &[SceneNode],
     positions: &[(f32, f32)],
 ) {
-    // Find source and target positions by index (simplified — in production, use a HashMap)
-    // For now, edges reference node IDs but positions are by index
-    // This will be improved when SceneCache stores id→position mapping
-    let _ = (painter, transform, edge, positions);
-    // TODO: Phase 5 — edge rendering with proper id→position lookup
+    // Look up source and target positions by node ID
+    let src_idx = nodes.iter().position(|n| n.id == edge.source);
+    let tgt_idx = nodes.iter().position(|n| n.id == edge.target);
+
+    let (Some(si), Some(ti)) = (src_idx, tgt_idx) else {
+        return;
+    };
+
+    let src_pos = transform.transform_pos(Pos2::new(positions[si].0, positions[si].1));
+    let tgt_pos = transform.transform_pos(Pos2::new(positions[ti].0, positions[ti].1));
+
+    let edge_color = match edge.edge_type {
+        ob_poc_types::graph_scene::SceneEdgeType::Dependency => Color32::from_rgb(245, 158, 11), // amber
+        ob_poc_types::graph_scene::SceneEdgeType::Ownership => Color32::from_rgb(139, 92, 246),  // purple
+        ob_poc_types::graph_scene::SceneEdgeType::Control => Color32::from_rgb(59, 130, 246),    // blue
+        _ => Color32::from_rgb(71, 85, 105), // slate
+    };
+
+    let stroke_width = (edge.weight * 1.5).clamp(0.5, 3.0);
+    painter.line_segment([src_pos, tgt_pos], Stroke::new(stroke_width, edge_color));
+
+    // Edge label at midpoint
+    if let Some(ref label) = edge.label {
+        let mid = Pos2::new(
+            (src_pos.x + tgt_pos.x) / 2.0,
+            (src_pos.y + tgt_pos.y) / 2.0,
+        );
+        painter.text(
+            mid,
+            egui::Align2::CENTER_CENTER,
+            label,
+            egui::FontId::proportional(9.0),
+            Color32::from_rgb(148, 163, 184),
+        );
+    }
 }
 
 /// Color for a node based on its type and state.

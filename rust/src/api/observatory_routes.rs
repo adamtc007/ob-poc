@@ -326,34 +326,22 @@ async fn get_graph_scene(
 }
 
 /// Attempt to hydrate a constellation for a CBU. Returns Err if no map found.
+///
+/// Uses the existing constellation runtime path (`handle_constellation_hydrate`)
+/// with the workspace default map name from `WorkspaceKind::Cbu`'s registry entry,
+/// rather than hardcoding jurisdiction-to-map selection.
 async fn try_hydrate_cbu(
     pool: &sqlx::PgPool,
     cbu_id: Uuid,
 ) -> anyhow::Result<crate::sem_os_runtime::constellation_runtime::HydratedConstellation> {
-    use crate::sem_os_runtime::constellation_runtime;
+    use crate::repl::types_v2::WorkspaceKind;
+    use crate::sem_os_runtime::constellation_runtime::handle_constellation_hydrate;
 
-    // Try to find the constellation map for this CBU's structure type
-    // First, look up the CBU's jurisdiction to pick the right map
-    let jurisdiction: Option<String> = sqlx::query_scalar(
-        "SELECT jurisdiction FROM \"ob-poc\".client_business_units WHERE id = $1"
-    )
-    .bind(cbu_id)
-    .fetch_optional(pool)
-    .await?;
+    let default_map = WorkspaceKind::Cbu
+        .registry_entry()
+        .default_constellation_map;
 
-    let map_name = match jurisdiction.as_deref() {
-        Some("LU") => "struct.lux.ucits.sicav",
-        Some("IE") => "struct.ie.icav",
-        Some("UK") => "struct.uk.oeic",
-        _ => "struct.lux.ucits.sicav", // Default
-    };
-
-    let map = constellation_runtime::load_builtin_constellation_map(map_name)
-        .map_err(|e| anyhow::anyhow!("No constellation map for {map_name}: {e}"))?;
-
-    constellation_runtime::hydrate_constellation(pool, cbu_id, None, &map)
-        .await
-        .map_err(|e| anyhow::anyhow!("{e}"))
+    handle_constellation_hydrate(pool, cbu_id, None, default_map).await
 }
 
 /// GET /api/observatory/session/:id/diagrams/:diagram_type

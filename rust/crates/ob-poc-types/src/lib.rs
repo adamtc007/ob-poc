@@ -28,6 +28,7 @@ pub mod investor_register;
 pub mod manco_group;
 pub mod narration;
 pub mod onboarding_state;
+pub mod orientation;
 pub mod resolution;
 pub mod semantic_stage;
 pub mod session_input;

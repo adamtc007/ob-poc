@@ -9,40 +9,39 @@ pub mod levels;
 use egui::{Ui, Vec2};
 
 use crate::actions::ObservatoryAction;
-use crate::state::ObservatoryState;
+use crate::state::CanvasApp;
 
 /// Render the central constellation canvas. Returns action on interaction.
-pub fn render(ui: &mut Ui, state: &ObservatoryState) -> Option<ObservatoryAction> {
+pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
     let available = ui.available_size();
     let (response, painter) =
         ui.allocate_painter(available, egui::Sense::click_and_drag());
 
-    // ── Background ──
-    painter.rect_filled(response.rect, 0.0, egui::Color32::from_rgb(15, 23, 42));
+    // ── Background (depth-encoded) ──
+    let depth_t = app.current_level as usize as f32 / 5.0;
+    let colors = ob_poc_types::galaxy::DepthColors::default();
+    let (r, g, b) = colors.color_at(depth_t);
+    painter.rect_filled(response.rect, 0.0, egui::Color32::from_rgb(r, g, b));
 
     // ── World-to-screen transform ──
-    let transform = world_to_screen(&state.camera, &response.rect);
+    let transform = world_to_screen(&app.camera, &response.rect);
 
     // ── Paint scene by level ──
-    if let Some(ref scene) = state.fetch.graph_scene.as_ready() {
-        levels::paint(&painter, &transform, scene, state);
+    if let Some(ref scene) = app.scene {
+        levels::paint(&painter, &transform, scene, app);
     } else {
         // No scene loaded — show placeholder
         painter.text(
             response.rect.center(),
             egui::Align2::CENTER_CENTER,
-            if state.fetch.graph_scene.is_pending() {
-                "Loading constellation..."
-            } else {
-                "No constellation data"
-            },
+            "No constellation data",
             egui::FontId::proportional(16.0),
             egui::Color32::from_rgb(100, 116, 139),
         );
     }
 
     // ── Paint observation controls (overlays) ──
-    if let Some(ctrl_action) = controls::paint_controls(ui, &painter, &response.rect, state) {
+    if let Some(ctrl_action) = controls::paint_controls(ui, &painter, &response.rect, app) {
         return Some(ctrl_action);
     }
 
@@ -70,7 +69,7 @@ pub fn render(ui: &mut Ui, state: &ObservatoryState) -> Option<ObservatoryAction
     if response.clicked() || response.double_clicked() {
         if let Some(pointer_pos) = response.hover_pos() {
             let world_pos = transform.inverse().transform_pos(pointer_pos);
-            if let Some(ref scene) = state.fetch.graph_scene.as_ready() {
+            if let Some(ref scene) = app.scene {
                 if let Some(node_id) = hit_test(scene, world_pos) {
                     if response.double_clicked() {
                         // Semantic drill — requires server round-trip
@@ -105,20 +104,58 @@ fn world_to_screen(
 }
 
 /// Hit test: find the nearest scene node to a world-space point.
+/// Computes positions using the same orbital algorithm as the level renderers.
 fn hit_test(
     scene: &ob_poc_types::graph_scene::GraphSceneModel,
     world_pos: egui::Pos2,
 ) -> Option<String> {
-    let hit_radius = 30.0; // world-space radius
+    let hit_radius = 30.0;
+    let positions = compute_node_positions(&scene.nodes);
 
-    for node in &scene.nodes {
-        if let Some((nx, ny)) = node.position_hint {
-            let dist = ((world_pos.x - nx).powi(2) + (world_pos.y - ny).powi(2)).sqrt();
-            if dist < hit_radius {
-                return Some(node.id.clone());
+    let mut best: Option<(String, f32)> = None;
+    for (i, node) in scene.nodes.iter().enumerate() {
+        let (nx, ny) = positions[i];
+        let dist = ((world_pos.x - nx).powi(2) + (world_pos.y - ny).powi(2)).sqrt();
+        if dist < hit_radius {
+            if best.as_ref().map_or(true, |(_, d)| dist < *d) {
+                best = Some((node.id.clone(), dist));
             }
         }
     }
 
-    None
+    best.map(|(id, _)| id)
+}
+
+/// Compute node positions using the same orbital algorithm as the level renderers.
+/// First node at center, remaining in concentric rings.
+fn compute_node_positions(nodes: &[ob_poc_types::graph_scene::SceneNode]) -> Vec<(f32, f32)> {
+    use std::f32::consts::TAU;
+    let mut positions = Vec::with_capacity(nodes.len());
+
+    for (i, node) in nodes.iter().enumerate() {
+        // Use server-provided position_hint if available
+        if let Some(pos) = node.position_hint {
+            positions.push(pos);
+            continue;
+        }
+        // Otherwise compute orbital position (same as system.rs)
+        if i == 0 {
+            positions.push((0.0, 0.0));
+        } else {
+            let orbital_idx = i - 1;
+            let ring_capacity = 12;
+            let ring = orbital_idx / ring_capacity;
+            let idx_in_ring = orbital_idx % ring_capacity;
+            let total = nodes.len() - 1;
+            let nodes_in_ring = if (ring + 1) * ring_capacity <= total {
+                ring_capacity
+            } else {
+                total - ring * ring_capacity
+            };
+            let ring_radius = 200.0 + (ring as f32) * 150.0;
+            let angle = (idx_in_ring as f32 / nodes_in_ring as f32) * TAU - TAU / 4.0;
+            positions.push((angle.cos() * ring_radius, angle.sin() * ring_radius));
+        }
+    }
+    positions
 }

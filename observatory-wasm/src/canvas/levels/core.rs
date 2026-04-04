@@ -7,14 +7,14 @@ use egui::{Color32, Painter, Pos2, Stroke, Vec2};
 
 use ob_poc_types::graph_scene::{GraphSceneModel, SceneEdgeType};
 
-use crate::state::ObservatoryState;
+use crate::state::CanvasApp;
 
 /// Paint Core-level: ownership/control chains as top-down tree.
 pub fn paint(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     scene: &GraphSceneModel,
-    state: &ObservatoryState,
+    app: &CanvasApp,
 ) {
     // Edges with ownership percentages
     for edge in &scene.edges {
@@ -67,7 +67,7 @@ pub fn paint(
     for node in &scene.nodes {
         let (x, y) = node.position_hint.unwrap_or((0.0, 0.0));
         let screen_pos = transform.transform_pos(Pos2::new(x, y));
-        let is_selected = state.interaction.selected_node.as_deref() == Some(&node.id);
+        let is_selected = app.interaction.selected_node.as_deref() == Some(&node.id);
 
         let node_size = Vec2::new(120.0, 36.0);
         let node_rect = egui::Rect::from_center_size(screen_pos, node_size);

@@ -1,79 +1,24 @@
-//! ObservatoryState — root application state.
+//! Canvas-only state — scene, camera, interaction.
 //!
-//! Strict three-layer separation:
-//! - Semantic input: server-authored, read-only during render
-//! - Observation frame: client-owned camera/view state, no semantic meaning
-//! - Render cache: derived from semantic input + observation frame, invalidated on change
+//! Scene data pushed from React via set_scene().
+//! Actions sent to React via on_action() callback.
+
+use std::cell::RefCell;
 
 use ob_poc_types::galaxy::ViewLevel;
 use ob_poc_types::graph_scene::GraphSceneModel;
 
-use crate::actions::Tab;
+// ── Thread-local mailboxes for React↔egui communication ──
 
-// ── Semantic Input (server-authored) ─────────────────────────
-
-/// Orientation contract — the canonical answer to "where am I?"
-/// Deserialized from server JSON. Never modified by egui.
-pub type OrientationContract = serde_json::Value;
-
-/// ShowPacket with viewports. Deserialized from server JSON.
-pub type ShowPacket = serde_json::Value;
-
-/// Health metrics for Mission Control.
-#[derive(Debug, Clone, Default, serde::Deserialize)]
-pub struct HealthMetrics {
-    pub pending_changesets: i64,
-    pub stale_dryruns: i64,
-    pub active_snapshots: i64,
-    pub archived_changesets: i64,
-    pub embedding_freshness_hours: Option<f64>,
-    pub outbox_depth: Option<i64>,
+thread_local! {
+    pub static SCENE_MAILBOX: RefCell<Option<GraphSceneModel>> = RefCell::new(None);
+    pub static LEVEL_MAILBOX: RefCell<Option<ViewLevel>> = RefCell::new(None);
+    pub static ACTION_CALLBACK: RefCell<Option<js_sys::Function>> = RefCell::new(None);
 }
 
-// ── Async Fetch State ────────────────────────────────────────
-
-/// Generic async slot: tracks fetch lifecycle.
-#[derive(Debug, Clone)]
-pub enum AsyncSlot<T> {
-    Empty,
-    Pending,
-    Ready(T),
-    Error(String),
-}
-
-impl<T> Default for AsyncSlot<T> {
-    fn default() -> Self {
-        Self::Empty
-    }
-}
-
-impl<T> AsyncSlot<T> {
-    pub fn is_pending(&self) -> bool {
-        matches!(self, Self::Pending)
-    }
-
-    pub fn as_ready(&self) -> Option<&T> {
-        match self {
-            Self::Ready(v) => Some(v),
-            _ => None,
-        }
-    }
-}
-
-/// All in-flight or completed fetches.
-#[derive(Default)]
-pub struct FetchState {
-    pub orientation: AsyncSlot<OrientationContract>,
-    pub show_packet: AsyncSlot<ShowPacket>,
-    pub graph_scene: AsyncSlot<GraphSceneModel>,
-    pub health: AsyncSlot<HealthMetrics>,
-}
-
-// ── Observation Frame (client-owned) ─────────────────────────
+// ── Observation Frame (client-owned) ──
 
 /// Client-owned camera state. NO semantic meaning.
-/// Zoom, pan, anchor do NOT change the semantic struct.
-/// Uses spring interpolation: current values lerp toward target values.
 #[derive(Debug, Clone)]
 pub struct ObservationFrame {
     pub zoom: f32,
@@ -102,7 +47,6 @@ impl Default for ObservationFrame {
 }
 
 impl ObservationFrame {
-    /// Whether the camera is still interpolating toward its target.
     pub fn is_animating(&self) -> bool {
         let eps = 0.01;
         (self.zoom - self.target_zoom).abs() > eps
@@ -111,71 +55,122 @@ impl ObservationFrame {
     }
 }
 
-// ── Interaction State (ephemeral) ────────────────────────────
+// ── Interaction State (ephemeral) ──
 
-/// Per-frame interaction state. NOT semantic focus.
 #[derive(Debug, Clone, Default)]
 pub struct InteractionState {
-    /// Hovered node (visual only).
     pub hovered_node: Option<String>,
-    /// Selected node (visual only — NOT semantic focus).
     pub selected_node: Option<String>,
 }
 
-// ── Render Cache ─────────────────────────────────────────────
+// ── Canvas App (eframe::App) ──
 
-/// Cached layout data. Invalidated when scene generation changes.
-#[derive(Debug, Clone, Default)]
-pub struct SceneCache {
-    /// Generation counter of the GraphSceneModel this cache was built from.
-    pub source_generation: u64,
-    /// Computed node positions (node_id → (x, y)).
-    pub node_positions: Vec<(String, f32, f32)>,
-    /// Whether the cache needs rebuilding.
-    pub dirty: bool,
-}
-
-impl SceneCache {
-    /// Check if cache is valid for the given scene generation.
-    pub fn is_valid_for(&self, generation: u64) -> bool {
-        !self.dirty && self.source_generation == generation
-    }
-
-    /// Mark cache as needing rebuild.
-    pub fn invalidate(&mut self) {
-        self.dirty = true;
-    }
-}
-
-// ── Root State ───────────────────────────────────────────────
-
-/// Root application state. Owned by the eframe::App.
-/// Three-layer separation enforced by field grouping.
-#[derive(Default)]
-pub struct ObservatoryState {
-    // ── Semantic input (server-authored) ──
-    pub fetch: FetchState,
-    pub navigation_history: Vec<OrientationContract>,
-
-    // ── Async fetch mailbox (ehttp callbacks write here) ──
-    pub mailbox: crate::fetch::FetchMailbox,
-
-    // ── Observation frame (client-owned) ──
-    pub camera: ObservationFrame,
-
-    // ── Interaction (ephemeral) ──
-    pub interaction: InteractionState,
-
-    // ── Render cache ──
-    pub scene_cache: SceneCache,
-
-    // ── UI mode ──
-    pub active_tab: Tab,
-
-    // ── Session identity ──
-    pub session_id: String,
-    pub base_url: String,
-
-    // ── View level (derived from orientation, cached for quick access) ──
+/// Minimal eframe::App — just the constellation canvas.
+/// All structural UI (headers, viewports, dashboard) lives in React.
+pub struct CanvasApp {
+    pub scene: Option<GraphSceneModel>,
     pub current_level: ViewLevel,
+    pub camera: ObservationFrame,
+    pub interaction: InteractionState,
+}
+
+impl Default for CanvasApp {
+    fn default() -> Self {
+        Self {
+            scene: None,
+            current_level: ViewLevel::default(),
+            camera: ObservationFrame::default(),
+            interaction: InteractionState::default(),
+        }
+    }
+}
+
+impl eframe::App for CanvasApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // ── 1. Process mailbox (React → egui) ──
+        SCENE_MAILBOX.with(|m| {
+            if let Some(scene) = m.borrow_mut().take() {
+                self.scene = Some(scene);
+            }
+        });
+        LEVEL_MAILBOX.with(|m| {
+            if let Some(level) = m.borrow_mut().take() {
+                self.current_level = level;
+            }
+        });
+
+        // ── 2. Tick camera animation ──
+        let dt = ctx.input(|i| i.predicted_dt);
+        let lerp = 8.0 * dt;
+        self.camera.pan_x += (self.camera.target_pan_x - self.camera.pan_x) * lerp;
+        self.camera.pan_y += (self.camera.target_pan_y - self.camera.pan_y) * lerp;
+        self.camera.zoom += (self.camera.target_zoom - self.camera.zoom) * lerp;
+
+        if self.camera.is_animating() {
+            ctx.request_repaint();
+        }
+
+        // ── 3. Render canvas (full panel, no shell chrome) ──
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE)
+            .show(ctx, |ui| {
+                if let Some(action) = crate::canvas::render(ui, self) {
+                    self.process_action(action, ctx);
+                }
+            });
+    }
+}
+
+impl CanvasApp {
+    fn process_action(&mut self, action: crate::actions::ObservatoryAction, ctx: &egui::Context) {
+        use crate::actions::ObservatoryAction;
+
+        match &action {
+            // ── Observation frame (local only) ──
+            ObservatoryAction::VisualZoom { delta } => {
+                let factor = (delta * 0.002).exp();
+                self.camera.target_zoom = (self.camera.target_zoom * factor).clamp(0.05, 10.0);
+                ctx.request_repaint();
+            }
+            ObservatoryAction::Pan { dx, dy } => {
+                let z = self.camera.zoom;
+                self.camera.target_pan_x -= dx / z;
+                self.camera.target_pan_y -= dy / z;
+                ctx.request_repaint();
+            }
+            ObservatoryAction::SelectNode { node_id } => {
+                self.interaction.selected_node = Some(node_id.clone());
+            }
+            ObservatoryAction::DeselectNode => {
+                self.interaction.selected_node = None;
+            }
+            ObservatoryAction::AnchorNode { node_id } => {
+                self.camera.anchor_node_id = Some(node_id.clone());
+            }
+            ObservatoryAction::ClearAnchor => {
+                self.camera.anchor_node_id = None;
+            }
+            ObservatoryAction::ResetView => {
+                self.camera = ObservationFrame::default();
+                ctx.request_repaint();
+            }
+            // ── Semantic actions → forward to React via callback ──
+            _ => {}
+        }
+
+        // Forward ALL actions to React via JS callback (React decides what's semantic)
+        #[cfg(target_arch = "wasm32")]
+        {
+            ACTION_CALLBACK.with(|cb| {
+                if let Some(ref func) = *cb.borrow() {
+                    if let Ok(json) = serde_json::to_string(&action) {
+                        let _ = func.call1(
+                            &wasm_bindgen::JsValue::NULL,
+                            &wasm_bindgen::JsValue::from_str(&json),
+                        );
+                    }
+                }
+            });
+        }
+    }
 }

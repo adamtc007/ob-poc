@@ -420,9 +420,9 @@ export function ChatPage() {
                 {showRunbookPlan ? "Hide Plan" : "Compile Plan"}
               </button>
               <button
-                onClick={() => window.open(`/observatory/${sessionId}`, '_blank')}
+                onClick={() => navigate(`/observatory/${sessionId}`)}
                 className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-secondary)]"
-                title="Open Observatory in new tab"
+                title="Open Observatory"
               >
                 <Telescope size={14} />
                 Observatory

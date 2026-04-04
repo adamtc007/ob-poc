@@ -6,7 +6,7 @@
 use egui::{Color32, Painter, Pos2, Rect, Stroke, Vec2};
 
 use crate::actions::ObservatoryAction;
-use crate::state::ObservatoryState;
+use crate::state::CanvasApp;
 
 /// Paint observation controls as overlays on the canvas.
 /// Returns action if user interacts with a control.
@@ -14,7 +14,7 @@ pub fn paint_controls(
     _ui: &egui::Ui,
     painter: &Painter,
     canvas_rect: &Rect,
-    state: &ObservatoryState,
+    app: &CanvasApp,
 ) -> Option<ObservatoryAction> {
     let action = None;
 
@@ -23,25 +23,25 @@ pub fn paint_controls(
     painter.text(
         zoom_pos,
         egui::Align2::LEFT_BOTTOM,
-        format!("{:.0}%", state.camera.zoom * 100.0),
+        format!("{:.0}%", app.camera.zoom * 100.0),
         egui::FontId::monospace(10.0),
         Color32::from_rgb(148, 163, 184),
     );
 
     // ── Anchor indicator (bottom-left, above zoom) ──
-    if let Some(ref anchor_id) = state.camera.anchor_node_id {
+    if let Some(ref anchor_id) = app.camera.anchor_node_id {
         let anchor_pos = Pos2::new(canvas_rect.left() + 12.0, canvas_rect.bottom() - 28.0);
         painter.text(
             anchor_pos,
             egui::Align2::LEFT_BOTTOM,
-            format!("⚓ {anchor_id}"),
+            format!("Anchor: {anchor_id}"),
             egui::FontId::proportional(10.0),
             Color32::from_rgb(245, 158, 11),
         );
     }
 
     // ── Selected node indicator (bottom-right) ──
-    if let Some(ref selected) = state.interaction.selected_node {
+    if let Some(ref selected) = app.interaction.selected_node {
         let sel_pos = Pos2::new(canvas_rect.right() - 12.0, canvas_rect.bottom() - 12.0);
         painter.text(
             sel_pos,
@@ -76,7 +76,7 @@ pub fn paint_controls(
     );
 
     // Minimap: show node dots
-    if let Some(ref scene) = state.fetch.graph_scene.as_ready() {
+    if let Some(ref scene) = app.scene {
         let scene_bounds = compute_scene_bounds(scene);
         if scene_bounds.width() > 0.0 && scene_bounds.height() > 0.0 {
             let mini_transform =
@@ -90,7 +90,7 @@ pub fn paint_controls(
             }
 
             // Viewport indicator on minimap
-            let cam = &state.camera;
+            let cam = &app.camera;
             let vp_size = Vec2::splat(200.0 / cam.zoom);
             let vp_rect = Rect::from_center_size(Pos2::new(cam.pan_x, cam.pan_y), vp_size);
             let mini_vp = Rect::from_min_max(

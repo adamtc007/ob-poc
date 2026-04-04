@@ -2,7 +2,7 @@
 name = "observatory-wasm"
 version = "0.1.0"
 edition = "2021"
-description = "Observatory — egui/eframe WASM application for SemOS visual rendering"
+description = "Observatory — egui constellation canvas, embedded in React shell via WASM"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -24,9 +24,6 @@ web-sys = { version = "0.3", features = ["Window", "Document", "Location", "Html
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
-# HTTP client for WASM
-ehttp = "0.5"
 
 # Logging
 log = "0.4"
