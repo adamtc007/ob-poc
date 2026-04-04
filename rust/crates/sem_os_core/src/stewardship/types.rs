@@ -554,6 +554,10 @@ pub struct ShowPacket {
     pub deltas: Option<Vec<ViewportDelta>>,
     pub narrative: Option<String>,
     pub next_actions: Vec<SuggestedAction>,
+    /// Observatory orientation contract — projected from existing resolution state.
+    /// Present when the Observatory UI is active.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub orientation: Option<crate::observatory::orientation::OrientationContract>,
 }
 
 // ─── SuggestedAction (§9.14.4) ────────────────────────────────

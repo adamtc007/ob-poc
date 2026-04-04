@@ -26,7 +26,8 @@ use crate::state::AppState;
 use ob_poc::api::{
     control_routes, create_agent_router_with_semantic_and_repl, create_attribute_router,
     create_client_router, create_constellation_router, create_deal_router,
-    create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
+    create_dsl_viewer_router, create_entity_router, create_graph_router,
+    observatory_routes::create_observatory_router, create_resolution_router,
     create_scoped_entity_router, create_session_graph_router, create_session_store,
     create_stewardship_router, create_taxonomy_router, create_trading_matrix_router,
     create_universe_router, service_resource_router,
@@ -53,6 +54,56 @@ use entity_gateway::{
     server::EntityGatewayService,
     GatewayConfig,
 };
+
+/// Locate the observatory-wasm/pkg directory.
+fn observatory_wasm_dir() -> String {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let candidates = [
+        format!("{}/../../observatory-wasm/pkg", manifest_dir),
+        format!("{}/../../../observatory-wasm/pkg", manifest_dir),
+    ];
+    for candidate in &candidates {
+        if std::path::Path::new(candidate).exists() {
+            return candidate.clone();
+        }
+    }
+    format!("{}/../../observatory-wasm/pkg", manifest_dir)
+}
+
+/// Serve the Observatory HTML host page.
+/// The HTML loads the WASM module from /observatory/pkg/.
+async fn serve_observatory_html() -> impl axum::response::IntoResponse {
+    let html = r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observatory — SemOS</title>
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0f172a; }
+        canvas { width: 100%; height: 100%; }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #94a3b8; font-family: system-ui, sans-serif; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading Observatory...</div>
+    <canvas id="observatory_canvas"></canvas>
+    <script type="module">
+        import init, { start_observatory } from '/observatory/pkg/observatory_wasm.js';
+        async function main() {
+            await init();
+            document.getElementById('loading').remove();
+            await start_observatory();
+        }
+        main().catch(e => {
+            document.getElementById('loading').textContent = 'Failed to load: ' + e;
+            console.error(e);
+        });
+    </script>
+</body>
+</html>"#;
+    axum::response::Html(html)
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -969,7 +1020,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(service_resource_router(pool.clone()))
         // CBU session management superseded by REPL V2 unified pipeline
         // Stewardship routes (focus, show loop, SSE, manifests)
-        .merge(create_stewardship_router(pool.clone()));
+        .merge(create_stewardship_router(pool.clone()))
+        // Observatory routes (orientation, show-packet, navigation history)
+        .nest("/api/observatory", create_observatory_router(pool.clone(), sessions.clone()));
 
     // React dist directory - serve assets from React build
     let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {
@@ -1022,6 +1075,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/vite.svg",
             ServeFile::new(format!("{}/vite.svg", react_dist_dir)),
         )
+        // Observatory WASM assets (served from observatory-wasm/pkg/)
+        .nest_service(
+            "/observatory/pkg",
+            ServeDir::new(observatory_wasm_dir()),
+        )
+        // Observatory HTML host (separate browser tab)
+        .route("/observatory", get(serve_observatory_html))
+        .route("/observatory/:session_id", get(serve_observatory_html))
         // Index.html at root (React app)
         .route("/", get(routes::static_files::serve_index))
         // SPA fallback: serve index.html for client-side routing

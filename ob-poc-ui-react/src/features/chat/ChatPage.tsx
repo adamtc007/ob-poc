@@ -5,7 +5,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useCallback, useMemo, useState } from "react";
-import { Loader2, BookOpen } from "lucide-react";
+import { Loader2, BookOpen, Telescope } from "lucide-react";
 import { chatApi } from "../../api/chat";
 import { scopeApi, type CbuSummary } from "../../api/scope";
 import { isSessionMissingError } from "../../api/sessionStorage";
@@ -409,7 +409,7 @@ export function ChatPage() {
             onPromptAgent={handleSend}
           />
 
-          {/* Runbook plan controls */}
+          {/* Runbook plan + Observatory controls */}
           {sessionId && (
             <div className="flex items-center gap-2 border-t border-[var(--border-primary)] px-3 py-2">
               <button
@@ -418,6 +418,14 @@ export function ChatPage() {
               >
                 <BookOpen size={14} />
                 {showRunbookPlan ? "Hide Plan" : "Compile Plan"}
+              </button>
+              <button
+                onClick={() => window.open(`/observatory/${sessionId}`, '_blank')}
+                className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-secondary)]"
+                title="Open Observatory in new tab"
+              >
+                <Telescope size={14} />
+                Observatory
               </button>
             </div>
           )}

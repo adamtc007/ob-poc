@@ -1,0 +1,185 @@
+# Navigation verbs — registered in SemOS verb registry.
+# Same resolution pipeline as domain verbs. Same governance enforcement.
+# Observatory navigation produces identical workspace stack transitions as REPL commands.
+
+domains:
+  nav:
+    description: |
+      Observatory navigation verbs. Semantic navigation (drill, zoom-out, select)
+      produces workspace stack transitions. Observation controls (camera, lens)
+      are client-only and never mutate semantic state.
+
+    verbs:
+      drill:
+        description: "Drill into a focused object — opens deeper level"
+        behavior: plugin
+        handler: NavDrillOp
+        invocation_phrases:
+          - "drill into"
+          - "zoom into"
+          - "open"
+          - "explore"
+          - "navigate to"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: navigation
+          tags: [navigation, drill]
+          subject_kinds: []
+          phase_tags: [navigation]
+          side_effects: state_write
+        args:
+          - name: target_id
+            type: string
+            required: true
+            description: "Node ID to drill into"
+          - name: target_level
+            type: string
+            required: false
+            description: "Target view level (cluster, system, planet, surface, core)"
+        returns:
+          type: record
+          fields: [success, message]
+
+      zoom-out:
+        description: "Semantic zoom out — go up one level"
+        behavior: plugin
+        handler: NavZoomOutOp
+        invocation_phrases:
+          - "zoom out"
+          - "go up"
+          - "back up"
+          - "step back"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: navigation
+          tags: [navigation, zoom]
+          subject_kinds: []
+          phase_tags: [navigation]
+          side_effects: state_write
+        args: []
+        returns:
+          type: record
+          fields: [success, message]
+
+      select:
+        description: "Set semantic focus to a specific entity or object"
+        behavior: plugin
+        handler: NavSelectOp
+        invocation_phrases:
+          - "select"
+          - "focus on"
+          - "look at"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: navigation
+          tags: [navigation, select]
+          subject_kinds: []
+          phase_tags: [navigation]
+          side_effects: state_write
+        args:
+          - name: target_id
+            type: string
+            required: true
+            description: "Entity or object ID to focus on"
+        returns:
+          type: record
+          fields: [success, message]
+
+      set-cluster-type:
+        description: "Change cluster grouping mode (jurisdiction, client, risk, product)"
+        behavior: plugin
+        handler: NavSetClusterTypeOp
+        invocation_phrases:
+          - "group by"
+          - "cluster by"
+          - "show by"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: navigation
+          tags: [navigation, cluster]
+          subject_kinds: []
+          phase_tags: [navigation]
+          side_effects: none
+        args:
+          - name: cluster_type
+            type: string
+            required: true
+            description: "One of: jurisdiction, client, risk, product"
+        returns:
+          type: void
+
+      set-lens:
+        description: "Change observation lens (overlay, depth probe, filters)"
+        behavior: plugin
+        handler: NavSetLensOp
+        invocation_phrases:
+          - "show drafts"
+          - "show active only"
+          - "show ownership"
+          - "show control"
+          - "overlay"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: navigation
+          tags: [navigation, lens]
+          subject_kinds: []
+          phase_tags: [navigation]
+          side_effects: none
+        args:
+          - name: overlay
+            type: string
+            required: false
+            description: "active_only or draft_overlay"
+          - name: depth_probe
+            type: string
+            required: false
+            description: "ownership, control, services, documents"
+        returns:
+          type: void
+
+      history-back:
+        description: "Navigate back in history — replay previous OrientationContract"
+        behavior: plugin
+        handler: NavHistoryBackOp
+        invocation_phrases:
+          - "back"
+          - "previous"
+          - "undo navigation"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: navigation
+          tags: [navigation, history]
+          subject_kinds: []
+          phase_tags: [navigation]
+          side_effects: state_write
+        args: []
+        returns:
+          type: record
+          fields: [direction, success]
+
+      history-forward:
+        description: "Navigate forward in history"
+        behavior: plugin
+        handler: NavHistoryForwardOp
+        invocation_phrases:
+          - "forward"
+          - "next"
+          - "redo navigation"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: navigation
+          tags: [navigation, history]
+          subject_kinds: []
+          phase_tags: [navigation]
+          side_effects: state_write
+        args: []
+        returns:
+          type: record
+          fields: [direction, success]

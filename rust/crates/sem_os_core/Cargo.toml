@@ -5,6 +5,7 @@ edition = "2021"
 description = "Semantic OS core — pure domain types, port traits, gate logic. Zero sqlx."
 
 [dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
 async-trait = "0.1"
 tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"

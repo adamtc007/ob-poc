@@ -11,6 +11,7 @@ pub mod gates;
 pub mod grounding;
 pub mod ids;
 pub mod macro_def;
+pub mod observatory;
 pub mod ports;
 pub mod principal;
 pub mod proto;

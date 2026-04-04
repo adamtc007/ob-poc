@@ -4,7 +4,7 @@
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*)
-> **Verbs:** 1,480+ canonical verbs (1,464 base + 16 cross-workspace), 24,587 intent patterns (DB-sourced)
+> **Verbs:** 1,487+ canonical verbs (1,464 base + 16 cross-workspace + 7 navigation), 24,587 intent patterns (DB-sourced)
 > **Macros:** 103 operator macros (22 YAML files, 18 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
 > **Latest schema addition:** `rust/migrations/20260403_compensation_records.sql`
@@ -271,6 +271,12 @@ ob-poc-ui-react/src/
 | `GET /api/session/:id/trace` | Session trace (append-only mutation log) |
 | `GET /api/session/:id/trace/:seq` | Single trace entry by sequence |
 | `POST /api/session/:id/trace/replay` | Replay trace (strict/relaxed/dry_run) |
+| `GET /api/observatory/session/:id/orientation` | OrientationContract for session |
+| `GET /api/observatory/session/:id/show-packet` | ShowPacket with orientation |
+| `GET /api/observatory/session/:id/graph-scene` | GraphSceneModel (constellation projection) |
+| `GET /api/observatory/session/:id/navigation-history` | OrientationContract sequence |
+| `GET /api/observatory/session/:id/diagrams/:type` | Mermaid diagram (erd, verb_flow, etc.) |
+| `GET /api/observatory/health` | SemReg health metrics |
 
 **Legacy (410 Gone):** `POST /chat`, `POST /decision/reply`, `POST /repl-input`, `POST /select-verb`
 
@@ -287,7 +293,7 @@ npm run build && npm run typecheck && npm run lint
 
 **Complete (✅):** React Migration (077), V2 REPL (7-state, 320 tests), Runbook Compilation, Candle Semantic Pipeline, Agent Pipeline + PolicyGate, Solar Navigation (038), Promotion Pipeline (043), Teaching (044), Client Group Resolver (048), Workflow Task Queue (049), Transactional Execution (050), CustomOp Auto-Registration (051), Client Group Research (055), REPL Viewport Feedback (056), Verb Disambiguation UI (057), Unified Architecture (058), Playbook System (059), LSP (060/063), CBU Structure Macros (064), Unified Lookup (074), Lexicon (072), Entity Linking (073), Clarification UX (075), Inspector-First (076), Deal Record & Fee Billing (067), BPMN-Lite (all phases incl. Phase 4 PostgresProcessStore + Phase 5A Inclusive Gateway), BPMN-Lite Integration (Phase B), BPMN-Lite Authoring (Phases B-D), KYC/UBO Skeleton (S1-S2), Semantic OS (Phases 0-9 + Standalone v1.1 + Stewardship Phase 0-1), Governed Registry Authoring (v0.4, migrations 099-102), CCIR + SessionVerbSurface, Loopback Calibration (v0.3), Onboarding State View, Verb Disambiguation UX, Constellation Orphan Remediation, SemOS Grounded Action Surface, Pipeline Leak Remediation, Sage Intent Skeleton (Phase 1), Entity-First Utterance Parsing, Coder Rewrite (Phase 2), Sage-Primary Chat Narration, SemTaxonomy Three-Step, NLCI CBU Cutover, CBU Role Surface Reconciliation, Phase 0 Vocabulary Rationalization (Batches 1-3), Schema Consolidation (115-121), Domain Metadata Coverage (306/306 tables), Scenario-Based Intent Resolution (Phases 0.5-5), AffinityGraph & Diagram Generation, Discovery Pipeline (Phase 2), Utterance API Coverage Harness, Unified Session Input Cutover, Workspace-Scoped REPL Navigation, SemOS Attribute DSL + Schema Cleanup, SemOS Footprint Hydration S6, SemOS Document Governance Bootstrap (122-123), StateGraph Pipeline (Phase 0-3 substrate), Session Stack Machine Runbook Architecture (R1-R9, migrations 125-128), Unified Session Pipeline (ADR 040 — tollgates enforced, 149/149 tests, response adapter, dead code removal -4,480 lines), Derived Attribute Persistence (D0-D12 — canonical two-table model, staleness propagation, CBU projection view), SemOS-First Hub Implementation (Phases 1-7 — AttributeDefBody complete, SemOS-first write path, materialization trigger, identity resolution inverted, 7 new verbs, SemOS Maintenance workspace), Sage Proactive Narration (ADR 043 — NarrationEngine, contextual query intercept, post-execution narration, NarrationPanel React component, narration boost signal, end-to-end wiring), Verb/Noun Separation (S-expression aligned — assemble-cbu macro_selector, analyse-ubo verb_selector, action stem extractor), Instrument Matrix Two-Stage (group template + CBU instance), Session Recovery (resume with fresh scope), Two-Tier Attribute Model (AttributeVisibility External/Internal, attribute.define-internal + attribute.update-internal, migration 130, operational-tier auto-approved), BPMN-Lite Durability Fixes (transaction atomicity via atomic_start/atomic_complete, job claim timeout + reclaim, tick_all orchestrator, dedupe cache TTL pruning, 3 background housekeeping tasks), Cross-Workspace State Consistency (P1-P10 — shared atom registry with lifecycle FSM, shared fact versioning, workspace fact refs with staleness propagation, constellation replay types, remediation events with FSM, external call idempotency envelope, provider capabilities, compensation records, YAML seeds for 5 initial atoms, platform DAG derivation; 12 shared-atom verbs + 4 remediation verbs, 8 migrations, 10 cross_workspace modules, 10 macros (8 shared-atom + 2 remediation incl. batch foreach), 6 scenario routes, 24 constellation slots)
 
-**In Progress / Parked (⚠️):** Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), StateGraph Phase 1 reconciliation (parked pending external correction table)
+**In Progress / Parked (⚠️):** Observatory (Phases 1-3 complete — Rust backend types/projection/routes, egui WASM crate with shell/panels/canvas/5 level renderers, wasm-pack builds; Phases 4-8 pending), Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), StateGraph Phase 1 reconciliation (parked pending external correction table)
 
 **Removed (❌):** V1 Staged Runbook (054), ESPER Navigation Crates (065 — retained for reference), ECIR / NounIndex (Tier -1 noun taxonomy — replaced by ConstellationVerbIndex + workspace pack constraints)
 
@@ -302,6 +308,9 @@ npm run build && npm run typecheck && npm run lint
 | `session.undo / redo`, `session.info / list` | History & state |
 | `view.universe / book / cbu` | Zoom levels |
 | `view.drill / surface / trace / xray / refine` | Navigation within CBU |
+| `nav.drill / zoom-out / select` | Observatory semantic navigation |
+| `nav.set-cluster-type / set-lens` | Observatory observation controls |
+| `nav.history-back / history-forward` | Observatory navigation history |
 
 All user input goes through unified `IntentPipeline` → `HybridVerbSearcher` → semantic match. No separate ESPER path.
 
@@ -359,6 +368,9 @@ ob-poc/
 ├── bpmn-lite/                  # Standalone BPMN orchestration (NOT inside rust/)
 │   ├── bpmn-lite-core/         # Core: types, compiler, VM, store, authoring
 │   └── bpmn-lite-server/       # gRPC server (tonic), proto definitions
+├── observatory-wasm/             # Observatory egui/eframe WASM app (separate browser tab)
+│   ├── src/                      # App shell, panels, canvas, level renderers
+│   └── pkg/                      # wasm-pack output (WASM + JS glue)
 ├── ob-poc-ui-react/            # React/TypeScript frontend (PRIMARY UI)
 │   ├── src/features/           # Chat, Inspector, Semantic OS, Settings
 │   └── dist/                   # Production build (served by Rust)
@@ -515,6 +527,7 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 | `schema` | 5 | Schema introspection |
 | `agent` | 4+ | Agent mode/policy, telemetry |
 | `sem_reg.*` | ~32 | Semantic Registry MCP tools |
+| `nav` | 7 | Observatory semantic navigation (drill, zoom, select, lens, history) |
 | `shared-atom` | 8+8 macros | Cross-workspace shared atom registry, replay, acknowledge, batch ops |
 | `remediation` | 4+2 macros | Remediation event lifecycle (defer, revoke, confirm, audit trail) |
 
@@ -533,6 +546,7 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 | Macros: operator vocabulary, expansion engine, MacroIndex, lint, composite macros, state DAG, pack mapping | `docs/annex-macros.md` |
 | Contracts, deals, billing, client groups, documents, entity linking, inspector, lexicon, lookup, playbooks, transactional execution | `docs/annex-domain-features.md` |
 | React frontend details, Zed extension, LSP, ob-agentic onboarding pipeline | `docs/annex-frontend-and-tools.md` |
+| Observatory: egui WASM app, OrientationContract, GraphSceneModel, navigation verbs | `docs/observatory-implementation-plan.md` |
 
 **Pre-existing annexes (unchanged):**
 
@@ -634,6 +648,9 @@ When you see these in a task, read the corresponding annex first:
 | "NarrationEngine", "NarrationPayload", "contextual query", "what's next", "suggested_next", "narration boost" | `rust/src/agent/narration_engine.rs`, `rust/crates/ob-poc-types/src/narration.rs` |
 | "VerbOutput", "verb output", "outputs declaration" | `rust/crates/sem_os_core/src/verb_contract.rs` |
 | "stack machine", "workspace stack", "writes_since_push", "is_peek" | `rust/src/repl/types_v2.rs`, `rust/src/repl/session_v2.rs` |
+| "observatory", "Observatory", "OrientationContract", "GraphSceneModel", "ViewLevel", "egui WASM" | `docs/observatory-implementation-plan.md` |
+| "nav.drill", "nav.zoom-out", "nav.select", "navigation verbs", "observation lens" | `rust/config/verbs/navigation.yaml`, `rust/src/domain_ops/navigation_ops.rs` |
+| "graph scene", "SceneNode", "SceneEdge", "LayoutStrategy", "DrillTarget" | `rust/crates/ob-poc-types/src/graph_scene.rs`, `rust/crates/sem_os_core/src/observatory/graph_scene_projection.rs` |
 
 ---
 

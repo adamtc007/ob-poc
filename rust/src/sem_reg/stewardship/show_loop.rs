@@ -66,6 +66,7 @@ impl ShowLoop {
             deltas: None,
             narrative: Self::generate_narrative(focus),
             next_actions,
+            orientation: None,
         })
     }
 

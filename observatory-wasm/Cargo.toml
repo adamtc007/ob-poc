@@ -1,0 +1,40 @@
+[package]
+name = "observatory-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "Observatory — egui/eframe WASM application for SemOS visual rendering"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Shared types (WASM-safe, no tokio/prost)
+ob-poc-types = { path = "../rust/crates/ob-poc-types" }
+
+# egui + eframe (glow backend — smaller WASM, WebGL, sufficient for 2D)
+egui = "0.33"
+eframe = { version = "0.33", default-features = false, features = ["glow"] }
+
+# WASM interop
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["Window", "Document", "Location", "HtmlCanvasElement", "Element", "console"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# HTTP client for WASM
+ehttp = "0.5"
+
+# Logging
+log = "0.4"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

@@ -47,18 +47,25 @@ pub enum AgentMode {
     /// Blocked: authoring verbs (propose, validate, dry_run, plan).
     #[default]
     Governed,
+
+    /// Maintenance plane: SemOS infrastructure operations.
+    ///
+    /// Allowed: maintenance.*, governance.*, registry.*, schema.*, focus.*,
+    /// audit.*, agent.*, changeset.*, authoring.* (full surface).
+    /// Blocked: business verbs (cbu.*, entity.*, trading-profile.*, etc.)
+    Maintenance,
 }
 
 impl AgentMode {
     /// Whether this mode allows authoring verbs (propose, validate, dry_run, plan).
     pub fn allows_authoring(&self) -> bool {
-        matches!(self, AgentMode::Research)
+        matches!(self, AgentMode::Research | AgentMode::Maintenance)
     }
 
     /// Whether this mode allows full db_introspect surface.
     /// Governed mode restricts to verify_table_exists and describe_table only.
     pub fn allows_full_introspect(&self) -> bool {
-        matches!(self, AgentMode::Research)
+        matches!(self, AgentMode::Research | AgentMode::Maintenance)
     }
 
     /// Whether this mode allows governed business verbs.
@@ -66,11 +73,17 @@ impl AgentMode {
         matches!(self, AgentMode::Governed)
     }
 
+    /// Whether this mode allows maintenance verbs.
+    pub fn allows_maintenance(&self) -> bool {
+        matches!(self, AgentMode::Maintenance | AgentMode::Governed)
+    }
+
     /// Parse from string (case-insensitive).
     pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "research" => Some(AgentMode::Research),
             "governed" => Some(AgentMode::Governed),
+            "maintenance" => Some(AgentMode::Maintenance),
             _ => None,
         }
     }
@@ -78,7 +91,7 @@ impl AgentMode {
     /// db_introspect subcommands allowed in this mode.
     pub fn allowed_introspect_subcommands(&self) -> &[&str] {
         match self {
-            AgentMode::Research => &[
+            AgentMode::Research | AgentMode::Maintenance => &[
                 "list_tables",
                 "describe_table",
                 "verify_table_exists",
@@ -114,6 +127,13 @@ impl AgentMode {
     /// - `changeset.*` — Research only (authoring), blocked in Governed
     /// - `governance.*`, `maintenance.*` — Governed only (pipeline/ops), blocked in Research
     /// - `authoring.*` — Research allows propose/validate/dry-run/plan/diff; Governed allows publish
+    /// Domain prefixes blocked in Maintenance mode (business-plane only).
+    const BUSINESS_ONLY_PREFIXES: &[&str] = &[
+        "cbu.", "entity.", "trading-profile.", "investor.", "custody.",
+        "deal.", "billing.", "contract.", "document.", "kyc.",
+        "screening.", "screening-ops.", "ownership.",
+    ];
+
     pub fn is_verb_allowed(&self, verb_fqn: &str) -> bool {
         let is_authoring = Self::AUTHORING_VERB_PREFIXES
             .iter()
@@ -146,6 +166,18 @@ impl AgentMode {
                 {
                     return false;
                 }
+                true
+            }
+            AgentMode::Maintenance => {
+                // Maintenance mode blocks business domain verbs
+                if Self::BUSINESS_ONLY_PREFIXES
+                    .iter()
+                    .any(|prefix| verb_fqn.starts_with(prefix))
+                {
+                    return false;
+                }
+                // Maintenance allows everything else: authoring, governance,
+                // maintenance, registry, schema, focus, audit, agent, changeset, nav
                 true
             }
         }

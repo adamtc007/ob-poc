@@ -23,6 +23,7 @@ pub mod control;
 pub mod decision;
 pub mod disambiguation;
 pub mod galaxy;
+pub mod graph_scene;
 pub mod investor_register;
 pub mod manco_group;
 pub mod narration;

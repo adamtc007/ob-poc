@@ -393,19 +393,22 @@ When no client group is loaded: `agent`, `audit`, `client-group`, `focus`, `glei
 
 ```rust
 pub enum AgentMode {
-    Research,    // Exploration, introspection, changeset authoring
+    Research,     // Exploration, introspection, changeset authoring
     #[default]
-    Governed,    // Validated business verbs, publishing
+    Governed,     // Validated business verbs, publishing
+    Maintenance,  // Full surface: maintenance.*, governance.*, registry.*, changeset.*, authoring.*
 }
 ```
 
-| Verb Category | Research | Governed |
-|---|---|---|
-| Business verbs (cbu.*, entity.*, kyc-case.*) | Blocked | Allowed (via SemReg) |
-| Authoring (authoring.propose, authoring.validate) | Allowed | Blocked |
-| Changeset (changeset.*, review, publish) | Allowed | Blocked (propose only) |
-| Introspection (db_introspect.*) | Full surface | verify + describe only |
-| Registry/schema/focus/audit/agent | Allowed | Allowed |
+| Verb Category | Research | Governed | Maintenance |
+|---|---|---|---|
+| Business verbs (cbu.*, entity.*, kyc-case.*) | Blocked | Allowed (via SemReg) | Blocked |
+| Authoring (authoring.propose, authoring.validate) | Allowed | Blocked | Allowed |
+| Changeset (changeset.*, review, publish) | Allowed | Blocked (propose only) | Allowed |
+| Introspection (db_introspect.*) | Full surface | verify + describe only | Full surface |
+| Registry/schema/focus/audit/agent | Allowed | Allowed | Allowed |
+| Maintenance (maintenance.*) | Blocked | Allowed | Allowed |
+| Navigation (nav.*) | Allowed | Allowed | Allowed |
 
 ---
 
@@ -457,6 +460,44 @@ pub enum ViewportKind {
     BreakingChanges,
 }
 ```
+
+---
+
+## Observatory — Visual Projection Layer
+
+**Plan:** `docs/observatory-implementation-plan.md`
+**Status:** Phases 1-3 complete, Phases 4-8 pending
+
+The Observatory renders as a standalone egui/eframe WASM application in a separate browser tab (`/observatory/:sessionId`). Chat UI remains React. Both tabs share the session ID and communicate via the same REST API.
+
+### Rust Backend (Phase 1)
+
+| File | Purpose |
+|---|---|
+| `sem_os_core/src/observatory/orientation.rs` | OrientationContract (6 questions: mode, level, focus, scope, lens, actions), ViewLevel (6 levels), EntryReason, OrientationDelta |
+| `sem_os_core/src/observatory/projection.rs` | `project_orientation()` — pure transform from ContextResolutionResponse + FocusState → OrientationContract |
+| `sem_os_core/src/observatory/graph_scene_projection.rs` | `project_graph_scene()` — HydratedConstellation → GraphSceneModel (layout strategy per ViewLevel) |
+| `ob-poc-types/src/graph_scene.rs` | WASM-safe types: GraphSceneModel, SceneNode, SceneEdge, LayoutStrategy, DrillTarget |
+| `api/observatory_routes.rs` | 6 REST endpoints under `/api/observatory/` |
+| `domain_ops/navigation_ops.rs` | 7 nav.* verb handlers (plugin ops) |
+| `config/verbs/navigation.yaml` | 7 nav.* verb YAML definitions |
+
+### egui WASM Application (Phases 2-3)
+
+**Crate:** `observatory-wasm/` (repo root, not under `rust/`)
+**Build:** `cd observatory-wasm && wasm-pack build --target web --release`
+**Depends on:** `ob-poc-types` only (no sem_os_core — avoids tokio/prost WASM blockers)
+
+Architecture: three-layer state separation:
+- **Semantic state** (server-authoritative): OrientationContract, ShowPacket, GraphSceneModel — fetched via REST
+- **Observation frame** (client-owned): camera (zoom, pan, target), anchor node — local spring interpolation
+- **Interaction state** (ephemeral): hovered/selected nodes — per-frame only
+
+5 level renderers: Universe (force-directed clusters), Cluster (bounded CBU nodes), System (deterministic orbital), Planet (entity relationship graph), Core (tree/DAG ownership chains).
+
+### ShowPacket.orientation
+
+`ShowPacket` carries an optional `orientation: Option<OrientationContract>` field. The show-packet endpoint populates it by calling `project_orientation()` after computing the base ShowPacket.
 
 ---
 
@@ -718,6 +759,12 @@ SEM_OS_DATABASE_URL="postgresql:///data_designer" SEM_OS_JWT_SECRET=dev-secret \
 | `rust/crates/sem_os_core/src/constellation_map_def.rs` | Slot + verb palette types |
 | `rust/crates/sem_os_core/src/state_machine_def.rs` | State machine types |
 | `rust/crates/sem_os_core/src/authoring/agent_mode.rs` | `AgentMode` + gating rules |
+| `rust/crates/sem_os_core/src/observatory/orientation.rs` | OrientationContract, ViewLevel, EntryReason types |
+| `rust/crates/sem_os_core/src/observatory/projection.rs` | `project_orientation()`, `compute_delta()` |
+| `rust/crates/sem_os_core/src/observatory/graph_scene_projection.rs` | `project_graph_scene()` — constellation → scene |
+| `rust/crates/ob-poc-types/src/graph_scene.rs` | GraphSceneModel, SceneNode (WASM-safe) |
+| `rust/src/api/observatory_routes.rs` | Observatory REST endpoints |
+| `rust/src/domain_ops/navigation_ops.rs` | nav.* verb handlers |
 | `rust/crates/sem_os_obpoc_adapter/src/scanner.rs` | Pure conversion functions |
 | `rust/crates/sem_os_obpoc_adapter/src/metadata.rs` | `DomainMetadata` loader |
 | `rust/config/sem_os_seeds/` | Universes, constellations, state machines, metadata |

@@ -58,6 +58,7 @@ mod kyc_case_ops;
 mod lifecycle_ops;
 mod manco_ops;
 mod matrix_overlay_ops;
+mod navigation_ops;
 mod observation_ops;
 mod onboarding;
 mod outreach_ops;
