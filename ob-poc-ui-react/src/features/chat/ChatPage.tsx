@@ -8,6 +8,8 @@ import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { Loader2, BookOpen, Telescope } from "lucide-react";
 import { chatApi } from "../../api/chat";
 import { scopeApi, type CbuSummary } from "../../api/scope";
+import { observatoryApi } from "../../api/observatory";
+import { FlightDeck } from "./components/FlightDeck";
 import { isSessionMissingError } from "../../api/sessionStorage";
 import { queryKeys, queryClient } from "../../lib/query";
 import { useChatStore } from "../../stores/chat";
@@ -54,6 +56,14 @@ export function ChatPage() {
     enabled: !!sessionId,
     retry: (failureCount, err) =>
       !isSessionMissingError(err) && failureCount < 2,
+  });
+
+  // Observatory orientation for Flight Deck
+  const { data: orientation } = useQuery({
+    queryKey: ["observatory", "orientation", sessionId],
+    queryFn: () => observatoryApi.getOrientation(sessionId!),
+    enabled: !!sessionId,
+    refetchInterval: 5000,
   });
 
   useEffect(() => {
@@ -312,6 +322,14 @@ export function ChatPage() {
 
       {/* Main chat area */}
       <div className="flex flex-1 flex-col">
+        {/* Flight Deck — Observatory control panel */}
+        {sessionId && (
+          <FlightDeck
+            orientation={orientation ?? null}
+            onSendMessage={(msg) => sendMutation.mutate(msg)}
+          />
+        )}
+
         {/* Messages */}
         <div className="flex-1 overflow-auto p-4">
           {isLoading ? (
