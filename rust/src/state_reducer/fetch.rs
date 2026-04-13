@@ -32,6 +32,25 @@ pub async fn fetch_slot_overlays(
     entity_id: Uuid,
     case_id: Option<Uuid>,
 ) -> Result<SlotOverlayData> {
+    match fetch_slot_overlays_inner(pool, cbu_id, entity_id, case_id).await {
+        Ok(data) => Ok(data),
+        Err(e) => {
+            tracing::warn!(error = %e, %cbu_id, %entity_id, "Overlay fetch failed — returning empty overlays");
+            Ok(SlotOverlayData {
+                sources: HashMap::new(),
+                scope: ScopeData { fields: serde_json::json!({}) },
+                slots: Vec::new(),
+            })
+        }
+    }
+}
+
+async fn fetch_slot_overlays_inner(
+    pool: &PgPool,
+    cbu_id: Uuid,
+    entity_id: Uuid,
+    case_id: Option<Uuid>,
+) -> Result<SlotOverlayData> {
     let mut data = SlotOverlayData {
         sources: HashMap::new(),
         scope: ScopeData {
@@ -53,7 +72,10 @@ pub async fn fetch_slot_overlays(
     .bind(entity_id)
     .fetch_all(pool)
     .await
-    .context("failed to fetch entity role overlays")?;
+    .unwrap_or_else(|e| {
+        tracing::warn!(error = %e, %cbu_id, %entity_id, "Failed to fetch entity role overlays — continuing with empty overlays");
+        Vec::new()
+    });
 
     if !entity_roles.is_empty() {
         data.sources.insert(
@@ -136,6 +158,25 @@ pub(crate) async fn fetch_slot_overlays_tx(
     entity_id: Uuid,
     case_id: Option<Uuid>,
 ) -> Result<SlotOverlayData> {
+    match fetch_slot_overlays_tx_inner(tx, cbu_id, entity_id, case_id).await {
+        Ok(data) => Ok(data),
+        Err(e) => {
+            tracing::warn!(error = %e, %cbu_id, %entity_id, "Overlay fetch (tx) failed — returning empty overlays");
+            Ok(SlotOverlayData {
+                sources: HashMap::new(),
+                scope: ScopeData { fields: serde_json::json!({}) },
+                slots: Vec::new(),
+            })
+        }
+    }
+}
+
+async fn fetch_slot_overlays_tx_inner(
+    tx: &mut Transaction<'_, Postgres>,
+    cbu_id: Uuid,
+    entity_id: Uuid,
+    case_id: Option<Uuid>,
+) -> Result<SlotOverlayData> {
     let mut data = SlotOverlayData {
         sources: HashMap::new(),
         scope: ScopeData {
@@ -157,7 +198,10 @@ pub(crate) async fn fetch_slot_overlays_tx(
     .bind(entity_id)
     .fetch_all(&mut **tx)
     .await
-    .context("failed to fetch entity role overlays")?;
+    .unwrap_or_else(|e| {
+        tracing::warn!(error = %e, %cbu_id, %entity_id, "Failed to fetch entity role overlays (tx) — continuing with empty overlays");
+        Vec::new()
+    });
 
     if !entity_roles.is_empty() {
         data.sources.insert(
