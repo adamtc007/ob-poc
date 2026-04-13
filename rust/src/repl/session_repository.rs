@@ -290,6 +290,13 @@ impl SessionRepositoryV2 {
                             .unwrap_or_else(|| serde_json::json!([])),
                     )
                     .context("Failed to deserialize execution_log")?,
+                    bindings: serde_json::from_value(
+                        extended_state
+                            .get("bindings")
+                            .cloned()
+                            .unwrap_or_else(|| serde_json::json!({})),
+                    )
+                    .context("Failed to deserialize bindings")?,
                     cbu_ids: serde_json::from_value(
                         extended_state
                             .get("cbu_ids")

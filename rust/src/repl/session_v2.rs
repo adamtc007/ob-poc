@@ -90,6 +90,12 @@ pub struct ReplSessionV2 {
     /// Results of executed plan steps.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub execution_log: Vec<crate::runbook::plan_types::StepResult>,
+    /// Symbol table for @reference resolution (`:as @myEntity` bindings).
+    /// Session-scoped — persists across workspace switches.
+    /// Synced from ExecutionContext.pending_session.bindings after verb execution.
+    #[serde(default)]
+    pub bindings: std::collections::HashMap<String, serde_json::Value>,
+
     /// CBU IDs in the current working set.
     /// Insertion-ordered Vec (not HashSet) because subject_id is set from
     /// the LAST entry (most recently created/loaded CBU).
@@ -158,6 +164,7 @@ impl ReplSessionV2 {
             runbook_plan: None,
             runbook_plan_cursor: None,
             execution_log: Vec::new(),
+            bindings: std::collections::HashMap::new(),
             cbu_ids: Vec::new(),
             name: None,
             created_at: now,

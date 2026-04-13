@@ -703,6 +703,38 @@ impl ReplOrchestratorV2 {
                         }
                     }
 
+                    // Sync constraint cascade from execution results.
+                    // Verb handlers like session.set-current-case/mandate/structure
+                    // mutate the pending UnifiedSession's constraint fields.
+                    // We sync relevant fields to the TOS WorkspaceFrame.
+                    for entry in &session.runbook.entries {
+                        if !matches!(entry.status, crate::repl::runbook::EntryStatus::Completed) {
+                            continue;
+                        }
+                        if let Some(ref result) = entry.result {
+                            let inner = result.get("Record").unwrap_or(result);
+                            // Sync case_id if present
+                            if let Some(case_id_str) = inner.get("case_id").and_then(|v| v.as_str()) {
+                                if let Ok(case_id) = Uuid::parse_str(case_id_str) {
+                                    if let Some(tos) = session.workspace_stack.last_mut() {
+                                        tos.current_case_id = Some(case_id);
+                                    }
+                                }
+                            }
+                            // Sync deal_id if present
+                            if let Some(deal_id_str) = inner.get("deal_id").and_then(|v| v.as_str()) {
+                                if let Ok(deal_id) = Uuid::parse_str(deal_id_str) {
+                                    if let Some(tos) = session.workspace_stack.last_mut() {
+                                        tos.deal_id = Some(deal_id);
+                                        tos.deal_name = inner.get("deal_name")
+                                            .and_then(|v| v.as_str())
+                                            .map(|s| s.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Set subject_id from cbu_ids (Vec::last = most recently added).
                     if session.workspace_stack.last().map_or(true, |f| f.subject_id.is_none()) {
                         if let Some(&cbu_id) = session.cbu_ids.last() {

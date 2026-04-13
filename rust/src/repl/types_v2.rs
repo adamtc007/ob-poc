@@ -453,6 +453,35 @@ pub struct WorkspaceFrame {
     #[serde(skip)]
     pub stale_shared_facts: Vec<crate::cross_workspace::fact_refs::StaleSharedFactRef>,
 
+    // --- Constraint cascade (workspace-scoped working context) ---
+    // Each workspace frame carries its own constraint state.
+    // Switching workspaces (push/pop) preserves per-workspace context.
+    // Synced from ExecutionContext.pending_session after verb execution.
+
+    /// Current structure context (e.g., fund structure ID).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_structure_id: Option<Uuid>,
+
+    /// Current structure display name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_structure_name: Option<String>,
+
+    /// Current KYC case ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_case_id: Option<Uuid>,
+
+    /// Current trading mandate ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_mandate_id: Option<Uuid>,
+
+    /// Deal context for deal workspace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deal_id: Option<Uuid>,
+
+    /// Deal display name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deal_name: Option<String>,
+
     // --- Viewport state (observation frame, NOT resource truth) ---
     // These fields describe how the user is observing the DAG.
     // They do NOT affect the DAG, do NOT trigger rehydration.
@@ -526,6 +555,12 @@ impl WorkspaceFrame {
             narration_hot_verbs: Vec::new(),
             constellation_verb_index: None,
             stale_shared_facts: Vec::new(),
+            current_structure_id: None,
+            current_structure_name: None,
+            current_case_id: None,
+            current_mandate_id: None,
+            deal_id: None,
+            deal_name: None,
             view_level: default_view_level(),
             focus_slot_path: None,
             nav_snapshots: Vec::new(),
