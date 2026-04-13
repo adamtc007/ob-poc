@@ -1953,12 +1953,6 @@ impl UnifiedSession {
     }
 
     /// Set zoom level
-    pub fn set_zoom(&mut self, level: ZoomLevel, focal_entity: Option<Uuid>) {
-        self.entity_scope.zoom_level = level;
-        self.entity_scope.focal_entity_id = focal_entity;
-        self.updated_at = Utc::now();
-    }
-
     /// Add DSL entry to run sheet
     pub fn add_dsl(&mut self, dsl_source: String, display_dsl: String) -> Uuid {
         let id = Uuid::new_v4();
@@ -2035,61 +2029,8 @@ impl UnifiedSession {
     }
 
     /// Push current state to history
-    pub fn push_state(&mut self, action_label: &str) {
-        self.state_stack.push(
-            self.entity_scope.clone(),
-            self.run_sheet.cursor,
-            action_label.to_string(),
-        );
-    }
-
-    /// Navigate back
-    pub fn back(&mut self, n: usize) -> bool {
-        if let Some(snapshot) = self.state_stack.back(n) {
-            self.entity_scope = snapshot.entity_scope.clone();
-            self.run_sheet.cursor = snapshot.run_sheet_cursor;
-            self.updated_at = Utc::now();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Navigate forward
-    pub fn forward(&mut self, n: usize) -> bool {
-        if let Some(snapshot) = self.state_stack.forward(n) {
-            self.entity_scope = snapshot.entity_scope.clone();
-            self.run_sheet.cursor = snapshot.run_sheet_cursor;
-            self.updated_at = Utc::now();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Go to start of history
-    pub fn go_to_start(&mut self) -> bool {
-        if let Some(snapshot) = self.state_stack.go_to_start() {
-            self.entity_scope = snapshot.entity_scope.clone();
-            self.run_sheet.cursor = snapshot.run_sheet_cursor;
-            self.updated_at = Utc::now();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Go to end of history
-    pub fn go_to_last(&mut self) -> bool {
-        if let Some(snapshot) = self.state_stack.go_to_last() {
-            self.entity_scope = snapshot.entity_scope.clone();
-            self.run_sheet.cursor = snapshot.run_sheet_cursor;
-            self.updated_at = Utc::now();
-            true
-        } else {
-            false
-        }
-    }
+    // DELETED: push_state, back, forward, go_to_start, go_to_last
+    // — 0 callers outside unified.rs (state_stack navigation replaced by ReplStateV2)
 
     /// Start resolution workflow
     pub fn start_resolution(&mut self, refs: Vec<UnresolvedRef>) {
@@ -2303,75 +2244,13 @@ impl UnifiedSession {
         }
     }
 
-    // =========================================================================
-    // DAG State Methods
-    // =========================================================================
+    // DELETED: mark_verb_completed, check_prereqs, reset_dag_state (0 callers)
+    // DELETED: update_view, select_node, deselect_node, clear_selection, expand_node, collapse_node (0 callers)
 
-    /// Mark a verb as completed and update DAG state
-    pub fn mark_verb_completed(&mut self, verb_fqn: &str) {
-        self.dag_state.mark_completed(verb_fqn);
-        self.updated_at = Utc::now();
-    }
-
-    /// Set a DAG state flag
+    /// Set a DAG state flag (still called by session_ops.rs verb handlers)
     pub fn set_dag_flag(&mut self, key: &str, value: bool) {
         self.dag_state.set_flag(key, value);
         self.updated_at = Utc::now();
-    }
-
-    /// Check if prereqs are satisfied for a verb
-    pub fn check_prereqs(&self, prereqs: &[PrereqCondition]) -> bool {
-        prereqs
-            .iter()
-            .all(|prereq| prereq.is_satisfied(&self.dag_state))
-    }
-
-    /// Reset DAG state (for session reset)
-    pub fn reset_dag_state(&mut self) {
-        self.dag_state.clear();
-        self.updated_at = Utc::now();
-    }
-
-    /// Update view state
-    pub fn update_view(&mut self, camera_x: f32, camera_y: f32, zoom: f32) {
-        self.view_state.camera_x = camera_x;
-        self.view_state.camera_y = camera_y;
-        self.view_state.zoom = zoom;
-        self.updated_at = Utc::now();
-    }
-
-    /// Select node
-    pub fn select_node(&mut self, node_id: Uuid) {
-        self.view_state.selected_nodes.insert(node_id);
-        self.updated_at = Utc::now();
-    }
-
-    /// Deselect node
-    pub fn deselect_node(&mut self, node_id: &Uuid) {
-        if self.view_state.selected_nodes.remove(node_id) {
-            self.updated_at = Utc::now();
-        }
-    }
-
-    /// Clear selection
-    pub fn clear_selection(&mut self) {
-        if !self.view_state.selected_nodes.is_empty() {
-            self.view_state.selected_nodes.clear();
-            self.updated_at = Utc::now();
-        }
-    }
-
-    /// Expand node
-    pub fn expand_node(&mut self, node_id: Uuid) {
-        self.view_state.expanded_nodes.insert(node_id);
-        self.updated_at = Utc::now();
-    }
-
-    /// Collapse node
-    pub fn collapse_node(&mut self, node_id: &Uuid) {
-        if self.view_state.expanded_nodes.remove(node_id) {
-            self.updated_at = Utc::now();
-        }
     }
 
     // =========================================================================
