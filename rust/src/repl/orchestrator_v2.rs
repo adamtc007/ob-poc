@@ -715,12 +715,19 @@ impl ReplOrchestratorV2 {
                             .filter(|e| matches!(e.status, crate::repl::runbook::EntryStatus::Completed))
                             .find_map(|e| {
                                 e.result.as_ref().and_then(|v| {
-                                    // Try "cbu_id" field (from cbu.create result)
-                                    v.get("cbu_id")
-                                        .and_then(|id| id.as_str())
-                                        .and_then(|s| Uuid::parse_str(s).ok())
-                                        // Also try direct UUID value (from ExecutionResult::Uuid serialized)
-                                        .or_else(|| v.as_str().and_then(|s| Uuid::parse_str(s).ok()))
+                                    // ExecutionResult::Record serializes as {"Record": {inner}}
+                                    // ExecutionResult::Uuid serializes as {"Uuid": "uuid-string"}
+                                    let inner = v.get("Record").or(Some(v));
+                                    inner.and_then(|r| {
+                                        r.get("cbu_id")
+                                            .and_then(|id| id.as_str())
+                                            .and_then(|s| Uuid::parse_str(s).ok())
+                                    })
+                                    .or_else(|| {
+                                        v.get("Uuid")
+                                            .and_then(|id| id.as_str())
+                                            .and_then(|s| Uuid::parse_str(s).ok())
+                                    })
                                 })
                             });
 
