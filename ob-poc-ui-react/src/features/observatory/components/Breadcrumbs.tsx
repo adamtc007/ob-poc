@@ -6,8 +6,8 @@
  */
 
 import { useCallback } from "react";
-import { observatoryApi } from "../../../api/observatory";
-import { queryClient } from "../../../lib/query";
+import { chatApi } from "../../../api/chat";
+import { queryClient, queryKeys } from "../../../lib/query";
 import type { OrientationContract } from "../../../types/observatory";
 
 interface Props {
@@ -23,20 +23,14 @@ export function Breadcrumbs({ history, cursor, sessionId }: Props) {
 
   const invalidateQueries = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: ["observatory", "orientation", sessionId],
-    });
-    queryClient.invalidateQueries({
-      queryKey: ["observatory", "graph-scene", sessionId],
-    });
-    queryClient.invalidateQueries({
-      queryKey: ["observatory", "nav-history", sessionId],
+      queryKey: queryKeys.observatory.all(sessionId),
     });
   }, [sessionId]);
 
   const handleBack = useCallback(async () => {
     if (!canGoBack) return;
     try {
-      await observatoryApi.navigate(sessionId, "nav.history-back", {});
+      await chatApi.sendMessage(sessionId, { message: "nav.history-back" });
       invalidateQueries();
     } catch (err) {
       console.error("History back failed:", err);
@@ -46,7 +40,7 @@ export function Breadcrumbs({ history, cursor, sessionId }: Props) {
   const handleForward = useCallback(async () => {
     if (!canGoForward) return;
     try {
-      await observatoryApi.navigate(sessionId, "nav.history-forward", {});
+      await chatApi.sendMessage(sessionId, { message: "nav.history-forward" });
       invalidateQueries();
     } catch (err) {
       console.error("History forward failed:", err);
@@ -57,9 +51,8 @@ export function Breadcrumbs({ history, cursor, sessionId }: Props) {
     async (entry: OrientationContract) => {
       // Navigate to the focus of the clicked breadcrumb entry
       try {
-        await observatoryApi.navigate(sessionId, "nav.drill", {
-          target_id: entry.focus_identity.canonical_id,
-          target_level: entry.view_level,
+        await chatApi.sendMessage(sessionId, {
+          message: `nav.drill ${entry.focus_identity.canonical_id}`,
         });
         invalidateQueries();
       } catch (err) {

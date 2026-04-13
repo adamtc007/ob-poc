@@ -452,6 +452,45 @@ pub struct WorkspaceFrame {
     /// Transient (not serialized).
     #[serde(skip)]
     pub stale_shared_facts: Vec<crate::cross_workspace::fact_refs::StaleSharedFactRef>,
+
+    // --- Viewport state (observation frame, NOT resource truth) ---
+    // These fields describe how the user is observing the DAG.
+    // They do NOT affect the DAG, do NOT trigger rehydration.
+    // Mutated by nav verbs (nav.drill, nav.set-lens, etc.).
+
+    /// Current Observatory view level.
+    /// Viewport state — does not affect DAG, does not trigger rehydration.
+    #[serde(default = "default_view_level")]
+    pub view_level: ob_poc_types::galaxy::ViewLevel,
+
+    /// Current focus slot path within the constellation (e.g., "cbu.kyc.screening").
+    /// Viewport state — selects which part of the DAG is in focus.
+    /// If this changes to a slot in a DIFFERENT constellation/CBU, that IS a
+    /// materialization boundary crossing and requires rehydration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus_slot_path: Option<String>,
+
+    /// Navigation history for this workspace frame (viewport snapshots).
+    /// Viewport state — back/forward restores previous observation frame.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nav_snapshots: Vec<ViewportSnapshot>,
+
+    /// Current position in nav_snapshots (for back/forward).
+    #[serde(default)]
+    pub nav_cursor: usize,
+}
+
+fn default_view_level() -> ob_poc_types::galaxy::ViewLevel {
+    ob_poc_types::galaxy::ViewLevel::System
+}
+
+/// Lightweight viewport snapshot for navigation history (back/forward).
+/// Captures viewport state only — NOT DAG state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ViewportSnapshot {
+    pub view_level: ob_poc_types::galaxy::ViewLevel,
+    pub focus_slot_path: Option<String>,
+    pub timestamp: DateTime<Utc>,
 }
 
 impl WorkspaceFrame {
@@ -487,6 +526,10 @@ impl WorkspaceFrame {
             narration_hot_verbs: Vec::new(),
             constellation_verb_index: None,
             stale_shared_facts: Vec::new(),
+            view_level: default_view_level(),
+            focus_slot_path: None,
+            nav_snapshots: Vec::new(),
+            nav_cursor: 0,
         }
     }
 }

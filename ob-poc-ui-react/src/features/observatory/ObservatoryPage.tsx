@@ -10,7 +10,8 @@ import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { observatoryApi } from "../../api/observatory";
-import { queryClient } from "../../lib/query";
+import { chatApi } from "../../api/chat";
+import { queryClient, queryKeys } from "../../lib/query";
 import { LocationHeader } from "./components/LocationHeader";
 import { Breadcrumbs } from "./components/Breadcrumbs";
 import { ViewportRenderer } from "./components/ViewportRenderer";
@@ -27,7 +28,7 @@ export function ObservatoryPage() {
 
   // Fetch orientation
   const { data: orientation } = useQuery({
-    queryKey: ["observatory", "orientation", sessionId],
+    queryKey: queryKeys.observatory.orientation(sessionId!),
     queryFn: () => observatoryApi.getOrientation(sessionId!),
     enabled: !!sessionId,
     refetchInterval: 5000,
@@ -35,7 +36,7 @@ export function ObservatoryPage() {
 
   // Fetch show packet (for viewports)
   const { data: showPacket } = useQuery({
-    queryKey: ["observatory", "show-packet", sessionId],
+    queryKey: queryKeys.observatory.showPacket(sessionId!),
     queryFn: () => observatoryApi.getShowPacket(sessionId!),
     enabled: !!sessionId,
     refetchInterval: 5000,
@@ -43,14 +44,14 @@ export function ObservatoryPage() {
 
   // Fetch graph scene (for constellation canvas)
   const { data: graphScene } = useQuery({
-    queryKey: ["observatory", "graph-scene", sessionId],
+    queryKey: queryKeys.observatory.graphScene(sessionId!),
     queryFn: () => observatoryApi.getGraphScene(sessionId!),
     enabled: !!sessionId,
   });
 
   // Fetch navigation history (includes cursor position)
   const { data: navHistoryData } = useQuery({
-    queryKey: ["observatory", "nav-history", sessionId],
+    queryKey: queryKeys.observatory.navHistory(sessionId!),
     queryFn: () => observatoryApi.getNavigationHistory(sessionId!),
     enabled: !!sessionId,
   });
@@ -95,17 +96,25 @@ export function ObservatoryPage() {
 
       if (!verb) return;
 
+      // Route through the standard REPL input path — single input surface.
+      // Same path FlightDeck and chat text use. No bespoke /navigate endpoint.
+      const message = args && Object.keys(args).length > 0
+        ? `${verb} ${Object.values(args).join(" ")}`
+        : verb;
+
       try {
-        await observatoryApi.navigate(sessionId, verb, args);
-        // Invalidate cached orientation + graph scene so queries refetch
+        await chatApi.sendMessage(sessionId, { message });
+        // Invalidate all projections (observatory + chat) — placed in the
+        // success path (not optimistic) because the server must have committed
+        // the viewport state change before we refetch.
         queryClient.invalidateQueries({
-          queryKey: ["observatory", "orientation", sessionId],
+          queryKey: queryKeys.observatory.all(sessionId),
         });
         queryClient.invalidateQueries({
-          queryKey: ["observatory", "graph-scene", sessionId],
+          queryKey: queryKeys.scope(sessionId),
         });
         queryClient.invalidateQueries({
-          queryKey: ["observatory", "nav-history", sessionId],
+          queryKey: queryKeys.constellation.all,
         });
       } catch (err) {
         console.error("Navigation failed:", err);
@@ -132,18 +141,18 @@ export function ObservatoryPage() {
           // Reset view — invalidate graph scene to trigger refetch
           if (sessionId) {
             queryClient.invalidateQueries({
-              queryKey: ["observatory", "graph-scene", sessionId],
+              queryKey: queryKeys.observatory.graphScene(sessionId),
             });
           }
           break;
         case "Backspace":
-          // Zoom out
+          // Zoom out — through standard REPL input path
           if (sessionId) {
-            observatoryApi
-              .navigate(sessionId, "nav.zoom-out", {})
+            chatApi
+              .sendMessage(sessionId, { message: "nav.zoom-out" })
               .then(() => {
                 queryClient.invalidateQueries({
-                  queryKey: ["observatory"],
+                  queryKey: queryKeys.observatory.all(sessionId),
                 });
               })
               .catch((err: unknown) =>
@@ -154,8 +163,12 @@ export function ObservatoryPage() {
           break;
         case "r":
         case "R":
-          // Refresh all observatory queries
-          queryClient.invalidateQueries({ queryKey: ["observatory"] });
+          // Refresh all observatory + chat queries
+          if (sessionId) {
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.observatory.all(sessionId),
+            });
+          }
           break;
         case "m":
         case "M":

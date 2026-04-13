@@ -60,7 +60,7 @@ export function ChatPage() {
 
   // Observatory orientation for Flight Deck
   const { data: orientation } = useQuery({
-    queryKey: ["observatory", "orientation", sessionId],
+    queryKey: queryKeys.observatory.orientation(sessionId!),
     queryFn: () => observatoryApi.getOrientation(sessionId!),
     enabled: !!sessionId,
     refetchInterval: 5000,
@@ -169,6 +169,14 @@ export function ChatPage() {
         queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
         queryClient.invalidateQueries({
           queryKey: queryKeys.constellation.all,
+        });
+        // Cross-invalidate Observatory projections — both UIs project from the
+        // same session DAG, so when a chat verb changes the DAG, Observatory
+        // must refresh immediately (not wait for 5s poll).
+        // Placed in onSuccess (not onMutate) because the server must have
+        // committed the state change before we invalidate.
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.observatory.all(sessionId),
         });
       }
       setStreaming(false);

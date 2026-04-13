@@ -2,6 +2,14 @@
 //!
 //! Given a set of CBU IDs (from the session scope), queries the database
 //! to build a [`GroupCompositeState`] snapshot with per-CBU state summaries.
+//!
+//! TRANSITIONAL (SE-10 in audit): This module queries raw SQL independently from
+//! the session's hydrated constellation DAG. The preferred path is
+//! `GroupCompositeState::from_hydrated_constellation()` which projects from
+//! the same `HydratedSlot` tree the compiler and narration engine use.
+//! This module is kept as a fallback for pre-workspace states where the
+//! hydrated constellation is not yet available. It should be removed when
+//! all callers have migrated to the DAG-sourced path.
 
 use sqlx::PgPool;
 use uuid::Uuid;

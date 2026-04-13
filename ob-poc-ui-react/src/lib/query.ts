@@ -68,6 +68,22 @@ export const queryKeys = {
       [...queryKeys.constellation.all, "cases", cbuId] as const,
   },
 
+  // Observatory
+  observatory: {
+    all: (sessionId: string) => ["observatory", sessionId] as const,
+    orientation: (sessionId: string) =>
+      ["observatory", "orientation", sessionId] as const,
+    showPacket: (sessionId: string) =>
+      ["observatory", "show-packet", sessionId] as const,
+    graphScene: (sessionId: string) =>
+      ["observatory", "graph-scene", sessionId] as const,
+    navHistory: (sessionId: string) =>
+      ["observatory", "nav-history", sessionId] as const,
+    health: () => ["observatory", "health"] as const,
+    diagram: (sessionId: string, type: string) =>
+      ["observatory", "diagram", sessionId, type] as const,
+  },
+
   // Semantic OS
   semOs: {
     all: ["semOs"] as const,

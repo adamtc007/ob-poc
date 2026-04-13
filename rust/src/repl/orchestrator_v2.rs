@@ -661,7 +661,7 @@ impl ReplOrchestratorV2 {
         let mut response = match session.state.clone() {
             ReplStateV2::ScopeGate { .. } => self.handle_scope_gate(session, input).await,
             ReplStateV2::WorkspaceSelection { .. } => {
-                self.handle_workspace_selection(session, input)
+                self.handle_workspace_selection(session, input).await
             }
             ReplStateV2::JourneySelection { .. } => self.handle_journey_selection(session, input),
             ReplStateV2::InPack { .. } => self.handle_in_pack(session, input).await,
@@ -689,6 +689,13 @@ impl ReplOrchestratorV2 {
                 }
             }
         }
+
+        // Apply viewport state changes from navigation verb results.
+        // Nav verbs return NavResult records that signal viewport mutations
+        // (view_level, focus_slot_path, history direction). The orchestrator
+        // applies these to the session's WorkspaceFrame — single write path.
+        // Nav verbs do NOT increment writes_since_push, do NOT trigger rehydration.
+        self.apply_nav_result_if_present(session, &response);
 
         // Compute post-execution narration (ADR 043) when writes occurred and
         // the contextual query path didn't already attach a narration payload.
@@ -818,6 +825,76 @@ impl ReplOrchestratorV2 {
         _session: &ReplSessionV2,
     ) -> anyhow::Result<WorkspaceStateView> {
         anyhow::bail!("Constellation hydration requires database feature")
+    }
+
+    /// Apply viewport state changes after a navigation verb execution.
+    ///
+    /// Checks if the response message looks like a nav verb result (contains
+    /// "Drilled to", "Zoomed out", etc.) and updates session viewport state
+    /// accordingly. This is the ONLY place nav viewport state is written.
+    ///
+    /// Nav verbs do NOT increment writes_since_push, do NOT trigger rehydration
+    /// (the DAG hasn't changed — only the observation frame).
+    fn apply_nav_result_if_present(
+        &self,
+        session: &mut ReplSessionV2,
+        response: &ReplResponseV2,
+    ) {
+        use ob_poc_types::galaxy::ViewLevel;
+
+        let msg = &response.message;
+
+        // Detect nav verb results by message prefix (set by nav verb handlers)
+        if msg.starts_with("Navigated back") {
+            session.nav_back();
+            return;
+        }
+        if msg.starts_with("Navigated forward") {
+            session.nav_forward();
+            return;
+        }
+
+        // For drill/zoom/select/lens — save current viewport before changing
+        let is_nav = msg.starts_with("Drilled to")
+            || msg.starts_with("Zoomed out")
+            || msg.starts_with("Focus set")
+            || msg.starts_with("Lens updated")
+            || msg.starts_with("Cluster mode updated");
+
+        if !is_nav {
+            return;
+        }
+
+        session.push_nav_snapshot();
+
+        if msg.starts_with("Zoomed out") {
+            let current = session.tos_view_level();
+            let parent = match current {
+                ViewLevel::Core => ViewLevel::Surface,
+                ViewLevel::Surface => ViewLevel::Planet,
+                ViewLevel::Planet => ViewLevel::System,
+                ViewLevel::System => ViewLevel::Cluster,
+                ViewLevel::Cluster => ViewLevel::Universe,
+                ViewLevel::Universe => ViewLevel::Universe,
+            };
+            session.set_tos_view_level(parent);
+        } else if msg.starts_with("Drilled to") {
+            // Extract target from "Drilled to <target>"
+            let target = msg.strip_prefix("Drilled to ").unwrap_or("");
+            if !target.is_empty() {
+                session.set_tos_focus_slot(Some(target.to_string()));
+            }
+            // TODO (Phase 3.3a): detect materialization boundary crossing
+            // by comparing target against current constellation CBU ID.
+            // For now, drill stays within the current constellation.
+        } else if msg.starts_with("Focus set to") {
+            let target = msg.strip_prefix("Focus set to ").unwrap_or("");
+            if !target.is_empty() {
+                session.set_tos_focus_slot(Some(target.to_string()));
+            }
+        }
+        // Lens and cluster mode changes: viewport state fields for these
+        // will be added when LensState is stored on WorkspaceFrame (Phase 4).
     }
 
     async fn persist_trace_scaffold(
@@ -1087,7 +1164,7 @@ impl ReplOrchestratorV2 {
         }
     }
 
-    fn handle_workspace_selection(
+    async fn handle_workspace_selection(
         &self,
         session: &mut ReplSessionV2,
         input: UserInputV2,
@@ -1120,6 +1197,24 @@ impl ReplOrchestratorV2 {
         };
 
         session.set_workspace_root(workspace.clone());
+
+        // Hydrate the empty constellation immediately — the DAG exists from this point.
+        // This read-only hydration populates the slot tree in its initial state so that
+        // Observatory endpoints can render the empty-but-structured DAG, and the narration
+        // engine can compute "everything is empty, here are all the gaps."
+        #[cfg(feature = "database")]
+        if let Some(ref pool) = self.pool {
+            match self.rehydrate_tos(pool, session).await {
+                Ok(hydrated) => {
+                    session.hydrate_tos(hydrated);
+                    tracing::debug!(workspace = ?workspace, "Initial constellation hydration on workspace selection");
+                }
+                Err(e) => {
+                    tracing::warn!(workspace = ?workspace, error = %e, "Initial hydration failed on workspace selection — Observatory will show empty DAG");
+                }
+            }
+        }
+
         session.set_state(ReplStateV2::JourneySelection { candidates: None });
         let packs = self.pack_router.list_packs_for_workspace(&workspace);
         ReplResponseV2 {

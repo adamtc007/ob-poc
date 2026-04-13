@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { observatoryApi } from "../../../api/observatory";
+import { queryKeys } from "../../../lib/query";
 
 interface Props {
   sessionId: string;
@@ -28,7 +29,7 @@ export function MermaidPanel({ sessionId }: Props) {
   const [activeDiagram, setActiveDiagram] = useState<DiagramType>("erd");
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["observatory", "diagram", sessionId, activeDiagram],
+    queryKey: queryKeys.observatory.diagram(sessionId, activeDiagram),
     queryFn: () => observatoryApi.getDiagram(sessionId, activeDiagram),
     enabled: !collapsed,
   });

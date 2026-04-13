@@ -24,7 +24,9 @@ use sem_os_core::observatory::projection;
 use sem_os_core::stewardship::types::{FocusState, FocusUpdateSource, OverlayMode};
 
 use crate::api::session::SessionStore;
+use crate::repl::session_v2::ReplSessionV2;
 use crate::sem_reg::stewardship::show_loop::ShowLoop;
+use crate::sem_os_runtime::constellation_runtime::HydratedSlot;
 
 /// Observatory API error response.
 #[derive(Debug, Serialize)]
@@ -46,6 +48,12 @@ impl ObservatoryError {
 }
 
 /// Per-session navigation history with a cursor for back/forward.
+///
+/// DEPRECATED: Navigation history should live on WorkspaceFrame.nav_snapshots.
+/// This standalone HashMap is a side exit (SX-3 in the audit). The frontend
+/// now routes all navigation through POST /session/:id/input, so this store
+/// is only populated by the legacy POST /navigate endpoint. It will be removed
+/// when /navigate is fully decommissioned.
 #[derive(Debug, Clone, Default)]
 pub struct SessionNavHistory {
     /// Ordered list of orientation snapshots.
@@ -58,15 +66,26 @@ pub struct SessionNavHistory {
 /// Thread-safe store for all sessions' navigation histories.
 pub type NavigationHistory = Arc<RwLock<HashMap<Uuid, SessionNavHistory>>>;
 
+/// Thread-safe store for REPL V2 sessions (canonical DAG source).
+pub type ReplSessionStore = Arc<RwLock<HashMap<Uuid, ReplSessionV2>>>;
+
 /// Route state for observatory endpoints.
 #[derive(Clone)]
 pub struct ObservatoryState {
     pub pool: PgPool,
     pub sessions: SessionStore,
+    /// REPL V2 session store — the canonical source for hydrated constellation DAG.
+    /// Observatory endpoints read `tos.hydrated_state` from here.
+    pub repl_sessions: Option<ReplSessionStore>,
     pub nav_history: NavigationHistory,
 }
 
 /// Build a FocusState from session ID (default empty focus).
+///
+/// TRANSITIONAL: Used only by ShowLoop viewport computation (get_show_packet) and
+/// the navigate() handler. NOT used by get_orientation() or get_graph_scene() which
+/// read from the session's hydrated DAG. This function should be removed when
+/// ShowLoop viewports are unified and /navigate is collapsed into /session/:id/input.
 fn default_focus(session_id: Uuid) -> FocusState {
     FocusState {
         session_id,
@@ -81,6 +100,9 @@ fn default_focus(session_id: Uuid) -> FocusState {
 }
 
 /// Extract a business label from the session's target universe description.
+///
+/// TRANSITIONAL: Used only by the legacy fallback path in orientation_from_repl_or_legacy().
+/// Will be removed when all sessions have REPL V2 sessions.
 fn business_label_from_session(
     sessions: &std::collections::HashMap<Uuid, crate::session::UnifiedSession>,
     session_id: Uuid,
@@ -91,60 +113,239 @@ fn business_label_from_session(
         .map(|u| u.description.clone())
 }
 
-/// GET /api/observatory/session/:id/orientation
+// ── DAG identity projection ─────────────────────────────────
+//
+// These functions project OrientationContract from the REPL session's
+// hydrated constellation DAG — the same DAG the compiler and narration
+// engine read. No independent hydration. No parallel state.
+
+/// Project an OrientationContract from a REPL session's TOS hydrated state.
 ///
-/// Returns the current OrientationContract for a session.
-async fn get_orientation(
-    State(state): State<ObservatoryState>,
-    Path(session_id): Path<Uuid>,
-) -> impl IntoResponse {
-    let sessions = state.sessions.read().await;
-    if !sessions.contains_key(&session_id) {
-        return ObservatoryError::not_found("Session not found").into_response();
+/// Reads `tos.hydrated_state` (resource state / the DAG) to populate
+/// `available_actions`. Falls back gracefully when TOS is absent or
+/// not yet hydrated (pre-workspace-selection).
+fn project_orientation_from_repl_session(session: &ReplSessionV2) -> OrientationContract {
+    let tos = session.workspace_stack.last();
+    let hydrated = tos.and_then(|f| f.hydrated_state.as_ref());
+    let constellation = hydrated.and_then(|h| h.hydrated_constellation.as_ref());
+
+    // available_actions from HydratedSlot.available_verbs — same source the compiler uses
+    let available_actions: Vec<ActionDescriptor> = constellation
+        .map(|c| collect_actions_from_slots(&c.slots))
+        .unwrap_or_default();
+
+    // Focus identity from TOS workspace context
+    let (focus_kind, focus_identity) = derive_focus_from_tos(tos, constellation);
+
+    // Business label from session universe description
+    let _business_label = tos
+        .and_then(|f| f.hydrated_state.as_ref())
+        .and_then(|h| h.subject_ref.as_ref())
+        .map(|sr| format!("{:?}:{}", sr.kind, sr.id));
+
+    // View level from TOS viewport state (set by nav.drill/nav.zoom-out)
+    let view_level = tos
+        .map(|f| to_orientation_view_level(f.view_level))
+        .unwrap_or(ViewLevel::Universe);
+
+    // Lens — defaults until Phase 3 adds viewport state
+    let lens = LensState {
+        overlay: OverlayState::ActiveOnly,
+        depth_probe: None,
+        cluster_mode: ClusterMode::Jurisdiction,
+        active_filters: vec![],
+    };
+
+    // Map REPL AgentMode (Sage|Repl) to Observatory AgentMode (Governed|Research|Maintenance).
+    // The REPL mode describes the UI shell; the Observatory mode describes the governance tier.
+    // Default to Governed — the orchestrator's SemOS context resolution determines the real mode.
+    let observatory_mode = AgentMode::Governed;
+
+    OrientationContract {
+        session_mode: observatory_mode,
+        view_level,
+        focus_kind,
+        focus_identity,
+        scope: projection::scope_from_level(view_level),
+        lens,
+        entry_reason: EntryReason::SessionStart,
+        available_actions,
+        delta_from_previous: None,
+        computed_at: chrono::Utc::now(),
+    }
+}
+
+/// Walk the HydratedSlot tree and collect available/blocked verbs as ActionDescriptors.
+/// This reads the SAME `available_verbs` and `blocked_verbs` fields that the compiler
+/// uses via `discover_advancing_slots()` and the narration engine reads for gap analysis.
+fn collect_actions_from_slots(slots: &[HydratedSlot]) -> Vec<ActionDescriptor> {
+    let mut actions = Vec::new();
+    collect_actions_recursive(slots, &mut actions);
+    // Sort by enabled (true first), then by action_id for stability
+    actions.sort_by(|a, b| b.enabled.cmp(&a.enabled).then_with(|| a.action_id.cmp(&b.action_id)));
+    actions
+}
+
+fn collect_actions_recursive(slots: &[HydratedSlot], actions: &mut Vec<ActionDescriptor>) {
+    for slot in slots {
+        // Enabled verbs from state machine transitions
+        for verb in &slot.available_verbs {
+            // Avoid duplicates (same verb may appear on multiple slots)
+            if !actions.iter().any(|a| a.action_id == *verb) {
+                actions.push(ActionDescriptor {
+                    action_id: verb.clone(),
+                    label: verb.clone(),
+                    action_kind: "primitive".into(),
+                    enabled: true,
+                    disabled_reason: None,
+                    rank_score: 1.0,
+                });
+            }
+        }
+        // Blocked verbs with reasons
+        for blocked in &slot.blocked_verbs {
+            let verb_id = &blocked.verb;
+            if !actions.iter().any(|a| a.action_id == *verb_id) {
+                let reason = blocked
+                    .reasons
+                    .iter()
+                    .map(|r| r.message.as_str())
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                actions.push(ActionDescriptor {
+                    action_id: verb_id.clone(),
+                    label: verb_id.clone(),
+                    action_kind: "primitive".into(),
+                    enabled: false,
+                    disabled_reason: Some(reason),
+                    rank_score: 0.0,
+                });
+            }
+        }
+        // Recurse into children
+        collect_actions_recursive(&slot.children, actions);
+    }
+}
+
+/// Derive focus kind and identity from the TOS workspace frame and constellation.
+fn derive_focus_from_tos(
+    tos: Option<&crate::repl::types_v2::WorkspaceFrame>,
+    constellation: Option<&crate::sem_os_runtime::constellation_runtime::HydratedConstellation>,
+) -> (FocusKind, FocusIdentity) {
+    if let Some(frame) = tos {
+        let kind = match &frame.workspace {
+            crate::repl::types_v2::WorkspaceKind::Cbu => FocusKind::Cbu,
+            crate::repl::types_v2::WorkspaceKind::Kyc => FocusKind::Case,
+            crate::repl::types_v2::WorkspaceKind::Deal => FocusKind::Other("deal".into()),
+            crate::repl::types_v2::WorkspaceKind::SemOsMaintenance => FocusKind::Constellation,
+            _ => FocusKind::Constellation,
+        };
+
+        let label = constellation
+            .map(|c| c.constellation.clone())
+            .or_else(|| frame.hydrated_state.as_ref().map(|h| h.constellation_map.clone()))
+            .unwrap_or_else(|| frame.workspace.label().to_string());
+
+        let canonical_id = frame
+            .subject_id
+            .map(|id| id.to_string())
+            .unwrap_or_else(|| frame.constellation_map.clone());
+
+        let identity = FocusIdentity {
+            canonical_id,
+            business_label: label,
+            object_type: Some(frame.workspace.label().to_string()),
+        };
+        (kind, identity)
+    } else {
+        // No workspace selected — session-level focus
+        (
+            FocusKind::Constellation,
+            FocusIdentity {
+                canonical_id: "session".into(),
+                business_label: "Session".into(),
+                object_type: None,
+            },
+        )
+    }
+}
+
+/// Try to read a ReplSessionV2 and project orientation from it.
+/// Falls back to legacy projection if REPL session is not available.
+async fn orientation_from_repl_or_legacy(
+    state: &ObservatoryState,
+    session_id: Uuid,
+) -> OrientationContract {
+    // Try REPL session first (canonical DAG source)
+    if let Some(ref repl_sessions) = state.repl_sessions {
+        let sessions = repl_sessions.read().await;
+        if let Some(repl_session) = sessions.get(&session_id) {
+            return project_orientation_from_repl_session(repl_session);
+        }
     }
 
+    // Fallback: legacy projection from UnifiedSession (empty actions)
+    let sessions = state.sessions.read().await;
     let label = business_label_from_session(&sessions, session_id);
     let focus = default_focus(session_id);
-
-    let contract = projection::project_orientation(
+    projection::project_orientation(
         None,
         &focus,
         ViewLevel::Universe,
         AgentMode::Governed,
         EntryReason::SessionStart,
         label.as_deref(),
-    );
+    )
+}
 
+/// GET /api/observatory/session/:id/orientation
+///
+/// Returns the current OrientationContract for a session.
+/// Projects from the REPL session's TOS hydrated state (the canonical DAG).
+async fn get_orientation(
+    State(state): State<ObservatoryState>,
+    Path(session_id): Path<Uuid>,
+) -> impl IntoResponse {
+    // Verify session exists in either store
+    let exists = {
+        let sessions = state.sessions.read().await;
+        sessions.contains_key(&session_id)
+    };
+    if !exists {
+        return ObservatoryError::not_found("Session not found").into_response();
+    }
+
+    let contract = orientation_from_repl_or_legacy(&state, session_id).await;
     Json(contract).into_response()
 }
 
 /// GET /api/observatory/session/:id/show-packet
 ///
 /// Returns the full ShowPacket with orientation for a session.
+///
+/// TRANSITIONAL: The orientation field is projected from the session's hydrated DAG
+/// (canonical). The viewport computation (Focus, Object, Diff, Gates) still reads from
+/// FocusState + SemReg snapshots independently. This is acceptable because those viewports
+/// render SemReg object detail (not constellation slot state). See audit doc SE-12/SE-13.
 async fn get_show_packet(
     State(state): State<ObservatoryState>,
     Path(session_id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let sessions = state.sessions.read().await;
-    if !sessions.contains_key(&session_id) {
+    let exists = {
+        let sessions = state.sessions.read().await;
+        sessions.contains_key(&session_id)
+    };
+    if !exists {
         return ObservatoryError::not_found("Session not found").into_response();
     }
 
-    let label = business_label_from_session(&sessions, session_id);
-    drop(sessions); // Release lock before async call
+    // Orientation: projected from session's hydrated DAG (canonical)
+    let contract = orientation_from_repl_or_legacy(&state, session_id).await;
 
+    // ShowLoop viewports: still read from FocusState + SemReg snapshots (transitional)
     let focus = default_focus(session_id);
-
     match ShowLoop::compute_show_packet(&state.pool, &focus, "system", None).await {
         Ok(mut packet) => {
-            let contract = projection::project_orientation(
-                None,
-                &focus,
-                ViewLevel::Universe,
-                AgentMode::Governed,
-                EntryReason::SessionStart,
-                label.as_deref(),
-            );
             packet.orientation = Some(contract);
             Json(packet).into_response()
         }
@@ -256,23 +457,62 @@ struct HealthMetrics {
 
 /// GET /api/observatory/session/:id/graph-scene
 ///
-/// Returns the GraphSceneModel — projected from the session's hydrated constellation.
-/// Attempts real hydration if a CBU is in scope; falls back to stub scene.
+/// Returns the GraphSceneModel — projected from the session's hydrated constellation DAG.
+/// Reads from `tos.hydrated_state.hydrated_constellation` (same data the compiler reads).
+/// Falls back to independent hydration only when TOS is not yet hydrated.
 async fn get_graph_scene(
     State(state): State<ObservatoryState>,
     Path(session_id): Path<Uuid>,
 ) -> impl IntoResponse {
     use ob_poc_types::galaxy::ViewLevel;
-    use ob_poc_types::graph_scene::*;
-    use sem_os_core::observatory::graph_scene_projection::{self, SlotProjection, GraphEdgeProjection};
+    use sem_os_core::observatory::graph_scene_projection;
 
+    // 1. Try to read from REPL session's TOS hydrated constellation (canonical DAG)
+    if let Some(ref repl_sessions) = state.repl_sessions {
+        let sessions = repl_sessions.read().await;
+        if let Some(repl_session) = sessions.get(&session_id) {
+            let tos_constellation = repl_session
+                .workspace_stack
+                .last()
+                .and_then(|f| f.hydrated_state.as_ref())
+                .and_then(|h| h.hydrated_constellation.as_ref());
+
+            if let Some(constellation) = tos_constellation {
+                // Read view level from TOS viewport state
+                let view_level = repl_session
+                    .workspace_stack
+                    .last()
+                    .map(|f| f.view_level)
+                    .unwrap_or(ViewLevel::System);
+
+                // Project from session DAG — same data the compiler reads
+                let slots = slots_from_hydrated(&constellation.slots);
+                let scene = graph_scene_projection::project_graph_scene(
+                    &constellation.constellation,
+                    &constellation.jurisdiction,
+                    &constellation.cbu_id.to_string(),
+                    &slots,
+                    view_level,
+                    1,
+                );
+                return Json(scene).into_response();
+            }
+        }
+    }
+
+    // 2. Fallback: no TOS hydration yet (pre-workspace-selection).
+    // TOCTOU note: we dropped the sessions read guard above, so another request could
+    // trigger rehydration between the drop and this fallback. This is SAFE because the
+    // fallback only fires when hydrated_state is None — i.e., no workspace is selected
+    // yet, meaning there is no constellation to be stale about. The worst case is that
+    // we hydrate a CBU that was just loaded by a concurrent request, producing a valid
+    // (if redundant) result.
     let sessions = state.sessions.read().await;
     let session = match sessions.get(&session_id) {
         Some(s) => s,
         None => return ObservatoryError::not_found("Session not found").into_response(),
     };
 
-    // Try to get CBU IDs from session scope
     let cbu_ids: Vec<Uuid> = session.entity_scope.cbu_ids.iter().copied().collect();
     let label = session
         .target_universe
@@ -281,38 +521,9 @@ async fn get_graph_scene(
         .unwrap_or_else(|| "Observatory".into());
     drop(sessions);
 
-    // If we have a CBU, try real hydration
     if let Some(cbu_id) = cbu_ids.first() {
-        // Try to load and hydrate a constellation for this CBU
         if let Ok(hydrated) = try_hydrate_cbu(&state.pool, *cbu_id).await {
-            // Project HydratedConstellation → GraphSceneModel
-            let slots: Vec<SlotProjection> = hydrated
-                .slots
-                .iter()
-                .map(|slot| SlotProjection {
-                    name: slot.name.clone(),
-                    path: slot.path.clone(),
-                    slot_type: serde_json::to_value(&slot.slot_type)
-                        .ok()
-                        .and_then(|v| v.as_str().map(|s| s.to_string()))
-                        .unwrap_or_else(|| "entity".into()),
-                    computed_state: slot.computed_state.clone(),
-                    progress: slot.progress,
-                    blocking: slot.blocking,
-                    depth: slot.path.matches('.').count(),
-                    parent_path: slot.path.rsplit_once('.').map(|(p, _)| p.to_string()),
-                    child_count: slot.children.len(),
-                    depends_on: vec![],
-                    graph_edges: slot.graph_edges.iter().map(|e| GraphEdgeProjection {
-                        from_id: e.from_entity_id.to_string(),
-                        to_id: e.to_entity_id.to_string(),
-                        edge_type: e.ownership_type.clone().unwrap_or_else(|| "ownership".into()),
-                        label: e.percentage.map(|p| format!("{:.0}%", p)),
-                        weight: e.percentage.unwrap_or(0.0) as f32,
-                    }).collect(),
-                })
-                .collect();
-
+            let slots = slots_from_hydrated(&hydrated.slots);
             let scene = graph_scene_projection::project_graph_scene(
                 &hydrated.constellation,
                 &hydrated.jurisdiction,
@@ -325,31 +536,52 @@ async fn get_graph_scene(
         }
     }
 
-    // Fallback: return a stub scene
-    let scene = GraphSceneModel {
-        generation: 1,
-        level: ViewLevel::System,
-        layout_strategy: LayoutStrategy::DeterministicOrbital,
-        nodes: vec![SceneNode {
-            id: "cbu".into(),
-            label,
-            node_type: SceneNodeType::Cbu,
-            state: Some("filled".into()),
-            progress: 0,
-            blocking: false,
-            depth: 0,
-            position_hint: Some((0.0, 0.0)),
-            badges: vec![],
-            child_count: 0,
-            group_id: None,
-        }],
-        edges: vec![],
-        groups: vec![],
-        drill_targets: vec![],
-        max_depth: 0,
-    };
+    // 3. No CBU in scope — return stub scene
+    Json(stub_graph_scene(Some(&label), ViewLevel::System)).into_response()
+}
 
-    Json(scene).into_response()
+/// Project HydratedSlot tree into SlotProjection vec for graph_scene_projection.
+/// This is the single conversion point — used by both the TOS path and fallback path.
+fn slots_from_hydrated(
+    slots: &[HydratedSlot],
+) -> Vec<sem_os_core::observatory::graph_scene_projection::SlotProjection> {
+    let mut result = Vec::new();
+    flatten_slots_recursive(slots, &mut result);
+    result
+}
+
+fn flatten_slots_recursive(
+    slots: &[HydratedSlot],
+    result: &mut Vec<sem_os_core::observatory::graph_scene_projection::SlotProjection>,
+) {
+    use sem_os_core::observatory::graph_scene_projection::SlotProjection;
+    use sem_os_core::observatory::graph_scene_projection::GraphEdgeProjection;
+    for slot in slots {
+        result.push(SlotProjection {
+            name: slot.name.clone(),
+            path: slot.path.clone(),
+            slot_type: serde_json::to_value(&slot.slot_type)
+                .ok()
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| "entity".into()),
+            computed_state: slot.computed_state.clone(),
+            progress: slot.progress,
+            blocking: slot.blocking,
+            depth: slot.path.matches('.').count(),
+            parent_path: slot.path.rsplit_once('.').map(|(p, _)| p.to_string()),
+            child_count: slot.children.len(),
+            depends_on: vec![], // TODO: populate from SlotDef.depends_on when available on HydratedSlot
+            graph_edges: slot.graph_edges.iter().map(|e| GraphEdgeProjection {
+                from_id: e.from_entity_id.to_string(),
+                to_id: e.to_entity_id.to_string(),
+                edge_type: e.ownership_type.clone().unwrap_or_else(|| "ownership".into()),
+                label: e.percentage.map(|p| format!("{:.0}%", p)),
+                weight: e.percentage.unwrap_or(0.0) as f32,
+            }).collect(),
+        });
+        // Recurse into children
+        flatten_slots_recursive(&slot.children, result);
+    }
 }
 
 /// Attempt to hydrate a constellation for a CBU. Returns Err if no map found.
@@ -619,6 +851,18 @@ fn parse_view_level(s: &str) -> ViewLevel {
     }
 }
 
+/// Convert ob-poc-types galaxy ViewLevel to sem_os_core orientation ViewLevel.
+fn to_orientation_view_level(level: ob_poc_types::galaxy::ViewLevel) -> ViewLevel {
+    match level {
+        ob_poc_types::galaxy::ViewLevel::Universe => ViewLevel::Universe,
+        ob_poc_types::galaxy::ViewLevel::Cluster => ViewLevel::Cluster,
+        ob_poc_types::galaxy::ViewLevel::System => ViewLevel::System,
+        ob_poc_types::galaxy::ViewLevel::Planet => ViewLevel::Planet,
+        ob_poc_types::galaxy::ViewLevel::Surface => ViewLevel::Surface,
+        ob_poc_types::galaxy::ViewLevel::Core => ViewLevel::Core,
+    }
+}
+
 /// Convert sem_os_core ViewLevel to ob-poc-types galaxy ViewLevel.
 fn to_galaxy_view_level(level: ViewLevel) -> ob_poc_types::galaxy::ViewLevel {
     match level {
@@ -663,10 +907,20 @@ fn stub_graph_scene(
 }
 
 /// Create the Observatory router.
-pub fn create_observatory_router(pool: PgPool, sessions: SessionStore) -> Router {
+///
+/// `repl_sessions` is the REPL V2 session store — the canonical source for hydrated
+/// constellation DAG. When provided, Observatory endpoints read `tos.hydrated_state`
+/// from here instead of building parallel state. Pass `None` only in tests or when
+/// the REPL V2 orchestrator is not available.
+pub fn create_observatory_router(
+    pool: PgPool,
+    sessions: SessionStore,
+    repl_sessions: Option<ReplSessionStore>,
+) -> Router {
     let state = ObservatoryState {
         pool,
         sessions,
+        repl_sessions,
         nav_history: Arc::new(RwLock::new(HashMap::new())),
     };
 

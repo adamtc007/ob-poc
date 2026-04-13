@@ -4,6 +4,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { observatoryApi } from "../../../api/observatory";
+import { queryKeys } from "../../../lib/query";
 
 interface Props {
   sessionId: string;
@@ -11,7 +12,7 @@ interface Props {
 
 export function MissionControl({ sessionId: _sessionId }: Props) {
   const { data: health } = useQuery({
-    queryKey: ["observatory", "health"],
+    queryKey: queryKeys.observatory.health(),
     queryFn: () => observatoryApi.getHealth(),
     refetchInterval: 10000,
   });

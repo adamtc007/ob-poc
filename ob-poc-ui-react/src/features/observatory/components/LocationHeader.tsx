@@ -6,8 +6,8 @@
 
 import { useState } from "react";
 import type { OrientationContract } from "../../../types/observatory";
-import { observatoryApi } from "../../../api/observatory";
-import { queryClient } from "../../../lib/query";
+import { chatApi } from "../../../api/chat";
+import { queryClient, queryKeys } from "../../../lib/query";
 
 interface Props {
   orientation: OrientationContract | null;
@@ -44,10 +44,10 @@ export function LocationHeader({ orientation, sessionId }: Props) {
     setToggling(true);
     const newMode = isActiveOverlay ? "draft_overlay" : "active_only";
     try {
-      await observatoryApi.navigate(sessionId, "nav.set-lens", {
-        overlay: newMode,
+      await chatApi.sendMessage(sessionId, {
+        message: `nav.set-lens overlay ${newMode}`,
       });
-      queryClient.invalidateQueries({ queryKey: ["observatory"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observatory.all(sessionId) });
     } catch (err) {
       console.error("Overlay toggle failed:", err);
     } finally {

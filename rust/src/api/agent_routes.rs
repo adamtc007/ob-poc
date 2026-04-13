@@ -158,21 +158,32 @@ async fn session_input(
     // Try routing through REPL V2 orchestrator first (unified pipeline).
     if let Some(ref orchestrator) = state.repl_v2_orchestrator {
         if let Some(repl_response) = try_route_through_repl(&req, orchestrator, session_id).await {
+            // Extract onboarding state from REPL response BEFORE moving it into
+            // the chat response adapter (which takes ownership). Reads from the
+            // hydrated constellation on session feedback — same DAG the compiler uses.
+            let onboarding_from_dag =
+                crate::api::agent_enrichment::try_onboarding_from_repl_response(
+                    &repl_response,
+                    None,
+                );
+
             let mut chat_response =
                 crate::api::response_adapter::repl_to_chat_response(repl_response, session_id);
 
-            // Enrich with onboarding state if past scope gate
-            #[cfg(feature = "database")]
             if chat_response.decision.is_none() {
-                // Only enrich when not in a gate state (scope/workspace/journey)
-                if let Some(osv) = crate::api::agent_enrichment::compute_onboarding_state(
-                    &state.pool,
-                    session_id,
-                    None,
-                )
-                .await
-                {
+                if let Some(osv) = onboarding_from_dag {
                     chat_response.onboarding_state = Some(osv);
+                } else {
+                    #[cfg(feature = "database")]
+                    if let Some(osv) = crate::api::agent_enrichment::compute_onboarding_state_from_db(
+                        &state.pool,
+                        session_id,
+                        None,
+                    )
+                    .await
+                    {
+                        chat_response.onboarding_state = Some(osv);
+                    }
                 }
             }
 

@@ -946,6 +946,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         repl_v2_orchestrator
     };
 
+    // Extract the REPL session store before moving the orchestrator Arc.
+    // Observatory endpoints read `tos.hydrated_state` from this store.
+    let repl_session_store = repl_v2_orchestrator.sessions_for_test().clone();
+
     // Build stateless API router (from main ob-poc crate) with SHARED session store.
     // Unified input endpoint (`/api/session/:id/input`) receives the REPL V2 adapter.
     let agent_router = create_agent_router_with_semantic_and_repl(
@@ -991,7 +995,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Stewardship routes (focus, show loop, SSE, manifests)
         .merge(create_stewardship_router(pool.clone()))
         // Observatory routes (orientation, show-packet, navigation history)
-        .nest("/api/observatory", create_observatory_router(pool.clone(), sessions.clone()));
+        // Pass the REPL V2 session store so Observatory reads from the canonical hydrated DAG.
+        .nest("/api/observatory", create_observatory_router(
+            pool.clone(),
+            sessions.clone(),
+            Some(repl_session_store),
+        ));
 
     // React dist directory - serve assets from React build
     let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {

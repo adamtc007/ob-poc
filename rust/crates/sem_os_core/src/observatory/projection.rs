@@ -177,7 +177,7 @@ fn focus_identity_from_focus(focus: &FocusState, business_label: Option<&str>) -
     }
 }
 
-fn scope_from_level(level: ViewLevel) -> ObservatoryScope {
+pub fn scope_from_level(level: ViewLevel) -> ObservatoryScope {
     match level {
         ViewLevel::Universe => ObservatoryScope::Universe,
         ViewLevel::Cluster => ObservatoryScope::Cluster,

@@ -85,6 +85,95 @@ pub struct BlockedVerbHint {
 }
 
 impl GroupCompositeState {
+    /// Build a `GroupCompositeState` from a hydrated constellation.
+    ///
+    /// Projects from the same `HydratedSlot` tree the compiler and narration engine use.
+    /// This avoids the raw SQL path in `composite_state_loader.rs` (SE-10 in the audit).
+    ///
+    /// The mapping from slot families to composite state fields:
+    ///   - Root CBU slot → cbu_count (one per constellation, may need extension for multi-CBU)
+    ///   - Slots with `computed_state == "filled"` in "kyc" family → has_kyc_case
+    ///   - Slots with `computed_state == "filled"` in "screening" family → has_screening
+    ///   - Slot progress aggregated for domain_counts
+    pub fn from_hydrated_constellation(
+        constellation: &crate::sem_os_runtime::constellation_runtime::HydratedConstellation,
+    ) -> Self {
+        let mut domain_counts = HashMap::new();
+        let mut cbu_states = Vec::new();
+
+        // Walk the slot tree to derive composite state
+        // flags = (has_ubo, has_control, has_kyc_case, kyc_case_status, has_screening, screening_complete)
+        let mut flags = (false, false, false, None::<String>, false, false);
+
+        for slot in &constellation.slots {
+            Self::walk_slots_recursive(slot, &mut domain_counts, &mut flags);
+        }
+
+        let has_ubo = flags.0;
+        let has_control = flags.1;
+
+        // Build a single CBU state summary from the constellation
+        cbu_states.push(CbuStateSummary {
+            cbu_id: constellation.cbu_id.to_string(),
+            cbu_name: Some(constellation.constellation.clone()),
+            lifecycle_state: Some("ACTIVE".into()),
+            has_kyc_case: flags.2,
+            kyc_case_status: flags.3,
+            has_screening: flags.4,
+            screening_complete: flags.5,
+            document_coverage_pct: None,
+        });
+
+        let mut state = Self {
+            cbu_count: 1,
+            domain_counts,
+            has_ubo_determination: has_ubo,
+            has_control_chain: has_control,
+            cbu_states,
+            next_likely_verbs: Vec::new(),
+            blocked_verbs: Vec::new(),
+        };
+
+        state.derive_next_likely_verbs();
+        state
+    }
+
+    fn walk_slots_recursive(
+        slot: &crate::sem_os_runtime::constellation_runtime::HydratedSlot,
+        domain_counts: &mut HashMap<String, usize>,
+        flags: &mut (bool, bool, bool, Option<String>, bool, bool),
+        // flags = (has_ubo, has_control, has_kyc_case, kyc_case_status, has_screening, screening_complete)
+    ) {
+        let path = &slot.path;
+        let filled = slot.computed_state != "empty" && slot.computed_state != "initial";
+
+        if filled && (path.contains("ubo") || path.contains("ownership")) {
+            flags.0 = true;
+        }
+        if filled && path.contains("control") {
+            flags.1 = true;
+        }
+        if filled && (path.contains("kyc") || path.contains("case")) {
+            flags.2 = true;
+            flags.3 = Some(slot.computed_state.clone());
+            *domain_counts.entry("kyc_case".into()).or_insert(0) += 1;
+        }
+        if filled && path.contains("screening") {
+            flags.4 = true;
+            if slot.computed_state == "complete" || slot.computed_state == "approved" {
+                flags.5 = true;
+            }
+            *domain_counts.entry("screening".into()).or_insert(0) += 1;
+        }
+        if filled && path.contains("document") {
+            *domain_counts.entry("document".into()).or_insert(0) += 1;
+        }
+
+        for child in &slot.children {
+            Self::walk_slots_recursive(child, domain_counts, flags);
+        }
+    }
+
     /// Compute the score adjustment for a given verb based on composite state.
     ///
     /// Returns a value in [-0.15, +0.15] that should be added to the verb's

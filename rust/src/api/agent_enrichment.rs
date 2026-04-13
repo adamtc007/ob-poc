@@ -8,12 +8,45 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-/// Compute the onboarding state view for the current group scope.
+use crate::repl::response_v2::ReplResponseV2;
+
+/// Try to extract onboarding state from the REPL response's session feedback.
 ///
-/// Loads CBU IDs from the scope graph, then builds the composite state
-/// and projects the onboarding view. Returns `None` if no CBUs are in scope.
+/// This reads from the hydrated constellation on the session's TOS — the same
+/// DAG the compiler and narration engine use. Avoids the raw SQL path in
+/// `composite_state_loader.rs` (SE-10/SE-11 in the audit).
+///
+/// Returns `None` if the response doesn't carry session feedback with a
+/// hydrated constellation (e.g., during tollgate states before workspace selection).
+/// In that case the caller should fall back to `compute_onboarding_state_from_db`.
+pub fn try_onboarding_from_repl_response(
+    response: &ReplResponseV2,
+    group_name: Option<&str>,
+) -> Option<ob_poc_types::onboarding_state::OnboardingStateView> {
+    let feedback = response.session_feedback.as_ref()?;
+    let constellation = feedback.tos.hydrated_constellation.as_ref()?;
+
+    // Project from hydrated slots — same data the narration engine reads.
+    // We build a lightweight GroupCompositeState from the constellation slots
+    // rather than querying the database independently.
+    let composite = crate::agent::composite_state::GroupCompositeState::from_hydrated_constellation(
+        constellation,
+    );
+
+    Some(crate::agent::onboarding_state_view::project_onboarding_state(
+        &composite, group_name,
+    ))
+}
+
+/// Compute the onboarding state view from the database (legacy path).
+///
+/// TRANSITIONAL: This is the SE-10/SE-11 side entrance — it loads CBU state
+/// from raw SQL queries instead of reading from the session's hydrated DAG.
+/// Kept as a fallback for when the REPL response doesn't carry a hydrated
+/// constellation (pre-workspace states). Use `try_onboarding_from_repl_response`
+/// as the preferred path.
 #[cfg(feature = "database")]
-pub async fn compute_onboarding_state(
+pub async fn compute_onboarding_state_from_db(
     pool: &PgPool,
     session_id: Uuid,
     group_name: Option<&str>,
@@ -30,7 +63,7 @@ pub async fn compute_onboarding_state(
         _ => return None,
     };
 
-    // Load group composite state
+    // Load group composite state from DB (legacy — SE-10)
     match crate::agent::composite_state_loader::load_group_composite_state(pool, &cbu_ids).await {
         Ok(Some(composite)) => Some(
             crate::agent::onboarding_state_view::project_onboarding_state(&composite, group_name),

@@ -482,6 +482,24 @@ The Observatory renders as a standalone egui/eframe WASM application in a separa
 | `domain_ops/navigation_ops.rs` | 7 nav.* verb handlers (plugin ops) |
 | `config/verbs/navigation.yaml` | 7 nav.* verb YAML definitions |
 
+### DAG Identity (2026-04-13)
+
+All Observatory endpoints project from the session's `tos.hydrated_state` — the same `HydratedSlot` tree the runbook compiler and narration engine read. No independent hydration.
+
+**Two kinds of state on the session:**
+- **Resource state (the DAG):** `tos.hydrated_state.hydrated_constellation` — rehydrated after verb execution writes
+- **Viewport state:** `WorkspaceFrame.view_level`, `.focus_slot_path`, `.nav_snapshots` — mutated by nav verbs, no rehydration
+
+**Key functions:**
+- `project_orientation_from_repl_session()` — projects OrientationContract from TOS (available_actions from `HydratedSlot.available_verbs`)
+- `slots_from_hydrated()` — single conversion point for GraphSceneModel projection
+- `orientation_from_repl_or_legacy()` — tries REPL session first, falls back to legacy
+- `apply_nav_result_if_present()` — orchestrator interprets nav verb results, writes viewport state
+
+**Frontend:** All navigation routes through `chatApi.sendMessage()` → `POST /session/:id/input`. Zero calls to `observatoryApi.navigate()` remain. Cross-cache invalidation between Chat and Observatory query keys in both directions.
+
+**Side doors closed:** SE-1 through SE-5 (independent hydration), SX-3 (`/navigate` bypassed by frontend). SE-10/SE-11 (OnboardingStateView) has DAG-sourced preferred path with DB fallback.
+
 ### Architecture: React Shell + egui Canvas
 
 **React shell** (`ob-poc-ui-react/src/features/observatory/`): LocationHeader, Breadcrumbs, ViewportRenderer (Focus/Object/Diff/Gates), ActionPalette, MissionControl, ConstellationCanvas wrapper. All typed via `types/observatory.ts`.
@@ -653,7 +671,11 @@ domains:
 
 ## Onboarding State View
 
-`OnboardingStateView` is computed from live DB composite state and returned on every `ChatResponse`.
+`OnboardingStateView` is returned on every `ChatResponse`. Two sourcing paths exist:
+
+1. **DAG-sourced (preferred):** `try_onboarding_from_repl_response()` in `agent_enrichment.rs` reads from the REPL response's `session_feedback.tos.hydrated_constellation` — the same `HydratedSlot` tree the compiler and narration engine use. Calls `GroupCompositeState::from_hydrated_constellation()` which walks the slot tree to derive CBU state.
+
+2. **DB-sourced (fallback):** `compute_onboarding_state_from_db()` runs raw SQL against `cbus`, `cases`, `screenings` tables. Used only when the REPL response doesn't carry a hydrated constellation (pre-workspace states). Marked transitional (SE-10/SE-11 in Observatory audit).
 
 ### GroupCompositeState
 

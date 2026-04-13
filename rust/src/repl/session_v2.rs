@@ -521,6 +521,83 @@ impl ReplSessionV2 {
         self.last_active_at = Utc::now();
     }
 
+    // ── Viewport state accessors (observation frame, NOT resource truth) ──
+
+    /// Current Observatory view level from TOS.
+    pub fn tos_view_level(&self) -> ob_poc_types::galaxy::ViewLevel {
+        self.workspace_stack
+            .last()
+            .map(|f| f.view_level)
+            .unwrap_or(ob_poc_types::galaxy::ViewLevel::Universe)
+    }
+
+    /// Set the Observatory view level on TOS.
+    pub fn set_tos_view_level(&mut self, level: ob_poc_types::galaxy::ViewLevel) {
+        if let Some(tos) = self.workspace_stack.last_mut() {
+            tos.view_level = level;
+        }
+    }
+
+    /// Current focus slot path from TOS.
+    pub fn tos_focus_slot_path(&self) -> Option<&str> {
+        self.workspace_stack
+            .last()
+            .and_then(|f| f.focus_slot_path.as_deref())
+    }
+
+    /// Set the focus slot path on TOS.
+    pub fn set_tos_focus_slot(&mut self, path: Option<String>) {
+        if let Some(tos) = self.workspace_stack.last_mut() {
+            tos.focus_slot_path = path;
+        }
+    }
+
+    /// Push a viewport snapshot to TOS navigation history (for back/forward).
+    /// Truncates any forward history beyond the current cursor.
+    pub fn push_nav_snapshot(&mut self) {
+        if let Some(tos) = self.workspace_stack.last_mut() {
+            let snapshot = super::types_v2::ViewportSnapshot {
+                view_level: tos.view_level,
+                focus_slot_path: tos.focus_slot_path.clone(),
+                timestamp: chrono::Utc::now(),
+            };
+            // Truncate forward history
+            if tos.nav_cursor + 1 < tos.nav_snapshots.len() {
+                tos.nav_snapshots.truncate(tos.nav_cursor + 1);
+            }
+            tos.nav_snapshots.push(snapshot);
+            tos.nav_cursor = tos.nav_snapshots.len() - 1;
+        }
+    }
+
+    /// Navigate back in viewport history. Returns true if cursor moved.
+    pub fn nav_back(&mut self) -> bool {
+        if let Some(tos) = self.workspace_stack.last_mut() {
+            if tos.nav_cursor > 0 {
+                tos.nav_cursor -= 1;
+                let snap = &tos.nav_snapshots[tos.nav_cursor];
+                tos.view_level = snap.view_level;
+                tos.focus_slot_path = snap.focus_slot_path.clone();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Navigate forward in viewport history. Returns true if cursor moved.
+    pub fn nav_forward(&mut self) -> bool {
+        if let Some(tos) = self.workspace_stack.last_mut() {
+            if tos.nav_cursor + 1 < tos.nav_snapshots.len() {
+                tos.nav_cursor += 1;
+                let snap = &tos.nav_snapshots[tos.nav_cursor];
+                tos.view_level = snap.view_level;
+                tos.focus_slot_path = snap.focus_slot_path.clone();
+                return true;
+            }
+        }
+        false
+    }
+
     /// Pop the top-of-stack frame and mark the restored frame stale.
     ///
     /// # Examples

@@ -5,8 +5,8 @@
  * blocked_actions (disabled, reason tooltip).
  */
 
-import { observatoryApi } from "../../../../api/observatory";
-import { queryClient } from "../../../../lib/query";
+import { chatApi } from "../../../../api/chat";
+import { queryClient, queryKeys } from "../../../../lib/query";
 
 interface ActionEntry {
   verb_fqn: string;
@@ -36,9 +36,9 @@ export function ActionSurface({ data, sessionId }: Props) {
   const handleInvoke = async (verbFqn: string) => {
     if (!sessionId) return;
     try {
-      await observatoryApi.navigate(sessionId, verbFqn, {});
+      await chatApi.sendMessage(sessionId, { message: verbFqn });
       queryClient.invalidateQueries({
-        queryKey: ["observatory"],
+        queryKey: queryKeys.observatory.all(sessionId),
       });
     } catch (err) {
       console.error("Action invoke failed:", err);

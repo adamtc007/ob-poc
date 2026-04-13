@@ -7,6 +7,13 @@
 //! - Jump to a breadcrumb level (back-to)
 //! - Get current breadcrumbs
 //!
+//! KNOWN SIDE EXITS (SX-6/7/8 in Observatory audit): These handlers directly
+//! manipulate `taxonomy_stack` on the session without going through the REPL
+//! orchestrator. This is acceptable because taxonomy navigation is a specialized
+//! UI concern not currently rendered by the Observatory. If Observatory ever
+//! needs taxonomy context, these should route through nav verbs with a
+//! `target_type: "taxonomy"` parameter.
+//!
 //! The taxonomy stack is session-scoped, stored in UnifiedSessionContext.
 
 use axum::{

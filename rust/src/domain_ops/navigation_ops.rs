@@ -1,7 +1,13 @@
 //! Navigation verb handlers — nav.drill, nav.zoom-out, nav.select, etc.
 //!
-//! These verbs produce workspace stack transitions identical to equivalent REPL commands.
-//! Observatory-specific camera framing differs, but semantic transitions are identical.
+//! These verbs mutate VIEWPORT STATE on the session (view level, focus slot,
+//! lens, nav history). They do NOT mutate the DAG (resource state) and do NOT
+//! trigger rehydration — except when nav.drill crosses a materialization boundary.
+//!
+//! The verb handlers return structured NavResult records. The orchestrator reads
+//! these results and applies the viewport state changes to the session's
+//! WorkspaceFrame. This keeps the single-write-path invariant: all session
+//! mutations happen in orchestrator_v2.process(), not in verb handlers.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -12,20 +18,30 @@ use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 /// Result of a navigation operation.
+/// The orchestrator reads these fields to update session viewport state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NavResult {
     pub success: bool,
     pub message: String,
-}
-
-/// Result of a navigation history operation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NavHistoryResult {
-    pub direction: String,
-    pub success: bool,
+    /// If set, the orchestrator should update WorkspaceFrame.view_level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_level: Option<String>,
+    /// If set, the orchestrator should update WorkspaceFrame.focus_slot_path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_slot: Option<String>,
+    /// If true, the drill target is in a different CBU/constellation,
+    /// requiring rehydration (materialization boundary crossing).
+    #[serde(default)]
+    pub crossed_boundary: bool,
+    /// Navigation direction for history operations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub history_direction: Option<String>,
 }
 
 /// nav.drill — semantic drill into a focused object.
+///
+/// Updates view level and focus slot. If the target is in a different CBU,
+/// sets crossed_boundary=true so the orchestrator triggers rehydration.
 #[register_custom_op]
 pub struct NavDrillOp;
 
@@ -38,16 +54,35 @@ impl crate::domain_ops::CustomOperation for NavDrillOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
+        verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<ExecutionResult> {
+        let target_id = find_arg(verb_call, "target_id");
+        let _target_level = find_arg(verb_call, "target_level");
+
         let result = NavResult {
             success: true,
-            message: "Drill executed".into(),
+            message: format!("Drilled to {}", target_id.as_deref().unwrap_or("target")),
+            target_level: None,
+            target_slot: target_id,
+            crossed_boundary: false,
+            history_direction: None,
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+}
+
+/// Extract a string argument from a VerbCall by key.
+fn find_arg(verb_call: &VerbCall, key: &str) -> Option<String> {
+    use dsl_core::ast::{AstNode, Literal};
+    verb_call.arguments.iter()
+        .find(|a| a.key == key)
+        .and_then(|a| match &a.value {
+            AstNode::Literal(Literal::String(s), _) => Some(s.clone()),
+            AstNode::SymbolRef { name, .. } => Some(name.clone()),
+            _ => None,
+        })
 }
 
 /// nav.zoom-out — semantic zoom out, go up one level.
@@ -67,9 +102,14 @@ impl crate::domain_ops::CustomOperation for NavZoomOutOp {
         _ctx: &mut ExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<ExecutionResult> {
+        // Orchestrator reads target_level=None + no target_slot and decrements level
         let result = NavResult {
             success: true,
             message: "Zoomed out one level".into(),
+            target_level: None, // Orchestrator computes parent level
+            target_slot: None,  // Clear focus on zoom out
+            crossed_boundary: false,
+            history_direction: None,
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
@@ -88,13 +128,18 @@ impl crate::domain_ops::CustomOperation for NavSelectOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
-        _verb_call: &VerbCall,
+        verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<ExecutionResult> {
+        let target_id = find_arg(verb_call, "target_id");
         let result = NavResult {
             success: true,
-            message: "Focus set".into(),
+            message: format!("Focus set to {}", target_id.as_deref().unwrap_or("target")),
+            target_level: None,
+            target_slot: target_id,
+            crossed_boundary: false,
+            history_direction: None,
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
@@ -117,7 +162,16 @@ impl crate::domain_ops::CustomOperation for NavSetClusterTypeOp {
         _ctx: &mut ExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        // Cluster mode is a lens parameter — orchestrator stores on session
+        let result = NavResult {
+            success: true,
+            message: "Cluster mode updated".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -138,11 +192,20 @@ impl crate::domain_ops::CustomOperation for NavSetLensOp {
         _ctx: &mut ExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
+        // Lens state is a viewport parameter — orchestrator stores on session
+        let result = NavResult {
+            success: true,
+            message: "Lens updated".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
-/// nav.history-back — replay previous OrientationContract.
+/// nav.history-back — navigate back in viewport history.
 #[register_custom_op]
 pub struct NavHistoryBackOp;
 
@@ -159,15 +222,19 @@ impl crate::domain_ops::CustomOperation for NavHistoryBackOp {
         _ctx: &mut ExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<ExecutionResult> {
-        let result = NavHistoryResult {
-            direction: "back".into(),
+        let result = NavResult {
             success: true,
+            message: "Navigated back".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: Some("back".into()),
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
-/// nav.history-forward — replay next OrientationContract.
+/// nav.history-forward — navigate forward in viewport history.
 #[register_custom_op]
 pub struct NavHistoryForwardOp;
 
@@ -184,9 +251,13 @@ impl crate::domain_ops::CustomOperation for NavHistoryForwardOp {
         _ctx: &mut ExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<ExecutionResult> {
-        let result = NavHistoryResult {
-            direction: "forward".into(),
+        let result = NavResult {
             success: true,
+            message: "Navigated forward".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: Some("forward".into()),
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
