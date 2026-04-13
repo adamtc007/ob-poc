@@ -487,6 +487,16 @@ impl CustomOperation for TemplateBatchOp {
             client_group_name: ctx.client_group_name.clone(),
             // Inherit persona for tag filtering
             persona: ctx.persona.clone(),
+            // Phase 3 typed fields — fresh per batch
+            pending_session_name: None,
+            pending_dag_flags: Vec::new(),
+            pending_structure_id: None,
+            pending_structure_name: None,
+            pending_case_id: None,
+            pending_mandate_id: None,
+            pending_deal_id: None,
+            pending_deal_name: None,
+            cbu_scope_dirty: false,
         };
 
         // 10. Create and run BatchExecutor

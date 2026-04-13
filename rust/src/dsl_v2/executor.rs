@@ -487,6 +487,35 @@ pub struct ExecutionContext {
     /// When set, tag search will be filtered by persona (kyc, trading, ops, onboarding).
     /// Set via `session.set-persona` verb.
     pub persona: Option<String>,
+
+    // --- Typed session mutation fields (Phase 3 session merge) ---
+    // Verb handlers write to these instead of pending_session.
+    // Orchestrator syncs back to ReplSessionV2/WorkspaceFrame after execution.
+
+    /// Session display name — set by session.load-cluster.
+    pub pending_session_name: Option<String>,
+
+    /// DAG state flags set during execution (verb → flag pairs).
+    /// Synced to session dag_state after execution.
+    pub pending_dag_flags: Vec<(String, bool)>,
+
+    /// Constraint cascade: current structure set by verb handler.
+    pub pending_structure_id: Option<Uuid>,
+    pub pending_structure_name: Option<String>,
+
+    /// Constraint cascade: current case set by verb handler.
+    pub pending_case_id: Option<Uuid>,
+
+    /// Constraint cascade: current mandate set by verb handler.
+    pub pending_mandate_id: Option<Uuid>,
+
+    /// Deal context set by verb handler.
+    pub pending_deal_id: Option<Option<Uuid>>,  // Some(Some(id)) = set, Some(None) = cleared
+    pub pending_deal_name: Option<Option<String>>,
+
+    /// Whether CBU scope was modified during this execution.
+    /// When true, orchestrator syncs session_cbu_ids back to session.cbu_ids.
+    pub cbu_scope_dirty: bool,
 }
 
 impl Default for ExecutionContext {
@@ -513,6 +542,15 @@ impl Default for ExecutionContext {
             client_group_id: None,
             client_group_name: None,
             persona: None,
+            pending_session_name: None,
+            pending_dag_flags: Vec::new(),
+            pending_structure_id: None,
+            pending_structure_name: None,
+            pending_case_id: None,
+            pending_mandate_id: None,
+            pending_deal_id: None,
+            pending_deal_name: None,
+            cbu_scope_dirty: false,
         }
     }
 }
@@ -639,6 +677,16 @@ impl ExecutionContext {
             client_group_name: self.client_group_name.clone(),
             // Inherit persona for tag filtering
             persona: self.persona.clone(),
+            // Phase 3 typed fields — fresh per iteration (no inheritance)
+            pending_session_name: None,
+            pending_dag_flags: Vec::new(),
+            pending_structure_id: None,
+            pending_structure_name: None,
+            pending_case_id: None,
+            pending_mandate_id: None,
+            pending_deal_id: None,
+            pending_deal_name: None,
+            cbu_scope_dirty: false,
         }
     }
 
