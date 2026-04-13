@@ -684,59 +684,31 @@ impl ReplOrchestratorV2 {
             if tos.writes_since_push > 0 {
                 #[cfg(feature = "database")]
                 if let Some(ref pool) = self.pool {
-                    // Resolve subject_id from execution results if not yet set.
-                    // After cbu.create executes, the result JSON contains { "cbu_id": uuid }.
-                    // We extract this and set it as subject_id on the workspace frame so
-                    // constellation hydration knows which CBU to hydrate.
-                    if session.workspace_stack.last().map_or(true, |f| f.subject_id.is_none()) {
-                        // Scan recent completed runbook entries for a cbu_id in their result
-                        let completed_count = session.runbook.entries.iter()
-                            .filter(|e| matches!(e.status, crate::repl::runbook::EntryStatus::Completed))
-                            .count();
-                        tracing::info!(
-                            completed_count,
-                            total_entries = session.runbook.entries.len(),
-                            "subject_id resolution: scanning runbook entries"
-                        );
-                        for (i, e) in session.runbook.entries.iter().enumerate() {
-                            tracing::info!(
-                                idx = i,
-                                status = ?e.status,
-                                has_result = e.result.is_some(),
-                                result_preview = ?e.result.as_ref().map(|v| {
-                                    let s = v.to_string();
-                                    if s.len() > 120 { format!("{}...", &s[..120]) } else { s }
-                                }),
-                                "runbook entry"
-                            );
+                    // Sync cbu_ids from verb execution results (bridge — removed in Phase 3).
+                    // cbu.create returns {"Record":{"cbu_id":"uuid",...}} — extract and append.
+                    for entry in &session.runbook.entries {
+                        if !matches!(entry.status, crate::repl::runbook::EntryStatus::Completed) {
+                            continue;
                         }
+                        if let Some(ref result) = entry.result {
+                            // ExecutionResult::Record serializes as {"Record": {inner}}
+                            let inner = result.get("Record").unwrap_or(result);
+                            if let Some(cbu_id_str) = inner.get("cbu_id").and_then(|v| v.as_str()) {
+                                if let Ok(cbu_id) = Uuid::parse_str(cbu_id_str) {
+                                    if !session.cbu_ids.contains(&cbu_id) {
+                                        session.cbu_ids.push(cbu_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
 
-                        let cbu_id_from_result = session.runbook.entries.iter().rev()
-                            .filter(|e| matches!(e.status, crate::repl::runbook::EntryStatus::Completed))
-                            .find_map(|e| {
-                                e.result.as_ref().and_then(|v| {
-                                    // ExecutionResult::Record serializes as {"Record": {inner}}
-                                    // ExecutionResult::Uuid serializes as {"Uuid": "uuid-string"}
-                                    let inner = v.get("Record").or(Some(v));
-                                    inner.and_then(|r| {
-                                        r.get("cbu_id")
-                                            .and_then(|id| id.as_str())
-                                            .and_then(|s| Uuid::parse_str(s).ok())
-                                    })
-                                    .or_else(|| {
-                                        v.get("Uuid")
-                                            .and_then(|id| id.as_str())
-                                            .and_then(|s| Uuid::parse_str(s).ok())
-                                    })
-                                })
-                            });
-
-                        tracing::info!(?cbu_id_from_result, "subject_id extraction result");
-
-                        if let Some(cbu_id) = cbu_id_from_result {
+                    // Set subject_id from cbu_ids (Vec::last = most recently added).
+                    if session.workspace_stack.last().map_or(true, |f| f.subject_id.is_none()) {
+                        if let Some(&cbu_id) = session.cbu_ids.last() {
                             if let Some(tos) = session.workspace_stack.last_mut() {
                                 tos.subject_id = Some(cbu_id);
-                                tracing::info!(%cbu_id, "Resolved subject_id from runbook execution result");
+                                tracing::debug!(%cbu_id, "Set subject_id from session.cbu_ids");
                             }
                         }
                     }
@@ -1256,10 +1228,19 @@ impl ReplOrchestratorV2 {
 
         session.set_workspace_root(workspace.clone());
 
-        // Hydrate the empty constellation immediately — the DAG exists from this point.
-        // This read-only hydration populates the slot tree in its initial state so that
-        // Observatory endpoints can render the empty-but-structured DAG, and the narration
-        // engine can compute "everything is empty, here are all the gaps."
+        // Set subject_id from cbu_ids so constellation hydration knows which CBU to hydrate.
+        // cbu_ids was populated during ScopeGate from the client group's CBU list.
+        if let Some(&cbu_id) = session.cbu_ids.last() {
+            if let Some(tos) = session.workspace_stack.last_mut() {
+                if tos.subject_id.is_none() {
+                    tos.subject_id = Some(cbu_id);
+                    tracing::debug!(%cbu_id, "Set subject_id from session.cbu_ids on workspace selection");
+                }
+            }
+        }
+
+        // Hydrate the constellation immediately — the DAG exists from this point.
+        // With subject_id set, this hydrates the real slot tree for the CBU, not an empty stub.
         #[cfg(feature = "database")]
         if let Some(ref pool) = self.pool {
             match self.rehydrate_tos(pool, session).await {
@@ -2196,6 +2177,36 @@ impl ReplOrchestratorV2 {
         // Even if session.load-cluster failed (e.g., no CBUs yet for this group),
         // the group is valid — the user can create CBUs in the CBU workspace.
         session.set_client_scope(group_id);
+        session.name = Some(group_name.to_string());
+
+        // Populate cbu_ids on the REPL session from the execution result.
+        // session.load-cluster returns {"Record":{"manco_name":"...","count_added":N,...}}
+        // and populates ExecutionContext.pending_session.entity_scope.cbu_ids.
+        // We also query the DB directly as a reliable fallback.
+        #[cfg(feature = "database")]
+        if let Some(ref pool) = self.pool {
+            if let Ok(db_cbu_ids) = sqlx::query_scalar::<_, Uuid>(
+                r#"SELECT DISTINCT cge.cbu_id FROM "ob-poc".client_group_entity cge
+                   WHERE cge.group_id = $1
+                     AND cge.cbu_id IS NOT NULL"#,
+            )
+            .bind(group_id)
+            .fetch_all(pool)
+            .await
+            {
+                session.cbu_ids.clear();
+                for id in db_cbu_ids {
+                    if !session.cbu_ids.contains(&id) {
+                        session.cbu_ids.push(id);
+                    }
+                }
+                tracing::debug!(
+                    group_id = %group_id,
+                    cbu_count = session.cbu_ids.len(),
+                    "Populated session.cbu_ids from client group"
+                );
+            }
+        }
 
         if !succeeded {
             tracing::info!(

@@ -290,6 +290,20 @@ impl SessionRepositoryV2 {
                             .unwrap_or_else(|| serde_json::json!([])),
                     )
                     .context("Failed to deserialize execution_log")?,
+                    cbu_ids: serde_json::from_value(
+                        extended_state
+                            .get("cbu_ids")
+                            .cloned()
+                            .unwrap_or_else(|| serde_json::json!([])),
+                    )
+                    .context("Failed to deserialize cbu_ids")?,
+                    name: serde_json::from_value(
+                        extended_state
+                            .get("name")
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Null),
+                    )
+                    .context("Failed to deserialize name")?,
                     created_at: r.try_get("created_at")?,
                     last_active_at: r.try_get("last_active_at")?,
                     // Transient field — the authoritative counter is on `runbook.next_version_counter`

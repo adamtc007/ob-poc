@@ -90,6 +90,19 @@ pub struct ReplSessionV2 {
     /// Results of executed plan steps.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub execution_log: Vec<crate::runbook::plan_types::StepResult>,
+    /// CBU IDs in the current working set.
+    /// Insertion-ordered Vec (not HashSet) because subject_id is set from
+    /// the LAST entry (most recently created/loaded CBU).
+    /// Populated during ScopeGate (group loads CBUs) and updated by verb
+    /// execution (cbu.create appends). Dedup via contains() before push.
+    #[serde(default)]
+    pub cbu_ids: Vec<Uuid>,
+
+    /// Session display name (e.g., "Allianz Global Investors").
+    /// Set during ScopeGate from the client group name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
     pub created_at: DateTime<Utc>,
     pub last_active_at: DateTime<Utc>,
     #[serde(default)]
@@ -145,6 +158,8 @@ impl ReplSessionV2 {
             runbook_plan: None,
             runbook_plan_cursor: None,
             execution_log: Vec::new(),
+            cbu_ids: Vec::new(),
+            name: None,
             created_at: now,
             last_active_at: now,
             next_runbook_version: 0,
