@@ -127,6 +127,7 @@ impl AgentMode {
     /// - `changeset.*` — Research only (authoring), blocked in Governed
     /// - `governance.*`, `maintenance.*` — Governed only (pipeline/ops), blocked in Research
     /// - `authoring.*` — Research allows propose/validate/dry-run/plan/diff; Governed allows publish
+    ///
     /// Domain prefixes blocked in Maintenance mode (business-plane only).
     const BUSINESS_ONLY_PREFIXES: &[&str] = &[
         "cbu.", "entity.", "trading-profile.", "investor.", "custody.",

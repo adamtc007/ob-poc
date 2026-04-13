@@ -78,10 +78,14 @@ pub async fn hydrate_constellation(
     };
     let scope = build_eval_scope(&mut tx, cbu_id, case_id)
         .await
-        .map_err(ConstellationError::Other)?;
+        .map_err(|err| ConstellationError::Execution(format!("build_eval_scope failed: {err}")))?;
 
     for slot in &map.slots_ordered {
-        hydrate_slot_tx(&mut tx, cbu_id, case_id, map, slot, &scope, &mut raw).await?;
+        hydrate_slot_tx(&mut tx, cbu_id, case_id, map, slot, &scope, &mut raw)
+            .await
+            .map_err(|err| {
+                ConstellationError::Execution(format!("slot '{}' failed: {err}", slot.name))
+            })?;
     }
 
     let normalized =
@@ -98,13 +102,30 @@ async fn hydrate_slot_tx(
     scope: &RuntimeEvalScope,
     raw: &mut RawHydrationData,
 ) -> ConstellationResult<()> {
-    let rows = load_slot_rows_tx(tx, cbu_id, case_id, slot, raw).await?;
+    let rows = load_slot_rows_tx(tx, cbu_id, case_id, slot, raw)
+        .await
+        .map_err(|err| {
+            ConstellationError::Execution(format!("load_slot_rows failed for '{}': {err}", slot.name))
+        })?;
     raw.slot_rows.insert(slot.name.clone(), rows.clone());
-    populate_entity_details_tx(tx, raw, &rows).await?;
+    populate_entity_details_tx(tx, raw, &rows).await.map_err(|err| {
+        ConstellationError::Execution(format!(
+            "populate_entity_details failed for '{}': {err}",
+            slot.name
+        ))
+    })?;
 
     if let Some(entity_id) = pick_deterministic_row(&rows).and_then(|row| row.entity_id) {
         let Some(machine_name) = slot.def.state_machine.as_ref() else {
-            hydrate_slot_overlays_tx(tx, cbu_id, case_id, raw, slot, entity_id).await?;
+            if let Err(err) = hydrate_slot_overlays_tx(tx, cbu_id, case_id, raw, slot, entity_id).await
+            {
+                tracing::warn!(
+                    slot = %slot.name,
+                    %entity_id,
+                    error = %err,
+                    "Overlay hydration failed for non-state-machine slot — continuing"
+                );
+            }
             return Ok(());
         };
         let machine = map.state_machines.get(machine_name).ok_or_else(|| {
@@ -123,14 +144,27 @@ async fn hydrate_slot_tx(
             Some(scope),
         )
         .await
-        .map_err(ConstellationError::Other)?;
+        .map_err(|err| {
+            ConstellationError::Execution(format!(
+                "collect_slot_runtime_artifacts failed for '{}' entity {}: {err}",
+                slot.name, entity_id
+            ))
+        })?;
         let derived = artifacts
             .reducer_result
             .ok_or_else(|| ConstellationError::Execution("missing reducer result".into()))?;
         raw.warnings
             .insert(slot.name.clone(), derived.consistency_warnings.clone());
         raw.reducer_results.insert(slot.name.clone(), derived);
-        hydrate_slot_overlays_tx(tx, cbu_id, case_id, raw, slot, entity_id).await?;
+        if let Err(err) = hydrate_slot_overlays_tx(tx, cbu_id, case_id, raw, slot, entity_id).await
+        {
+            tracing::warn!(
+                slot = %slot.name,
+                %entity_id,
+                error = %err,
+                "Overlay hydration writeback failed after reducer evaluation — continuing"
+            );
+        }
     }
 
     Ok(())

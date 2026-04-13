@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result};
-use sqlx::{PgPool, Postgres, Transaction};
+use sqlx::{Acquire, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::ast::{FieldValue, OverlayRow, ScopeData, SlotOverlayData};
@@ -158,17 +158,35 @@ pub(crate) async fn fetch_slot_overlays_tx(
     entity_id: Uuid,
     case_id: Option<Uuid>,
 ) -> Result<SlotOverlayData> {
-    match fetch_slot_overlays_tx_inner(tx, cbu_id, entity_id, case_id).await {
-        Ok(data) => Ok(data),
+    // Overlay hydration is best-effort. Run it under a savepoint so any SQL
+    // error can be rolled back locally without aborting the parent
+    // constellation-hydration transaction.
+    let mut overlay_tx = tx
+        .begin()
+        .await
+        .context("failed to open overlay savepoint")?;
+    let data = match fetch_slot_overlays_tx_inner(&mut overlay_tx, cbu_id, entity_id, case_id).await
+    {
+        Ok(data) => data,
         Err(e) => {
+            overlay_tx
+                .rollback()
+                .await
+                .context("failed to rollback overlay savepoint")?;
             tracing::warn!(error = %e, %cbu_id, %entity_id, "Overlay fetch (tx) failed — returning empty overlays");
-            Ok(SlotOverlayData {
+            return Ok(SlotOverlayData {
                 sources: HashMap::new(),
                 scope: ScopeData { fields: serde_json::json!({}) },
                 slots: Vec::new(),
-            })
+            });
         }
-    }
+    };
+
+    overlay_tx
+        .commit()
+        .await
+        .context("failed to commit overlay savepoint")?;
+    Ok(data)
 }
 
 async fn fetch_slot_overlays_tx_inner(
@@ -197,11 +215,7 @@ async fn fetch_slot_overlays_tx_inner(
     .bind(cbu_id)
     .bind(entity_id)
     .fetch_all(&mut **tx)
-    .await
-    .unwrap_or_else(|e| {
-        tracing::warn!(error = %e, %cbu_id, %entity_id, "Failed to fetch entity role overlays (tx) — continuing with empty overlays");
-        Vec::new()
-    });
+    .await?;
 
     if !entity_roles.is_empty() {
         data.sources.insert(
@@ -232,13 +246,6 @@ async fn fetch_slot_overlays_tx_inner(
         .bind(entity_id)
         .fetch_all(&mut **tx)
         .await
-        .or_else(|err| {
-            if is_missing_relation_error(&err, "entity_workstreams") {
-                Ok(Vec::new())
-            } else {
-                Err(err)
-            }
-        })
         .context("failed to fetch workstream overlays")?;
 
         if !workstreams.is_empty() {
@@ -465,13 +472,6 @@ async fn fetch_screenings_tx(
     .bind(workstream_ids)
     .fetch_all(&mut **tx)
     .await
-    .or_else(|err| {
-        if is_missing_relation_error(&err, "screenings") {
-            Ok(Vec::new())
-        } else {
-            Err(err)
-        }
-    })
     .context("failed to fetch screening overlays")?;
 
     if !rows.is_empty() {
@@ -513,15 +513,6 @@ async fn fetch_evidence_tx(
     .bind(entity_id)
     .fetch_all(&mut **tx)
     .await
-    .or_else(|err| {
-        if is_missing_relation_error(&err, "kyc_ubo_evidence")
-            || is_missing_relation_error(&err, "ubo_registry")
-        {
-            Ok(Vec::new())
-        } else {
-            Err(err)
-        }
-    })
     .context("failed to fetch evidence overlays")?;
 
     if !rows.is_empty() {
@@ -562,13 +553,6 @@ async fn fetch_red_flags_tx(
     .bind(case_id)
     .fetch_all(&mut **tx)
     .await
-    .or_else(|err| {
-        if is_missing_relation_error(&err, "red_flags") {
-            Ok(Vec::new())
-        } else {
-            Err(err)
-        }
-    })
     .context("failed to fetch red flag overlays")?;
 
     if !rows.is_empty() {
@@ -604,13 +588,6 @@ async fn fetch_doc_requests_tx(
     .bind(workstream_ids)
     .fetch_all(&mut **tx)
     .await
-    .or_else(|err| {
-        if is_missing_relation_error(&err, "doc_requests") {
-            Ok(Vec::new())
-        } else {
-            Err(err)
-        }
-    })
     .context("failed to fetch document request overlays")?;
 
     if !rows.is_empty() {

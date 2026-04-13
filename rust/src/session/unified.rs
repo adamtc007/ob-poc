@@ -2028,7 +2028,7 @@ impl UnifiedSession {
         }
     }
 
-    /// Push current state to history
+    // Push current state to history
     // DELETED: push_state, back, forward, go_to_start, go_to_last
     // — 0 callers outside unified.rs (state_stack navigation replaced by ReplStateV2)
 

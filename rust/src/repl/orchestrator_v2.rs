@@ -683,7 +683,7 @@ impl ReplOrchestratorV2 {
         if let Some(tos) = session.workspace_stack.last() {
             if tos.writes_since_push > 0 {
                 #[cfg(feature = "database")]
-                if let Some(ref pool) = self.pool {
+                if let Some(pool) = self.pool() {
                     // Sync cbu_ids from verb execution results (bridge — removed in Phase 3).
                     // cbu.create returns {"Record":{"cbu_id":"uuid",...}} — extract and append.
                     for entry in &session.runbook.entries {
@@ -736,7 +736,11 @@ impl ReplOrchestratorV2 {
                     }
 
                     // Set subject_id from cbu_ids (Vec::last = most recently added).
-                    if session.workspace_stack.last().map_or(true, |f| f.subject_id.is_none()) {
+                    if session
+                        .workspace_stack
+                        .last()
+                        .is_none_or(|frame| frame.subject_id.is_none())
+                    {
                         if let Some(&cbu_id) = session.cbu_ids.last() {
                             if let Some(tos) = session.workspace_stack.last_mut() {
                                 tos.subject_id = Some(cbu_id);
@@ -967,7 +971,7 @@ impl ReplOrchestratorV2 {
     ) -> Option<NewUtteranceTrace> {
         let raw_utterance = input_trace_text(input)?;
 
-        let pool = self.pool.clone()?;
+        let pool = self.pool().cloned()?;
 
         let repository = UtteranceTraceRepository::new(pool);
         let sage_ctx = repl_trace_sage_context(session);
@@ -1021,7 +1025,7 @@ impl ReplOrchestratorV2 {
     ) -> Option<Uuid> {
         let mut trace = trace?;
 
-        let pool = self.pool.clone()?;
+        let pool = self.pool().cloned()?;
 
         let repository = UtteranceTraceRepository::new(pool);
         let sage_ctx = repl_trace_sage_context(session);
@@ -1100,7 +1104,7 @@ impl ReplOrchestratorV2 {
         response: &ReplResponseV2,
     ) -> Option<Uuid> {
         let parent_trace_id = parent_trace_id?;
-        let pool = self.pool.clone()?;
+        let pool = self.pool().cloned()?;
 
         let repository = UtteranceTraceRepository::new(pool);
         let mut trace = NewUtteranceTrace::in_progress(
@@ -1200,7 +1204,7 @@ impl ReplOrchestratorV2 {
                 // Resolve the input against client groups.
                 #[cfg(feature = "database")]
                 {
-                    if let Some(ref pool) = self.pool {
+                    if let Some(pool) = self.pool() {
                         let outcome = super::bootstrap::resolve_client_input(&content, pool).await;
                         return self.handle_bootstrap_outcome(session, outcome).await;
                     }
@@ -1276,14 +1280,38 @@ impl ReplOrchestratorV2 {
         // Hydrate the constellation immediately — the DAG exists from this point.
         // With subject_id set, this hydrates the real slot tree for the CBU, not an empty stub.
         #[cfg(feature = "database")]
-        if let Some(ref pool) = self.pool {
+        if let Some(pool) = self.pool() {
+            tracing::info!(
+                subject_id = ?session.workspace_stack.last().and_then(|frame| frame.subject_id),
+                subject_kind = ?session
+                    .workspace_stack
+                    .last()
+                    .and_then(|frame| frame.subject_kind.clone()),
+                cbu_ids_count = session.cbu_ids.len(),
+                workspace = ?workspace,
+                "About to hydrate TOS on workspace selection"
+            );
             match self.rehydrate_tos(pool, session).await {
                 Ok(hydrated) => {
+                    let has_constellation = hydrated.hydrated_constellation.is_some();
+                    let slot_count = hydrated
+                        .hydrated_constellation
+                        .as_ref()
+                        .map(|constellation| constellation.slots.len());
                     session.hydrate_tos(hydrated);
-                    tracing::debug!(workspace = ?workspace, "Initial constellation hydration on workspace selection");
+                    tracing::info!(
+                        ?has_constellation,
+                        ?slot_count,
+                        workspace = ?workspace,
+                        "Initial constellation hydration succeeded on workspace selection"
+                    );
                 }
                 Err(e) => {
-                    tracing::warn!(workspace = ?workspace, error = %e, "Initial hydration failed on workspace selection — Observatory will show empty DAG");
+                    tracing::error!(
+                        workspace = ?workspace,
+                        error = %e,
+                        "Initial constellation hydration failed on workspace selection"
+                    );
                 }
             }
         }
@@ -2218,7 +2246,7 @@ impl ReplOrchestratorV2 {
         // and populates ExecutionContext.pending_session.entity_scope.cbu_ids.
         // We also query the DB directly as a reliable fallback.
         #[cfg(feature = "database")]
-        if let Some(ref pool) = self.pool {
+        if let Some(pool) = self.pool() {
             if let Ok(db_cbu_ids) = sqlx::query_scalar::<_, Uuid>(
                 r#"SELECT DISTINCT cge.cbu_id FROM "ob-poc".client_group_entity cge
                    WHERE cge.group_id = $1
@@ -5074,7 +5102,7 @@ impl ReplOrchestratorV2 {
                     compiled_id,
                     None,
                     &bridge,
-                    self.pool.as_ref(),
+                    self.pool(),
                 )
                 .await
                 {
@@ -5091,7 +5119,7 @@ impl ReplOrchestratorV2 {
                     compiled_id,
                     None,
                     &bridge,
-                    self.pool.as_ref(),
+                    self.pool(),
                 )
                 .await
                 {
@@ -5103,7 +5131,7 @@ impl ReplOrchestratorV2 {
             }
         } else {
             let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-            match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool.as_ref())
+            match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool())
                 .await
             {
                 Ok(result) => extract_first_outcome(result),

@@ -560,7 +560,7 @@ fn flatten_slots_recursive(
         result.push(SlotProjection {
             name: slot.name.clone(),
             path: slot.path.clone(),
-            slot_type: serde_json::to_value(&slot.slot_type)
+            slot_type: serde_json::to_value(slot.slot_type)
                 .ok()
                 .and_then(|v| v.as_str().map(|s| s.to_string()))
                 .unwrap_or_else(|| "entity".into()),
@@ -745,7 +745,7 @@ async fn navigate(
                 .map(|slot| SlotProjection {
                     name: slot.name.clone(),
                     path: slot.path.clone(),
-                    slot_type: serde_json::to_value(&slot.slot_type)
+                    slot_type: serde_json::to_value(slot.slot_type)
                         .ok()
                         .and_then(|v| v.as_str().map(|s| s.to_string()))
                         .unwrap_or_else(|| "entity".into()),

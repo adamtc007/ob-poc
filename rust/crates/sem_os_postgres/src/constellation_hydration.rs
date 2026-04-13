@@ -543,55 +543,35 @@ pub async fn query_entity_graph_rows_tx(
         return Ok((Vec::new(), Vec::new()));
     }
 
-    let rows = sqlx::query_as::<_, (Uuid,)>(
+    let rows = sqlx::query_as::<_, (Uuid, Uuid, Option<f64>, Option<String>, i32)>(
         r#"
-        WITH RECURSIVE ownership_tree AS (
-            SELECT DISTINCT er.to_entity_id AS entity_id, 1 AS depth
-            FROM "ob-poc".entity_relationships er
-            WHERE er.from_entity_id = ANY($1)
-              AND er.relationship_type = 'OWNERSHIP'
-            UNION
-            SELECT er.to_entity_id AS entity_id, ot.depth + 1
-            FROM "ob-poc".entity_relationships er
-            JOIN ownership_tree ot ON er.from_entity_id = ot.entity_id
-            WHERE er.relationship_type = 'OWNERSHIP'
-              AND ot.depth < $2
-        )
-        SELECT DISTINCT entity_id
-        FROM ownership_tree
-        "#,
-    )
-    .bind(seeds)
-    .bind(max_depth)
-    .fetch_all(&mut **tx)
-    .await?;
-
-    let edges = sqlx::query_as::<_, (Uuid, Uuid, Option<f64>, Option<String>, i32)>(
-        r#"
-        WITH RECURSIVE ownership_edges AS (
+        WITH RECURSIVE ownership_chain AS (
             SELECT
                 er.from_entity_id,
                 er.to_entity_id,
-                er.percentage_owned,
-                er.relationship_subtype,
+                er.percentage::float8,
+                COALESCE(er.ownership_type, er.control_type, er.relationship_type) AS edge_type,
                 1 AS depth
-            FROM "ob-poc".entity_relationships er
-            WHERE er.from_entity_id = ANY($1)
-              AND er.relationship_type = 'OWNERSHIP'
-            UNION
+            FROM "ob-poc".entity_relationships_current er
+            WHERE er.to_entity_id = ANY($1)
+              AND er.relationship_type IN ('ownership', 'control', 'management')
+
+            UNION ALL
+
             SELECT
                 er.from_entity_id,
                 er.to_entity_id,
-                er.percentage_owned,
-                er.relationship_subtype,
-                oe.depth + 1
-            FROM "ob-poc".entity_relationships er
-            JOIN ownership_edges oe ON er.from_entity_id = oe.to_entity_id
-            WHERE er.relationship_type = 'OWNERSHIP'
-              AND oe.depth < $2
+                er.percentage::float8,
+                COALESCE(er.ownership_type, er.control_type, er.relationship_type) AS edge_type,
+                oc.depth + 1
+            FROM ownership_chain oc
+            JOIN "ob-poc".entity_relationships_current er
+              ON er.to_entity_id = oc.from_entity_id
+            WHERE oc.depth < $2
+              AND er.relationship_type IN ('ownership', 'control', 'management')
         )
-        SELECT from_entity_id, to_entity_id, percentage_owned, relationship_subtype, depth
-        FROM ownership_edges
+        SELECT from_entity_id, to_entity_id, percentage, edge_type, depth
+        FROM ownership_chain
         "#,
     )
     .bind(seeds)
@@ -599,28 +579,40 @@ pub async fn query_entity_graph_rows_tx(
     .fetch_all(&mut **tx)
     .await?;
 
-    Ok((
-        rows.into_iter()
-            .map(|(entity_id,)| HydrationSlotRow {
-                entity_id: Some(entity_id),
-                record_id: Some(entity_id),
-                filter_value: None,
+    let mut nodes = seeds
+        .iter()
+        .copied()
+        .map(|entity_id| HydrationSlotRow {
+            entity_id: Some(entity_id),
+            record_id: Some(entity_id),
+            filter_value: None,
+            created_at: None,
+        })
+        .collect::<Vec<_>>();
+    let edges = rows
+        .into_iter()
+        .map(|(from_entity_id, to_entity_id, percentage, ownership_type, depth)| {
+            nodes.push(HydrationSlotRow {
+                entity_id: Some(from_entity_id),
+                record_id: Some(from_entity_id),
+                filter_value: ownership_type.clone(),
                 created_at: None,
-            })
-            .collect(),
-        edges
-            .into_iter()
-            .map(
-                |(from_entity_id, to_entity_id, percentage, ownership_type, depth)| {
-                    HydrationGraphEdge {
-                        from_entity_id,
-                        to_entity_id,
-                        percentage,
-                        ownership_type,
-                        depth: depth as usize,
-                    }
-                },
-            )
-            .collect(),
-    ))
+            });
+            nodes.push(HydrationSlotRow {
+                entity_id: Some(to_entity_id),
+                record_id: Some(to_entity_id),
+                filter_value: ownership_type.clone(),
+                created_at: None,
+            });
+            HydrationGraphEdge {
+                from_entity_id,
+                to_entity_id,
+                percentage,
+                ownership_type,
+                depth: depth as usize,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    Ok((nodes, edges))
 }
