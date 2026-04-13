@@ -740,7 +740,8 @@ impl ReplOrchestratorV2 {
                         if let Some(&cbu_id) = session.cbu_ids.last() {
                             if let Some(tos) = session.workspace_stack.last_mut() {
                                 tos.subject_id = Some(cbu_id);
-                                tracing::debug!(%cbu_id, "Set subject_id from session.cbu_ids");
+                                tos.subject_kind = Some(crate::repl::types_v2::SubjectKind::Cbu);
+                                tracing::debug!(%cbu_id, "Set subject_id + subject_kind from session.cbu_ids");
                             }
                         }
                     }
@@ -1266,7 +1267,8 @@ impl ReplOrchestratorV2 {
             if let Some(tos) = session.workspace_stack.last_mut() {
                 if tos.subject_id.is_none() {
                     tos.subject_id = Some(cbu_id);
-                    tracing::debug!(%cbu_id, "Set subject_id from session.cbu_ids on workspace selection");
+                    tos.subject_kind = Some(crate::repl::types_v2::SubjectKind::Cbu);
+                    tracing::debug!(%cbu_id, "Set subject_id + subject_kind on workspace selection");
                 }
             }
         }
