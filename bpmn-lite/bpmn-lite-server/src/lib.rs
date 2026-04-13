@@ -4,3 +4,4 @@
 //! crates can build gRPC clients without duplicating proto compilation.
 
 pub mod grpc;
+pub mod load_harness;

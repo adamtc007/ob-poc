@@ -41,6 +41,21 @@ impl Vm {
         instance: &mut ProcessInstance,
         program: &CompiledProgram,
     ) -> Result<TickOutcome> {
+        let mut pending_events = Vec::new();
+        let outcome = self
+            .tick_fiber_inner(fiber, instance, program, &mut pending_events)
+            .await?;
+        self.flush_events(instance.instance_id, &mut pending_events).await?;
+        Ok(outcome)
+    }
+
+    async fn tick_fiber_inner(
+        &self,
+        fiber: &mut Fiber,
+        instance: &mut ProcessInstance,
+        program: &CompiledProgram,
+        pending_events: &mut Vec<RuntimeEvent>,
+    ) -> Result<TickOutcome> {
         let pc = fiber.pc as usize;
         if pc >= program.program.len() {
             return Err(anyhow!(
@@ -49,11 +64,11 @@ impl Vm {
             ));
         }
 
-        let instr = program.program[pc].clone();
+        let instr = &program.program[pc];
 
         match instr {
             Instr::Jump { target } => {
-                fiber.pc = target;
+                fiber.pc = *target;
                 Ok(TickOutcome::Continue)
             }
 
@@ -63,7 +78,7 @@ impl Vm {
                     .pop()
                     .ok_or_else(|| anyhow!("BrIf: stack underflow"))?;
                 if is_truthy(&val) {
-                    fiber.pc = target;
+                    fiber.pc = *target;
                 } else {
                     fiber.pc += 1;
                 }
@@ -76,7 +91,7 @@ impl Vm {
                     .pop()
                     .ok_or_else(|| anyhow!("BrIfNot: stack underflow"))?;
                 if !is_truthy(&val) {
-                    fiber.pc = target;
+                    fiber.pc = *target;
                 } else {
                     fiber.pc += 1;
                 }
@@ -84,13 +99,13 @@ impl Vm {
             }
 
             Instr::PushBool(b) => {
-                fiber.stack.push(Value::Bool(b));
+                fiber.stack.push(Value::Bool(*b));
                 fiber.pc += 1;
                 Ok(TickOutcome::Continue)
             }
 
             Instr::PushI64(n) => {
-                fiber.stack.push(Value::I64(n));
+                fiber.stack.push(Value::I64(*n));
                 fiber.pc += 1;
                 Ok(TickOutcome::Continue)
             }
@@ -104,7 +119,7 @@ impl Vm {
             Instr::LoadFlag { key } => {
                 let val = instance
                     .flags
-                    .get(&key)
+                    .get(key)
                     .cloned()
                     .unwrap_or(Value::Bool(false));
                 fiber.stack.push(val);
@@ -117,13 +132,11 @@ impl Vm {
                     .stack
                     .pop()
                     .ok_or_else(|| anyhow!("StoreFlag: stack underflow"))?;
-                instance.flags.insert(key, val.clone());
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::FlagSet { key, value: val },
-                    )
-                    .await?;
+                instance.flags.insert(*key, val.clone());
+                pending_events.push(RuntimeEvent::FlagSet {
+                    key: *key,
+                    value: val,
+                });
                 fiber.pc += 1;
                 Ok(TickOutcome::Continue)
             }
@@ -136,7 +149,7 @@ impl Vm {
                 // Derive deterministic job_key
                 let task_type_str = program
                     .task_manifest
-                    .get(task_type as usize)
+                    .get(*task_type as usize)
                     .cloned()
                     .unwrap_or_else(|| format!("task_{task_type}"));
                 let service_task_id = program
@@ -154,7 +167,7 @@ impl Vm {
                     // Apply cached completion
                     apply_completion(instance, &cached);
                     // Push retc values (we push a single bool for simplicity)
-                    for _ in 0..retc {
+                    for _ in 0..*retc {
                         fiber.stack.push(Value::Bool(true));
                     }
                     fiber.pc += 1;
@@ -173,24 +186,19 @@ impl Vm {
                     process_instance_id: instance.instance_id,
                     task_type: task_type_str.clone(),
                     service_task_id: service_task_id.clone(),
-                    domain_payload: instance.domain_payload.clone(),
+                    domain_payload: instance.domain_payload.to_string(),
                     domain_payload_hash: instance.domain_payload_hash,
                     orch_flags,
                     retries_remaining: 3,
                 };
 
                 // Emit event
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::JobActivated {
-                            job_key: job_key.clone(),
-                            task_type: task_type_str,
-                            service_task_id,
-                            pc: fiber.pc,
-                        },
-                    )
-                    .await?;
+                pending_events.push(RuntimeEvent::JobActivated {
+                    job_key: job_key.clone(),
+                    task_type: task_type_str,
+                    service_task_id,
+                    pc: fiber.pc,
+                });
 
                 // Enqueue job
                 self.store.enqueue_job(&activation).await?;
@@ -206,34 +214,24 @@ impl Vm {
                 let mut child_ids = Vec::new();
                 let mut target_addrs = Vec::new();
 
-                for &target in targets.iter() {
+                for target in targets.iter().copied() {
                     let child_id = Uuid::now_v7();
                     let child = Fiber::new(child_id, target);
                     self.store.save_fiber(instance.instance_id, &child).await?;
-                    self.store
-                        .append_event(
-                            instance.instance_id,
-                            &RuntimeEvent::FiberSpawned {
-                                fiber_id: child_id,
-                                pc: target,
-                                parent: Some(fiber.fiber_id),
-                            },
-                        )
-                        .await?;
+                    pending_events.push(RuntimeEvent::FiberSpawned {
+                        fiber_id: child_id,
+                        pc: target,
+                        parent: Some(fiber.fiber_id),
+                    });
                     child_ids.push(child_id);
                     target_addrs.push(target);
                 }
 
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::Forked {
-                            fork_id: format!("pc_{}", fiber.pc),
-                            child_fibers: child_ids,
-                            targets: target_addrs,
-                        },
-                    )
-                    .await?;
+                pending_events.push(RuntimeEvent::Forked {
+                    fork_id: format!("pc_{}", fiber.pc),
+                    child_fibers: child_ids,
+                    targets: target_addrs,
+                });
 
                 // Parent fiber ends after fork
                 self.store
@@ -244,37 +242,27 @@ impl Vm {
             }
 
             Instr::Join { id, expected, next } => {
-                let count = self.store.join_arrive(instance.instance_id, id).await?;
+                let count = self.store.join_arrive(instance.instance_id, *id).await?;
 
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::JoinArrived {
-                            join_id: id,
-                            fiber_id: fiber.fiber_id,
-                        },
-                    )
-                    .await?;
+                pending_events.push(RuntimeEvent::JoinArrived {
+                    join_id: *id,
+                    fiber_id: fiber.fiber_id,
+                });
 
-                if count >= expected {
+                if count >= *expected {
                     // All branches arrived — release
-                    self.store.join_reset(instance.instance_id, id).await?;
-                    self.store
-                        .append_event(
-                            instance.instance_id,
-                            &RuntimeEvent::JoinReleased {
-                                join_id: id,
-                                next_pc: next,
-                                released_fiber_id: fiber.fiber_id,
-                            },
-                        )
-                        .await?;
-                    fiber.pc = next;
+                    self.store.join_reset(instance.instance_id, *id).await?;
+                    pending_events.push(RuntimeEvent::JoinReleased {
+                        join_id: *id,
+                        next_pc: *next,
+                        released_fiber_id: fiber.fiber_id,
+                    });
+                    fiber.pc = *next;
                     fiber.wait = WaitState::Running;
                     Ok(TickOutcome::Continue)
                 } else {
                     // Wait for more branches
-                    fiber.wait = WaitState::Join { join_id: id };
+                    fiber.wait = WaitState::Join { join_id: *id };
                     self.store.save_fiber(instance.instance_id, fiber).await?;
                     // Delete this fiber — it's consumed by the join
                     self.store
@@ -289,19 +277,14 @@ impl Vm {
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64;
-                let deadline = now + ms;
+                let deadline = now + *ms;
                 fiber.wait = WaitState::Timer {
                     deadline_ms: deadline,
                 };
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::WaitTimerSet {
-                            fiber_id: fiber.fiber_id,
-                            deadline_ms: deadline,
-                        },
-                    )
-                    .await?;
+                pending_events.push(RuntimeEvent::WaitTimerSet {
+                    fiber_id: fiber.fiber_id,
+                    deadline_ms: deadline,
+                });
                 self.store.save_fiber(instance.instance_id, fiber).await?;
                 fiber.pc += 1; // advance past wait so resume continues
                 Ok(TickOutcome::Parked(WaitState::Timer {
@@ -310,19 +293,18 @@ impl Vm {
             }
 
             Instr::WaitUntil { deadline_ms } => {
-                fiber.wait = WaitState::Timer { deadline_ms };
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::WaitTimerSet {
-                            fiber_id: fiber.fiber_id,
-                            deadline_ms,
-                        },
-                    )
-                    .await?;
+                fiber.wait = WaitState::Timer {
+                    deadline_ms: *deadline_ms,
+                };
+                pending_events.push(RuntimeEvent::WaitTimerSet {
+                    fiber_id: fiber.fiber_id,
+                    deadline_ms: *deadline_ms,
+                });
                 self.store.save_fiber(instance.instance_id, fiber).await?;
                 fiber.pc += 1;
-                Ok(TickOutcome::Parked(WaitState::Timer { deadline_ms }))
+                Ok(TickOutcome::Parked(WaitState::Timer {
+                    deadline_ms: *deadline_ms,
+                }))
             }
 
             Instr::WaitMsg {
@@ -330,28 +312,23 @@ impl Vm {
                 name,
                 corr_reg,
             } => {
-                let corr_key = if (corr_reg as usize) < fiber.regs.len() {
-                    fiber.regs[corr_reg as usize].clone()
+                let corr_key = if (*corr_reg as usize) < fiber.regs.len() {
+                    fiber.regs[*corr_reg as usize].clone()
                 } else {
                     Value::Bool(false)
                 };
 
                 fiber.wait = WaitState::Msg {
-                    wait_id,
-                    name,
+                    wait_id: *wait_id,
+                    name: *name,
                     corr_key: corr_key.clone(),
                 };
 
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::WaitMsgSubscribed {
-                            fiber_id: fiber.fiber_id,
-                            name,
-                            corr_key,
-                        },
-                    )
-                    .await?;
+                pending_events.push(RuntimeEvent::WaitMsgSubscribed {
+                    fiber_id: fiber.fiber_id,
+                    name: *name,
+                    corr_key,
+                });
                 self.store.save_fiber(instance.instance_id, fiber).await?;
                 fiber.pc += 1;
                 Ok(TickOutcome::Parked(fiber.wait.clone()))
@@ -363,16 +340,11 @@ impl Vm {
                     arms.iter().map(|a| a.into()).collect();
 
                 // Emit RaceRegistered event
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::RaceRegistered {
-                            race_id,
-                            fiber_id: fiber.fiber_id,
-                            arms: arm_descs,
-                        },
-                    )
-                    .await?;
+                pending_events.push(RuntimeEvent::RaceRegistered {
+                    race_id: *race_id,
+                    fiber_id: fiber.fiber_id,
+                    arms: arm_descs,
+                });
 
                 // Emit WaitMsgSubscribed for each Msg arm (so signal() can find them)
                 for arm in arms.iter() {
@@ -382,16 +354,11 @@ impl Vm {
                         } else {
                             Value::Bool(false)
                         };
-                        self.store
-                            .append_event(
-                                instance.instance_id,
-                                &RuntimeEvent::WaitMsgSubscribed {
-                                    fiber_id: fiber.fiber_id,
-                                    name: *name,
-                                    corr_key,
-                                },
-                            )
-                            .await?;
+                        pending_events.push(RuntimeEvent::WaitMsgSubscribed {
+                            fiber_id: fiber.fiber_id,
+                            name: *name,
+                            corr_key,
+                        });
                     }
                 }
 
@@ -406,7 +373,7 @@ impl Vm {
                     _ => None,
                 });
                 fiber.wait = WaitState::Race {
-                    race_id,
+                    race_id: *race_id,
                     timer_deadline_ms,
                     job_key: None,
                     interrupting: true,
@@ -427,20 +394,15 @@ impl Vm {
             }
 
             Instr::IncCounter { counter_id } => {
-                let count = instance.counters.entry(counter_id).or_insert(0);
+                let count = instance.counters.entry(*counter_id).or_insert(0);
                 *count += 1;
                 let new_value = *count;
                 fiber.loop_epoch += 1;
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::CounterIncremented {
-                            counter_id,
-                            new_value,
-                            loop_epoch: fiber.loop_epoch,
-                        },
-                    )
-                    .await?;
+                pending_events.push(RuntimeEvent::CounterIncremented {
+                    counter_id: *counter_id,
+                    new_value,
+                    loop_epoch: fiber.loop_epoch,
+                });
                 fiber.pc += 1;
                 Ok(TickOutcome::Continue)
             }
@@ -450,9 +412,9 @@ impl Vm {
                 limit,
                 target,
             } => {
-                let count = instance.counters.get(&counter_id).copied().unwrap_or(0);
-                if count < limit {
-                    fiber.pc = target;
+                let count = instance.counters.get(counter_id).copied().unwrap_or(0);
+                if count < *limit {
+                    fiber.pc = *target;
                 } else {
                     fiber.pc += 1;
                 }
@@ -472,9 +434,9 @@ impl Vm {
                         Some(key) => {
                             let val = instance
                                 .flags
-                                .get(&key)
-                                .cloned()
-                                .unwrap_or(Value::Bool(false));
+                            .get(&key)
+                            .cloned()
+                            .unwrap_or(Value::Bool(false));
                             is_truthy(&val)
                         }
                     };
@@ -486,7 +448,7 @@ impl Vm {
                 // Zero conditions matched
                 if taken_targets.is_empty() {
                     if let Some(default) = default_target {
-                        taken_targets.push(default);
+                        taken_targets.push(*default);
                     } else {
                         // No default — incident
                         let incident_id = Uuid::now_v7();
@@ -510,16 +472,11 @@ impl Vm {
                             resolution: None,
                         };
                         self.store.save_incident(&incident).await?;
-                        self.store
-                            .append_event(
-                                instance.instance_id,
-                                &RuntimeEvent::IncidentCreated {
-                                    incident_id,
-                                    service_task_id: gateway_id,
-                                    job_key: None,
-                                },
-                            )
-                            .await?;
+                        pending_events.push(RuntimeEvent::IncidentCreated {
+                            incident_id,
+                            service_task_id: gateway_id,
+                            job_key: None,
+                        });
                         fiber.wait = WaitState::Incident { incident_id };
                         self.store.save_fiber(instance.instance_id, fiber).await?;
                         instance.state = ProcessState::Failed { incident_id };
@@ -530,7 +487,7 @@ impl Vm {
                 // Set dynamic join expected
                 instance
                     .join_expected
-                    .insert(join_id, taken_targets.len() as u16);
+                    .insert(*join_id, taken_targets.len() as u16);
 
                 // Spawn fibers
                 let mut child_ids = Vec::new();
@@ -538,31 +495,21 @@ impl Vm {
                     let child_id = Uuid::now_v7();
                     let child = Fiber::new(child_id, target);
                     self.store.save_fiber(instance.instance_id, &child).await?;
-                    self.store
-                        .append_event(
-                            instance.instance_id,
-                            &RuntimeEvent::FiberSpawned {
-                                fiber_id: child_id,
-                                pc: target,
-                                parent: Some(fiber.fiber_id),
-                            },
-                        )
-                        .await?;
+                    pending_events.push(RuntimeEvent::FiberSpawned {
+                        fiber_id: child_id,
+                        pc: target,
+                        parent: Some(fiber.fiber_id),
+                    });
                     child_ids.push(child_id);
                 }
 
                 // Emit InclusiveForkTaken event
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::InclusiveForkTaken {
-                            gateway_id: format!("pc_{}", fiber.pc),
-                            branches_taken: taken_targets.clone(),
-                            join_id,
-                            expected: taken_targets.len() as u16,
-                        },
-                    )
-                    .await?;
+                pending_events.push(RuntimeEvent::InclusiveForkTaken {
+                    gateway_id: format!("pc_{}", fiber.pc),
+                    branches_taken: taken_targets.clone(),
+                    join_id: *join_id,
+                    expected: taken_targets.len() as u16,
+                });
 
                 // Delete parent fiber (same pattern as Fork)
                 self.store
@@ -573,38 +520,28 @@ impl Vm {
 
             Instr::JoinDynamic { id, next } => {
                 let expected =
-                    instance.join_expected.get(&id).copied().ok_or_else(|| {
+                    instance.join_expected.get(id).copied().ok_or_else(|| {
                         anyhow!("JoinDynamic: no expected count for join_id {}", id)
                     })?;
 
-                let count = self.store.join_arrive(instance.instance_id, id).await?;
+                let count = self.store.join_arrive(instance.instance_id, *id).await?;
 
-                self.store
-                    .append_event(
-                        instance.instance_id,
-                        &RuntimeEvent::JoinArrived {
-                            join_id: id,
-                            fiber_id: fiber.fiber_id,
-                        },
-                    )
-                    .await?;
+                pending_events.push(RuntimeEvent::JoinArrived {
+                    join_id: *id,
+                    fiber_id: fiber.fiber_id,
+                });
 
                 if count >= expected {
                     // All branches arrived — release
-                    self.store.join_reset(instance.instance_id, id).await?;
-                    instance.join_expected.remove(&id); // clean up dynamic expected
-                    self.store
-                        .append_event(
-                            instance.instance_id,
-                            &RuntimeEvent::JoinReleased {
-                                join_id: id,
-                                next_pc: next,
-                                released_fiber_id: fiber.fiber_id,
-                            },
-                        )
-                        .await?;
+                    self.store.join_reset(instance.instance_id, *id).await?;
+                    instance.join_expected.remove(id); // clean up dynamic expected
+                    pending_events.push(RuntimeEvent::JoinReleased {
+                        join_id: *id,
+                        next_pc: *next,
+                        released_fiber_id: fiber.fiber_id,
+                    });
                     // Advance pc AFTER event is recorded (PITR determinism)
-                    fiber.pc = next;
+                    fiber.pc = *next;
                     fiber.wait = WaitState::Running;
                     Ok(TickOutcome::Continue)
                 } else {
@@ -648,7 +585,7 @@ impl Vm {
                 self.store.save_incident(&incident).await?;
                 fiber.wait = WaitState::Incident { incident_id };
                 self.store.save_fiber(instance.instance_id, fiber).await?;
-                Ok(TickOutcome::Failed { code })
+                Ok(TickOutcome::Failed { code: *code })
             }
         }
     }
@@ -661,13 +598,36 @@ impl Vm {
         program: &CompiledProgram,
         max_steps: usize,
     ) -> Result<TickOutcome> {
+        let mut pending_events = Vec::new();
         for _ in 0..max_steps {
-            match self.tick_fiber(fiber, instance, program).await? {
+            match self
+                .tick_fiber_inner(fiber, instance, program, &mut pending_events)
+                .await?
+            {
                 TickOutcome::Continue => continue,
-                other => return Ok(other),
+                other => {
+                    self.flush_events(instance.instance_id, &mut pending_events).await?;
+                    return Ok(other);
+                }
             }
         }
+        self.flush_events(instance.instance_id, &mut pending_events).await?;
         Ok(TickOutcome::Continue)
+    }
+
+    async fn flush_events(
+        &self,
+        instance_id: Uuid,
+        pending_events: &mut Vec<RuntimeEvent>,
+    ) -> Result<()> {
+        if pending_events.is_empty() {
+            return Ok(());
+        }
+        self.store
+            .batch_append_events(instance_id, pending_events)
+            .await?;
+        pending_events.clear();
+        Ok(())
     }
 
     /// Resume a fiber parked on a job. Fiber-resume ONLY — no mutation of
@@ -710,7 +670,8 @@ impl Vm {
                     instance.instance_id,
                     &RuntimeEvent::JobCompleted {
                         job_key: completion.job_key.clone(),
-                        domain_payload_hash_out: completion.domain_payload_hash,
+                        payload_hash_before: instance.domain_payload_hash,
+                        payload_hash_after: compute_hash(&completion.domain_payload),
                         orch_flags_out: completion.orch_flags.clone(),
                         pc_next: fiber.pc,
                     },
@@ -847,8 +808,8 @@ fn is_truthy(val: &Value) -> bool {
 }
 
 pub(crate) fn apply_completion(instance: &mut ProcessInstance, completion: &JobCompletion) {
-    instance.domain_payload = completion.domain_payload.clone();
-    instance.domain_payload_hash = completion.domain_payload_hash;
+    instance.domain_payload = Arc::<str>::from(completion.domain_payload.as_str());
+    instance.domain_payload_hash = compute_hash(&completion.domain_payload);
     // Merge orch_flags: completion flags update instance flags
     // We need to convert string keys back to FlagKey (u32)
     for (key_str, value) in &completion.orch_flags {
@@ -900,7 +861,8 @@ mod tests {
             instance_id: Uuid::now_v7(),
             process_key: "test".to_string(),
             bytecode_version: [0u8; 32],
-            domain_payload: payload.to_string(),
+            tenant_id: "default".to_string(),
+            domain_payload: payload.to_string().into(),
             domain_payload_hash: compute_hash(payload),
             flags: BTreeMap::new(),
             counters: BTreeMap::new(),
@@ -953,7 +915,7 @@ mod tests {
 
         // Dequeue job
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 10)
+            .dequeue_jobs(&["create_case".to_string()], 10, "default")
             .await
             .unwrap();
         assert_eq!(jobs.len(), 1);
@@ -963,7 +925,7 @@ mod tests {
         let completion1 = JobCompletion {
             job_key: jobs[0].job_key.clone(),
             domain_payload: payload_after_1.to_string(),
-            domain_payload_hash: compute_hash(payload_after_1),
+            expected_instance_payload_hash: compute_hash(r#"{"case_id":"abc"}"#),
             orch_flags: BTreeMap::new(),
         };
         let resumed = vm
@@ -973,7 +935,7 @@ mod tests {
         assert!(resumed.is_some(), "Fiber should be resumed");
         apply_completion(&mut instance, &completion1);
         store.save_instance(&instance).await.unwrap();
-        assert_eq!(instance.domain_payload, payload_after_1);
+        assert_eq!(instance.domain_payload.as_ref(), payload_after_1);
 
         // Load resumed fiber
         let fibers = store.load_fibers(instance.instance_id).await.unwrap();
@@ -994,7 +956,7 @@ mod tests {
 
         // Dequeue second job
         let jobs = store
-            .dequeue_jobs(&["request_docs".to_string()], 10)
+            .dequeue_jobs(&["request_docs".to_string()], 10, "default")
             .await
             .unwrap();
         assert_eq!(jobs.len(), 1);
@@ -1004,7 +966,7 @@ mod tests {
         let completion2 = JobCompletion {
             job_key: jobs[0].job_key.clone(),
             domain_payload: payload_after_2.to_string(),
-            domain_payload_hash: compute_hash(payload_after_2),
+            expected_instance_payload_hash: compute_hash(payload_after_1),
             orch_flags: BTreeMap::new(),
         };
         let resumed = vm
@@ -1062,14 +1024,14 @@ mod tests {
 
         // Complete job — set flag_0 = true via orch_flags
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1)
+            .dequeue_jobs(&["create_case".to_string()], 1, "default")
             .await
             .unwrap();
         let payload = r#"{"done":true}"#;
         let completion = JobCompletion {
             job_key: jobs[0].job_key.clone(),
             domain_payload: payload.to_string(),
-            domain_payload_hash: compute_hash(payload),
+            expected_instance_payload_hash: compute_hash(r#"{"case_id":"abc"}"#),
             orch_flags: BTreeMap::from([("flag_0".to_string(), Value::Bool(true))]),
         };
         let resumed = vm
@@ -1148,7 +1110,7 @@ mod tests {
             .await
             .unwrap();
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1)
+            .dequeue_jobs(&["create_case".to_string()], 1, "default")
             .await
             .unwrap();
 
@@ -1157,7 +1119,7 @@ mod tests {
         let completion = JobCompletion {
             job_key: jobs[0].job_key.clone(),
             domain_payload: payload.to_string(),
-            domain_payload_hash: compute_hash(payload),
+            expected_instance_payload_hash: compute_hash(r#"{"case_id":"abc"}"#),
             orch_flags: BTreeMap::new(),
         };
         let resumed = vm
@@ -1184,7 +1146,7 @@ mod tests {
 
         // No new jobs enqueued
         let queue = store
-            .dequeue_jobs(&["create_case".to_string()], 10)
+            .dequeue_jobs(&["create_case".to_string()], 10, "default")
             .await
             .unwrap();
         assert!(queue.is_empty());
@@ -1219,7 +1181,7 @@ mod tests {
             .unwrap();
 
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1)
+            .dequeue_jobs(&["create_case".to_string()], 1, "default")
             .await
             .unwrap();
 
@@ -1227,7 +1189,7 @@ mod tests {
         let completion = JobCompletion {
             job_key: jobs[0].job_key.clone(),
             domain_payload: r#"{"done":true}"#.to_string(),
-            domain_payload_hash: [0xFFu8; 32], // Wrong hash
+            expected_instance_payload_hash: [0xFFu8; 32], // Wrong hash
             orch_flags: BTreeMap::new(),
         };
 
@@ -1295,14 +1257,14 @@ mod tests {
 
         // Complete
         let jobs = store
-            .dequeue_jobs(&["create_case".to_string()], 1)
+            .dequeue_jobs(&["create_case".to_string()], 1, "default")
             .await
             .unwrap();
         let payload = r#"{"done":true}"#;
         let completion = JobCompletion {
             job_key: jobs[0].job_key.clone(),
             domain_payload: payload.to_string(),
-            domain_payload_hash: compute_hash(payload),
+            expected_instance_payload_hash: compute_hash(r#"{"case_id":"abc"}"#),
             orch_flags: BTreeMap::new(),
         };
         let resumed = vm

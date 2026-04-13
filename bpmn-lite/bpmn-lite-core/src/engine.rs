@@ -14,6 +14,7 @@ use uuid::Uuid;
 /// VM, and store. gRPC handlers delegate to this.
 pub struct BpmnLiteEngine {
     store: Arc<dyn ProcessStore>,
+    tenant_id: String,
 }
 
 /// Result of compiling BPMN XML.
@@ -28,7 +29,10 @@ pub struct CompileResult {
 #[derive(Debug, Clone)]
 pub struct ProcessInspection {
     pub instance_id: Uuid,
+    pub tenant_id: String,
     pub process_key: String,
+    pub bytecode_version: [u8; 32],
+    pub domain_payload_hash: [u8; 32],
     pub state: ProcessState,
     pub fibers: Vec<FiberInspection>,
     pub incidents: Vec<Incident>,
@@ -44,7 +48,14 @@ pub struct FiberInspection {
 
 impl BpmnLiteEngine {
     pub fn new(store: Arc<dyn ProcessStore>) -> Self {
-        Self { store }
+        Self::new_with_tenant(store, "default")
+    }
+
+    pub fn new_with_tenant(store: Arc<dyn ProcessStore>, tenant_id: impl Into<String>) -> Self {
+        Self {
+            store,
+            tenant_id: tenant_id.into(),
+        }
     }
 
     /// Compile BPMN XML → verified IR → bytecode, store the program.
@@ -176,9 +187,10 @@ impl BpmnLiteEngine {
         let instance_id = Uuid::now_v7();
         let instance = ProcessInstance {
             instance_id,
+            tenant_id: self.tenant_id.clone(),
             process_key: process_key.to_string(),
             bytecode_version,
-            domain_payload: domain_payload.to_string(),
+            domain_payload: domain_payload.to_string().into(),
             domain_payload_hash,
             flags: BTreeMap::new(),
             counters: BTreeMap::new(),
@@ -208,7 +220,7 @@ impl BpmnLiteEngine {
 
     /// Tick all running instances. Returns count ticked.
     pub async fn tick_all(&self) -> Result<u32> {
-        let ids = self.store.list_running_instances().await?;
+        let ids = self.store.list_running_instances(&self.tenant_id).await?;
         let mut ticked = 0u32;
         for id in ids {
             if let Err(e) = self.tick_instance(id).await {
@@ -603,7 +615,10 @@ impl BpmnLiteEngine {
             .await?
             .ok_or_else(|| anyhow!("Program not found for instance {}", instance_id))?;
 
-        let jobs = self.store.dequeue_jobs(&program.task_manifest, 100).await?;
+        let jobs = self
+            .store
+            .dequeue_jobs(&program.task_manifest, 100, &self.tenant_id)
+            .await?;
         Ok(jobs)
     }
 
@@ -623,12 +638,12 @@ impl BpmnLiteEngine {
     /// Three guards protect against ghost signals:
     ///   1. Dedupe — already-processed job_key is silently accepted
     ///   2. State  — Cancelled/Completed instance → SignalIgnored event
-    ///   3. Hash   — domain_payload_hash must match instance snapshot
+    ///   3. Hash   — worker-supplied expected/current hash must match instance snapshot
     pub async fn complete_job(
         &self,
         job_key: &str,
         domain_payload: &str,
-        domain_payload_hash: [u8; 32],
+        expected_instance_payload_hash: [u8; 32],
         orch_flags: BTreeMap<String, Value>,
     ) -> Result<()> {
         let (instance_id, _task_type_id, pc) = parse_job_key(job_key)?;
@@ -656,7 +671,7 @@ impl BpmnLiteEngine {
 
         // ── Guard 3: payload hash ──
         let expected = compute_hash(&instance.domain_payload);
-        if domain_payload_hash != expected {
+        if expected_instance_payload_hash != expected {
             return Err(anyhow!(
                 "Payload hash mismatch on complete_job: job_key={}",
                 job_key
@@ -672,7 +687,7 @@ impl BpmnLiteEngine {
         let completion = JobCompletion {
             job_key: job_key.to_string(),
             domain_payload: domain_payload.to_string(),
-            domain_payload_hash,
+            expected_instance_payload_hash,
             orch_flags,
         };
 
@@ -1042,7 +1057,10 @@ impl BpmnLiteEngine {
 
         Ok(ProcessInspection {
             instance_id,
+            tenant_id: instance.tenant_id,
             process_key: instance.process_key,
+            bytecode_version: instance.bytecode_version,
+            domain_payload_hash: instance.domain_payload_hash,
             state: instance.state,
             fibers: fiber_inspections,
             incidents,
@@ -1055,7 +1073,9 @@ impl BpmnLiteEngine {
         task_types: &[String],
         max_jobs: usize,
     ) -> Result<Vec<JobActivation>> {
-        self.store.dequeue_jobs(task_types, max_jobs).await
+        self.store
+            .dequeue_jobs(task_types, max_jobs, &self.tenant_id)
+            .await
     }
 
     /// Read events from the event log.
@@ -1346,6 +1366,59 @@ mod tests {
             events_after_first, events_after_second,
             "Dedupe should not emit additional events"
         );
+    }
+
+    #[tokio::test]
+    async fn test_complete_job_recomputes_payload_hash() {
+        let (engine, store, iid, job_key, expected_hash) = setup_parked_job().await;
+        let new_payload = r#"{"result":"done","version":2}"#;
+        let new_hash = compute_hash(new_payload);
+
+        engine
+            .complete_job(&job_key, new_payload, expected_hash, BTreeMap::new())
+            .await
+            .unwrap();
+
+        let persisted = store.load_instance(iid).await.unwrap().unwrap();
+        assert_eq!(persisted.domain_payload.as_ref(), new_payload);
+        assert_eq!(persisted.domain_payload_hash, new_hash);
+
+        let history_payload = store
+            .load_payload_version(iid, &new_hash)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(history_payload, new_payload);
+
+        let events = store.read_events(iid, 0).await.unwrap();
+        let completed = events
+            .iter()
+            .find_map(|(_, event)| match event {
+                RuntimeEvent::JobCompleted {
+                    payload_hash_before,
+                    payload_hash_after,
+                    ..
+                } => Some((*payload_hash_before, *payload_hash_after)),
+                _ => None,
+            })
+            .expect("missing JobCompleted event");
+        assert_eq!(completed.0, expected_hash);
+        assert_eq!(completed.1, new_hash);
+    }
+
+    #[tokio::test]
+    async fn test_complete_job_rejects_stale_expected_hash() {
+        let (engine, store, iid, job_key, _expected_hash) = setup_parked_job().await;
+        let stale_hash = compute_hash(r#"{"stale":true}"#);
+
+        let result = engine
+            .complete_job(&job_key, r#"{"result":"nope"}"#, stale_hash, BTreeMap::new())
+            .await;
+        assert!(result.is_err(), "stale expected hash must be rejected");
+
+        let persisted = store.load_instance(iid).await.unwrap().unwrap();
+        assert_eq!(persisted.domain_payload.as_ref(), r#"{"case":"cancel-test"}"#);
+        assert_eq!(persisted.domain_payload_hash, compute_hash(r#"{"case":"cancel-test"}"#));
     }
 
     // ── T-CANCEL-3: cancel purges job queue + emits WaitCancelled ──
@@ -2009,7 +2082,7 @@ mod tests {
 
         // Assert: no jobs for this instance remain
         let jobs = store
-            .dequeue_jobs(&["slow_task".to_string()], 100)
+            .dequeue_jobs(&["slow_task".to_string()], 100, "default")
             .await
             .unwrap();
         let instance_jobs: Vec<_> = jobs
@@ -2259,7 +2332,7 @@ mod tests {
 
         // Should now have a job for enhanced_review
         let new_jobs = store
-            .dequeue_jobs(&["enhanced_review".to_string()], 10)
+            .dequeue_jobs(&["enhanced_review".to_string()], 10, "default")
             .await
             .unwrap();
         assert!(
@@ -2817,7 +2890,8 @@ mod tests {
             instance_id: Uuid::now_v7(),
             process_key: "test".to_string(),
             bytecode_version: program.bytecode_version,
-            domain_payload: "{}".to_string(),
+            tenant_id: "default".to_string(),
+            domain_payload: "{}".to_string().into(),
             domain_payload_hash: [0u8; 32],
             flags: BTreeMap::new(),
             counters: BTreeMap::new(),

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
+use std::sync::Arc;
 use uuid::Uuid;
 
 // ─── Scalar aliases ───────────────────────────────────────────
@@ -293,10 +294,11 @@ impl ProcessState {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProcessInstance {
     pub instance_id: Uuid,
+    pub tenant_id: String,
     pub process_key: String,
     pub bytecode_version: [u8; 32],
     /// Opaque canonical JSON — never parsed by the VM.
-    pub domain_payload: String,
+    pub domain_payload: Arc<str>,
     /// SHA-256 of domain_payload.
     pub domain_payload_hash: [u8; 32],
     /// Orchestration flags — flat primitives for branching.
@@ -331,7 +333,10 @@ pub struct JobActivation {
 pub struct JobCompletion {
     pub job_key: String,
     pub domain_payload: String,
-    pub domain_payload_hash: [u8; 32],
+    /// Optimistic concurrency guard: hash of the instance payload snapshot the worker read.
+    /// This is not the hash of `domain_payload`; the engine recomputes the new canonical hash
+    /// from the returned payload before persistence.
+    pub expected_instance_payload_hash: [u8; 32],
     pub orch_flags: BTreeMap<String, Value>,
 }
 

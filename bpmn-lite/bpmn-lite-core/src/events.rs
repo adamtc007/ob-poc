@@ -53,7 +53,8 @@ pub enum RuntimeEvent {
     },
     JobCompleted {
         job_key: String,
-        domain_payload_hash_out: [u8; 32],
+        payload_hash_before: [u8; 32],
+        payload_hash_after: [u8; 32],
         orch_flags_out: BTreeMap<String, Value>,
         pc_next: Addr,
     },

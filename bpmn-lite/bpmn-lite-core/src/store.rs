@@ -45,7 +45,12 @@ pub trait ProcessStore: Send + Sync {
     // ── Job queue ──
 
     async fn enqueue_job(&self, activation: &JobActivation) -> Result<()>;
-    async fn dequeue_jobs(&self, task_types: &[String], max: usize) -> Result<Vec<JobActivation>>;
+    async fn dequeue_jobs(
+        &self,
+        task_types: &[String],
+        max: usize,
+        tenant_id: &str,
+    ) -> Result<Vec<JobActivation>>;
     async fn ack_job(&self, job_key: &str) -> Result<()>;
 
     /// Cancel all pending and inflight jobs for an instance.
@@ -72,6 +77,13 @@ pub trait ProcessStore: Send + Sync {
 
     /// Append an event and return its sequence number.
     async fn append_event(&self, instance_id: Uuid, event: &RuntimeEvent) -> Result<u64>;
+    async fn batch_append_events(&self, instance_id: Uuid, events: &[RuntimeEvent]) -> Result<u64> {
+        let mut last_seq = 0;
+        for event in events {
+            last_seq = self.append_event(instance_id, event).await?;
+        }
+        Ok(last_seq)
+    }
     async fn read_events(
         &self,
         instance_id: Uuid,
@@ -125,5 +137,5 @@ pub trait ProcessStore: Send + Sync {
     async fn prune_dedupe_cache(&self, older_than_ms: u64) -> Result<u32>;
 
     /// List all running (non-terminal) instance IDs.
-    async fn list_running_instances(&self) -> Result<Vec<Uuid>>;
+    async fn list_running_instances(&self, tenant_id: &str) -> Result<Vec<Uuid>>;
 }

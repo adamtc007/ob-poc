@@ -4,6 +4,7 @@ use crate::types::*;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -116,7 +117,7 @@ impl ProcessStore for MemoryStore {
             .instances
             .get_mut(&id)
             .ok_or_else(|| anyhow!("instance not found: {id}"))?;
-        inst.domain_payload = payload.to_string();
+        inst.domain_payload = Arc::<str>::from(payload);
         inst.domain_payload_hash = *hash;
         Ok(())
     }
@@ -199,13 +200,23 @@ impl ProcessStore for MemoryStore {
         Ok(())
     }
 
-    async fn dequeue_jobs(&self, task_types: &[String], max: usize) -> Result<Vec<JobActivation>> {
+    async fn dequeue_jobs(
+        &self,
+        task_types: &[String],
+        max: usize,
+        tenant_id: &str,
+    ) -> Result<Vec<JobActivation>> {
         let mut w = self.inner.write().await;
         let mut result = Vec::new();
         let mut remaining = VecDeque::new();
 
         while let Some(job) = w.job_queue.pop_front() {
-            if result.len() < max && task_types.contains(&job.task_type) {
+            let same_tenant = w
+                .instances
+                .get(&job.process_instance_id)
+                .map(|instance| instance.tenant_id == tenant_id)
+                .unwrap_or(false);
+            if result.len() < max && same_tenant && task_types.contains(&job.task_type) {
                 w.inflight_jobs
                     .insert(job.job_key.clone(), (job.clone(), Instant::now()));
                 result.push(job);
@@ -301,6 +312,22 @@ impl ProcessStore for MemoryStore {
         Ok(current_seq)
     }
 
+    async fn batch_append_events(&self, instance_id: Uuid, events: &[RuntimeEvent]) -> Result<u64> {
+        let mut w = self.inner.write().await;
+        let mut last_seq = 0;
+        for event in events {
+            let seq = w.event_seq.entry(instance_id).or_insert(0);
+            *seq += 1;
+            let current_seq = *seq;
+            w.events
+                .entry(instance_id)
+                .or_default()
+                .push((current_seq, event.clone()));
+            last_seq = current_seq;
+        }
+        Ok(last_seq)
+    }
+
     async fn read_events(
         &self,
         instance_id: Uuid,
@@ -369,8 +396,10 @@ impl ProcessStore for MemoryStore {
         // save instance
         w.instances.insert(instance.instance_id, instance.clone());
         // save fiber
-        w.fibers
-            .insert((instance.instance_id, root_fiber.fiber_id), root_fiber.clone());
+        w.fibers.insert(
+            (instance.instance_id, root_fiber.fiber_id),
+            root_fiber.clone(),
+        );
         // append event
         let seq = w.event_seq.entry(instance.instance_id).or_insert(0);
         *seq += 1;
@@ -391,12 +420,14 @@ impl ProcessStore for MemoryStore {
         // save instance (upsert)
         w.instances.insert(instance.instance_id, instance.clone());
         // dedupe put
-        w.dedupe
-            .insert(completion.job_key.clone(), (completion.clone(), Instant::now()));
+        w.dedupe.insert(
+            completion.job_key.clone(),
+            (completion.clone(), Instant::now()),
+        );
         // save payload version
         w.payload_history.insert(
-            (instance.instance_id, completion.domain_payload_hash),
-            completion.domain_payload.clone(),
+            (instance.instance_id, instance.domain_payload_hash),
+            instance.domain_payload.to_string(),
         );
         Ok(())
     }
@@ -432,11 +463,11 @@ impl ProcessStore for MemoryStore {
         Ok((before - w.dedupe.len()) as u32)
     }
 
-    async fn list_running_instances(&self) -> Result<Vec<Uuid>> {
+    async fn list_running_instances(&self, tenant_id: &str) -> Result<Vec<Uuid>> {
         let r = self.inner.read().await;
         Ok(r.instances
             .iter()
-            .filter(|(_, inst)| !inst.state.is_terminal())
+            .filter(|(_, inst)| !inst.state.is_terminal() && inst.tenant_id == tenant_id)
             .map(|(id, _)| *id)
             .collect())
     }
@@ -454,7 +485,8 @@ mod tests {
             instance_id: id,
             process_key: "test-process".to_string(),
             bytecode_version: [0u8; 32],
-            domain_payload: payload.to_string(),
+            tenant_id: "default".to_string(),
+            domain_payload: payload.to_string().into(),
             domain_payload_hash: hash,
             flags: BTreeMap::from([(0, Value::Bool(true)), (1, Value::I64(42))]),
             counters: BTreeMap::new(),
@@ -542,7 +574,7 @@ mod tests {
         let completion = JobCompletion {
             job_key: "job-abc".to_string(),
             domain_payload: r#"{"done":true}"#.to_string(),
-            domain_payload_hash: sha2_hash(r#"{"done":true}"#),
+            expected_instance_payload_hash: sha2_hash(r#"{"case_id":"abc"}"#),
             orch_flags: BTreeMap::new(),
         };
 
@@ -561,10 +593,12 @@ mod tests {
         let task_type = "create_case".to_string();
 
         for i in 0..3 {
+            let instance_id = Uuid::now_v7();
+            store.save_instance(&make_instance(instance_id)).await.unwrap();
             store
                 .enqueue_job(&JobActivation {
                     job_key: format!("job-{i}"),
-                    process_instance_id: Uuid::now_v7(),
+                    process_instance_id: instance_id,
                     task_type: task_type.clone(),
                     service_task_id: format!("task-{i}"),
                     domain_payload: "{}".to_string(),
@@ -577,7 +611,10 @@ mod tests {
         }
 
         // Dequeue 2
-        let batch1 = store.dequeue_jobs(std::slice::from_ref(&task_type), 2).await.unwrap();
+        let batch1 = store
+            .dequeue_jobs(std::slice::from_ref(&task_type), 2, "default")
+            .await
+            .unwrap();
         assert_eq!(batch1.len(), 2);
         assert_eq!(batch1[0].job_key, "job-0");
         assert_eq!(batch1[1].job_key, "job-1");
@@ -586,7 +623,10 @@ mod tests {
         store.ack_job("job-0").await.unwrap();
 
         // Dequeue remaining
-        let batch2 = store.dequeue_jobs(std::slice::from_ref(&task_type), 10).await.unwrap();
+        let batch2 = store
+            .dequeue_jobs(std::slice::from_ref(&task_type), 10, "default")
+            .await
+            .unwrap();
         assert_eq!(batch2.len(), 1);
         assert_eq!(batch2[0].job_key, "job-2");
     }

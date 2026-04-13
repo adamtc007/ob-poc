@@ -23,9 +23,9 @@ BPMN-Lite is a lightweight durable workflow orchestration engine. It executes lo
 bpmn-lite/                              # Standalone Rust workspace
 ├── bpmn-lite-core/
 │   ├── src/
-│   │   ├── vm.rs                       # Fiber execution engine (700+ lines)
+│   │   ├── vm.rs                       # Fiber execution engine (batched event emission)
 │   │   ├── engine.rs                   # BpmnLiteEngine facade (tick, compile, start, signal)
-│   │   ├── store.rs                    # ProcessStore trait (33 async methods)
+│   │   ├── store.rs                    # ProcessStore trait (tenant-aware + batch append)
 │   │   ├── store_memory.rs             # In-memory implementation (testing)
 │   │   ├── store_postgres.rs           # PostgreSQL backend (production)
 │   │   ├── types.rs                    # Fiber, ProcessInstance, 18 Instr variants
@@ -37,11 +37,15 @@ bpmn-lite/                              # Standalone Rust workspace
 │   │       ├── publish.rs              # Atomic compile + persist
 │   │       ├── lints.rs                # Structural warnings
 │   │       └── registry.rs             # TemplateStore trait
-│   └── migrations/                     # 13 SQL migrations (001–013)
+│   └── migrations/                     # 14 SQL migrations (001–014)
 ├── bpmn-lite-server/
 │   ├── src/
-│   │   └── grpc.rs                     # BpmnLiteService impl (7 RPC methods)
+│   │   ├── grpc.rs                     # BpmnLiteService impl
+│   │   ├── load_harness.rs             # Reusable concurrent workflow stress harness
+│   │   └── main.rs                     # Server bootstrap with configurable bind address
 │   └── proto/bpmn_lite/v1/bpmn_lite.proto
+├── xtask/
+│   └── src/main.rs                     # smoke/stress orchestration, optional server spawn
 └── Cargo.toml
 
 rust/src/bpmn_integration/              # ob-poc ↔ bpmn-lite bridge (12 modules)
@@ -64,7 +68,18 @@ rust/src/bpmn_integration/              # ob-poc ↔ bpmn-lite bridge (12 module
 cargo x bpmn-lite build
 cargo x bpmn-lite test
 cargo x bpmn-lite start --database-url postgresql:///data_designer
+cd bpmn-lite && cargo run -p xtask -- smoke --spawn-server
+cd bpmn-lite && cargo run -p xtask -- stress --spawn-server --instances 300 --workers 16
 ```
+
+### Current hardening status
+
+- Job completion now treats the worker-supplied completion hash as an expected/current snapshot hash only.
+- The canonical persisted payload hash is recomputed from the returned payload before instance state and payload history are written.
+- VM event emission is batched through `ProcessStore::batch_append_events()`.
+- `ProcessInstance.domain_payload` is stored as `Arc<str>`.
+- Store operations that scan instances or dequeue jobs are tenant-scoped.
+- `Inspect` returns real `bytecode_version` and payload-hash metadata.
 
 ---
 
@@ -137,6 +152,17 @@ pub enum ProcessState {
     Failed { incident_id: Uuid },
 }
 ```
+
+### Completion hash invariant
+
+After a successful `CompleteJob` call:
+
+- the worker-supplied hash must match the instance payload snapshot that was activated
+- `instance.domain_payload` is replaced with the returned payload
+- `instance.domain_payload_hash` is recomputed from that returned payload
+- payload history is written with the same recomputed hash
+
+There is no valid path where a new payload is persisted with an old hash.
 
 ### Fork / Join (Token Passing)
 
@@ -225,6 +251,13 @@ message JobActivationMsg {
     int32 retries_remaining = 8;
 }
 ```
+
+`domain_payload_hash` on activation is the hash of the currently persisted instance payload snapshot the worker is reading.
+
+**CompleteJobRequest semantics:**
+- request `domain_payload_hash` is the optimistic-concurrency guard hash for the worker snapshot
+- it is not trusted as the canonical hash of the new returned payload
+- the server recomputes the stored payload hash from `domain_payload`
 
 **FailJobRequest:**
 ```protobuf

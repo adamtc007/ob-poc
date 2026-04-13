@@ -4,6 +4,7 @@ use crate::types::*;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// Serialize a `Value` into a deterministic string key for dead-letter lookup.
@@ -86,11 +87,12 @@ impl ProcessStore for PostgresProcessStore {
         sqlx::query(
             r#"
             INSERT INTO process_instances (
-                instance_id, process_key, bytecode_version, domain_payload,
+                instance_id, tenant_id, process_key, bytecode_version, domain_payload,
                 domain_payload_hash, flags, counters, join_expected, state,
                 correlation_id, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (instance_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
                 process_key = EXCLUDED.process_key,
                 bytecode_version = EXCLUDED.bytecode_version,
                 domain_payload = EXCLUDED.domain_payload,
@@ -103,6 +105,7 @@ impl ProcessStore for PostgresProcessStore {
             "#,
         )
         .bind(instance.instance_id)
+        .bind(&instance.tenant_id)
         .bind(&instance.process_key)
         .bind(&instance.bytecode_version[..])
         .bind(&instance.domain_payload)
@@ -122,7 +125,7 @@ impl ProcessStore for PostgresProcessStore {
     async fn load_instance(&self, id: Uuid) -> Result<Option<ProcessInstance>> {
         let row = sqlx::query(
             r#"
-            SELECT instance_id, process_key, bytecode_version, domain_payload,
+            SELECT instance_id, tenant_id, process_key, bytecode_version, domain_payload,
                    domain_payload_hash, flags, counters, join_expected, state,
                    correlation_id,
                    EXTRACT(EPOCH FROM created_at) * 1000 AS created_at_ms
@@ -148,9 +151,10 @@ impl ProcessStore for PostgresProcessStore {
 
                 Ok(Some(ProcessInstance {
                     instance_id: row.get("instance_id"),
+                    tenant_id: row.get("tenant_id"),
                     process_key: row.get("process_key"),
                     bytecode_version: bytes_to_hash(bytecode_version)?,
-                    domain_payload: row.get("domain_payload"),
+                    domain_payload: Arc::<str>::from(row.get::<String, _>("domain_payload")),
                     domain_payload_hash: bytes_to_hash(domain_payload_hash)?,
                     flags: serde_json::from_value(flags_json)?,
                     counters: serde_json::from_value(counters_json)?,
@@ -413,9 +417,9 @@ impl ProcessStore for PostgresProcessStore {
         sqlx::query(
             r#"
             INSERT INTO job_queue (
-                job_key, process_instance_id, task_type, service_task_id,
+                job_key, tenant_id, process_instance_id, task_type, service_task_id,
                 domain_payload, domain_payload_hash, orch_flags, retries_remaining
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ) VALUES ($1, (SELECT tenant_id FROM process_instances WHERE instance_id = $2), $2, $3, $4, $5, $6, $7, $8)
             "#,
         )
         .bind(&activation.job_key)
@@ -432,13 +436,19 @@ impl ProcessStore for PostgresProcessStore {
         Ok(())
     }
 
-    async fn dequeue_jobs(&self, task_types: &[String], max: usize) -> Result<Vec<JobActivation>> {
+    async fn dequeue_jobs(
+        &self,
+        task_types: &[String],
+        max: usize,
+        tenant_id: &str,
+    ) -> Result<Vec<JobActivation>> {
         let rows = sqlx::query(
             r#"
             WITH claimed AS (
                 SELECT job_key
                 FROM job_queue
                 WHERE status = 'pending'
+                  AND tenant_id = $3
                   AND task_type = ANY($1)
                 ORDER BY created_at
                 LIMIT $2
@@ -460,6 +470,7 @@ impl ProcessStore for PostgresProcessStore {
         )
         .bind(task_types)
         .bind(max as i64)
+        .bind(tenant_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -616,6 +627,39 @@ impl ProcessStore for PostgresProcessStore {
         use sqlx::Row;
         let seq: i64 = row.get("seq");
         Ok(seq as u64)
+    }
+
+    async fn batch_append_events(&self, instance_id: Uuid, events: &[RuntimeEvent]) -> Result<u64> {
+        let mut tx = self.pool.begin().await?;
+        let mut last_seq = 0;
+        for event in events {
+            let event_json = serde_json::to_value(event)?;
+            let row = sqlx::query(
+                r#"
+                WITH seq AS (
+                    INSERT INTO event_sequences (instance_id, next_seq)
+                    VALUES ($1, 1)
+                    ON CONFLICT (instance_id) DO UPDATE
+                        SET next_seq = event_sequences.next_seq + 1
+                    RETURNING next_seq
+                )
+                INSERT INTO event_log (instance_id, seq, event)
+                SELECT $1, seq.next_seq, $2
+                FROM seq
+                RETURNING seq
+                "#,
+            )
+            .bind(instance_id)
+            .bind(&event_json)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            use sqlx::Row;
+            let seq: i64 = row.get("seq");
+            last_seq = seq as u64;
+        }
+        tx.commit().await?;
+        Ok(last_seq)
     }
 
     async fn read_events(
@@ -924,8 +968,8 @@ impl ProcessStore for PostgresProcessStore {
             "#,
         )
         .bind(instance.instance_id)
-        .bind(&completion.domain_payload_hash[..])
-        .bind(&completion.domain_payload)
+        .bind(&instance.domain_payload_hash[..])
+        .bind(&instance.domain_payload)
         .execute(&mut *tx)
         .await?;
 
@@ -976,10 +1020,11 @@ impl ProcessStore for PostgresProcessStore {
         Ok(cnt as u32)
     }
 
-    async fn list_running_instances(&self) -> Result<Vec<Uuid>> {
+    async fn list_running_instances(&self, tenant_id: &str) -> Result<Vec<Uuid>> {
         let rows = sqlx::query(
-            r#"SELECT instance_id FROM process_instances WHERE state = '"Running"'::jsonb"#,
+            r#"SELECT instance_id FROM process_instances WHERE tenant_id = $1 AND state = '"Running"'::jsonb"#,
         )
+        .bind(tenant_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -1166,7 +1211,7 @@ mod tests {
         let completion = JobCompletion {
             job_key: "job-abc".to_string(),
             domain_payload: r#"{"done":true}"#.to_string(),
-            domain_payload_hash: sha2_hash(r#"{"done":true}"#),
+            expected_instance_payload_hash: sha2_hash(r#"{"case_id":"abc"}"#),
             orch_flags: BTreeMap::new(),
         };
 
@@ -1207,14 +1252,20 @@ mod tests {
         }
 
         // Dequeue 2
-        let batch1 = store.dequeue_jobs(std::slice::from_ref(&task_type), 2).await.unwrap();
+        let batch1 = store
+            .dequeue_jobs(std::slice::from_ref(&task_type), 2)
+            .await
+            .unwrap();
         assert_eq!(batch1.len(), 2);
 
         // Ack one
         store.ack_job(&batch1[0].job_key).await.unwrap();
 
         // Dequeue remaining
-        let batch2 = store.dequeue_jobs(std::slice::from_ref(&task_type), 10).await.unwrap();
+        let batch2 = store
+            .dequeue_jobs(std::slice::from_ref(&task_type), 10)
+            .await
+            .unwrap();
         assert_eq!(batch2.len(), 1);
     }
 

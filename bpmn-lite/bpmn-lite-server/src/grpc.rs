@@ -277,12 +277,8 @@ impl BpmnLite for BpmnLiteService {
             state: state_str.to_string(),
             fibers,
             waits,
-            bytecode_version: inspection
-                .fibers
-                .first()
-                .map(|_| Vec::new())
-                .unwrap_or_default(), // Not stored in FiberInspection, return empty
-            domain_payload_hash: String::new(),
+            bytecode_version: inspection.bytecode_version.to_vec(),
+            domain_payload_hash: hex::encode(inspection.domain_payload_hash),
         }))
     }
 

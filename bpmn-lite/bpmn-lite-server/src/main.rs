@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_env_filter(EnvFilter::from_default_env().add_directive("info".parse()?))
         .init();
 
-    let addr = "0.0.0.0:50051".parse()?;
+    let addr = parse_bind_addr().parse()?;
 
     let database_url = parse_database_url();
 
@@ -107,4 +107,18 @@ fn parse_database_url() -> Option<String> {
     }
     // Fall back to env var
     std::env::var("DATABASE_URL").ok()
+}
+
+/// Parse bind address from `--bind <addr>` CLI arg or `BPMN_LITE_BIND` env var.
+fn parse_bind_addr() -> String {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(addr) = args
+        .windows(2)
+        .find(|w| w[0] == "--bind")
+        .map(|w| w[1].clone())
+    {
+        return addr;
+    }
+
+    std::env::var("BPMN_LITE_BIND").unwrap_or_else(|_| "0.0.0.0:50051".to_string())
 }

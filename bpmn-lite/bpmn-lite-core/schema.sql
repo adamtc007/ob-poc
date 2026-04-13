@@ -12,6 +12,7 @@
 -- ---------------------------------------------------------------------------
 CREATE TABLE process_instances (
     instance_id       UUID PRIMARY KEY,
+    tenant_id         TEXT NOT NULL DEFAULT 'default',
     process_key       TEXT NOT NULL,
     bytecode_version  BYTEA NOT NULL,
     domain_payload    TEXT NOT NULL,
@@ -26,6 +27,7 @@ CREATE TABLE process_instances (
 );
 CREATE INDEX idx_instances_process_key ON process_instances (process_key);
 CREATE INDEX idx_instances_correlation ON process_instances (correlation_id);
+CREATE INDEX idx_instances_tenant_running ON process_instances (tenant_id, updated_at);
 
 -- ---------------------------------------------------------------------------
 -- 002: Fibers
@@ -65,6 +67,7 @@ CREATE TABLE dedupe_cache (
 -- ---------------------------------------------------------------------------
 CREATE TABLE job_queue (
     job_key              TEXT PRIMARY KEY,
+    tenant_id            TEXT NOT NULL DEFAULT 'default',
     process_instance_id  UUID NOT NULL,
     task_type            TEXT NOT NULL,
     service_task_id      TEXT NOT NULL,
@@ -78,6 +81,7 @@ CREATE TABLE job_queue (
 );
 CREATE INDEX idx_jobs_pending ON job_queue (task_type, created_at) WHERE status = 'pending';
 CREATE INDEX idx_jobs_instance ON job_queue (process_instance_id);
+CREATE INDEX idx_jobs_tenant_pending ON job_queue (tenant_id, task_type, created_at) WHERE status = 'pending';
 
 -- ---------------------------------------------------------------------------
 -- 006: Compiled Programs

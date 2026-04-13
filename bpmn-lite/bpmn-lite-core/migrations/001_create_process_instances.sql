@@ -1,5 +1,6 @@
 CREATE TABLE process_instances (
     instance_id       UUID PRIMARY KEY,
+    tenant_id         TEXT NOT NULL DEFAULT 'default',
     process_key       TEXT NOT NULL,
     bytecode_version  BYTEA NOT NULL,
     domain_payload    TEXT NOT NULL,
@@ -14,3 +15,4 @@ CREATE TABLE process_instances (
 );
 CREATE INDEX idx_instances_process_key ON process_instances (process_key);
 CREATE INDEX idx_instances_correlation ON process_instances (correlation_id);
+CREATE INDEX idx_instances_tenant_running ON process_instances (tenant_id, updated_at);

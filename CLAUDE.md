@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-04-04
+> **Last reviewed:** 2026-04-13
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 22 active Rust crates (16 ob-poc + 6 sem_os_*)
@@ -60,6 +60,8 @@ cargo x bpmn-lite build            # Build
 cargo x bpmn-lite test             # Run all tests
 cargo x bpmn-lite start            # Build release + start (port 50051)
 cargo x bpmn-lite start --database-url postgresql:///data_designer  # With PostgresProcessStore
+cd bpmn-lite && cargo run -p xtask -- smoke --spawn-server
+cd bpmn-lite && cargo run -p xtask -- stress --spawn-server --instances 300 --workers 16
 
 # Schema overview (living doc with mermaid ER diagrams)
 npx md-to-pdf migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md
@@ -77,6 +79,16 @@ SEM_OS_DATABASE_URL="postgresql:///data_designer" SEM_OS_JWT_SECRET=dev-secret c
 ```
 
 Current schema export target: `migrations/master-schema.sql` (canonical), `schema_export.sql` (convenience copy)
+
+### BPMN-Lite Status
+
+- `bpmn-lite/` now has a local `xtask` entrypoint for reusable smoke/stress automation.
+- The harness implementation lives in `bpmn-lite-server/src/load_harness.rs`; `xtask` owns optional server spawn and argument forwarding.
+- Completion hash semantics are hardened: the worker-supplied completion hash is only a snapshot guard, while the server persists the hash of the new payload it actually stores.
+- `ProcessInstance.domain_payload` uses `Arc<str>` internally to reduce activation-path clone pressure.
+- VM runtime events are batched through the `ProcessStore` boundary.
+- Instance scans and job dequeue paths are tenant-scoped with migration `bpmn-lite-core/migrations/014_add_tenant_id.sql`.
+- gRPC `Inspect` now returns real bytecode and payload-hash metadata.
 
 **SemOS is the hub for all things.** All paths lead to SemOS — nowhere else. The PostgreSQL schema is a supplementary store, a materialized projection, switchable if needed.
 

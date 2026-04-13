@@ -1,5 +1,6 @@
 CREATE TABLE job_queue (
     job_key              TEXT PRIMARY KEY,
+    tenant_id            TEXT NOT NULL DEFAULT 'default',
     process_instance_id  UUID NOT NULL,
     task_type            TEXT NOT NULL,
     service_task_id      TEXT NOT NULL,
@@ -13,3 +14,4 @@ CREATE TABLE job_queue (
 );
 CREATE INDEX idx_jobs_pending ON job_queue (task_type, created_at) WHERE status = 'pending';
 CREATE INDEX idx_jobs_instance ON job_queue (process_instance_id);
+CREATE INDEX idx_jobs_tenant_pending ON job_queue (tenant_id, task_type, created_at) WHERE status = 'pending';
