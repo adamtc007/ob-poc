@@ -682,7 +682,34 @@ impl ReplOrchestratorV2 {
         // constellation state (updated slot states, available verbs, progress).
         if let Some(tos) = session.workspace_stack.last() {
             if tos.writes_since_push > 0 {
+                #[cfg(feature = "database")]
                 if let Some(ref pool) = self.pool {
+                    // Resolve subject_id if not yet set on the workspace frame.
+                    // After cbu.create or session.load-cluster executes, a CBU exists in
+                    // the DB but subject_id on the REPL WorkspaceFrame may still be None.
+                    // We resolve it from the client group's CBUs so constellation hydration
+                    // knows which CBU to hydrate.
+                    if session.workspace_stack.last().map_or(true, |f| f.subject_id.is_none()) {
+                        let group_id = session.workspace_stack.last()
+                            .map(|f| f.session_scope.client_group_id);
+                        if let Some(group_id) = group_id {
+                            if let Ok(Some(cbu_id)) = sqlx::query_scalar::<_, Uuid>(
+                                r#"SELECT cbu_id FROM "ob-poc".cbus
+                                   WHERE client_group_id = $1 AND deleted_at IS NULL
+                                   ORDER BY created_at DESC LIMIT 1"#,
+                            )
+                            .bind(group_id)
+                            .fetch_optional(pool)
+                            .await
+                            {
+                                if let Some(tos) = session.workspace_stack.last_mut() {
+                                    tos.subject_id = Some(cbu_id);
+                                    tracing::debug!(%cbu_id, %group_id, "Resolved subject_id from client group CBUs for constellation hydration");
+                                }
+                            }
+                        }
+                    }
+
                     if let Ok(hydrated) = self.rehydrate_tos(pool, session).await {
                         session.hydrate_tos(hydrated);
                     }
