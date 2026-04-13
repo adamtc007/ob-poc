@@ -684,28 +684,52 @@ impl ReplOrchestratorV2 {
             if tos.writes_since_push > 0 {
                 #[cfg(feature = "database")]
                 if let Some(ref pool) = self.pool {
-                    // Resolve subject_id if not yet set on the workspace frame.
-                    // After cbu.create or session.load-cluster executes, a CBU exists in
-                    // the DB but subject_id on the REPL WorkspaceFrame may still be None.
-                    // We resolve it from the client group's CBUs so constellation hydration
-                    // knows which CBU to hydrate.
+                    // Resolve subject_id from execution results if not yet set.
+                    // After cbu.create executes, the result JSON contains { "cbu_id": uuid }.
+                    // We extract this and set it as subject_id on the workspace frame so
+                    // constellation hydration knows which CBU to hydrate.
                     if session.workspace_stack.last().map_or(true, |f| f.subject_id.is_none()) {
-                        let group_id = session.workspace_stack.last()
-                            .map(|f| f.session_scope.client_group_id);
-                        if let Some(group_id) = group_id {
-                            if let Ok(Some(cbu_id)) = sqlx::query_scalar::<_, Uuid>(
-                                r#"SELECT cbu_id FROM "ob-poc".cbus
-                                   WHERE client_group_id = $1 AND deleted_at IS NULL
-                                   ORDER BY created_at DESC LIMIT 1"#,
-                            )
-                            .bind(group_id)
-                            .fetch_optional(pool)
-                            .await
-                            {
-                                if let Some(tos) = session.workspace_stack.last_mut() {
-                                    tos.subject_id = Some(cbu_id);
-                                    tracing::debug!(%cbu_id, %group_id, "Resolved subject_id from client group CBUs for constellation hydration");
-                                }
+                        // Scan recent completed runbook entries for a cbu_id in their result
+                        let completed_count = session.runbook.entries.iter()
+                            .filter(|e| matches!(e.status, crate::repl::runbook::EntryStatus::Completed))
+                            .count();
+                        tracing::info!(
+                            completed_count,
+                            total_entries = session.runbook.entries.len(),
+                            "subject_id resolution: scanning runbook entries"
+                        );
+                        for (i, e) in session.runbook.entries.iter().enumerate() {
+                            tracing::info!(
+                                idx = i,
+                                status = ?e.status,
+                                has_result = e.result.is_some(),
+                                result_preview = ?e.result.as_ref().map(|v| {
+                                    let s = v.to_string();
+                                    if s.len() > 120 { format!("{}...", &s[..120]) } else { s }
+                                }),
+                                "runbook entry"
+                            );
+                        }
+
+                        let cbu_id_from_result = session.runbook.entries.iter().rev()
+                            .filter(|e| matches!(e.status, crate::repl::runbook::EntryStatus::Completed))
+                            .find_map(|e| {
+                                e.result.as_ref().and_then(|v| {
+                                    // Try "cbu_id" field (from cbu.create result)
+                                    v.get("cbu_id")
+                                        .and_then(|id| id.as_str())
+                                        .and_then(|s| Uuid::parse_str(s).ok())
+                                        // Also try direct UUID value (from ExecutionResult::Uuid serialized)
+                                        .or_else(|| v.as_str().and_then(|s| Uuid::parse_str(s).ok()))
+                                })
+                            });
+
+                        tracing::info!(?cbu_id_from_result, "subject_id extraction result");
+
+                        if let Some(cbu_id) = cbu_id_from_result {
+                            if let Some(tos) = session.workspace_stack.last_mut() {
+                                tos.subject_id = Some(cbu_id);
+                                tracing::info!(%cbu_id, "Resolved subject_id from runbook execution result");
                             }
                         }
                     }
