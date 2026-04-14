@@ -100,15 +100,13 @@ impl PendingDispatchStore {
         .await
         .context("Failed to claim pending dispatches")?;
 
-        Ok(rows
-            .into_iter()
+        rows.into_iter()
             .map(|r| {
                 use sqlx::Row;
                 let status = r.get::<String, _>("status");
-                let session_stack = serde_json::from_value(
-                    r.get::<serde_json::Value, _>("session_stack"),
-                )
-                .context("Failed to deserialize pending dispatch session_stack")?;
+                let session_stack =
+                    serde_json::from_value(r.get::<serde_json::Value, _>("session_stack"))
+                        .context("Failed to deserialize pending dispatch session_stack")?;
                 Ok(PendingDispatch {
                     dispatch_id: r.get("dispatch_id"),
                     payload_hash: r.get("payload_hash"),
@@ -132,7 +130,7 @@ impl PendingDispatchStore {
                     dispatched_at: r.get("dispatched_at"),
                 })
             })
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 
     /// Mark a dispatch as successfully sent to bpmn-lite.
@@ -201,15 +199,13 @@ impl PendingDispatchStore {
         .await
         .context("Failed to list pending dispatches")?;
 
-        Ok(rows
-            .into_iter()
+        rows.into_iter()
             .map(|r| {
                 use sqlx::Row;
                 let status = r.get::<String, _>("status");
-                let session_stack = serde_json::from_value(
-                    r.get::<serde_json::Value, _>("session_stack"),
-                )
-                .context("Failed to deserialize pending dispatch session_stack")?;
+                let session_stack =
+                    serde_json::from_value(r.get::<serde_json::Value, _>("session_stack"))
+                        .context("Failed to deserialize pending dispatch session_stack")?;
                 Ok(PendingDispatch {
                     dispatch_id: r.get("dispatch_id"),
                     payload_hash: r.get("payload_hash"),
@@ -233,6 +229,6 @@ impl PendingDispatchStore {
                     dispatched_at: r.get("dispatched_at"),
                 })
             })
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 }

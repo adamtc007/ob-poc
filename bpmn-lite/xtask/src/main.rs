@@ -1,5 +1,5 @@
 use std::net::TcpStream;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -141,11 +141,7 @@ fn docker_down_command(extra_args: &[String]) -> Result<()> {
     docker_down(&workspace_root, &parsed)
 }
 
-fn spawn_server(
-    workspace_root: &PathBuf,
-    server_url: &str,
-    database_url: Option<&str>,
-) -> Result<Child> {
+fn spawn_server(workspace_root: &Path, server_url: &str, database_url: Option<&str>) -> Result<Child> {
     let bind_addr = extract_bind_addr(server_url)?;
     let mut command = Command::new("cargo");
     command
@@ -301,7 +297,7 @@ fn parse_args(extra_args: &[String]) -> Result<ParsedArgs> {
     Ok(parsed)
 }
 
-fn docker_up(workspace_root: &PathBuf, parsed: &ParsedArgs) -> Result<DockerDeployment> {
+fn docker_up(workspace_root: &Path, parsed: &ParsedArgs) -> Result<DockerDeployment> {
     ensure_docker_available()?;
 
     let instance_name = sanitize_instance_name(
@@ -407,7 +403,7 @@ fn docker_up(workspace_root: &PathBuf, parsed: &ParsedArgs) -> Result<DockerDepl
     })
 }
 
-fn docker_down(_workspace_root: &PathBuf, parsed: &ParsedArgs) -> Result<()> {
+fn docker_down(_workspace_root: &Path, parsed: &ParsedArgs) -> Result<()> {
     ensure_docker_available()?;
     let instance_name = sanitize_instance_name(
         parsed
@@ -428,7 +424,7 @@ fn ensure_docker_available() -> Result<()> {
         .context("docker is required for docker-* xtask commands")
 }
 
-fn ensure_docker_image(workspace_root: &PathBuf, image: &str) -> Result<()> {
+fn ensure_docker_image(workspace_root: &Path, image: &str) -> Result<()> {
     let repo_root = workspace_root
         .parent()
         .ok_or_else(|| anyhow!("failed to locate repo root from bpmn-lite workspace"))?;
