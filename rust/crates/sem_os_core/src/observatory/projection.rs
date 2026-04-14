@@ -153,25 +153,19 @@ fn focus_identity_from_focus(focus: &FocusState, business_label: Option<&str>) -
     if let Some(first) = focus.object_refs.first() {
         FocusIdentity {
             canonical_id: first.fqn.clone(),
-            business_label: business_label
-                .unwrap_or(&first.fqn)
-                .to_string(),
+            business_label: business_label.unwrap_or(&first.fqn).to_string(),
             object_type: Some(first.object_type.clone()),
         }
     } else if let Some(changeset_id) = focus.changeset_id {
         FocusIdentity {
             canonical_id: changeset_id.to_string(),
-            business_label: business_label
-                .unwrap_or("Changeset")
-                .to_string(),
+            business_label: business_label.unwrap_or("Changeset").to_string(),
             object_type: Some("changeset".into()),
         }
     } else {
         FocusIdentity {
             canonical_id: focus.session_id.to_string(),
-            business_label: business_label
-                .unwrap_or("Session")
-                .to_string(),
+            business_label: business_label.unwrap_or("Session").to_string(),
             object_type: None,
         }
     }
@@ -204,9 +198,7 @@ fn lens_from_focus(focus: &FocusState) -> LensState {
     }
 }
 
-fn actions_from_resolution(
-    response: Option<&ContextResolutionResponse>,
-) -> Vec<ActionDescriptor> {
+fn actions_from_resolution(response: Option<&ContextResolutionResponse>) -> Vec<ActionDescriptor> {
     let Some(response) = response else {
         return vec![];
     };

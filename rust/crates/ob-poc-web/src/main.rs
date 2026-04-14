@@ -26,11 +26,10 @@ use crate::state::AppState;
 use ob_poc::api::{
     control_routes, create_agent_router_with_semantic_and_repl, create_attribute_router,
     create_client_router, create_constellation_router, create_deal_router,
-    create_dsl_viewer_router, create_entity_router, create_graph_router,
-    observatory_routes::create_observatory_router, create_resolution_router,
+    create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
     create_scoped_entity_router, create_session_graph_router, create_session_store,
     create_stewardship_router, create_taxonomy_router, create_trading_matrix_router,
-    create_universe_router, service_resource_router,
+    create_universe_router, observatory_routes::create_observatory_router, service_resource_router,
 };
 
 // Import gateway resolver for resolution routes
@@ -649,15 +648,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // WorkflowDispatcher — routes Direct vs Orchestrated.
                                 // Each store wraps a PgPool (cheap Arc clone), so we
                                 // create separate instances per consumer.
-                                let dispatcher = Arc::new(WorkflowDispatcher::new(
-                                    inner,
-                                    config_index.clone(),
-                                    client.clone(),
-                                    CorrelationStore::new(pool.clone()),
-                                    ParkedTokenStore::new(pool.clone()),
-                                    PendingDispatchStore::new(pool.clone()),
-                                )
-                                .with_pool(pool.clone()));
+                                let dispatcher = Arc::new(
+                                    WorkflowDispatcher::new(
+                                        inner,
+                                        config_index.clone(),
+                                        client.clone(),
+                                        CorrelationStore::new(pool.clone()),
+                                        ParkedTokenStore::new(pool.clone()),
+                                        PendingDispatchStore::new(pool.clone()),
+                                    )
+                                    .with_pool(pool.clone()),
+                                );
 
                                 // Spawn JobWorker (long-poll job activation loop)
                                 let (job_shutdown_tx, job_shutdown_rx) =
@@ -700,10 +701,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 );
 
                                 (
-                                    Some(
-                                        dispatcher.clone()
-                                            as Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>,
-                                    ),
+                                    Some(dispatcher.clone()
+                                        as Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>),
                                     Some(dispatcher),
                                     orchestrated_verbs,
                                 )
@@ -1103,11 +1102,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_stewardship_router(pool.clone()))
         // Observatory routes (orientation, show-packet, navigation history)
         // Pass the REPL V2 session store so Observatory reads from the canonical hydrated DAG.
-        .nest("/api/observatory", create_observatory_router(
-            pool.clone(),
-            sessions.clone(),
-            Some(repl_session_store),
-        ));
+        .nest(
+            "/api/observatory",
+            create_observatory_router(pool.clone(), sessions.clone(), Some(repl_session_store)),
+        );
 
     // React dist directory - serve assets from React build
     let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {
@@ -1161,10 +1159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ServeFile::new(format!("{}/vite.svg", react_dist_dir)),
         )
         // Observatory WASM assets (served from observatory-wasm/pkg/)
-        .nest_service(
-            "/observatory/pkg",
-            ServeDir::new(observatory_wasm_dir()),
-        )
+        .nest_service("/observatory/pkg", ServeDir::new(observatory_wasm_dir()))
         // Observatory route handled by React SPA (fallback serves index.html)
         // Index.html at root (React app)
         .route("/", get(routes::static_files::serve_index))

@@ -833,7 +833,8 @@ impl ReplOrchestratorV2 {
                         if let Some(ref result) = entry.result {
                             let inner = result.get("Record").unwrap_or(result);
                             // Sync case_id if present
-                            if let Some(case_id_str) = inner.get("case_id").and_then(|v| v.as_str()) {
+                            if let Some(case_id_str) = inner.get("case_id").and_then(|v| v.as_str())
+                            {
                                 if let Ok(case_id) = Uuid::parse_str(case_id_str) {
                                     if let Some(tos) = session.workspace_stack.last_mut() {
                                         tos.current_case_id = Some(case_id);
@@ -841,11 +842,13 @@ impl ReplOrchestratorV2 {
                                 }
                             }
                             // Sync deal_id if present
-                            if let Some(deal_id_str) = inner.get("deal_id").and_then(|v| v.as_str()) {
+                            if let Some(deal_id_str) = inner.get("deal_id").and_then(|v| v.as_str())
+                            {
                                 if let Ok(deal_id) = Uuid::parse_str(deal_id_str) {
                                     if let Some(tos) = session.workspace_stack.last_mut() {
                                         tos.deal_id = Some(deal_id);
-                                        tos.deal_name = inner.get("deal_name")
+                                        tos.deal_name = inner
+                                            .get("deal_name")
                                             .and_then(|v| v.as_str())
                                             .map(|s| s.to_string());
                                     }
@@ -1021,11 +1024,7 @@ impl ReplOrchestratorV2 {
     ///
     /// Nav verbs do NOT increment writes_since_push, do NOT trigger rehydration
     /// (the DAG hasn't changed — only the observation frame).
-    fn apply_nav_result_if_present(
-        &self,
-        session: &mut ReplSessionV2,
-        response: &ReplResponseV2,
-    ) {
+    fn apply_nav_result_if_present(&self, session: &mut ReplSessionV2, response: &ReplResponseV2) {
         use ob_poc_types::galaxy::ViewLevel;
 
         let msg = &response.message;
@@ -1639,8 +1638,9 @@ impl ReplOrchestratorV2 {
                         .record_answer(field.clone(), serde_json::Value::String(content.clone()));
                     self.record_pack_answer_entry(session, &field, &content, pack_id.as_deref());
                     if question.answer_kind == AnswerKind::EntityRef {
-                        if let Some(resolved_id) =
-                            self.resolve_entity_ref_answer(session, &field, &content).await
+                        if let Some(resolved_id) = self
+                            .resolve_entity_ref_answer(session, &field, &content)
+                            .await
                         {
                             let id_field = format!("{field}_id");
                             let id_value = resolved_id.to_string();
@@ -5432,14 +5432,8 @@ impl ReplOrchestratorV2 {
             if let Some(ref exec) = self.executor_v2 {
                 let bridge =
                     DslExecutorV2StepExecutor::new(exec.clone(), runbook_id, session_stack);
-                match execute_runbook_with_pool(
-                    store,
-                    compiled_id,
-                    None,
-                    &bridge,
-                    self.pool(),
-                )
-                .await
+                match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool())
+                    .await
                 {
                     Ok(result) => extract_first_outcome(result),
                     Err(e) => StepOutcome::Failed {
@@ -5449,14 +5443,8 @@ impl ReplOrchestratorV2 {
             } else {
                 // No V2 executor — fall back to sync bridge (never parks).
                 let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-                match execute_runbook_with_pool(
-                    store,
-                    compiled_id,
-                    None,
-                    &bridge,
-                    self.pool(),
-                )
-                .await
+                match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool())
+                    .await
                 {
                     Ok(result) => extract_first_outcome(result),
                     Err(e) => StepOutcome::Failed {
@@ -5466,9 +5454,7 @@ impl ReplOrchestratorV2 {
             }
         } else {
             let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-            match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool())
-                .await
-            {
+            match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool()).await {
                 Ok(result) => extract_first_outcome(result),
                 Err(e) => StepOutcome::Failed {
                     error: format!("Execution gate error: {}", e),

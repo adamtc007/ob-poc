@@ -298,9 +298,11 @@ impl SessionRepositoryV2 {
                         extended_state
                             .get("session_stack")
                             .cloned()
-                            .unwrap_or_else(|| serde_json::json!({
-                                "session_id": session_id,
-                            })),
+                            .unwrap_or_else(|| {
+                                serde_json::json!({
+                                    "session_id": session_id,
+                                })
+                            }),
                     )
                     .context("Failed to deserialize session_stack")?,
                     bindings: serde_json::from_value(

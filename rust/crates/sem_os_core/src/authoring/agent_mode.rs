@@ -130,9 +130,19 @@ impl AgentMode {
     ///
     /// Domain prefixes blocked in Maintenance mode (business-plane only).
     const BUSINESS_ONLY_PREFIXES: &[&str] = &[
-        "cbu.", "entity.", "trading-profile.", "investor.", "custody.",
-        "deal.", "billing.", "contract.", "document.", "kyc.",
-        "screening.", "screening-ops.", "ownership.",
+        "cbu.",
+        "entity.",
+        "trading-profile.",
+        "investor.",
+        "custody.",
+        "deal.",
+        "billing.",
+        "contract.",
+        "document.",
+        "kyc.",
+        "screening.",
+        "screening-ops.",
+        "ownership.",
     ];
 
     pub fn is_verb_allowed(&self, verb_fqn: &str) -> bool {

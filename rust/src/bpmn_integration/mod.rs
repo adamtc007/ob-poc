@@ -30,6 +30,7 @@ pub mod job_frames;
 pub mod parked_tokens;
 pub mod pending_dispatch_worker;
 pub mod pending_dispatches;
+pub mod request_state;
 pub mod signal_relay;
 pub mod types;
 pub mod worker;

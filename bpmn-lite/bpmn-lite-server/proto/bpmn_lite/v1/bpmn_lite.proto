@@ -48,6 +48,8 @@ message StartRequest {
     string session_stack_json = 5;
     map<string, ProtoValue> orch_flags = 6;
     string correlation_id = 7;
+    string entry_id = 8;
+    string runbook_id = 9;
 }
 
 message StartResponse {
@@ -120,6 +122,8 @@ message JobActivationMsg {
     string session_stack_json = 7;
     map<string, ProtoValue> orch_flags = 8;
     int32 retries_remaining = 9;
+    string entry_id = 10;
+    string runbook_id = 11;
 }
 
 message CompleteJobRequest {

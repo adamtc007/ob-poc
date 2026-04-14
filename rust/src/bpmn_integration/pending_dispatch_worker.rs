@@ -18,6 +18,7 @@ use super::client::{BpmnLiteConnection, StartProcessRequest};
 use super::config::WorkflowConfigIndex;
 use super::correlation::CorrelationStore;
 use super::pending_dispatches::PendingDispatchStore;
+use super::request_state::RequestStateStore;
 
 /// Retry interval between scan cycles.
 const POLL_INTERVAL_SECS: u64 = 10;
@@ -43,6 +44,8 @@ pub struct PendingDispatchWorker {
     pending_dispatches: PendingDispatchStore,
     /// Correlation store — to patch process_instance_id after success.
     correlations: CorrelationStore,
+    /// Requester-side lifecycle projection store.
+    request_states: RequestStateStore,
     /// Workflow config — for bytecode version lookup.
     config: Arc<WorkflowConfigIndex>,
 }
@@ -52,12 +55,14 @@ impl PendingDispatchWorker {
         bpmn_client: BpmnLiteConnection,
         pending_dispatches: PendingDispatchStore,
         correlations: CorrelationStore,
+        request_states: RequestStateStore,
         config: Arc<WorkflowConfigIndex>,
     ) -> Self {
         Self {
             bpmn_client,
             pending_dispatches,
             correlations,
+            request_states,
             config,
         }
     }
@@ -136,6 +141,8 @@ impl PendingDispatchWorker {
                 session_stack: dispatch.session_stack.clone(),
                 orch_flags: std::collections::HashMap::new(),
                 correlation_id: dispatch.correlation_id,
+                entry_id: dispatch.entry_id,
+                runbook_id: dispatch.runbook_id,
             })
             .await;
 
@@ -151,6 +158,18 @@ impl PendingDispatchWorker {
                         correlation_id = %dispatch.correlation_id,
                         error = %e,
                         "PendingDispatchWorker: failed to update correlation after dispatch"
+                    );
+                }
+                if let Err(e) = self
+                    .request_states
+                    .mark_in_progress(&dispatch.correlation_key, process_instance_id)
+                    .await
+                {
+                    tracing::error!(
+                        correlation_key = %dispatch.correlation_key,
+                        process_instance_id = %process_instance_id,
+                        error = %e,
+                        "PendingDispatchWorker: failed to mark requester state in_progress"
                     );
                 }
 
@@ -189,6 +208,17 @@ impl PendingDispatchWorker {
                 }
 
                 if dispatch.attempts + 1 >= MAX_ATTEMPTS {
+                    if let Err(state_err) = self
+                        .request_states
+                        .mark_failed(&dispatch.correlation_key, Some(&e.to_string()))
+                        .await
+                    {
+                        tracing::error!(
+                            correlation_key = %dispatch.correlation_key,
+                            error = %state_err,
+                            "PendingDispatchWorker: failed to mark requester state failed"
+                        );
+                    }
                     tracing::warn!(
                         verb = %dispatch.verb_fqn,
                         dispatch_id = %dispatch.dispatch_id,

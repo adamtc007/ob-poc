@@ -23,6 +23,8 @@ CREATE TABLE process_instances (
     join_expected     JSONB NOT NULL DEFAULT '{}',
     state             JSONB NOT NULL,
     correlation_id    TEXT NOT NULL,
+    entry_id          UUID NOT NULL,
+    runbook_id        UUID NOT NULL,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -77,6 +79,8 @@ CREATE TABLE job_queue (
     session_stack        JSONB NOT NULL DEFAULT '{}',
     orch_flags           JSONB NOT NULL DEFAULT '{}',
     retries_remaining    INTEGER NOT NULL DEFAULT 3,
+    entry_id             UUID NOT NULL,
+    runbook_id           UUID NOT NULL,
     status               TEXT NOT NULL DEFAULT 'pending',
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
     claimed_at           TIMESTAMPTZ

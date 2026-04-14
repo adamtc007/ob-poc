@@ -138,6 +138,8 @@ impl BpmnLite for BpmnLiteService {
                 hash,
                 &req.correlation_id,
                 session_stack,
+                parse_uuid(&req.entry_id)?,
+                parse_uuid(&req.runbook_id)?,
             )
             .await
             .map_err(engine_err)?;
@@ -324,6 +326,8 @@ impl BpmnLite for BpmnLiteService {
                     .map(|(k, v)| (k.clone(), value_to_proto(v)))
                     .collect(),
                 retries_remaining: job.retries_remaining as i32,
+                entry_id: job.entry_id.to_string(),
+                runbook_id: job.runbook_id.to_string(),
             };
             let _ = tx.send(Ok(msg)).await;
         }

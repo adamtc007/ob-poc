@@ -47,9 +47,15 @@ pub struct NavDrillOp;
 
 #[async_trait]
 impl crate::domain_ops::CustomOperation for NavDrillOp {
-    fn domain(&self) -> &'static str { "nav" }
-    fn verb(&self) -> &'static str { "drill" }
-    fn rationale(&self) -> &'static str { "Semantic drill into a focused object — opens deeper level" }
+    fn domain(&self) -> &'static str {
+        "nav"
+    }
+    fn verb(&self) -> &'static str {
+        "drill"
+    }
+    fn rationale(&self) -> &'static str {
+        "Semantic drill into a focused object — opens deeper level"
+    }
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -76,7 +82,9 @@ impl crate::domain_ops::CustomOperation for NavDrillOp {
 /// Extract a string argument from a VerbCall by key.
 fn find_arg(verb_call: &VerbCall, key: &str) -> Option<String> {
     use dsl_core::ast::{AstNode, Literal};
-    verb_call.arguments.iter()
+    verb_call
+        .arguments
+        .iter()
         .find(|a| a.key == key)
         .and_then(|a| match &a.value {
             AstNode::Literal(Literal::String(s), _) => Some(s.clone()),
@@ -91,9 +99,15 @@ pub struct NavZoomOutOp;
 
 #[async_trait]
 impl crate::domain_ops::CustomOperation for NavZoomOutOp {
-    fn domain(&self) -> &'static str { "nav" }
-    fn verb(&self) -> &'static str { "zoom-out" }
-    fn rationale(&self) -> &'static str { "Semantic zoom out — go up one level (not visual zoom)" }
+    fn domain(&self) -> &'static str {
+        "nav"
+    }
+    fn verb(&self) -> &'static str {
+        "zoom-out"
+    }
+    fn rationale(&self) -> &'static str {
+        "Semantic zoom out — go up one level (not visual zoom)"
+    }
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -121,9 +135,15 @@ pub struct NavSelectOp;
 
 #[async_trait]
 impl crate::domain_ops::CustomOperation for NavSelectOp {
-    fn domain(&self) -> &'static str { "nav" }
-    fn verb(&self) -> &'static str { "select" }
-    fn rationale(&self) -> &'static str { "Set semantic focus to a specific entity or object" }
+    fn domain(&self) -> &'static str {
+        "nav"
+    }
+    fn verb(&self) -> &'static str {
+        "select"
+    }
+    fn rationale(&self) -> &'static str {
+        "Set semantic focus to a specific entity or object"
+    }
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -151,9 +171,15 @@ pub struct NavSetClusterTypeOp;
 
 #[async_trait]
 impl crate::domain_ops::CustomOperation for NavSetClusterTypeOp {
-    fn domain(&self) -> &'static str { "nav" }
-    fn verb(&self) -> &'static str { "set-cluster-type" }
-    fn rationale(&self) -> &'static str { "Change cluster grouping mode" }
+    fn domain(&self) -> &'static str {
+        "nav"
+    }
+    fn verb(&self) -> &'static str {
+        "set-cluster-type"
+    }
+    fn rationale(&self) -> &'static str {
+        "Change cluster grouping mode"
+    }
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -181,9 +207,15 @@ pub struct NavSetLensOp;
 
 #[async_trait]
 impl crate::domain_ops::CustomOperation for NavSetLensOp {
-    fn domain(&self) -> &'static str { "nav" }
-    fn verb(&self) -> &'static str { "set-lens" }
-    fn rationale(&self) -> &'static str { "Change observation lens (overlay, depth probe, filters)" }
+    fn domain(&self) -> &'static str {
+        "nav"
+    }
+    fn verb(&self) -> &'static str {
+        "set-lens"
+    }
+    fn rationale(&self) -> &'static str {
+        "Change observation lens (overlay, depth probe, filters)"
+    }
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -211,9 +243,15 @@ pub struct NavHistoryBackOp;
 
 #[async_trait]
 impl crate::domain_ops::CustomOperation for NavHistoryBackOp {
-    fn domain(&self) -> &'static str { "nav" }
-    fn verb(&self) -> &'static str { "history-back" }
-    fn rationale(&self) -> &'static str { "Navigate back in history" }
+    fn domain(&self) -> &'static str {
+        "nav"
+    }
+    fn verb(&self) -> &'static str {
+        "history-back"
+    }
+    fn rationale(&self) -> &'static str {
+        "Navigate back in history"
+    }
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -240,9 +278,15 @@ pub struct NavHistoryForwardOp;
 
 #[async_trait]
 impl crate::domain_ops::CustomOperation for NavHistoryForwardOp {
-    fn domain(&self) -> &'static str { "nav" }
-    fn verb(&self) -> &'static str { "history-forward" }
-    fn rationale(&self) -> &'static str { "Navigate forward in history" }
+    fn domain(&self) -> &'static str {
+        "nav"
+    }
+    fn verb(&self) -> &'static str {
+        "history-forward"
+    }
+    fn rationale(&self) -> &'static str {
+        "Navigate forward in history"
+    }
 
     #[cfg(feature = "database")]
     async fn execute(

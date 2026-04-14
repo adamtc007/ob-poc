@@ -491,7 +491,6 @@ pub struct ExecutionContext {
     // --- Typed session mutation fields (Phase 3 session merge) ---
     // Verb handlers write to these instead of pending_session.
     // Orchestrator syncs back to ReplSessionV2/WorkspaceFrame after execution.
-
     /// Session display name — set by session.load-cluster.
     pub pending_session_name: Option<String>,
 
@@ -510,7 +509,7 @@ pub struct ExecutionContext {
     pub pending_mandate_id: Option<Uuid>,
 
     /// Deal context set by verb handler.
-    pub pending_deal_id: Option<Option<Uuid>>,  // Some(Some(id)) = set, Some(None) = cleared
+    pub pending_deal_id: Option<Option<Uuid>>, // Some(Some(id)) = set, Some(None) = cleared
     pub pending_deal_name: Option<Option<String>>,
 
     /// Whether CBU scope was modified during this execution.

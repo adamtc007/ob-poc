@@ -175,12 +175,13 @@ async fn session_input(
                     chat_response.onboarding_state = Some(osv);
                 } else {
                     #[cfg(feature = "database")]
-                    if let Some(osv) = crate::api::agent_enrichment::compute_onboarding_state_from_db(
-                        &state.pool,
-                        session_id,
-                        None,
-                    )
-                    .await
+                    if let Some(osv) =
+                        crate::api::agent_enrichment::compute_onboarding_state_from_db(
+                            &state.pool,
+                            session_id,
+                            None,
+                        )
+                        .await
                     {
                         chat_response.onboarding_state = Some(osv);
                     }

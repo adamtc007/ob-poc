@@ -52,6 +52,8 @@ pub struct StartProcessRequest {
     pub session_stack: SessionStackState,
     pub orch_flags: HashMap<String, OrchestratorFlag>,
     pub correlation_id: Uuid,
+    pub entry_id: Uuid,
+    pub runbook_id: Uuid,
 }
 
 /// Typed orchestrator flag value (maps to ProtoValue oneof).
@@ -100,6 +102,8 @@ pub struct JobActivation {
     pub session_stack: SessionStackState,
     pub orch_flags: HashMap<String, OrchestratorFlag>,
     pub retries_remaining: i32,
+    pub entry_id: Uuid,
+    pub runbook_id: Uuid,
 }
 
 /// Request to complete a job.
@@ -223,6 +227,8 @@ impl BpmnLiteConnection {
                 session_stack_json,
                 orch_flags: to_proto_flags(&req.orch_flags),
                 correlation_id: req.correlation_id.to_string(),
+                entry_id: req.entry_id.to_string(),
+                runbook_id: req.runbook_id.to_string(),
             })
             .await
             .context("StartProcess RPC failed")?
@@ -348,6 +354,10 @@ impl BpmnLiteConnection {
                 session_stack,
                 orch_flags: from_proto_flags(msg.orch_flags),
                 retries_remaining: msg.retries_remaining,
+                entry_id: Uuid::parse_str(&msg.entry_id)
+                    .context("Invalid entry_id in JobActivationMsg")?,
+                runbook_id: Uuid::parse_str(&msg.runbook_id)
+                    .context("Invalid runbook_id in JobActivationMsg")?,
             });
         }
 

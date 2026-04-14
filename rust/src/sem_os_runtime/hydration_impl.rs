@@ -105,19 +105,25 @@ async fn hydrate_slot_tx(
     let rows = load_slot_rows_tx(tx, cbu_id, case_id, slot, raw)
         .await
         .map_err(|err| {
-            ConstellationError::Execution(format!("load_slot_rows failed for '{}': {err}", slot.name))
+            ConstellationError::Execution(format!(
+                "load_slot_rows failed for '{}': {err}",
+                slot.name
+            ))
         })?;
     raw.slot_rows.insert(slot.name.clone(), rows.clone());
-    populate_entity_details_tx(tx, raw, &rows).await.map_err(|err| {
-        ConstellationError::Execution(format!(
-            "populate_entity_details failed for '{}': {err}",
-            slot.name
-        ))
-    })?;
+    populate_entity_details_tx(tx, raw, &rows)
+        .await
+        .map_err(|err| {
+            ConstellationError::Execution(format!(
+                "populate_entity_details failed for '{}': {err}",
+                slot.name
+            ))
+        })?;
 
     if let Some(entity_id) = pick_deterministic_row(&rows).and_then(|row| row.entity_id) {
         let Some(machine_name) = slot.def.state_machine.as_ref() else {
-            if let Err(err) = hydrate_slot_overlays_tx(tx, cbu_id, case_id, raw, slot, entity_id).await
+            if let Err(err) =
+                hydrate_slot_overlays_tx(tx, cbu_id, case_id, raw, slot, entity_id).await
             {
                 tracing::warn!(
                     slot = %slot.name,

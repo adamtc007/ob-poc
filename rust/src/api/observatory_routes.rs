@@ -25,8 +25,8 @@ use sem_os_core::stewardship::types::{FocusState, FocusUpdateSource, OverlayMode
 
 use crate::api::session::SessionStore;
 use crate::repl::session_v2::ReplSessionV2;
-use crate::sem_reg::stewardship::show_loop::ShowLoop;
 use crate::sem_os_runtime::constellation_runtime::HydratedSlot;
+use crate::sem_reg::stewardship::show_loop::ShowLoop;
 
 /// Observatory API error response.
 #[derive(Debug, Serialize)]
@@ -182,7 +182,11 @@ fn collect_actions_from_slots(slots: &[HydratedSlot]) -> Vec<ActionDescriptor> {
     let mut actions = Vec::new();
     collect_actions_recursive(slots, &mut actions);
     // Sort by enabled (true first), then by action_id for stability
-    actions.sort_by(|a, b| b.enabled.cmp(&a.enabled).then_with(|| a.action_id.cmp(&b.action_id)));
+    actions.sort_by(|a, b| {
+        b.enabled
+            .cmp(&a.enabled)
+            .then_with(|| a.action_id.cmp(&b.action_id))
+    });
     actions
 }
 
@@ -243,7 +247,12 @@ fn derive_focus_from_tos(
 
         let label = constellation
             .map(|c| c.constellation.clone())
-            .or_else(|| frame.hydrated_state.as_ref().map(|h| h.constellation_map.clone()))
+            .or_else(|| {
+                frame
+                    .hydrated_state
+                    .as_ref()
+                    .map(|h| h.constellation_map.clone())
+            })
             .unwrap_or_else(|| frame.workspace.label().to_string());
 
         let canonical_id = frame
@@ -400,9 +409,7 @@ async fn get_navigation_history(
 ///
 /// Returns aggregated health metrics from maintenance verb results.
 /// Phase 2: dashboard data for the Mission Control panel.
-async fn get_health_metrics(
-    State(state): State<ObservatoryState>,
-) -> impl IntoResponse {
+async fn get_health_metrics(State(state): State<ObservatoryState>) -> impl IntoResponse {
     // Query maintenance metrics from the database
     let pending = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM sem_reg.changesets WHERE status NOT IN ('published', 'rejected', 'archived')"
@@ -419,14 +426,14 @@ async fn get_health_metrics(
     .unwrap_or(0);
 
     let active_snapshots = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM sem_reg.snapshots WHERE status = 'active'"
+        "SELECT COUNT(*) FROM sem_reg.snapshots WHERE status = 'active'",
     )
     .fetch_one(&state.pool)
     .await
     .unwrap_or(0);
 
     let archived = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM sem_reg.changesets WHERE status = 'archived'"
+        "SELECT COUNT(*) FROM sem_reg.changesets WHERE status = 'archived'",
     )
     .fetch_one(&state.pool)
     .await
@@ -572,7 +579,10 @@ async fn get_session_stack_graph(
             .and_then(|scope| scope.client_group_name.clone())
             .unwrap_or_else(|| format!("Session {}", stack.session_id)),
         node_type: SceneNodeType::Aggregate,
-        state: stack.active_workspace.as_ref().map(|ws| format!("{:?}", ws)),
+        state: stack
+            .active_workspace
+            .as_ref()
+            .map(|ws| format!("{:?}", ws)),
         progress: 0,
         blocking: false,
         depth: 0,
@@ -630,7 +640,11 @@ async fn get_session_stack_graph(
             },
             target: node_id,
             edge_type: SceneEdgeType::Dependency,
-            label: Some(if index == 0 { "root".into() } else { "push".into() }),
+            label: Some(if index == 0 {
+                "root".into()
+            } else {
+                "push".into()
+            }),
             weight: 1.0,
         });
     }
@@ -662,8 +676,8 @@ fn flatten_slots_recursive(
     slots: &[HydratedSlot],
     result: &mut Vec<sem_os_core::observatory::graph_scene_projection::SlotProjection>,
 ) {
-    use sem_os_core::observatory::graph_scene_projection::SlotProjection;
     use sem_os_core::observatory::graph_scene_projection::GraphEdgeProjection;
+    use sem_os_core::observatory::graph_scene_projection::SlotProjection;
     for slot in slots {
         result.push(SlotProjection {
             name: slot.name.clone(),
@@ -679,13 +693,20 @@ fn flatten_slots_recursive(
             parent_path: slot.path.rsplit_once('.').map(|(p, _)| p.to_string()),
             child_count: slot.children.len(),
             depends_on: vec![], // TODO: populate from SlotDef.depends_on when available on HydratedSlot
-            graph_edges: slot.graph_edges.iter().map(|e| GraphEdgeProjection {
-                from_id: e.from_entity_id.to_string(),
-                to_id: e.to_entity_id.to_string(),
-                edge_type: e.ownership_type.clone().unwrap_or_else(|| "ownership".into()),
-                label: e.percentage.map(|p| format!("{:.0}%", p)),
-                weight: e.percentage.unwrap_or(0.0) as f32,
-            }).collect(),
+            graph_edges: slot
+                .graph_edges
+                .iter()
+                .map(|e| GraphEdgeProjection {
+                    from_id: e.from_entity_id.to_string(),
+                    to_id: e.to_entity_id.to_string(),
+                    edge_type: e
+                        .ownership_type
+                        .clone()
+                        .unwrap_or_else(|| "ownership".into()),
+                    label: e.percentage.map(|p| format!("{:.0}%", p)),
+                    weight: e.percentage.unwrap_or(0.0) as f32,
+                })
+                .collect(),
         });
         // Recurse into children
         flatten_slots_recursive(&slot.children, result);
@@ -766,7 +787,9 @@ async fn navigate(
     Path(session_id): Path<Uuid>,
     Json(request): Json<NavigateRequest>,
 ) -> impl IntoResponse {
-    use sem_os_core::observatory::graph_scene_projection::{self, GraphEdgeProjection, SlotProjection};
+    use sem_os_core::observatory::graph_scene_projection::{
+        self, GraphEdgeProjection, SlotProjection,
+    };
 
     // 1. Validate session exists and extract scope
     let sessions = state.sessions.read().await;
@@ -1040,7 +1063,10 @@ pub fn create_observatory_router(
             get(get_navigation_history),
         )
         .route("/session/:id/graph-scene", get(get_graph_scene))
-        .route("/session/:id/session-stack-graph", get(get_session_stack_graph))
+        .route(
+            "/session/:id/session-stack-graph",
+            get(get_session_stack_graph),
+        )
         .route("/session/:id/navigate", post(navigate))
         .route("/session/:id/diagrams/:diagram_type", get(get_diagram))
         .route("/health", get(get_health_metrics))

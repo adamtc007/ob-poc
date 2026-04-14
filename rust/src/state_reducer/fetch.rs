@@ -38,7 +38,9 @@ pub async fn fetch_slot_overlays(
             tracing::warn!(error = %e, %cbu_id, %entity_id, "Overlay fetch failed — returning empty overlays");
             Ok(SlotOverlayData {
                 sources: HashMap::new(),
-                scope: ScopeData { fields: serde_json::json!({}) },
+                scope: ScopeData {
+                    fields: serde_json::json!({}),
+                },
                 slots: Vec::new(),
             })
         }
@@ -176,7 +178,9 @@ pub(crate) async fn fetch_slot_overlays_tx(
             tracing::warn!(error = %e, %cbu_id, %entity_id, "Overlay fetch (tx) failed — returning empty overlays");
             return Ok(SlotOverlayData {
                 sources: HashMap::new(),
-                scope: ScopeData { fields: serde_json::json!({}) },
+                scope: ScopeData {
+                    fields: serde_json::json!({}),
+                },
                 slots: Vec::new(),
             });
         }

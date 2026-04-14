@@ -141,7 +141,11 @@ fn docker_down_command(extra_args: &[String]) -> Result<()> {
     docker_down(&workspace_root, &parsed)
 }
 
-fn spawn_server(workspace_root: &Path, server_url: &str, database_url: Option<&str>) -> Result<Child> {
+fn spawn_server(
+    workspace_root: &Path,
+    server_url: &str,
+    database_url: Option<&str>,
+) -> Result<Child> {
     let bind_addr = extract_bind_addr(server_url)?;
     let mut command = Command::new("cargo");
     command
@@ -420,8 +424,13 @@ fn docker_down(_workspace_root: &Path, parsed: &ParsedArgs) -> Result<()> {
 }
 
 fn ensure_docker_available() -> Result<()> {
-    run_command(Command::new("docker").arg("version").arg("--format").arg("{{.Server.Version}}"))
-        .context("docker is required for docker-* xtask commands")
+    run_command(
+        Command::new("docker")
+            .arg("version")
+            .arg("--format")
+            .arg("{{.Server.Version}}"),
+    )
+    .context("docker is required for docker-* xtask commands")
 }
 
 fn ensure_docker_image(workspace_root: &Path, image: &str) -> Result<()> {

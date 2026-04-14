@@ -272,7 +272,6 @@ impl CustomOperation for CbuCreateOp {
             ctx.bind(binding, cbu_id);
         }
 
-
         let skipped_reason: Option<&str> = if is_new {
             None
         } else {

@@ -229,7 +229,10 @@ mod tests {
             value["client_group_id"].is_string(),
             "client_group_id should serialize as string when Some"
         );
-        assert!(value["cbu_id"].is_string(), "cbu_id should serialize as string");
+        assert!(
+            value["cbu_id"].is_string(),
+            "cbu_id should serialize as string"
+        );
         assert_eq!(value["case_type"], "NEW_CLIENT");
     }
 

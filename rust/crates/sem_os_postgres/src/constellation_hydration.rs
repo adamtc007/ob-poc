@@ -591,27 +591,29 @@ pub async fn query_entity_graph_rows_tx(
         .collect::<Vec<_>>();
     let edges = rows
         .into_iter()
-        .map(|(from_entity_id, to_entity_id, percentage, ownership_type, depth)| {
-            nodes.push(HydrationSlotRow {
-                entity_id: Some(from_entity_id),
-                record_id: Some(from_entity_id),
-                filter_value: ownership_type.clone(),
-                created_at: None,
-            });
-            nodes.push(HydrationSlotRow {
-                entity_id: Some(to_entity_id),
-                record_id: Some(to_entity_id),
-                filter_value: ownership_type.clone(),
-                created_at: None,
-            });
-            HydrationGraphEdge {
-                from_entity_id,
-                to_entity_id,
-                percentage,
-                ownership_type,
-                depth: depth as usize,
-            }
-        })
+        .map(
+            |(from_entity_id, to_entity_id, percentage, ownership_type, depth)| {
+                nodes.push(HydrationSlotRow {
+                    entity_id: Some(from_entity_id),
+                    record_id: Some(from_entity_id),
+                    filter_value: ownership_type.clone(),
+                    created_at: None,
+                });
+                nodes.push(HydrationSlotRow {
+                    entity_id: Some(to_entity_id),
+                    record_id: Some(to_entity_id),
+                    filter_value: ownership_type.clone(),
+                    created_at: None,
+                });
+                HydrationGraphEdge {
+                    from_entity_id,
+                    to_entity_id,
+                    percentage,
+                    ownership_type,
+                    depth: depth as usize,
+                }
+            },
+        )
         .collect::<Vec<_>>();
 
     Ok((nodes, edges))

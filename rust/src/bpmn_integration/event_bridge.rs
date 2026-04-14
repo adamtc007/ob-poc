@@ -18,6 +18,7 @@ use uuid::Uuid;
 use super::client::{lifecycle_event_from_proto, BpmnLifecycleEvent, BpmnLiteConnection};
 use super::correlation::CorrelationStore;
 use super::parked_tokens::ParkedTokenStore;
+use super::request_state::RequestStateStore;
 use super::types::{CorrelationStatus, OutcomeEvent};
 
 // ---------------------------------------------------------------------------
@@ -30,6 +31,7 @@ pub struct EventBridge {
     bpmn_client: BpmnLiteConnection,
     correlations: CorrelationStore,
     parked_tokens: ParkedTokenStore,
+    request_states: RequestStateStore,
 }
 
 impl EventBridge {
@@ -37,11 +39,13 @@ impl EventBridge {
         bpmn_client: BpmnLiteConnection,
         correlations: CorrelationStore,
         parked_tokens: ParkedTokenStore,
+        request_states: RequestStateStore,
     ) -> Self {
         Self {
             bpmn_client,
             correlations,
             parked_tokens,
+            request_states,
         }
     }
 
@@ -303,18 +307,21 @@ impl EventBridge {
                 // Correlation → Completed, resolve all parked tokens.
                 self.update_correlation(process_instance_id, CorrelationStatus::Completed)
                     .await;
+                self.mark_request_returned(process_instance_id).await;
                 self.resolve_all_tokens(process_instance_id).await;
             }
-            OutcomeEvent::ProcessCancelled { .. } => {
+            OutcomeEvent::ProcessCancelled { reason, .. } => {
                 // Correlation → Cancelled, resolve all parked tokens.
                 self.update_correlation(process_instance_id, CorrelationStatus::Cancelled)
                     .await;
+                self.mark_request_killed(process_instance_id, Some(reason)).await;
                 self.resolve_all_tokens(process_instance_id).await;
             }
-            OutcomeEvent::IncidentCreated { .. } => {
+            OutcomeEvent::IncidentCreated { error, .. } => {
                 // Correlation → Failed (tokens remain waiting for manual resolution).
                 self.update_correlation(process_instance_id, CorrelationStatus::Failed)
                     .await;
+                self.mark_request_failed(process_instance_id, Some(error)).await;
             }
             OutcomeEvent::StepCompleted { .. } | OutcomeEvent::StepFailed { .. } => {
                 // Informational — no store updates needed.
@@ -379,6 +386,98 @@ impl EventBridge {
                     "Failed to resolve parked tokens"
                 );
             }
+        }
+    }
+
+    async fn mark_request_returned(&self, process_instance_id: Uuid) {
+        match self.request_key_for_process(process_instance_id).await {
+            Ok(Some(request_key)) => {
+                if let Err(e) = self.request_states.mark_returned(&request_key).await {
+                    tracing::error!(
+                        process_instance_id = %process_instance_id,
+                        request_key = %request_key,
+                        error = %e,
+                        "Failed to mark requester state returned"
+                    );
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::error!(
+                    process_instance_id = %process_instance_id,
+                    error = %e,
+                    "Failed correlation lookup for requester-state update"
+                );
+            }
+        }
+    }
+
+    async fn mark_request_killed(&self, process_instance_id: Uuid, reason: Option<&str>) {
+        match self.request_key_for_process(process_instance_id).await {
+            Ok(Some(request_key)) => {
+                if let Err(e) = self.request_states.mark_killed(&request_key, reason).await {
+                    tracing::error!(
+                        process_instance_id = %process_instance_id,
+                        request_key = %request_key,
+                        error = %e,
+                        "Failed to mark requester state killed"
+                    );
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::error!(
+                    process_instance_id = %process_instance_id,
+                    error = %e,
+                    "Failed correlation lookup for requester-state update"
+                );
+            }
+        }
+    }
+
+    async fn mark_request_failed(&self, process_instance_id: Uuid, error: Option<&str>) {
+        match self.request_key_for_process(process_instance_id).await {
+            Ok(Some(request_key)) => {
+                if let Err(e) = self.request_states.mark_failed(&request_key, error).await {
+                    tracing::error!(
+                        process_instance_id = %process_instance_id,
+                        request_key = %request_key,
+                        error = %e,
+                        "Failed to mark requester state failed"
+                    );
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::error!(
+                    process_instance_id = %process_instance_id,
+                    error = %e,
+                    "Failed correlation lookup for requester-state update"
+                );
+            }
+        }
+    }
+
+    async fn request_key_for_process(&self, process_instance_id: Uuid) -> Result<Option<String>> {
+        match self
+            .correlations
+            .find_by_process_instance(process_instance_id)
+            .await
+        {
+            Ok(Some(record)) => {
+                Ok(Some(format!(
+                    "{}:{}:{}",
+                    record.runbook_id, record.entry_id, record.correlation_id
+                )))
+            }
+            Ok(None) => {
+                tracing::warn!(
+                    process_instance_id = %process_instance_id,
+                    "No correlation found for requester-state update"
+                );
+                Ok(None)
+            }
+            Err(e) => Err(e),
         }
     }
 }

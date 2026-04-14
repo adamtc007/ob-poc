@@ -201,32 +201,22 @@ pub enum EntryReason {
     /// User navigated directly (typed command, clicked breadcrumb).
     DirectNavigation,
     /// User accepted an agent suggestion.
-    SuggestionAccepted {
-        suggestion_id: String,
-    },
+    SuggestionAccepted { suggestion_id: String },
     /// User drilled down from a parent object.
     DrillDown {
         from_level: ViewLevel,
         from_id: String,
     },
     /// A workflow step brought the user here.
-    WorkflowStep {
-        step_name: String,
-    },
+    WorkflowStep { step_name: String },
     /// Search result navigation.
-    SearchResult {
-        query: String,
-    },
+    SearchResult { query: String },
     /// Deep link (URL or external reference).
-    DeepLink {
-        uri: String,
-    },
+    DeepLink { uri: String },
     /// Initial session entry (no prior orientation).
     SessionStart,
     /// History navigation (back/forward).
-    HistoryReplay {
-        direction: String,
-    },
+    HistoryReplay { direction: String },
 }
 
 // ── ActionDescriptor ─────────────────────────────────────────

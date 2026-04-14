@@ -14,10 +14,11 @@ use super::correlation::CorrelationStore;
 use super::event_bridge::EventBridge;
 use super::parked_tokens::ParkedTokenStore;
 use super::pending_dispatches::PendingDispatchStore;
+use super::request_state::RequestStateStore;
 use super::signal_relay::SignalRelay;
 use super::types::{
     CorrelationRecord, CorrelationStatus, ExecutionRoute, ParkedToken, ParkedTokenStatus,
-    PendingDispatch, PendingDispatchStatus,
+    PendingDispatch, PendingDispatchStatus, RequestStateRecord, RequestStatus,
 };
 use crate::repl::orchestrator_v2::{DslExecutionOutcome, DslExecutorV2, ReplOrchestratorV2};
 use ob_poc_types::session_stack::SessionStackState;
@@ -51,6 +52,8 @@ pub struct WorkflowDispatcher {
     parked_tokens: ParkedTokenStore,
     /// Pending dispatch queue for BPMN resilience.
     pending_dispatches: PendingDispatchStore,
+    /// Requester-side lifecycle projection store.
+    request_states: RequestStateStore,
     /// Optional orchestrator handle used to relay BPMN terminal events back
     /// into parked REPL runbooks.
     signal_orchestrator: Arc<std::sync::RwLock<Option<Arc<ReplOrchestratorV2>>>>,
@@ -67,6 +70,7 @@ impl WorkflowDispatcher {
         correlations: CorrelationStore,
         parked_tokens: ParkedTokenStore,
         pending_dispatches: PendingDispatchStore,
+        request_states: RequestStateStore,
     ) -> Self {
         Self {
             inner,
@@ -75,6 +79,7 @@ impl WorkflowDispatcher {
             correlations,
             parked_tokens,
             pending_dispatches,
+            request_states,
             signal_orchestrator: Arc::new(std::sync::RwLock::new(None)),
             #[cfg(feature = "database")]
             pool: None,
@@ -281,6 +286,29 @@ impl WorkflowDispatcher {
 
         let correlation_id = Uuid::now_v7();
         let correlation_key = format!("{}:{}:{}", runbook_id, entry_id, correlation_id);
+        let request_record = RequestStateRecord {
+            request_key: correlation_key.clone(),
+            correlation_key: correlation_key.clone(),
+            session_id: session_stack.session_id,
+            runbook_id,
+            entry_id,
+            process_key: process_key.clone(),
+            process_instance_id: None,
+            status: RequestStatus::Requested,
+            requested_at: chrono::Utc::now(),
+            started_at: None,
+            completed_at: None,
+            failed_at: None,
+            killed_at: None,
+            last_error: None,
+        };
+        if let Err(e) = self.request_states.upsert_requested(&request_record).await {
+            tracing::error!(
+                correlation_key = %correlation_key,
+                error = %e,
+                "Failed to persist initial requester state"
+            );
+        }
 
         // 3. Extract domain_correlation_key from DSL args using the binding's
         //    correlation_field (e.g., "case_id" → `:case-id "uuid..."` → "uuid...").
@@ -311,6 +339,8 @@ impl WorkflowDispatcher {
                 session_stack: session_stack.clone(),
                 orch_flags: std::collections::HashMap::new(),
                 correlation_id,
+                entry_id,
+                runbook_id,
             })
             .await
         {
@@ -353,12 +383,37 @@ impl WorkflowDispatcher {
                         queue_err
                     ));
                 }
+                if let Err(state_err) = self
+                    .request_states
+                    .mark_dispatch_pending(&correlation_key, Some(&e.to_string()))
+                    .await
+                {
+                    tracing::error!(
+                        correlation_key = %correlation_key,
+                        error = %state_err,
+                        "Failed to mark requester state dispatch_pending"
+                    );
+                }
 
                 // Use dispatch_id as placeholder — PendingDispatchWorker will
                 // patch with the real process_instance_id after successful dispatch.
                 (dispatch_id, true)
             }
         };
+        if !queued {
+            if let Err(e) = self
+                .request_states
+                .mark_in_progress(&correlation_key, process_instance_id)
+                .await
+            {
+                tracing::error!(
+                    correlation_key = %correlation_key,
+                    process_instance_id = %process_instance_id,
+                    error = %e,
+                    "Failed to mark requester state in_progress"
+                );
+            }
+        }
 
         // 5. Record correlation: session ↔ process instance.
         //    Use Uuid::nil() for session_id since we don't have it at this layer.
@@ -414,6 +469,7 @@ impl WorkflowDispatcher {
                     self.bpmn_client.clone(),
                     self.correlations.clone(),
                     self.parked_tokens.clone(),
+                    self.request_states.clone(),
                 );
                 let relay = SignalRelay::new(orchestrator, self.correlations.clone());
                 let (outcome_tx, outcome_rx) = tokio::sync::mpsc::channel(32);
@@ -421,8 +477,9 @@ impl WorkflowDispatcher {
                     relay.run(outcome_rx).await;
                 });
                 tokio::spawn(async move {
-                    if let Err(error) =
-                        bridge.subscribe_instance(process_instance_id, outcome_tx).await
+                    if let Err(error) = bridge
+                        .subscribe_instance(process_instance_id, outcome_tx)
+                        .await
                     {
                         tracing::error!(
                             process_instance_id = %process_instance_id,
@@ -513,7 +570,7 @@ impl DslExecutorV2 for WorkflowDispatcher {
                     &verb_fqn,
                     session_stack.unwrap_or_default(),
                 )
-                    .await
+                .await
             }
         }
     }

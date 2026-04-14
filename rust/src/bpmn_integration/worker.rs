@@ -217,8 +217,8 @@ impl JobWorker {
         let dsl = build_dsl_from_payload(verb_fqn, &job.domain_payload);
 
         // 4. Execute the verb.
-        let entry_id = Uuid::new_v4();
-        let runbook_id = Uuid::new_v4();
+        let entry_id = job.entry_id;
+        let runbook_id = job.runbook_id;
         let outcome = self
             .executor
             .execute_v2(&dsl, entry_id, runbook_id, Some(job.session_stack.clone()))
@@ -471,7 +471,10 @@ mod tests {
             "kyc-case.create",
             r#""(kyc-case.create :cbu-id \"abc\" :case-type \"NEW_CLIENT\")""#,
         );
-        assert_eq!(dsl, r#"(kyc-case.create :cbu-id "abc" :case-type "NEW_CLIENT")"#);
+        assert_eq!(
+            dsl,
+            r#"(kyc-case.create :cbu-id "abc" :case-type "NEW_CLIENT")"#
+        );
     }
 
     #[test]

@@ -502,6 +502,8 @@ async fn start_instances(
                 session_stack_json: String::new(),
                 orch_flags: Default::default(),
                 correlation_id: format!("{}-{}", fixture.fixture.key, idx),
+                entry_id: uuid::Uuid::nil().to_string(),
+                runbook_id: uuid::Uuid::nil().to_string(),
             })
             .await
             .with_context(|| format!("StartProcess failed for fixture '{}'", fixture.fixture.key))?
@@ -672,13 +674,11 @@ async fn signal_loop(
 
         for target in active {
             let turn = sequence.next() as usize;
-            let signal_name = if ghost_signal_every > 0 && turn.is_multiple_of(ghost_signal_every)
-            {
+            let signal_name = if ghost_signal_every > 0 && turn.is_multiple_of(ghost_signal_every) {
                 "ghost_signal".to_string()
             } else {
-                let fixture = fixture_by_key(&target.workflow_key).ok_or_else(|| {
-                    anyhow!("Unknown workflow fixture '{}'", target.workflow_key)
-                })?;
+                let fixture = fixture_by_key(&target.workflow_key)
+                    .ok_or_else(|| anyhow!("Unknown workflow fixture '{}'", target.workflow_key))?;
                 fixture
                     .signal_messages
                     .get(turn % fixture.signal_messages.len())

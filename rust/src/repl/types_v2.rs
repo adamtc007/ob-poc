@@ -457,7 +457,6 @@ pub struct WorkspaceFrame {
     // Each workspace frame carries its own constraint state.
     // Switching workspaces (push/pop) preserves per-workspace context.
     // Synced from ExecutionContext.pending_session after verb execution.
-
     /// Current structure context (e.g., fund structure ID).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_structure_id: Option<Uuid>,
@@ -486,7 +485,6 @@ pub struct WorkspaceFrame {
     // These fields describe how the user is observing the DAG.
     // They do NOT affect the DAG, do NOT trigger rehydration.
     // Mutated by nav verbs (nav.drill, nav.set-lens, etc.).
-
     /// Current Observatory view level.
     /// Viewport state — does not affect DAG, does not trigger rehydration.
     #[serde(default = "default_view_level")]

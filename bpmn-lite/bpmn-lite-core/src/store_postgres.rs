@@ -90,8 +90,8 @@ impl ProcessStore for PostgresProcessStore {
             INSERT INTO process_instances (
                 instance_id, tenant_id, process_key, bytecode_version, domain_payload,
                 domain_payload_hash, session_stack, flags, counters, join_expected, state,
-                correlation_id, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                correlation_id, entry_id, runbook_id, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             ON CONFLICT (instance_id) DO UPDATE SET
                 tenant_id = EXCLUDED.tenant_id,
                 process_key = EXCLUDED.process_key,
@@ -103,7 +103,9 @@ impl ProcessStore for PostgresProcessStore {
                 counters = EXCLUDED.counters,
                 join_expected = EXCLUDED.join_expected,
                 state = EXCLUDED.state,
-                correlation_id = EXCLUDED.correlation_id
+                correlation_id = EXCLUDED.correlation_id,
+                entry_id = EXCLUDED.entry_id,
+                runbook_id = EXCLUDED.runbook_id
             "#,
         )
         .bind(instance.instance_id)
@@ -118,6 +120,8 @@ impl ProcessStore for PostgresProcessStore {
         .bind(&join_expected)
         .bind(&state)
         .bind(&instance.correlation_id)
+        .bind(instance.entry_id)
+        .bind(instance.runbook_id)
         .bind(created_at)
         .execute(&self.pool)
         .await?;
@@ -130,7 +134,7 @@ impl ProcessStore for PostgresProcessStore {
             r#"
             SELECT instance_id, tenant_id, process_key, bytecode_version, domain_payload,
                    domain_payload_hash, session_stack, flags, counters, join_expected, state,
-                   correlation_id,
+                   correlation_id, entry_id, runbook_id,
                    (EXTRACT(EPOCH FROM created_at) * 1000)::BIGINT AS created_at_ms
             FROM process_instances
             WHERE instance_id = $1
@@ -166,6 +170,8 @@ impl ProcessStore for PostgresProcessStore {
                     join_expected: serde_json::from_value(join_expected_json)?,
                     state: serde_json::from_value(state_json)?,
                     correlation_id: row.get("correlation_id"),
+                    entry_id: row.get("entry_id"),
+                    runbook_id: row.get("runbook_id"),
                     created_at: created_at_ms,
                 }))
             }
@@ -424,8 +430,9 @@ impl ProcessStore for PostgresProcessStore {
             r#"
             INSERT INTO job_queue (
                 job_key, tenant_id, process_instance_id, task_type, service_task_id,
-                domain_payload, domain_payload_hash, session_stack, orch_flags, retries_remaining
-            ) VALUES ($1, (SELECT tenant_id FROM process_instances WHERE instance_id = $2), $2, $3, $4, $5, $6, $7, $8, $9)
+                domain_payload, domain_payload_hash, session_stack, orch_flags, retries_remaining,
+                entry_id, runbook_id
+            ) VALUES ($1, (SELECT tenant_id FROM process_instances WHERE instance_id = $2), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             "#,
         )
         .bind(&activation.job_key)
@@ -437,6 +444,8 @@ impl ProcessStore for PostgresProcessStore {
         .bind(&session_stack)
         .bind(&orch_flags)
         .bind(activation.retries_remaining as i32)
+        .bind(activation.entry_id)
+        .bind(activation.runbook_id)
         .execute(&self.pool)
         .await?;
 
@@ -473,7 +482,9 @@ impl ProcessStore for PostgresProcessStore {
                       job_queue.domain_payload_hash,
                       job_queue.session_stack,
                       job_queue.orch_flags,
-                      job_queue.retries_remaining
+                      job_queue.retries_remaining,
+                      job_queue.entry_id,
+                      job_queue.runbook_id
             "#,
         )
         .bind(task_types)
@@ -500,6 +511,8 @@ impl ProcessStore for PostgresProcessStore {
                 session_stack: serde_json::from_value(session_stack_json)?,
                 orch_flags: serde_json::from_value(orch_flags_json)?,
                 retries_remaining: retries as u32,
+                entry_id: row.get("entry_id"),
+                runbook_id: row.get("runbook_id"),
             });
         }
         Ok(result)

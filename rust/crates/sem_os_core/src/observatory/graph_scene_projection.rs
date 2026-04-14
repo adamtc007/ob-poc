@@ -227,7 +227,8 @@ mod tests {
             },
         ];
 
-        let scene = project_graph_scene("Allianz SICAV", "LU", "cbu-1", &slots, ViewLevel::System, 2);
+        let scene =
+            project_graph_scene("Allianz SICAV", "LU", "cbu-1", &slots, ViewLevel::System, 2);
         assert_eq!(scene.nodes.len(), 3); // CBU + 2 slots
         assert_eq!(scene.generation, 2);
         // Dependency edge + 2 parent-child edges

@@ -534,7 +534,8 @@ impl CustomOperation for DocumentSolicitOp {
             .and_then(|a| a.value.as_string())
             .unwrap_or("verified");
 
-        let has_document_requirements = table_exists(pool, "\"ob-poc\".document_requirements").await?;
+        let has_document_requirements =
+            table_exists(pool, "\"ob-poc\".document_requirements").await?;
         let has_workflow_pending_tasks =
             table_exists(pool, "\"ob-poc\".workflow_pending_tasks").await?;
 
@@ -591,41 +592,41 @@ impl CustomOperation for DocumentSolicitOp {
         // For now, require workflow_instance_id for task creation
         if has_workflow_pending_tasks {
             if let Some(instance_id) = workflow_instance_id {
-            let args = serde_json::json!({
-                "subject_entity_id": subject_entity_id,
-                "doc_type": doc_type,
-                "requirement_id": requirement_id
-            });
+                let args = serde_json::json!({
+                    "subject_entity_id": subject_entity_id,
+                    "doc_type": doc_type,
+                    "requirement_id": requirement_id
+                });
 
-            sqlx::query(
-                r#"
+                sqlx::query(
+                    r#"
                 INSERT INTO "ob-poc".workflow_pending_tasks
                     (task_id, instance_id, blocker_type, blocker_key, verb, args,
                      expected_cargo_count, status)
                 VALUES ($1, $2, 'document', $3, 'document.solicit', $4, 1, 'pending')
                 "#,
-            )
-            .bind(task_id)
-            .bind(instance_id)
-            .bind(doc_type)
-            .bind(&args)
-            .execute(pool)
-            .await?;
+                )
+                .bind(task_id)
+                .bind(instance_id)
+                .bind(doc_type)
+                .bind(&args)
+                .execute(pool)
+                .await?;
 
-            // 3. Link requirement to task
-            sqlx::query(
-                r#"
+                // 3. Link requirement to task
+                sqlx::query(
+                    r#"
                 UPDATE "ob-poc".document_requirements
                 SET current_task_id = $2, status = 'requested', updated_at = now()
                 WHERE requirement_id = $1
                 "#,
-            )
-            .bind(requirement_id)
-            .bind(task_id)
-            .execute(pool)
-            .await?;
+                )
+                .bind(requirement_id)
+                .bind(task_id)
+                .execute(pool)
+                .await?;
 
-            ctx.bind("task", task_id);
+                ctx.bind("task", task_id);
             }
         }
 
@@ -700,8 +701,10 @@ impl CustomOperation for DocumentSolicitSetOp {
             .unwrap_or("verified");
 
         let task_id = Uuid::now_v7();
-        let mut request_items: Vec<DocumentSolicitationResult> = Vec::with_capacity(doc_types.len());
-        let has_document_requirements = table_exists(pool, "\"ob-poc\".document_requirements").await?;
+        let mut request_items: Vec<DocumentSolicitationResult> =
+            Vec::with_capacity(doc_types.len());
+        let has_document_requirements =
+            table_exists(pool, "\"ob-poc\".document_requirements").await?;
         let has_workflow_pending_tasks =
             table_exists(pool, "\"ob-poc\".workflow_pending_tasks").await?;
 
@@ -769,47 +772,47 @@ impl CustomOperation for DocumentSolicitSetOp {
         // 2. Create single pending task with expected_cargo_count = doc_types.len()
         if has_workflow_pending_tasks {
             if let Some(instance_id) = workflow_instance_id {
-            let args = serde_json::json!({
-                "subject_entity_id": subject_entity_id,
-                "doc_types": doc_types,
-                "requirement_ids": request_items
-                    .iter()
-                    .map(|item| item.requirement_id)
-                    .collect::<Vec<_>>()
-            });
+                let args = serde_json::json!({
+                    "subject_entity_id": subject_entity_id,
+                    "doc_types": doc_types,
+                    "requirement_ids": request_items
+                        .iter()
+                        .map(|item| item.requirement_id)
+                        .collect::<Vec<_>>()
+                });
 
-            sqlx::query(
-                r#"
+                sqlx::query(
+                    r#"
                 INSERT INTO "ob-poc".workflow_pending_tasks
                     (task_id, instance_id, blocker_type, blocker_key, verb, args,
                      expected_cargo_count, status)
                 VALUES ($1, $2, 'document_set', $3, 'document.solicit-batch', $4, $5, 'pending')
                 "#,
-            )
-            .bind(task_id)
-            .bind(instance_id)
-            .bind(doc_types.join(","))
-            .bind(&args)
-            .bind(doc_types.len() as i32)
-            .execute(pool)
-            .await?;
+                )
+                .bind(task_id)
+                .bind(instance_id)
+                .bind(doc_types.join(","))
+                .bind(&args)
+                .bind(doc_types.len() as i32)
+                .execute(pool)
+                .await?;
 
-            // 3. Link all requirements to the task and update status
-            for item in &request_items {
-                sqlx::query(
-                    r#"
+                // 3. Link all requirements to the task and update status
+                for item in &request_items {
+                    sqlx::query(
+                        r#"
                     UPDATE "ob-poc".document_requirements
                     SET current_task_id = $2, status = 'requested', updated_at = now()
                     WHERE requirement_id = $1
                     "#,
-                )
-                .bind(item.requirement_id)
-                .bind(task_id)
-                .execute(pool)
-                .await?;
-            }
+                    )
+                    .bind(item.requirement_id)
+                    .bind(task_id)
+                    .execute(pool)
+                    .await?;
+                }
 
-            ctx.bind("task", task_id);
+                ctx.bind("task", task_id);
             }
         }
 

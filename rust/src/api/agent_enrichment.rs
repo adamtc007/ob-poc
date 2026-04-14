@@ -33,9 +33,7 @@ pub fn try_onboarding_from_repl_response(
         constellation,
     );
 
-    Some(crate::agent::onboarding_state_view::project_onboarding_state(
-        &composite, group_name,
-    ))
+    Some(crate::agent::onboarding_state_view::project_onboarding_state(&composite, group_name))
 }
 
 /// Compute the onboarding state view from the database (legacy path).

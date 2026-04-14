@@ -41,9 +41,10 @@ use ob_poc::bpmn_integration::{
     job_frames::JobFrameStore,
     parked_tokens::ParkedTokenStore,
     pending_dispatches::PendingDispatchStore,
+    request_state::RequestStateStore,
     types::{
-        CorrelationStatus, ExecutionRoute, OutcomeEvent, ParkedTokenStatus, TaskBinding,
-        WorkflowBinding,
+        CorrelationStatus, ExecutionRoute, OutcomeEvent, ParkedTokenStatus, RequestStatus,
+        TaskBinding, WorkflowBinding,
     },
     worker::JobWorker,
 };
@@ -100,6 +101,14 @@ struct BpmnTestRig {
     config: Arc<WorkflowConfigIndex>,
     /// PG pool — used to create fresh store instances for each helper.
     pool: sqlx::PgPool,
+    /// Session-level advisory lock that serializes this shared-DB harness.
+    ///
+    /// The ignored BPMN E2E tests use a real Postgres database rather than
+    /// `#[sqlx::test]` ephemeral databases. Keeping this connection open holds
+    /// the advisory lock for the lifetime of the rig so concurrent harness
+    /// tests cannot cross-pollute the bridge tables.
+    #[allow(dead_code)]
+    isolation_lock: sqlx::pool::PoolConnection<sqlx::Postgres>,
     /// Bytecode version from compiling the kyc-open-case model.
     #[allow(dead_code)]
     bytecode_version: Vec<u8>,
@@ -144,6 +153,16 @@ impl BpmnTestRig {
 
         // 4. PG pool
         let pool = test_pool().await;
+        let mut isolation_lock = pool
+            .acquire()
+            .await
+            .expect("Failed to acquire PG connection");
+        sqlx::query("SELECT pg_advisory_lock($1)")
+            .bind(0x42504d4eu32 as i64)
+            .execute(&mut *isolation_lock)
+            .await
+            .expect("Failed to acquire BPMN E2E advisory lock");
+        cleanup_bridge_tables(&pool).await;
 
         // 5. Compile the kyc-open-case model and register bytecode
         let compile_result = client
@@ -168,6 +187,7 @@ impl BpmnTestRig {
             client,
             config: Arc::new(config),
             pool,
+            isolation_lock,
             bytecode_version: compile_result.bytecode_version,
         }
     }
@@ -181,6 +201,7 @@ impl BpmnTestRig {
             CorrelationStore::new(self.pool.clone()),
             ParkedTokenStore::new(self.pool.clone()),
             PendingDispatchStore::new(self.pool.clone()),
+            RequestStateStore::new(self.pool.clone()),
         )
     }
 
@@ -201,6 +222,7 @@ impl BpmnTestRig {
             self.client.clone(),
             CorrelationStore::new(self.pool.clone()),
             ParkedTokenStore::new(self.pool.clone()),
+            RequestStateStore::new(self.pool.clone()),
         )
     }
 
@@ -218,6 +240,11 @@ impl BpmnTestRig {
     fn job_frames(&self) -> JobFrameStore {
         JobFrameStore::new(self.pool.clone())
     }
+
+    /// Create a RequestStateStore for direct assertions.
+    fn request_states(&self) -> RequestStateStore {
+        RequestStateStore::new(self.pool.clone())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -226,11 +253,78 @@ impl BpmnTestRig {
 
 /// Create a PgPool for integration tests.
 async fn test_pool() -> sqlx::PgPool {
-    let url =
-        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
-    sqlx::PgPool::connect(&url)
+    let url = std::env::var("BPMN_E2E_DATABASE_URL")
+        .or_else(|_| std::env::var("DATABASE_URL"))
+        .unwrap_or_else(|_| "postgresql:///data_designer_test".to_string());
+    let pool = sqlx::PgPool::connect(&url)
         .await
-        .expect("Failed to connect to PostgreSQL")
+        .expect("Failed to connect to PostgreSQL");
+    let db_name: String = sqlx::query_scalar("SELECT current_database()")
+        .fetch_one(&pool)
+        .await
+        .expect("Failed to query current_database()");
+    let allow_non_test_db = std::env::var("BPMN_E2E_ALLOW_NONTEST_DB").unwrap_or_default() == "1";
+    assert!(
+        allow_non_test_db || db_name.contains("test"),
+        "Refusing to run BPMN E2E harness against non-test database '{}'. Set BPMN_E2E_ALLOW_NONTEST_DB=1 to override.",
+        db_name
+    );
+    pool
+}
+
+/// Reset the mutable BPMN/REPL bridge tables used by this ignored E2E harness.
+///
+/// These tests run against a shared Postgres database rather than ephemeral
+/// `#[sqlx::test]` databases, so stale rows from a prior run will otherwise
+/// leak into the next test's assertions.
+async fn cleanup_bridge_tables(pool: &sqlx::PgPool) {
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS "ob-poc".bpmn_request_states (
+            request_key TEXT PRIMARY KEY,
+            correlation_key TEXT NOT NULL UNIQUE,
+            session_id UUID NOT NULL,
+            runbook_id UUID NOT NULL,
+            entry_id UUID NOT NULL,
+            process_key TEXT NOT NULL,
+            process_instance_id UUID,
+            status TEXT NOT NULL,
+            requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            started_at TIMESTAMPTZ,
+            completed_at TIMESTAMPTZ,
+            failed_at TIMESTAMPTZ,
+            killed_at TIMESTAMPTZ,
+            last_error TEXT,
+            CONSTRAINT bpmn_request_states_status_check CHECK (
+                status = ANY (ARRAY[
+                    'requested'::text,
+                    'dispatch_pending'::text,
+                    'in_progress'::text,
+                    'returned'::text,
+                    'killed'::text,
+                    'failed'::text
+                ])
+            )
+        )
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to create bpmn_request_states table for test harness");
+
+    for statement in [
+        r#"TRUNCATE TABLE "ob-poc".bpmn_parked_tokens"#,
+        r#"TRUNCATE TABLE "ob-poc".bpmn_correlations"#,
+        r#"TRUNCATE TABLE "ob-poc".bpmn_pending_dispatches"#,
+        r#"TRUNCATE TABLE "ob-poc".bpmn_job_frames"#,
+        r#"TRUNCATE TABLE "ob-poc".repl_invocation_records"#,
+        r#"TRUNCATE TABLE "ob-poc".bpmn_request_states"#,
+    ] {
+        sqlx::query(statement)
+            .execute(pool)
+            .await
+            .unwrap_or_else(|e| panic!("Failed test bridge cleanup '{}': {}", statement, e));
+    }
 }
 
 /// Build a WorkflowConfigIndex with kyc-open-case orchestrated bindings.
@@ -436,6 +530,17 @@ async fn e2e_03_full_happy_path_choreography() {
         .await;
     let (process_instance_id, correlation_key) = extract_parked(&outcome);
     eprintln!("Step 1: Process started, pid={}", process_instance_id);
+    let request_after_dispatch = rig
+        .request_states()
+        .find_by_request_key(&correlation_key)
+        .await
+        .expect("DB error")
+        .expect("No requester state found");
+    assert_eq!(request_after_dispatch.status, RequestStatus::InProgress);
+    assert_eq!(
+        request_after_dispatch.process_instance_id,
+        Some(process_instance_id)
+    );
 
     // 2. Process service tasks: create_case_record + request_documents
     // May need multiple poll cycles as jobs become available sequentially
@@ -553,6 +658,13 @@ async fn e2e_03_full_happy_path_choreography() {
         token.is_none(),
         "Parked token should no longer be in 'waiting' state"
     );
+    let request_after_completion = rig
+        .request_states()
+        .find_by_request_key(&correlation_key)
+        .await
+        .expect("DB error")
+        .expect("No requester state after completion");
+    assert_eq!(request_after_completion.status, RequestStatus::Returned);
 
     eprintln!("e2e_03 PASSED: Full happy-path choreography completed");
 }
@@ -602,7 +714,9 @@ async fn e2e_04_runbook_park_and_resume() {
         .unwrap()
         .dsl
         .clone();
-    let outcome = dispatcher.execute_v2(&dsl, entry_id, runbook.id, None).await;
+    let outcome = dispatcher
+        .execute_v2(&dsl, entry_id, runbook.id, None)
+        .await;
     let (process_instance_id, correlation_key) = extract_parked(&outcome);
     eprintln!(
         "Step 1: Dispatched, pid={}, key={}",
@@ -990,6 +1104,13 @@ async fn e2e_08_signal_relay_bounces_to_orchestrator() {
         "Step 4: pid={}, key={}",
         process_instance_id, correlation_key
     );
+    let request_after_park = rig
+        .request_states()
+        .find_by_request_key(&correlation_key)
+        .await
+        .expect("DB error")
+        .expect("No requester state after park");
+    assert_eq!(request_after_park.status, RequestStatus::InProgress);
 
     // 5. Spawn background tasks: JobWorker + EventBridge + SignalRelay.
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
@@ -1094,6 +1215,13 @@ async fn e2e_08_signal_relay_bounces_to_orchestrator() {
         token.is_none(),
         "Parked token should no longer be in 'waiting' state"
     );
+    let request_after_bounce = rig
+        .request_states()
+        .find_by_request_key(&correlation_key)
+        .await
+        .expect("DB error")
+        .expect("No requester state after SignalRelay bounce");
+    assert_eq!(request_after_bounce.status, RequestStatus::Returned);
 
     eprintln!("e2e_08 PASSED: SignalRelay bounces BPMN completion to orchestrator");
 }
@@ -1638,6 +1766,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
         CorrelationStore::new(rig.pool.clone()),
         ParkedTokenStore::new(rig.pool.clone()),
         PendingDispatchStore::new(rig.pool.clone()),
+        RequestStateStore::new(rig.pool.clone()),
     );
     let worker = JobWorker::new(
         "dlq-test-worker".to_string(),

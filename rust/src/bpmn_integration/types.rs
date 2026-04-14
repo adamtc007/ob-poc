@@ -120,6 +120,78 @@ impl CorrelationStatus {
     }
 }
 
+// ─── Request State ───────────────────────────────────────────────────────────
+
+/// Coarse requester-facing lifecycle for a durable BPMN-backed request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RequestStatus {
+    Requested,
+    DispatchPending,
+    InProgress,
+    Returned,
+    Killed,
+    Failed,
+}
+
+impl RequestStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Requested => "requested",
+            Self::DispatchPending => "dispatch_pending",
+            Self::InProgress => "in_progress",
+            Self::Returned => "returned",
+            Self::Killed => "killed",
+            Self::Failed => "failed",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "requested" => Some(Self::Requested),
+            "dispatch_pending" => Some(Self::DispatchPending),
+            "in_progress" => Some(Self::InProgress),
+            "returned" => Some(Self::Returned),
+            "killed" => Some(Self::Killed),
+            "failed" => Some(Self::Failed),
+            _ => None,
+        }
+    }
+}
+
+/// Requester-side projection of a BPMN-backed durable request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequestStateRecord {
+    /// Canonical logical request key. For now this matches `correlation_key`.
+    pub request_key: String,
+    /// Original correlation key used by the parked runbook entry.
+    pub correlation_key: String,
+    /// ob-poc REPL session ID.
+    pub session_id: Uuid,
+    /// ob-poc runbook ID.
+    pub runbook_id: Uuid,
+    /// ob-poc runbook entry ID.
+    pub entry_id: Uuid,
+    /// BPMN process key.
+    pub process_key: String,
+    /// BPMN process instance ID when known.
+    pub process_instance_id: Option<Uuid>,
+    /// Current requester-facing status.
+    pub status: RequestStatus,
+    /// When the request was first created.
+    pub requested_at: DateTime<Utc>,
+    /// When BPMN accepted the request and created an instance.
+    pub started_at: Option<DateTime<Utc>>,
+    /// When the request returned successfully.
+    pub completed_at: Option<DateTime<Utc>>,
+    /// When the request failed.
+    pub failed_at: Option<DateTime<Utc>>,
+    /// When the request was killed/cancelled.
+    pub killed_at: Option<DateTime<Utc>>,
+    /// Last failure or dispatch error if any.
+    pub last_error: Option<String>,
+}
+
 // ─── Job Frame ───────────────────────────────────────────────────────────────
 
 /// Tracks job activation/completion for dedupe in the job worker.

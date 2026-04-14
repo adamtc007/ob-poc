@@ -31,8 +31,8 @@ pub mod onboarding_state;
 pub mod orientation;
 pub mod resolution;
 pub mod semantic_stage;
-pub mod session_stack;
 pub mod session_input;
+pub mod session_stack;
 pub mod trading_matrix;
 pub mod viewport;
 
@@ -47,8 +47,8 @@ pub use decision::*;
 pub use disambiguation::*;
 pub use onboarding_state::*;
 pub use resolution::*;
-pub use session_stack::*;
 pub use session_input::*;
+pub use session_stack::*;
 
 // ============================================================================
 // RESOLVED KEY - UUID vs Code distinction

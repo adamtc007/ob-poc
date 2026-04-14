@@ -746,6 +746,7 @@ async fn b3_12_dispatcher_direct_routing() {
     let config = load_config();
     let correlation_store = CorrelationStore::new(pool.clone());
     let parked_token_store = ParkedTokenStore::new(pool.clone());
+    let request_state_store = ob_poc::bpmn_integration::request_state::RequestStateStore::new(pool.clone());
 
     let inner: Arc<dyn DslExecutorV2> = Arc::new(StubExecutor);
     let dispatcher = WorkflowDispatcher::new(
@@ -755,11 +756,12 @@ async fn b3_12_dispatcher_direct_routing() {
         correlation_store,
         parked_token_store,
         PendingDispatchStore::new(pool.clone()),
+        request_state_store,
     );
 
     // Direct verb should delegate to inner executor (StubExecutor returns Completed).
     let result = dispatcher
-        .execute_v2("(session.info)", Uuid::new_v4(), Uuid::new_v4())
+        .execute_v2("(session.info)", Uuid::new_v4(), Uuid::new_v4(), None)
         .await;
 
     match result {

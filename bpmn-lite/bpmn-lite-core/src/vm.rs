@@ -45,7 +45,8 @@ impl Vm {
         let outcome = self
             .tick_fiber_inner(fiber, instance, program, &mut pending_events)
             .await?;
-        self.flush_events(instance.instance_id, &mut pending_events).await?;
+        self.flush_events(instance.instance_id, &mut pending_events)
+            .await?;
         Ok(outcome)
     }
 
@@ -191,6 +192,8 @@ impl Vm {
                     session_stack: instance.session_stack.clone(),
                     orch_flags,
                     retries_remaining: 3,
+                    entry_id: instance.entry_id,
+                    runbook_id: instance.runbook_id,
                 };
 
                 // Emit event
@@ -435,9 +438,9 @@ impl Vm {
                         Some(key) => {
                             let val = instance
                                 .flags
-                            .get(&key)
-                            .cloned()
-                            .unwrap_or(Value::Bool(false));
+                                .get(&key)
+                                .cloned()
+                                .unwrap_or(Value::Bool(false));
                             is_truthy(&val)
                         }
                     };
@@ -607,12 +610,14 @@ impl Vm {
             {
                 TickOutcome::Continue => continue,
                 other => {
-                    self.flush_events(instance.instance_id, &mut pending_events).await?;
+                    self.flush_events(instance.instance_id, &mut pending_events)
+                        .await?;
                     return Ok(other);
                 }
             }
         }
-        self.flush_events(instance.instance_id, &mut pending_events).await?;
+        self.flush_events(instance.instance_id, &mut pending_events)
+            .await?;
         Ok(TickOutcome::Continue)
     }
 
@@ -871,6 +876,8 @@ mod tests {
             join_expected: BTreeMap::new(),
             state: ProcessState::Running,
             correlation_id: "test-corr".to_string(),
+            entry_id: Uuid::new_v4(),
+            runbook_id: Uuid::new_v4(),
             created_at: 0,
         }
     }

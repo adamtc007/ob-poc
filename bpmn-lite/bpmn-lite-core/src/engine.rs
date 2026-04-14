@@ -185,6 +185,8 @@ impl BpmnLiteEngine {
             domain_payload_hash,
             correlation_id,
             SessionStackState::default(),
+            Uuid::nil(),
+            Uuid::nil(),
         )
         .await
     }
@@ -198,6 +200,8 @@ impl BpmnLiteEngine {
         domain_payload_hash: [u8; 32],
         correlation_id: &str,
         session_stack: SessionStackState,
+        entry_id: Uuid,
+        runbook_id: Uuid,
     ) -> Result<Uuid> {
         // Verify program exists
         let _program = self
@@ -220,6 +224,8 @@ impl BpmnLiteEngine {
             join_expected: BTreeMap::new(),
             state: ProcessState::Running,
             correlation_id: correlation_id.to_string(),
+            entry_id,
+            runbook_id,
             created_at: now_ms(),
         };
         // Create root fiber at pc=0
@@ -1313,6 +1319,8 @@ mod tests {
                 hash,
                 "corr-copy",
                 session_stack.clone(),
+                Uuid::new_v4(),
+                Uuid::new_v4(),
             )
             .await
             .unwrap();
@@ -1339,6 +1347,53 @@ mod tests {
             Some(ob_poc_types::session_stack::SessionWorkspaceKind::Kyc)
         );
         assert_eq!(loaded.session_stack.trace_sequence, 5);
+    }
+
+    #[tokio::test]
+    async fn test_job_activation_preserves_runbook_lineage() {
+        let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
+        let engine = BpmnLiteEngine::new(store.clone());
+
+        let bpmn = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL">
+          <bpmn:process id="lineage_proc" isExecutable="true">
+            <bpmn:startEvent id="start" />
+            <bpmn:serviceTask id="work" name="lineage_task" />
+            <bpmn:endEvent id="end" />
+            <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="work" />
+            <bpmn:sequenceFlow id="f2" sourceRef="work" targetRef="end" />
+          </bpmn:process>
+        </bpmn:definitions>"#;
+
+        let compile_result = engine.compile(bpmn).await.unwrap();
+        let payload = r#"{"case":"lineage"}"#;
+        let hash = compute_hash(payload);
+        let entry_id = Uuid::new_v4();
+        let runbook_id = Uuid::new_v4();
+
+        let instance_id = engine
+            .start_with_session_stack(
+                "lineage_proc",
+                compile_result.bytecode_version,
+                payload,
+                hash,
+                "corr-lineage",
+                SessionStackState::default(),
+                entry_id,
+                runbook_id,
+            )
+            .await
+            .unwrap();
+
+        engine.tick_instance(instance_id).await.unwrap();
+        let jobs = engine
+            .activate_jobs(&["lineage_task".to_string()], 1)
+            .await
+            .unwrap();
+
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].entry_id, entry_id);
+        assert_eq!(jobs[0].runbook_id, runbook_id);
     }
 
     // ── Shared BPMN fixture for T-CANCEL tests ──
@@ -1503,13 +1558,24 @@ mod tests {
         let stale_hash = compute_hash(r#"{"stale":true}"#);
 
         let result = engine
-            .complete_job(&job_key, r#"{"result":"nope"}"#, stale_hash, BTreeMap::new())
+            .complete_job(
+                &job_key,
+                r#"{"result":"nope"}"#,
+                stale_hash,
+                BTreeMap::new(),
+            )
             .await;
         assert!(result.is_err(), "stale expected hash must be rejected");
 
         let persisted = store.load_instance(iid).await.unwrap().unwrap();
-        assert_eq!(persisted.domain_payload.as_ref(), r#"{"case":"cancel-test"}"#);
-        assert_eq!(persisted.domain_payload_hash, compute_hash(r#"{"case":"cancel-test"}"#));
+        assert_eq!(
+            persisted.domain_payload.as_ref(),
+            r#"{"case":"cancel-test"}"#
+        );
+        assert_eq!(
+            persisted.domain_payload_hash,
+            compute_hash(r#"{"case":"cancel-test"}"#)
+        );
     }
 
     // ── T-CANCEL-3: cancel purges job queue + emits WaitCancelled ──
@@ -2990,6 +3056,8 @@ mod tests {
             join_expected: BTreeMap::new(),
             state: ProcessState::Running,
             correlation_id: "corr".to_string(),
+            entry_id: Uuid::new_v4(),
+            runbook_id: Uuid::new_v4(),
             created_at: 0,
         };
         store.save_instance(&instance).await.unwrap();

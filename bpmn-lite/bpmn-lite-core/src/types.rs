@@ -1,8 +1,8 @@
+use ob_poc_types::session_stack::SessionStackState;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use uuid::Uuid;
-use ob_poc_types::session_stack::SessionStackState;
 
 // ─── Scalar aliases ───────────────────────────────────────────
 
@@ -313,6 +313,10 @@ pub struct ProcessInstance {
     pub state: ProcessState,
     /// ob-poc runbook_entry_id for correlation.
     pub correlation_id: String,
+    /// Originating ob-poc runbook entry executing this BPMN-routed verb.
+    pub entry_id: Uuid,
+    /// Originating ob-poc runbook containing the parked entry.
+    pub runbook_id: Uuid,
     pub created_at: Timestamp,
 }
 
@@ -330,6 +334,8 @@ pub struct JobActivation {
     pub session_stack: SessionStackState,
     pub orch_flags: BTreeMap<String, Value>,
     pub retries_remaining: u32,
+    pub entry_id: Uuid,
+    pub runbook_id: Uuid,
 }
 
 /// Returned by ob-poc worker after verb execution.

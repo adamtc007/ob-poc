@@ -494,6 +494,8 @@ mod tests {
             join_expected: BTreeMap::new(),
             state: ProcessState::Running,
             correlation_id: "runbook-entry-1".to_string(),
+            entry_id: Uuid::new_v4(),
+            runbook_id: Uuid::new_v4(),
             created_at: 1000,
         }
     }
@@ -646,7 +648,10 @@ mod tests {
 
         for i in 0..3 {
             let instance_id = Uuid::now_v7();
-            store.save_instance(&make_instance(instance_id)).await.unwrap();
+            store
+                .save_instance(&make_instance(instance_id))
+                .await
+                .unwrap();
             store
                 .enqueue_job(&JobActivation {
                     job_key: format!("job-{i}"),
@@ -661,6 +666,8 @@ mod tests {
                     },
                     orch_flags: BTreeMap::new(),
                     retries_remaining: 3,
+                    entry_id: Uuid::new_v4(),
+                    runbook_id: Uuid::new_v4(),
                 })
                 .await
                 .unwrap();
@@ -674,7 +681,9 @@ mod tests {
         assert_eq!(batch1.len(), 2);
         assert_eq!(batch1[0].job_key, "job-0");
         assert_eq!(batch1[1].job_key, "job-1");
-        assert!(batch1.iter().all(|job| job.session_stack.session_id == session_id));
+        assert!(batch1
+            .iter()
+            .all(|job| job.session_stack.session_id == session_id));
 
         // Ack one
         store.ack_job("job-0").await.unwrap();
@@ -698,7 +707,10 @@ mod tests {
         let original_session_id = Uuid::new_v4();
         let mutated_session_id = Uuid::new_v4();
 
-        store.save_instance(&make_instance(instance_id)).await.unwrap();
+        store
+            .save_instance(&make_instance(instance_id))
+            .await
+            .unwrap();
 
         let mut activation = JobActivation {
             job_key: "job-copy-test".to_string(),
@@ -715,6 +727,8 @@ mod tests {
             },
             orch_flags: BTreeMap::new(),
             retries_remaining: 3,
+            entry_id: Uuid::new_v4(),
+            runbook_id: Uuid::new_v4(),
         };
 
         store.enqueue_job(&activation).await.unwrap();

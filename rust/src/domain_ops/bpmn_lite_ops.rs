@@ -178,7 +178,9 @@ impl CustomOperation for BpmnStartOp {
                 domain_payload_hash: hash,
                 session_stack: SessionStackState::default(),
                 orch_flags: std::collections::HashMap::new(),
-                correlation_id: Uuid::new_v4(),
+                correlation_id: Uuid::now_v7(),
+                entry_id: Uuid::nil(),
+                runbook_id: Uuid::nil(),
             })
             .await?;
 
