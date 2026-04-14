@@ -540,6 +540,114 @@ async fn get_graph_scene(
     Json(stub_graph_scene(Some(&label), ViewLevel::System)).into_response()
 }
 
+/// GET /api/observatory/session/:id/session-stack-graph
+///
+/// Returns a GraphSceneModel projected from the canonical SessionStackState.
+async fn get_session_stack_graph(
+    State(state): State<ObservatoryState>,
+    Path(session_id): Path<Uuid>,
+) -> impl IntoResponse {
+    use ob_poc_types::graph_scene::{
+        GraphSceneModel, LayoutStrategy, SceneEdge, SceneEdgeType, SceneNode, SceneNodeType,
+    };
+
+    let Some(repl_sessions) = state.repl_sessions.as_ref() else {
+        return ObservatoryError::not_found("REPL session store not configured").into_response();
+    };
+
+    let sessions = repl_sessions.read().await;
+    let Some(repl_session) = sessions.get(&session_id) else {
+        return ObservatoryError::not_found("REPL session not found").into_response();
+    };
+
+    let stack = &repl_session.session_stack;
+    let mut nodes = Vec::with_capacity(stack.workspace_stack.len() + 1);
+    let mut edges = Vec::with_capacity(stack.workspace_stack.len());
+
+    nodes.push(SceneNode {
+        id: format!("session:{}", stack.session_id),
+        label: stack
+            .scope
+            .as_ref()
+            .and_then(|scope| scope.client_group_name.clone())
+            .unwrap_or_else(|| format!("Session {}", stack.session_id)),
+        node_type: SceneNodeType::Aggregate,
+        state: stack.active_workspace.as_ref().map(|ws| format!("{:?}", ws)),
+        progress: 0,
+        blocking: false,
+        depth: 0,
+        position_hint: None,
+        badges: vec![],
+        child_count: stack.workspace_stack.len(),
+        group_id: None,
+    });
+
+    for (index, frame) in stack.workspace_stack.iter().enumerate() {
+        let node_id = format!("frame:{index}:{}", frame.constellation_map);
+        let label = match frame.subject_id {
+            Some(subject_id) => format!("{:?} {}", frame.workspace, subject_id),
+            None => format!("{:?}", frame.workspace),
+        };
+        let mut badges = Vec::new();
+        if frame.is_peek {
+            badges.push(ob_poc_types::graph_scene::SceneBadge {
+                badge_type: "peek".into(),
+                label: "peek".into(),
+                color: Some("#8892a0".into()),
+            });
+        }
+        if frame.stale {
+            badges.push(ob_poc_types::graph_scene::SceneBadge {
+                badge_type: "stale".into(),
+                label: "stale".into(),
+                color: Some("#d97706".into()),
+            });
+        }
+
+        nodes.push(SceneNode {
+            id: node_id.clone(),
+            label,
+            node_type: SceneNodeType::Cluster,
+            state: Some(frame.constellation_map.clone()),
+            progress: if frame.stale { 0 } else { 100 },
+            blocking: frame.stale,
+            depth: index + 1,
+            position_hint: None,
+            badges,
+            child_count: usize::from(index + 1 < stack.workspace_stack.len()),
+            group_id: None,
+        });
+
+        edges.push(SceneEdge {
+            source: if index == 0 {
+                format!("session:{}", stack.session_id)
+            } else {
+                format!(
+                    "frame:{}:{}",
+                    index - 1,
+                    stack.workspace_stack[index - 1].constellation_map
+                )
+            },
+            target: node_id,
+            edge_type: SceneEdgeType::Dependency,
+            label: Some(if index == 0 { "root".into() } else { "push".into() }),
+            weight: 1.0,
+        });
+    }
+
+    Json(GraphSceneModel {
+        generation: stack.trace_sequence,
+        level: ob_poc_types::galaxy::ViewLevel::System,
+        layout_strategy: LayoutStrategy::HierarchicalGraph,
+        nodes,
+        edges,
+        groups: vec![],
+        drill_targets: vec![],
+        max_depth: stack.workspace_stack.len(),
+    })
+    .into_response()
+}
+
 /// Project HydratedSlot tree into SlotProjection vec for graph_scene_projection.
 /// This is the single conversion point — used by both the TOS path and fallback path.
 fn slots_from_hydrated(
@@ -932,6 +1040,7 @@ pub fn create_observatory_router(
             get(get_navigation_history),
         )
         .route("/session/:id/graph-scene", get(get_graph_scene))
+        .route("/session/:id/session-stack-graph", get(get_session_stack_graph))
         .route("/session/:id/navigate", post(navigate))
         .route("/session/:id/diagrams/:diagram_type", get(get_diagram))
         .route("/health", get(get_health_metrics))

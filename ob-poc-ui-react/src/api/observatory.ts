@@ -32,6 +32,13 @@ export const observatoryApi = {
     );
   },
 
+  /** Fetch the canonical session stack DAG scene */
+  async getSessionStackGraph(sessionId: string): Promise<GraphSceneModel> {
+    return api.get<GraphSceneModel>(
+      `/observatory/session/${sessionId}/session-stack-graph`,
+    );
+  },
+
   /** Fetch navigation history with cursor (breadcrumbs) */
   async getNavigationHistory(
     sessionId: string,

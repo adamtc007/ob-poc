@@ -122,15 +122,22 @@ impl BpmnLite for BpmnLiteService {
         let req = request.into_inner();
         let bytecode_version = parse_bytecode_version(&req.bytecode_version)?;
         let hash = parse_hash(&req.domain_payload_hash)?;
+        let session_stack = if req.session_stack_json.is_empty() {
+            ob_poc_types::session_stack::SessionStackState::default()
+        } else {
+            serde_json::from_str(&req.session_stack_json)
+                .map_err(|e| Status::invalid_argument(format!("invalid session_stack_json: {e}")))?
+        };
 
         let instance_id = self
             .engine
-            .start(
+            .start_with_session_stack(
                 &req.process_key,
                 bytecode_version,
                 &req.domain_payload,
                 hash,
                 &req.correlation_id,
+                session_stack,
             )
             .await
             .map_err(engine_err)?;
@@ -308,6 +315,9 @@ impl BpmnLite for BpmnLiteService {
                 service_task_id: job.service_task_id,
                 domain_payload: job.domain_payload,
                 domain_payload_hash: job.domain_payload_hash.to_vec(),
+                session_stack_json: serde_json::to_string(&job.session_stack).map_err(|e| {
+                    Status::internal(format!("failed to serialize job session_stack: {e}"))
+                })?,
                 orch_flags: job
                     .orch_flags
                     .iter()

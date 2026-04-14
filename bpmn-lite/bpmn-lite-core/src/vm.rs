@@ -188,6 +188,7 @@ impl Vm {
                     service_task_id: service_task_id.clone(),
                     domain_payload: instance.domain_payload.to_string(),
                     domain_payload_hash: instance.domain_payload_hash,
+                    session_stack: instance.session_stack.clone(),
                     orch_flags,
                     retries_remaining: 3,
                 };
@@ -864,6 +865,7 @@ mod tests {
             tenant_id: "default".to_string(),
             domain_payload: payload.to_string().into(),
             domain_payload_hash: compute_hash(payload),
+            session_stack: ob_poc_types::session_stack::SessionStackState::default(),
             flags: BTreeMap::new(),
             counters: BTreeMap::new(),
             join_expected: BTreeMap::new(),

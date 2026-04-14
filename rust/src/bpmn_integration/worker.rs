@@ -219,22 +219,25 @@ impl JobWorker {
         // 4. Execute the verb.
         let entry_id = Uuid::new_v4();
         let runbook_id = Uuid::new_v4();
-        let outcome = self.executor.execute_v2(&dsl, entry_id, runbook_id).await;
+        let outcome = self
+            .executor
+            .execute_v2(&dsl, entry_id, runbook_id, Some(job.session_stack.clone()))
+            .await;
 
         match outcome {
             crate::repl::orchestrator_v2::DslExecutionOutcome::Completed(result) => {
                 // 5a. Success — complete the job via gRPC.
-                let result_json = serde_json::Value::Object(serde_json::Map::from_iter(
-                    std::iter::once(("result".to_string(), result)),
-                ));
-                let (canonical, hash) = canonical_json_with_hash(&result_json);
+                let result_json = completion_payload_from_result(result);
+                let (canonical, _) = canonical_json_with_hash(&result_json);
 
                 if let Err(e) = self
                     .bpmn_client
                     .complete_job(CompleteJobRequest {
                         job_key: job_key.clone(),
                         domain_payload: canonical,
-                        domain_payload_hash: hash,
+                        // The engine expects the hash of the current instance
+                        // payload snapshot, not the new completion payload.
+                        domain_payload_hash: job.domain_payload_hash.clone(),
                         orch_flags: std::collections::HashMap::new(),
                     })
                     .await
@@ -325,36 +328,102 @@ impl JobWorker {
 ///
 /// Falls back to raw JSON embedding if the payload isn't a flat JSON object.
 pub fn build_dsl_from_payload(verb_fqn: &str, domain_payload_json: &str) -> String {
-    // Try to parse as JSON object and extract args.
-    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(domain_payload_json) {
-        if map.is_empty() {
-            return format!("({})", verb_fqn);
+    match serde_json::from_str(domain_payload_json) {
+        Ok(serde_json::Value::Object(map)) => {
+            if map.is_empty() {
+                return format!("({})", verb_fqn);
+            }
+            let mut parts = vec![format!("({}", verb_fqn)];
+            for (key, value) in &map {
+                // Convert snake_case key to kebab-case for DSL.
+                let kebab_key = key.replace('_', "-");
+                let value_str = match value {
+                    serde_json::Value::String(s) => dsl_string_literal(s),
+                    serde_json::Value::Number(n) => n.to_string(),
+                    serde_json::Value::Bool(b) => b.to_string(),
+                    serde_json::Value::Null => "nil".to_string(),
+                    other => dsl_string_literal(
+                        &serde_json::to_string(other).unwrap_or_else(|_| other.to_string()),
+                    ),
+                };
+                parts.push(format!(":{} {}", kebab_key, value_str));
+            }
+            parts.push(")".to_string());
+            parts.join(" ")
         }
-        let mut parts = vec![format!("({}", verb_fqn)];
-        for (key, value) in &map {
-            // Convert snake_case key to kebab-case for DSL.
-            let kebab_key = key.replace('_', "-");
-            let value_str = match value {
-                serde_json::Value::String(s) => format!("\"{}\"", s),
-                serde_json::Value::Number(n) => n.to_string(),
-                serde_json::Value::Bool(b) => b.to_string(),
-                serde_json::Value::Null => "nil".to_string(),
-                other => format!("\"{}\"", other),
-            };
-            parts.push(format!(":{} {}", kebab_key, value_str));
+        Ok(serde_json::Value::String(raw)) => {
+            let trimmed = raw.trim();
+            if trimmed.starts_with('(') && trimmed.ends_with(')') {
+                tracing::debug!(
+                    verb_fqn,
+                    "Using canonical DSL string payload directly for BPMN job execution"
+                );
+                trimmed.to_string()
+            } else {
+                tracing::debug!(
+                    verb_fqn,
+                    "Falling back to raw :payload DSL embedding for string domain payload"
+                );
+                format!("({} :payload {})", verb_fqn, dsl_string_literal(&raw))
+            }
         }
-        parts.push(")".to_string());
-        parts.join(" ")
-    } else {
-        // Non-object payload — embed as raw :payload argument.
-        format!(
-            "({} :payload \"{}\")",
-            verb_fqn,
-            domain_payload_json
-                .replace('\\', "\\\\")
-                .replace('"', "\\\"")
-        )
+        _ => {
+            tracing::debug!(
+                verb_fqn,
+                "Falling back to raw :payload DSL embedding for non-object domain payload"
+            );
+            // Non-object payload — embed as raw :payload argument.
+            format!(
+                "({} :payload {})",
+                verb_fqn,
+                dsl_string_literal(domain_payload_json)
+            )
+        }
     }
+}
+
+fn dsl_string_literal(raw: &str) -> String {
+    format!("\"{}\"", raw.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// Build the BPMN completion payload from a verb execution result.
+///
+/// Object-shaped results are passed through unchanged so correlation keys like
+/// `case_id` remain top-level for later workflow steps. Scalar results are
+/// wrapped under `"result"` to preserve a uniform JSON object payload.
+fn completion_payload_from_result(result: serde_json::Value) -> serde_json::Value {
+    match result {
+        serde_json::Value::Object(map) => {
+            if let Some(unwrapped) = unwrap_singleton_dsl_result(&map) {
+                return unwrapped;
+            }
+            serde_json::Value::Object(map)
+        }
+        other => serde_json::Value::Object(serde_json::Map::from_iter(std::iter::once((
+            "result".to_string(),
+            other,
+        )))),
+    }
+}
+
+fn unwrap_singleton_dsl_result(
+    map: &serde_json::Map<String, serde_json::Value>,
+) -> Option<serde_json::Value> {
+    let success = map.get("success")?.as_bool()?;
+    if !success {
+        return None;
+    }
+
+    let results = map.get("results")?.as_array()?;
+    if results.len() != 1 {
+        return None;
+    }
+
+    let result_entry = results.first()?.as_object()?;
+    if let Some(value) = result_entry.get("value") {
+        return Some(value.clone());
+    }
+    result_entry.get("result").cloned()
 }
 
 // ---------------------------------------------------------------------------
@@ -397,8 +466,67 @@ mod tests {
     }
 
     #[test]
+    fn test_build_dsl_from_canonical_dsl_string_payload() {
+        let dsl = build_dsl_from_payload(
+            "kyc-case.create",
+            r#""(kyc-case.create :cbu-id \"abc\" :case-type \"NEW_CLIENT\")""#,
+        );
+        assert_eq!(dsl, r#"(kyc-case.create :cbu-id "abc" :case-type "NEW_CLIENT")"#);
+    }
+
+    #[test]
     fn test_build_dsl_invalid_json_fallback() {
         let dsl = build_dsl_from_payload("kyc.create-case", "not json at all");
         assert!(dsl.starts_with("(kyc.create-case :payload"));
+    }
+
+    #[test]
+    fn test_build_dsl_escapes_nested_json_values() {
+        let dsl = build_dsl_from_payload(
+            "document.solicit-batch",
+            r#"{"bindings":{},"results":[{"type":"record","value":{"case_id":"abc","status":"INTAKE"}}],"steps_executed":1,"success":true}"#,
+        );
+        assert!(dsl.contains(r#":bindings "{}""#));
+        assert!(dsl.contains(r#":results "[{\"type\":\"record\",\"value\":{\"case_id\":\"abc\",\"status\":\"INTAKE\"}}]""#));
+        assert!(dsl.contains(":steps-executed 1"));
+        assert!(dsl.contains(":success true"));
+    }
+
+    #[test]
+    fn test_completion_payload_from_object_result_preserves_top_level_keys() {
+        let payload = completion_payload_from_result(serde_json::json!({
+            "case_id": "abc",
+            "status": "INTAKE"
+        }));
+        assert_eq!(payload["case_id"], "abc");
+        assert_eq!(payload["status"], "INTAKE");
+        assert!(payload.get("result").is_none());
+    }
+
+    #[test]
+    fn test_completion_payload_from_scalar_result_wraps_result_key() {
+        let payload = completion_payload_from_result(serde_json::json!("done"));
+        assert_eq!(payload["result"], "done");
+    }
+
+    #[test]
+    fn test_completion_payload_unwraps_singleton_dsl_record_result() {
+        let payload = completion_payload_from_result(serde_json::json!({
+            "bindings": {},
+            "results": [{
+                "type": "record",
+                "value": {
+                    "case_id": "abc",
+                    "cbu_id": "def",
+                    "status": "INTAKE"
+                }
+            }],
+            "steps_executed": 1,
+            "success": true
+        }));
+        assert_eq!(payload["case_id"], "abc");
+        assert_eq!(payload["cbu_id"], "def");
+        assert_eq!(payload["status"], "INTAKE");
+        assert!(payload.get("results").is_none());
     }
 }

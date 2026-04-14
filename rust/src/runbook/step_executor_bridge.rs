@@ -60,13 +60,19 @@ pub struct DslExecutorV2StepExecutor {
     executor: Arc<dyn DslExecutorV2>,
     /// Runbook ID passed through to `execute_v2` for correlation.
     runbook_id: Uuid,
+    session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
 }
 
 impl DslExecutorV2StepExecutor {
-    pub fn new(executor: Arc<dyn DslExecutorV2>, runbook_id: Uuid) -> Self {
+    pub fn new(
+        executor: Arc<dyn DslExecutorV2>,
+        runbook_id: Uuid,
+        session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
+    ) -> Self {
         Self {
             executor,
             runbook_id,
+            session_stack,
         }
     }
 }
@@ -76,7 +82,12 @@ impl super::executor::StepExecutor for DslExecutorV2StepExecutor {
     async fn execute_step(&self, step: &CompiledStep) -> StepOutcome {
         match self
             .executor
-            .execute_v2(&step.dsl, step.step_id, self.runbook_id)
+            .execute_v2(
+                &step.dsl,
+                step.step_id,
+                self.runbook_id,
+                self.session_stack.clone(),
+            )
             .await
         {
             DslExecutionOutcome::Completed(result) => StepOutcome::Completed { result },
@@ -133,6 +144,7 @@ mod tests {
             _dsl: &str,
             _entry_id: Uuid,
             _runbook_id: Uuid,
+            _session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
         ) -> DslExecutionOutcome {
             DslExecutionOutcome::Parked {
                 task_id: Uuid::nil(),
@@ -187,7 +199,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_dsl_executor_v2_step_executor_parked() {
-        let executor = DslExecutorV2StepExecutor::new(Arc::new(ParkingExecutor), Uuid::new_v4());
+        let executor =
+            DslExecutorV2StepExecutor::new(Arc::new(ParkingExecutor), Uuid::new_v4(), None);
         let step = test_step();
         let outcome = executor.execute_step(&step).await;
 

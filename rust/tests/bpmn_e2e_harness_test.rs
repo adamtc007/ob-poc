@@ -18,6 +18,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use ob_poc_types::session_stack::SessionStackState;
 use sqlx::Row;
 use tokio::net::TcpListener;
 use tonic::transport::Server;
@@ -76,6 +77,7 @@ impl DslExecutorV2 for FailingStubExecutor {
         _dsl: &str,
         _entry_id: Uuid,
         _runbook_id: Uuid,
+        _session_stack: Option<SessionStackState>,
     ) -> DslExecutionOutcome {
         DslExecutionOutcome::Failed("Simulated verb execution failure".to_string())
     }
@@ -314,6 +316,7 @@ async fn e2e_01_dispatcher_parks_on_orchestrated_verb() {
             "(kyc-case.create :entity-id \"test-entity-001\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
 
@@ -374,6 +377,7 @@ async fn e2e_02_job_worker_processes_service_tasks() {
             "(kyc-case.create :entity-id \"test-entity-002\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
     let (process_instance_id, _) = extract_parked(&outcome);
@@ -427,6 +431,7 @@ async fn e2e_03_full_happy_path_choreography() {
             "(kyc-case.create :entity-id \"test-entity-003\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
     let (process_instance_id, correlation_key) = extract_parked(&outcome);
@@ -597,7 +602,7 @@ async fn e2e_04_runbook_park_and_resume() {
         .unwrap()
         .dsl
         .clone();
-    let outcome = dispatcher.execute_v2(&dsl, entry_id, runbook.id).await;
+    let outcome = dispatcher.execute_v2(&dsl, entry_id, runbook.id, None).await;
     let (process_instance_id, correlation_key) = extract_parked(&outcome);
     eprintln!(
         "Step 1: Dispatched, pid={}, key={}",
@@ -707,6 +712,7 @@ async fn e2e_05_job_worker_background_loop() {
             "(kyc-case.create :entity-id \"test-entity-005\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
     let (process_instance_id, _) = extract_parked(&outcome);
@@ -777,6 +783,7 @@ async fn e2e_06_cancellation_resolves_parked_token() {
             "(kyc-case.create :entity-id \"test-entity-006\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
     let (process_instance_id, correlation_key) = extract_parked(&outcome);
@@ -852,6 +859,7 @@ async fn e2e_07_job_failure_marks_frame() {
             "(kyc-case.create :entity-id \"test-entity-007\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
     let (process_instance_id, _) = extract_parked(&outcome);
@@ -1270,6 +1278,7 @@ impl DslExecutorV2 for CountingExecutor {
         dsl: &str,
         _entry_id: Uuid,
         _runbook_id: Uuid,
+        _session_stack: Option<SessionStackState>,
     ) -> DslExecutionOutcome {
         self.invocations.lock().unwrap().push(dsl.to_string());
         DslExecutionOutcome::Completed(serde_json::json!({"status": "ok"}))
@@ -1306,6 +1315,7 @@ async fn e2e_10_idempotency_dual_dedupe() {
             "(kyc-case.create :entity-id \"test-entity-010\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
     let (process_instance_id, _) = extract_parked(&outcome);
@@ -1391,6 +1401,7 @@ async fn e2e_11_payload_integrity_corrupt_hash_rejected() {
             "(kyc-case.create :entity-id \"test-entity-011\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
     let (process_instance_id, _) = extract_parked(&outcome);
@@ -1470,7 +1481,7 @@ async fn e2e_12_direct_vs_orchestrated_equivalence() {
 
     // 1. Direct route: session.info
     let direct_outcome = dispatcher
-        .execute_v2("(session.info)", entry_id_direct, runbook_id)
+        .execute_v2("(session.info)", entry_id_direct, runbook_id, None)
         .await;
 
     eprintln!("Step 1: Direct outcome = {:?}", direct_outcome);
@@ -1503,6 +1514,7 @@ async fn e2e_12_direct_vs_orchestrated_equivalence() {
             "(kyc-case.create :entity-id \"test-entity-012\")",
             entry_id_orch,
             runbook_id,
+            None,
         )
         .await;
 
@@ -1644,6 +1656,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
             "(kyc-case.create :entity-id \"test-entity-013\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
     let (process_instance_id, _) = extract_parked(&outcome);
@@ -1727,6 +1740,7 @@ async fn e2e_14_event_bridge_reconnect_dedup() {
             "(kyc-case.create :entity-id \"test-entity-014\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
     let (process_instance_id, _) = extract_parked(&outcome);
@@ -1835,6 +1849,7 @@ async fn e2e_15_crash_recovery_event_log_replay() {
             "(kyc-case.create :entity-id \"test-entity-015\")",
             entry_id,
             runbook_id,
+            None,
         )
         .await;
     let (process_instance_id, correlation_key) = extract_parked(&outcome);

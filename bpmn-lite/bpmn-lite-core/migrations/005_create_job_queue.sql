@@ -6,6 +6,7 @@ CREATE TABLE job_queue (
     service_task_id      TEXT NOT NULL,
     domain_payload       TEXT NOT NULL,
     domain_payload_hash  BYTEA NOT NULL,
+    session_stack        JSONB NOT NULL DEFAULT '{}',
     orch_flags           JSONB NOT NULL DEFAULT '{}',
     retries_remaining    INTEGER NOT NULL DEFAULT 3,
     status               TEXT NOT NULL DEFAULT 'pending',

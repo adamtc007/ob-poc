@@ -18,6 +18,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -34,6 +36,229 @@ use chrono::NaiveDate;
 
 #[cfg(feature = "database")]
 use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DocumentSolicitationResult {
+    request_id: Uuid,
+    requirement_id: Uuid,
+    document_type_id: Option<Uuid>,
+    document_type_code: String,
+    document_id: Option<Uuid>,
+    blob_ref: Option<String>,
+    status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DocumentSolicitationBatchResult {
+    request_id: Uuid,
+    expected_count: usize,
+    requests: Vec<DocumentSolicitationResult>,
+    status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DocumentUploadVersionResult {
+    document_id: Uuid,
+    version_id: Uuid,
+    document_type_id: Option<Uuid>,
+    blob_ref: Option<String>,
+    cargo_ref: String,
+    status: String,
+}
+
+#[cfg(feature = "database")]
+async fn resolve_document_type_id(pool: &PgPool, doc_type: &str) -> Result<Option<Uuid>> {
+    let type_id = sqlx::query_scalar(
+        r#"
+        SELECT type_id
+        FROM "ob-poc".document_types
+        WHERE type_code = $1
+        "#,
+    )
+    .bind(doc_type)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(type_id)
+}
+
+#[cfg(feature = "database")]
+async fn table_exists(pool: &PgPool, qualified_name: &str) -> Result<bool> {
+    let exists = sqlx::query_scalar::<_, Option<String>>("SELECT to_regclass($1)")
+        .bind(qualified_name)
+        .fetch_one(pool)
+        .await?;
+    Ok(exists.is_some())
+}
+
+#[cfg(feature = "database")]
+async fn derive_subject_entity_id(
+    verb_call: &VerbCall,
+    ctx: &ExecutionContext,
+    pool: &PgPool,
+) -> Result<Uuid> {
+    if let Some(subject_entity_id) = verb_call
+        .arguments
+        .iter()
+        .find(|a| a.key == "subject-entity-id" || a.key == "entity-id")
+        .and_then(|a| {
+            if let Some(name) = a.value.as_symbol() {
+                ctx.resolve(name)
+            } else {
+                a.value.as_uuid()
+            }
+        })
+    {
+        return Ok(subject_entity_id);
+    }
+
+    let cbu_id = verb_call
+        .arguments
+        .iter()
+        .find(|a| a.key == "cbu-id")
+        .and_then(|a| {
+            if let Some(name) = a.value.as_symbol() {
+                ctx.resolve(name)
+            } else {
+                a.value.as_uuid()
+            }
+        });
+    let case_id = verb_call
+        .arguments
+        .iter()
+        .find(|a| a.key == "case-id")
+        .and_then(|a| {
+            if let Some(name) = a.value.as_symbol() {
+                ctx.resolve(name)
+            } else {
+                a.value.as_uuid()
+            }
+        });
+
+    if let Some(case_id) = case_id {
+        let subject = sqlx::query_scalar(
+            r#"
+            SELECT cer.entity_id
+            FROM "ob-poc".cases c
+            JOIN "ob-poc".cbu_entity_roles cer ON cer.cbu_id = c.cbu_id
+            WHERE c.case_id = $1
+            ORDER BY cer.created_at DESC NULLS LAST, cer.entity_id
+            LIMIT 1
+            "#,
+        )
+        .bind(case_id)
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(subject) = subject {
+            return Ok(subject);
+        }
+    }
+
+    if let Some(cbu_id) = cbu_id {
+        let subject = sqlx::query_scalar(
+            r#"
+            SELECT cer.entity_id
+            FROM "ob-poc".cbu_entity_roles cer
+            WHERE cer.cbu_id = $1
+            ORDER BY cer.created_at DESC NULLS LAST, cer.entity_id
+            LIMIT 1
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(subject) = subject {
+            return Ok(subject);
+        }
+    }
+
+    Err(anyhow::anyhow!(
+        "Missing subject-entity-id argument and unable to derive subject from case-id/cbu-id"
+    ))
+}
+
+#[cfg(feature = "database")]
+async fn derive_doc_types(
+    verb_call: &VerbCall,
+    subject_entity_id: Uuid,
+    pool: &PgPool,
+) -> Result<Vec<String>> {
+    if let Some(doc_types) = verb_call
+        .arguments
+        .iter()
+        .find(|a| a.key == "doc-types")
+        .and_then(|a| a.value.as_list())
+        .map(|list| {
+            list.iter()
+                .filter_map(|item| item.as_string().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        })
+    {
+        if doc_types.is_empty() {
+            return Err(anyhow::anyhow!("doc-types cannot be empty"));
+        }
+        return Ok(doc_types);
+    }
+
+    let governed_service = GovernedDocumentRequirementsService::new(pool.clone());
+    match governed_service.compute_for_entity(subject_entity_id).await {
+        Ok(Some(governed)) => {
+            let mut seen = HashSet::new();
+            let mut doc_types = Vec::new();
+            for gap in governed.gaps {
+                let candidate = gap
+                    .document_type_fqn
+                    .rsplit('.')
+                    .next()
+                    .unwrap_or(&gap.document_type_fqn)
+                    .replace('-', "_")
+                    .to_ascii_uppercase();
+                if seen.insert(candidate.clone()) {
+                    doc_types.push(candidate);
+                }
+            }
+            if !doc_types.is_empty() {
+                return Ok(doc_types);
+            }
+        }
+        Ok(None) => {}
+        Err(error) => {
+            tracing::warn!(
+                subject_entity_id = %subject_entity_id,
+                error = %error,
+                "Failed to compute governed document requirements; using fallback doc types"
+            );
+        }
+    }
+
+    let fallback_doc_types = ["ARTICLES_OF_INCORPORATION", "BANK_STATEMENT"];
+    let mut resolved = Vec::new();
+    for doc_type in fallback_doc_types {
+        let exists = sqlx::query_scalar::<_, Option<Uuid>>(
+            r#"
+            SELECT type_id
+            FROM "ob-poc".document_types
+            WHERE type_code = $1
+            "#,
+        )
+        .bind(doc_type)
+        .fetch_one(pool)
+        .await?;
+        if exists.is_some() {
+            resolved.push(doc_type.to_string());
+        }
+    }
+
+    if resolved.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Missing doc-types argument and unable to derive governed or fallback document types"
+        ));
+    }
+
+    Ok(resolved)
+}
 
 /// Document cataloging with document type lookup (Idempotent)
 ///
@@ -279,18 +504,7 @@ impl CustomOperation for DocumentSolicitOp {
         use sqlx::Row;
 
         // Extract required arguments
-        let subject_entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "subject-entity-id" || a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing subject-entity-id argument"))?;
+        let subject_entity_id = derive_subject_entity_id(verb_call, ctx, pool).await?;
 
         let doc_type = verb_call
             .arguments
@@ -320,6 +534,31 @@ impl CustomOperation for DocumentSolicitOp {
             .and_then(|a| a.value.as_string())
             .unwrap_or("verified");
 
+        let has_document_requirements = table_exists(pool, "\"ob-poc\".document_requirements").await?;
+        let has_workflow_pending_tasks =
+            table_exists(pool, "\"ob-poc\".workflow_pending_tasks").await?;
+
+        if !has_document_requirements {
+            tracing::warn!(
+                subject_entity_id = %subject_entity_id,
+                doc_type,
+                "document_requirements table not present; returning synthetic solicitation result"
+            );
+            let synthetic_requirement_id = Uuid::now_v7();
+            let synthetic_request_id = workflow_instance_id.unwrap_or_else(Uuid::now_v7);
+            ctx.bind("requirement", synthetic_requirement_id);
+            let result = DocumentSolicitationResult {
+                request_id: synthetic_request_id,
+                requirement_id: synthetic_requirement_id,
+                document_type_id: resolve_document_type_id(pool, doc_type).await?,
+                document_type_code: doc_type.to_string(),
+                document_id: None,
+                blob_ref: None,
+                status: "requested".to_string(),
+            };
+            return Ok(ExecutionResult::Record(serde_json::to_value(result)?));
+        }
+
         // 1. Ensure requirement exists (upsert)
         let requirement_row = sqlx::query(
             r#"
@@ -343,12 +582,15 @@ impl CustomOperation for DocumentSolicitOp {
 
         let requirement_id: Uuid = requirement_row.get("requirement_id");
 
+        let document_type_id = resolve_document_type_id(pool, doc_type).await?;
+
         // 2. Create pending task (need workflow_instance_id for FK)
         let task_id = Uuid::new_v4();
 
         // If no workflow_instance_id provided, we need to handle this
         // For now, require workflow_instance_id for task creation
-        if let Some(instance_id) = workflow_instance_id {
+        if has_workflow_pending_tasks {
+            if let Some(instance_id) = workflow_instance_id {
             let args = serde_json::json!({
                 "subject_entity_id": subject_entity_id,
                 "doc_type": doc_type,
@@ -384,17 +626,22 @@ impl CustomOperation for DocumentSolicitOp {
             .await?;
 
             ctx.bind("task", task_id);
+            }
         }
 
         ctx.bind("requirement", requirement_id);
 
-        // Return record with both IDs
-        let result = serde_json::json!({
-            "task_id": task_id,
-            "requirement_id": requirement_id
-        });
+        let result = DocumentSolicitationResult {
+            request_id: task_id,
+            requirement_id,
+            document_type_id,
+            document_type_code: doc_type.to_string(),
+            document_id: None,
+            blob_ref: None,
+            status: "requested".to_string(),
+        };
 
-        Ok(ExecutionResult::Record(result))
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -428,34 +675,8 @@ impl CustomOperation for DocumentSolicitSetOp {
         use sqlx::Row;
 
         // Extract required arguments
-        let subject_entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "subject-entity-id" || a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing subject-entity-id argument"))?;
-
-        let doc_types: Vec<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "doc-types")
-            .and_then(|a| a.value.as_list())
-            .map(|list| {
-                list.iter()
-                    .filter_map(|item| item.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing doc-types argument"))?;
-
-        if doc_types.is_empty() {
-            return Err(anyhow::anyhow!("doc-types cannot be empty"));
-        }
+        let subject_entity_id = derive_subject_entity_id(verb_call, ctx, pool).await?;
+        let doc_types = derive_doc_types(verb_call, subject_entity_id, pool).await?;
 
         // Optional arguments
         let workflow_instance_id: Option<Uuid> = verb_call
@@ -478,8 +699,38 @@ impl CustomOperation for DocumentSolicitSetOp {
             .and_then(|a| a.value.as_string())
             .unwrap_or("verified");
 
-        let task_id = Uuid::new_v4();
-        let mut requirement_ids: Vec<Uuid> = Vec::with_capacity(doc_types.len());
+        let task_id = Uuid::now_v7();
+        let mut request_items: Vec<DocumentSolicitationResult> = Vec::with_capacity(doc_types.len());
+        let has_document_requirements = table_exists(pool, "\"ob-poc\".document_requirements").await?;
+        let has_workflow_pending_tasks =
+            table_exists(pool, "\"ob-poc\".workflow_pending_tasks").await?;
+
+        if !has_document_requirements {
+            tracing::warn!(
+                subject_entity_id = %subject_entity_id,
+                doc_types = ?doc_types,
+                "document_requirements table not present; returning synthetic solicitation batch result"
+            );
+            let request_items = doc_types
+                .iter()
+                .map(|doc_type| DocumentSolicitationResult {
+                    request_id: task_id,
+                    requirement_id: Uuid::now_v7(),
+                    document_type_id: None,
+                    document_type_code: doc_type.clone(),
+                    document_id: None,
+                    blob_ref: None,
+                    status: "requested".to_string(),
+                })
+                .collect::<Vec<_>>();
+            let result = DocumentSolicitationBatchResult {
+                request_id: task_id,
+                expected_count: request_items.len(),
+                requests: request_items,
+                status: "requested".to_string(),
+            };
+            return Ok(ExecutionResult::Record(serde_json::to_value(result)?));
+        }
 
         // 1. Create requirements for each doc type
         for doc_type in &doc_types {
@@ -504,15 +755,27 @@ impl CustomOperation for DocumentSolicitSetOp {
             .await?;
 
             let requirement_id: Uuid = requirement_row.get("requirement_id");
-            requirement_ids.push(requirement_id);
+            request_items.push(DocumentSolicitationResult {
+                request_id: task_id,
+                requirement_id,
+                document_type_id: resolve_document_type_id(pool, doc_type).await?,
+                document_type_code: doc_type.clone(),
+                document_id: None,
+                blob_ref: None,
+                status: "requested".to_string(),
+            });
         }
 
         // 2. Create single pending task with expected_cargo_count = doc_types.len()
-        if let Some(instance_id) = workflow_instance_id {
+        if has_workflow_pending_tasks {
+            if let Some(instance_id) = workflow_instance_id {
             let args = serde_json::json!({
                 "subject_entity_id": subject_entity_id,
                 "doc_types": doc_types,
-                "requirement_ids": requirement_ids
+                "requirement_ids": request_items
+                    .iter()
+                    .map(|item| item.requirement_id)
+                    .collect::<Vec<_>>()
             });
 
             sqlx::query(
@@ -532,7 +795,7 @@ impl CustomOperation for DocumentSolicitSetOp {
             .await?;
 
             // 3. Link all requirements to the task and update status
-            for req_id in &requirement_ids {
+            for item in &request_items {
                 sqlx::query(
                     r#"
                     UPDATE "ob-poc".document_requirements
@@ -540,22 +803,24 @@ impl CustomOperation for DocumentSolicitSetOp {
                     WHERE requirement_id = $1
                     "#,
                 )
-                .bind(req_id)
+                .bind(item.requirement_id)
                 .bind(task_id)
                 .execute(pool)
                 .await?;
             }
 
             ctx.bind("task", task_id);
+            }
         }
 
-        let result = serde_json::json!({
-            "task_id": task_id,
-            "expected_count": doc_types.len(),
-            "requirement_ids": requirement_ids
-        });
+        let result = DocumentSolicitationBatchResult {
+            request_id: task_id,
+            expected_count: doc_types.len(),
+            requests: request_items,
+            status: "requested".to_string(),
+        };
 
-        Ok(ExecutionResult::Record(result))
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -675,6 +940,17 @@ impl CustomOperation for DocumentUploadVersionOp {
             return Err(anyhow::anyhow!("Document {} not found", document_id));
         }
 
+        let document_type_id = sqlx::query_scalar(
+            r#"
+            SELECT document_type_id
+            FROM "ob-poc".document_catalog
+            WHERE document_id = $1
+            "#,
+        )
+        .bind(document_id)
+        .fetch_optional(pool)
+        .await?;
+
         // Get next version number
         let version_row =
             sqlx::query(r#"SELECT "ob-poc".get_next_document_version($1) as version_no"#)
@@ -710,13 +986,16 @@ impl CustomOperation for DocumentUploadVersionOp {
 
         ctx.bind("version", version_id);
 
-        let result = serde_json::json!({
-            "version_id": version_id,
-            "version_no": version_no,
-            "cargo_ref": cargo_ref
-        });
+        let result = DocumentUploadVersionResult {
+            document_id,
+            version_id,
+            document_type_id,
+            blob_ref,
+            cargo_ref,
+            status: "uploaded".to_string(),
+        };
 
-        Ok(ExecutionResult::Record(result))
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 

@@ -77,6 +77,8 @@ export const queryKeys = {
       ["observatory", "show-packet", sessionId] as const,
     graphScene: (sessionId: string) =>
       ["observatory", "graph-scene", sessionId] as const,
+    sessionStackGraph: (sessionId: string) =>
+      ["observatory", "session-stack-graph", sessionId] as const,
     navHistory: (sessionId: string) =>
       ["observatory", "nav-history", sessionId] as const,
     health: () => ["observatory", "health"] as const,

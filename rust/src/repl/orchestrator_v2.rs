@@ -21,7 +21,7 @@
 //! | RunbookEditing      | Message         | handle_in_pack_msg()   | SentencePlayback        |
 //! | Executing           | (completion)    | execute_runbook_from() | RunbookEditing          |
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Context as _;
@@ -45,12 +45,13 @@ use super::sentence_gen::SentenceGenerator;
 use super::session_v2::{MessageRole, ReplSessionV2};
 use super::types_v2::{
     ConstellationContextRef, ExecutionProgress, ReplCommandV2, ReplStateV2,
-    ResolvedConstellationContext, SessionFeedback, UserInputV2, WorkspaceFrame, WorkspaceKind,
-    WorkspaceOption, WorkspaceStateView,
+    ResolvedConstellationContext, SessionFeedback, SubjectKind, UserInputV2, WorkspaceFrame,
+    WorkspaceKind, WorkspaceOption, WorkspaceStateView,
 };
 use super::verb_config_index::VerbConfigIndex;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::journey::handoff::PackHandoff;
+use crate::journey::pack::AnswerKind;
 use crate::journey::playback::PackPlayback;
 use crate::journey::router::{PackRouteOutcome, PackRouter};
 use crate::journey::template::instantiate_template;
@@ -118,7 +119,13 @@ pub enum DslExecutionOutcome {
 /// Extended executor that can return parking signals.
 #[async_trait::async_trait]
 pub trait DslExecutorV2: Send + Sync {
-    async fn execute_v2(&self, dsl: &str, entry_id: Uuid, runbook_id: Uuid) -> DslExecutionOutcome;
+    async fn execute_v2(
+        &self,
+        dsl: &str,
+        entry_id: Uuid,
+        runbook_id: Uuid,
+        session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
+    ) -> DslExecutionOutcome;
 }
 
 /// Adapts any DslExecutor to DslExecutorV2 (sync-only path: never parks).
@@ -129,6 +136,7 @@ impl<T: DslExecutor> DslExecutorV2 for T {
         dsl: &str,
         _entry_id: Uuid,
         _runbook_id: Uuid,
+        _session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
     ) -> DslExecutionOutcome {
         match self.execute(dsl).await {
             Ok(v) => DslExecutionOutcome::Completed(v),
@@ -143,7 +151,13 @@ pub struct ParkableStubExecutor;
 
 #[async_trait::async_trait]
 impl DslExecutorV2 for ParkableStubExecutor {
-    async fn execute_v2(&self, dsl: &str, entry_id: Uuid, runbook_id: Uuid) -> DslExecutionOutcome {
+    async fn execute_v2(
+        &self,
+        dsl: &str,
+        entry_id: Uuid,
+        runbook_id: Uuid,
+        _session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
+    ) -> DslExecutionOutcome {
         if dsl.contains(":park") || dsl.contains(":durable") {
             DslExecutionOutcome::Parked {
                 task_id: Uuid::new_v4(),
@@ -174,6 +188,12 @@ pub struct ReplOrchestratorV2 {
     /// Macro registry for classify_verb() and compile_verb().
     macro_registry: Option<Arc<MacroRegistry>>,
     sessions: Arc<RwLock<HashMap<Uuid, ReplSessionV2>>>,
+    persistence_versions: Arc<RwLock<HashMap<Uuid, i64>>>,
+    /// Initial hardening only: sessions are lazily evicted on access.
+    /// This reduces stale accumulation but does not fully bound memory for
+    /// abandoned sessions that are never revisited. A background sweeper or
+    /// hard capacity policy remains follow-up work.
+    session_ttl: chrono::Duration,
     executor: Arc<dyn DslExecutor>,
     executor_v2: Option<Arc<dyn DslExecutorV2>>,
     /// Phase 5: Session persistence for durable execution / human gates.
@@ -194,6 +214,7 @@ pub struct ReplOrchestratorV2 {
     sem_os_client: Option<Arc<dyn SemOsClient>>,
     /// Optional lookup service for trace-time entity recovery.
     lookup_service: Option<LookupService>,
+    orchestrated_verbs: HashSet<String>,
 }
 
 impl ReplOrchestratorV2 {
@@ -208,6 +229,8 @@ impl ReplOrchestratorV2 {
             proposal_engine: None,
             macro_registry: None,
             sessions: Arc::new(RwLock::new(HashMap::new())),
+            persistence_versions: Arc::new(RwLock::new(HashMap::new())),
+            session_ttl: chrono::Duration::hours(24),
             executor,
             executor_v2: None,
             #[cfg(feature = "database")]
@@ -219,6 +242,7 @@ impl ReplOrchestratorV2 {
             unified_orch_pool: None,
             sem_os_client: None,
             lookup_service: None,
+            orchestrated_verbs: HashSet::new(),
         }
     }
 
@@ -322,6 +346,27 @@ impl ReplOrchestratorV2 {
         self
     }
 
+    /// Mark verbs that must be executed through the durable/orchestrated bridge.
+    pub fn with_orchestrated_verbs(mut self, verbs: HashSet<String>) -> Self {
+        self.orchestrated_verbs = verbs;
+        self
+    }
+
+    /// Override the lazy session TTL used for on-access eviction.
+    ///
+    /// This is initial eviction hardening only. It does not replace a future
+    /// sweeper task or hard capacity bound for abandoned sessions.
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// let orch = ReplOrchestratorV2::new(router, executor)
+    ///     .with_session_ttl(chrono::Duration::hours(1));
+    /// ```
+    pub fn with_session_ttl(mut self, ttl: chrono::Duration) -> Self {
+        self.session_ttl = ttl;
+        self
+    }
+
     /// Access the pack router (useful for tests and introspection).
     pub fn pack_router(&self) -> &PackRouter {
         &self.pack_router
@@ -342,13 +387,21 @@ impl ReplOrchestratorV2 {
     ///
     /// Used during session recovery (GET session not found in memory → load from DB → restore).
     pub async fn restore_session(&self, session: ReplSessionV2) {
+        self.restore_session_with_version(session, 0).await;
+    }
+
+    /// Insert a previously-persisted session into the in-memory map with its
+    /// repository version for future optimistic-concurrency writes.
+    pub async fn restore_session_with_version(&self, session: ReplSessionV2, version: i64) {
         let id = session.id;
         self.sessions.write().await.insert(id, session);
+        self.persistence_versions.write().await.insert(id, version);
     }
 
     /// Delete a session from memory and (if configured) from persistent storage.
     pub async fn delete_session(&self, session_id: Uuid) -> bool {
         let removed = self.sessions.write().await.remove(&session_id).is_some();
+        self.persistence_versions.write().await.remove(&session_id);
         if removed {
             self.maybe_delete_persisted_session(session_id).await;
         }
@@ -360,6 +413,7 @@ impl ReplOrchestratorV2 {
         let session = ReplSessionV2::new();
         let id = session.id;
         self.sessions.write().await.insert(id, session);
+        self.persistence_versions.write().await.insert(id, 0);
         id
     }
 
@@ -368,11 +422,65 @@ impl ReplOrchestratorV2 {
         let mut session = ReplSessionV2::new();
         session.id = id;
         self.sessions.write().await.insert(id, session);
+        self.persistence_versions.write().await.insert(id, 0);
     }
 
     /// Get a snapshot of session state (for API responses).
     pub async fn get_session(&self, session_id: Uuid) -> Option<ReplSessionV2> {
-        self.sessions.read().await.get(&session_id).cloned()
+        let maybe_in_memory = {
+            let sessions = self.sessions.read().await;
+            sessions.get(&session_id).cloned()
+        };
+        if let Some(session) = maybe_in_memory {
+            if self.session_expired(&session) {
+                tracing::info!(
+                    session_id = %session_id,
+                    ttl_seconds = self.session_ttl.num_seconds(),
+                    "Lazily evicting expired in-memory session"
+                );
+                self.delete_session(session_id).await;
+                return None;
+            }
+            return Some(session);
+        }
+
+        #[cfg(feature = "database")]
+        if let Some(ref repo) = self.session_repository {
+            match repo.load_session(session_id).await {
+                Ok(Some((mut session, version))) => {
+                    if self.session_expired(&session) {
+                        tracing::info!(
+                            session_id = %session_id,
+                            ttl_seconds = self.session_ttl.num_seconds(),
+                            "Lazily evicting expired persisted session"
+                        );
+                        self.maybe_delete_persisted_session(session_id).await;
+                        return None;
+                    }
+                    session.rehydrate(&self.pack_router);
+                    let snapshot = session.clone();
+                    self.restore_session_with_version(session, version).await;
+                    return Some(snapshot);
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        error = %error,
+                        "Failed to restore session from persistence"
+                    );
+                }
+            }
+        }
+
+        None
+    }
+
+    fn session_expired(&self, session: &ReplSessionV2) -> bool {
+        if self.session_ttl <= chrono::Duration::zero() {
+            return false;
+        }
+        chrono::Utc::now() - session.last_active_at > self.session_ttl
     }
 
     /// Persist the current snapshot of a session, if persistence is configured.
@@ -382,7 +490,18 @@ impl ReplOrchestratorV2 {
         };
         #[cfg(feature = "database")]
         if let Some(ref repo) = self.session_repository {
-            repo.save_session(&session, 0).await?;
+            let version = self
+                .persistence_versions
+                .read()
+                .await
+                .get(&session_id)
+                .copied()
+                .unwrap_or(0);
+            let new_version = repo.save_session(&session, version).await?;
+            self.persistence_versions
+                .write()
+                .await
+                .insert(session_id, new_version);
         }
         Ok(())
     }
@@ -1515,12 +1634,28 @@ impl ReplOrchestratorV2 {
                 if let Some(question) = self.next_required_question(session) {
                     // Record the answer to the previous question (if any).
                     let field = question.field.clone();
+                    let pack_id = session.active_pack_id();
                     session
                         .record_answer(field.clone(), serde_json::Value::String(content.clone()));
-
-                    // Record pack.answer on the runbook (Invariant I-1).
-                    let pack_id = session.active_pack_id();
                     self.record_pack_answer_entry(session, &field, &content, pack_id.as_deref());
+                    if question.answer_kind == AnswerKind::EntityRef {
+                        if let Some(resolved_id) =
+                            self.resolve_entity_ref_answer(session, &field, &content).await
+                        {
+                            let id_field = format!("{field}_id");
+                            let id_value = resolved_id.to_string();
+                            session.record_answer(
+                                id_field.clone(),
+                                serde_json::Value::String(id_value.clone()),
+                            );
+                            self.record_pack_answer_entry(
+                                session,
+                                &id_field,
+                                &id_value,
+                                pack_id.as_deref(),
+                            );
+                        }
+                    }
 
                     // Check for next question.
                     if let Some(next) = self.next_required_question(session) {
@@ -1990,6 +2125,7 @@ impl ReplOrchestratorV2 {
                 is_durable,
                 runbook_id,
                 fallback_version,
+                Some(session.session_stack.clone()),
             )
             .await;
 
@@ -2203,6 +2339,7 @@ impl ReplOrchestratorV2 {
                 false,
                 session.runbook.id,
                 fallback_version,
+                Some(session.session_stack.clone()),
             )
             .await;
 
@@ -2717,6 +2854,54 @@ impl ReplOrchestratorV2 {
             .cloned()
     }
 
+    async fn resolve_entity_ref_answer(
+        &self,
+        session: &ReplSessionV2,
+        field: &str,
+        content: &str,
+    ) -> Option<Uuid> {
+        #[cfg(feature = "database")]
+        if field == "entity_name" {
+            if let Some(pool) = self.pool() {
+                if !session.cbu_ids.is_empty() {
+                    if let Ok(Some(id)) = sqlx::query_scalar::<_, Uuid>(
+                        r#"SELECT cbu_id
+                           FROM "ob-poc".cbus
+                           WHERE deleted_at IS NULL
+                             AND lower(name) = lower($1)
+                             AND cbu_id = ANY($2)
+                           LIMIT 1"#,
+                    )
+                    .bind(content)
+                    .bind(&session.cbu_ids)
+                    .fetch_optional(pool)
+                    .await
+                    {
+                        return Some(id);
+                    }
+                }
+
+                if let Ok(Some(id)) = sqlx::query_scalar::<_, Uuid>(
+                    r#"SELECT cbu_id
+                       FROM "ob-poc".cbus
+                       WHERE deleted_at IS NULL
+                         AND lower(name) = lower($1)
+                       LIMIT 1"#,
+                )
+                .bind(content)
+                .fetch_optional(pool)
+                .await
+                {
+                    return Some(id);
+                }
+            }
+        }
+
+        let lookup = self.lookup_service.as_ref()?;
+        let analysis = lookup.analyze(content, 5).await;
+        analysis.dominant_entity.map(|entity| entity.entity_id)
+    }
+
     // -- Phase E: Fast command handling --
 
     /// Try to parse and handle a fast command from user input.
@@ -3047,6 +3232,17 @@ impl ReplOrchestratorV2 {
             }
             if let Some(id) = ctx_stack.derived_scope.client_group_id {
                 vars.insert("client_group_id".to_string(), id.to_string());
+            }
+            let current_cbu_id = ctx_stack.derived_scope.default_cbu.or_else(|| {
+                session
+                    .workspace_stack
+                    .iter()
+                    .rev()
+                    .find(|frame| matches!(frame.subject_kind, Some(SubjectKind::Cbu)))
+                    .and_then(|frame| frame.subject_id)
+            });
+            if let Some(cbu_id) = current_cbu_id {
+                vars.insert("current_cbu_id".to_string(), cbu_id.to_string());
             }
             vars
         };
@@ -4118,6 +4314,17 @@ impl ReplOrchestratorV2 {
             if let Some(id) = ctx_stack.derived_scope.client_group_id {
                 vars.insert("client_group_id".to_string(), id.to_string());
             }
+            let current_cbu_id = ctx_stack.derived_scope.default_cbu.or_else(|| {
+                session
+                    .workspace_stack
+                    .iter()
+                    .rev()
+                    .find(|frame| matches!(frame.subject_kind, Some(SubjectKind::Cbu)))
+                    .and_then(|frame| frame.subject_id)
+            });
+            if let Some(cbu_id) = current_cbu_id {
+                vars.insert("current_cbu_id".to_string(), cbu_id.to_string());
+            }
             vars
         };
 
@@ -4125,13 +4332,25 @@ impl ReplOrchestratorV2 {
         let verb_phrases = self.verb_config_index.all_invocation_phrases();
         let verb_descriptions = self.verb_config_index.all_descriptions();
 
-        // Answers derived from runbook fold.
-        let answers = &ctx_stack.accumulated_answers;
+        // Answers derived from runbook fold, with pack defaults filled in for
+        // unanswered questions so template expansion does not emit placeholders.
+        let mut answers = ctx_stack.accumulated_answers.clone();
+        for question in pack
+            .required_questions
+            .iter()
+            .chain(pack.optional_questions.iter())
+        {
+            if let Some(default) = &question.default {
+                answers
+                    .entry(question.field.clone())
+                    .or_insert_with(|| default.clone());
+            }
+        }
 
         match instantiate_template(
             template,
             &context_vars,
-            answers,
+            &answers,
             &self.sentence_gen,
             &verb_phrases,
             &verb_descriptions,
@@ -4143,7 +4362,10 @@ impl ReplOrchestratorV2 {
 
                 // Add all entries to runbook and mark as Confirmed
                 // (user confirmed by answering all pack questions).
-                for entry in entries {
+                for mut entry in entries {
+                    if let Some(resp) = self.try_compile_entry(session, &mut entry) {
+                        return resp;
+                    }
                     let id = session.runbook.add_entry(entry);
                     session.runbook.set_entry_status(id, EntryStatus::Confirmed);
                 }
@@ -4595,6 +4817,15 @@ impl ReplOrchestratorV2 {
                 .phase5_runtime_recheck(session, idx, entry_id, &entry_sentence, &entry_dsl)
                 .await
             {
+                tracing::warn!(
+                    session_id = %session.id,
+                    entry_id = %entry_id,
+                    sequence = entry_sequence,
+                    verb = %session.runbook.entries[idx].verb,
+                    dsl = %entry_dsl,
+                    outcome = ?outcome,
+                    "Runbook step blocked by Phase 5 runtime re-check"
+                );
                 let entry = &mut session.runbook.entries[idx];
                 entry.status = EntryStatus::Failed;
                 results.push(StepResult {
@@ -4653,11 +4884,20 @@ impl ReplOrchestratorV2 {
                             true, // is_durable
                             runbook_id,
                             fallback_version,
+                            Some(session.session_stack.clone()),
                         )
                         .await;
 
                     match gate_outcome {
                         StepOutcome::Completed { result } => {
+                            tracing::info!(
+                                session_id = %session.id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %session.runbook.entries[idx].verb,
+                                dsl = %entry_dsl,
+                                "Durable runbook step completed"
+                            );
                             let result_json = serde_json::to_value(&result).ok();
                             {
                                 let entry = &mut session.runbook.entries[idx];
@@ -4686,6 +4926,16 @@ impl ReplOrchestratorV2 {
                             correlation_key,
                             message,
                         } => {
+                            tracing::info!(
+                                session_id = %session.id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %session.runbook.entries[idx].verb,
+                                dsl = %entry_dsl,
+                                correlation_key = %correlation_key,
+                                park_message = %message,
+                                "Durable runbook step parked"
+                            );
                             let mut invocation = InvocationRecord::new(
                                 entry_id,
                                 runbook_id,
@@ -4712,6 +4962,15 @@ impl ReplOrchestratorV2 {
                             break;
                         }
                         StepOutcome::Failed { error } => {
+                            tracing::warn!(
+                                session_id = %session.id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %session.runbook.entries[idx].verb,
+                                dsl = %entry_dsl,
+                                error = %error,
+                                "Durable runbook step failed"
+                            );
                             let entry = &mut session.runbook.entries[idx];
                             entry.status = EntryStatus::Failed;
                             results.push(StepResult {
@@ -4724,6 +4983,15 @@ impl ReplOrchestratorV2 {
                             });
                         }
                         StepOutcome::Skipped { reason } => {
+                            tracing::info!(
+                                session_id = %session.id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %session.runbook.entries[idx].verb,
+                                dsl = %entry_dsl,
+                                reason = %reason,
+                                "Durable runbook step skipped"
+                            );
                             results.push(StepResult {
                                 entry_id,
                                 sequence: entry_sequence,
@@ -4749,11 +5017,20 @@ impl ReplOrchestratorV2 {
                             false, // not durable
                             runbook_id,
                             fallback_version,
+                            Some(session.session_stack.clone()),
                         )
                         .await;
 
                     match gate_outcome {
                         StepOutcome::Completed { result } => {
+                            tracing::info!(
+                                session_id = %session.id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %session.runbook.entries[idx].verb,
+                                dsl = %entry_dsl,
+                                "Sync runbook step completed"
+                            );
                             let result_json = serde_json::to_value(&result).ok();
                             {
                                 let entry = &mut session.runbook.entries[idx];
@@ -4779,6 +5056,15 @@ impl ReplOrchestratorV2 {
                             });
                         }
                         StepOutcome::Failed { error } => {
+                            tracing::warn!(
+                                session_id = %session.id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %session.runbook.entries[idx].verb,
+                                dsl = %entry_dsl,
+                                error = %error,
+                                "Sync runbook step failed"
+                            );
                             let entry = &mut session.runbook.entries[idx];
                             entry.status = EntryStatus::Failed;
                             results.push(StepResult {
@@ -4794,6 +5080,16 @@ impl ReplOrchestratorV2 {
                             correlation_key,
                             message,
                         } => {
+                            tracing::info!(
+                                session_id = %session.id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %session.runbook.entries[idx].verb,
+                                dsl = %entry_dsl,
+                                correlation_key = %correlation_key,
+                                park_message = %message,
+                                "Sync runbook step unexpectedly parked"
+                            );
                             // Unexpected park from sync path — treat as parked.
                             let mut invocation = InvocationRecord::new(
                                 entry_id,
@@ -4820,6 +5116,15 @@ impl ReplOrchestratorV2 {
                             break;
                         }
                         StepOutcome::Skipped { reason } => {
+                            tracing::info!(
+                                session_id = %session.id,
+                                entry_id = %entry_id,
+                                sequence = entry_sequence,
+                                verb = %session.runbook.entries[idx].verb,
+                                dsl = %entry_dsl,
+                                reason = %reason,
+                                "Sync runbook step skipped"
+                            );
                             results.push(StepResult {
                                 entry_id,
                                 sequence: entry_sequence,
@@ -4899,13 +5204,33 @@ impl ReplOrchestratorV2 {
             let summary = self.runbook_summary(session);
             let succeeded = results.iter().filter(|r| r.success).count();
             let failed = results.iter().filter(|r| !r.success).count();
+            let failure_details = if failed > 0 {
+                let details = results
+                    .iter()
+                    .filter(|r| !r.success)
+                    .map(|r| {
+                        format!(
+                            "Step {} ({}) — {}",
+                            r.sequence,
+                            r.sentence,
+                            r.message
+                                .clone()
+                                .unwrap_or_else(|| "Unknown execution failure".to_string())
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                format!("\n\nFailures:\n{}", details)
+            } else {
+                String::new()
+            };
 
             ReplResponseV2 {
                 state: session.state.clone(),
                 kind: ReplResponseKindV2::Executed { results },
                 message: format!(
-                    "Execution complete: {} succeeded, {} failed.\n\n{}",
-                    succeeded, failed, summary
+                    "Execution complete: {} succeeded, {} failed.{}\n\n{}",
+                    succeeded, failed, failure_details, summary
                 ),
                 runbook_summary: Some(summary),
                 step_count: session.runbook.entries.len(),
@@ -4987,6 +5312,11 @@ impl ReplOrchestratorV2 {
             ExecutionMode::Durable => CompiledExecutionMode::Durable,
             ExecutionMode::HumanGate => CompiledExecutionMode::HumanGate,
         };
+        let compiled_mode = if self.orchestrated_verbs.contains(&entry.verb) {
+            CompiledExecutionMode::Durable
+        } else {
+            compiled_mode
+        };
         let step = CompiledStep {
             step_id: entry.id,
             sentence: entry.sentence.clone(),
@@ -5033,6 +5363,7 @@ impl ReplOrchestratorV2 {
         is_durable: bool,
         runbook_id: Uuid,
         fallback_version: u64,
+        session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
     ) -> StepOutcome {
         // Construct the store backend: Postgres when pool available, in-memory fallback.
         // This ensures lock events, status events, and holder lookups fire in production
@@ -5047,10 +5378,13 @@ impl ReplOrchestratorV2 {
         let fallback_store: RunbookStore = RunbookStore::new();
 
         #[cfg(feature = "database")]
-        let store: &dyn RunbookStoreBackend = if let Some(ref pg) = pg_store {
-            pg
-        } else if let Some(ref s) = self.runbook_store {
+        let store: &dyn RunbookStoreBackend = if let Some(ref s) = self.runbook_store {
+            // REPL pre-compilation currently populates the configured runbook_store
+            // synchronously. Prefer that cache first so compiled artifacts are
+            // visible to the execution gate before any optional DB persistence.
             s.as_ref()
+        } else if let Some(ref pg) = pg_store {
+            pg
         } else {
             &fallback_store
         };
@@ -5096,7 +5430,8 @@ impl ReplOrchestratorV2 {
 
         if is_durable {
             if let Some(ref exec) = self.executor_v2 {
-                let bridge = DslExecutorV2StepExecutor::new(exec.clone(), runbook_id);
+                let bridge =
+                    DslExecutorV2StepExecutor::new(exec.clone(), runbook_id, session_stack);
                 match execute_runbook_with_pool(
                     store,
                     compiled_id,
@@ -5174,12 +5509,27 @@ impl ReplOrchestratorV2 {
         #[cfg(feature = "database")]
         {
             if let Some(ref repo) = self.session_repository {
-                if let Err(e) = repo.save_session(session, 0).await {
-                    tracing::warn!(
-                        session_id = %session.id,
-                        error = %e,
-                        "Best-effort session persist failed"
-                    );
+                let version = self
+                    .persistence_versions
+                    .read()
+                    .await
+                    .get(&session.id)
+                    .copied()
+                    .unwrap_or(0);
+                match repo.save_session(session, version).await {
+                    Ok(new_version) => {
+                        self.persistence_versions
+                            .write()
+                            .await
+                            .insert(session.id, new_version);
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            session_id = %session.id,
+                            error = %e,
+                            "Best-effort session persist failed"
+                        );
+                    }
                 }
             }
         }
@@ -5197,9 +5547,21 @@ impl ReplOrchestratorV2 {
         #[cfg(feature = "database")]
         {
             if let Some(ref repo) = self.session_repository {
-                repo.save_session(session, 0)
+                let version = self
+                    .persistence_versions
+                    .read()
+                    .await
+                    .get(&session.id)
+                    .copied()
+                    .unwrap_or(0);
+                let new_version = repo
+                    .save_session(session, version)
                     .await
                     .map_err(|e| OrchestratorError::PersistenceFailed(e.to_string()))?;
+                self.persistence_versions
+                    .write()
+                    .await
+                    .insert(session.id, new_version);
                 // Also persist any active invocation records.
                 for entry in &session.runbook.entries {
                     if let Some(ref inv) = entry.invocation {
@@ -5432,6 +5794,18 @@ impl ReplOrchestratorV2 {
         match response {
             crate::runbook::OrchestratorResponse::Compiled(summary) => {
                 entry.compiled_runbook_id = Some(summary.compiled_runbook_id);
+                if let Some(ref runbook) = summary.compiled_runbook {
+                    if let Some(first_step) = runbook.steps.first() {
+                        entry.execution_mode = match first_step.execution_mode {
+                            CompiledExecutionMode::Sync => ExecutionMode::Sync,
+                            CompiledExecutionMode::Durable => ExecutionMode::Durable,
+                            CompiledExecutionMode::HumanGate => ExecutionMode::HumanGate,
+                        };
+                    }
+                }
+                if self.orchestrated_verbs.contains(&entry.verb) {
+                    entry.execution_mode = ExecutionMode::Durable;
+                }
                 // Store the compiled runbook artifact so execute_runbook() can
                 // retrieve it by ID. INV-3: no execution without a stored artifact.
                 if let Some(ref store) = self.runbook_store {
@@ -6132,6 +6506,19 @@ definition_of_done:
     }
 
     #[tokio::test]
+    async fn test_session_ttl_eviction_on_access() {
+        let orch = make_orchestrator().with_session_ttl(chrono::Duration::seconds(1));
+        let mut session = ReplSessionV2::new();
+        let id = session.id;
+        session.last_active_at = chrono::Utc::now() - chrono::Duration::seconds(5);
+        orch.restore_session(session).await;
+
+        let loaded = orch.get_session(id).await;
+        assert!(loaded.is_none());
+        assert!(!orch.sessions.read().await.contains_key(&id));
+    }
+
+    #[tokio::test]
     async fn test_scope_gate_requires_scope() {
         let orch = make_orchestrator();
         let id = orch.create_session().await;
@@ -6658,6 +7045,7 @@ definition_of_done:
                 "(cbu.create :name \"test\")",
                 Uuid::new_v4(),
                 Uuid::new_v4(),
+                None,
             )
             .await;
         match result {
@@ -6674,7 +7062,7 @@ definition_of_done:
         let entry_id = Uuid::new_v4();
         let runbook_id = Uuid::new_v4();
         let result = executor
-            .execute_v2("(doc.solicit :park)", entry_id, runbook_id)
+            .execute_v2("(doc.solicit :park)", entry_id, runbook_id, None)
             .await;
         match result {
             DslExecutionOutcome::Parked {
@@ -6698,6 +7086,7 @@ definition_of_done:
                 "(cbu.create :name \"test\")",
                 Uuid::new_v4(),
                 Uuid::new_v4(),
+                None,
             )
             .await;
         match result {

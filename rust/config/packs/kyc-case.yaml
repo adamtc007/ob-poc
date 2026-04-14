@@ -5,9 +5,10 @@ id: kyc-case
 name: KYC Case
 version: "1.0"
 description: >
-  Open and manage a KYC case for a client entity. Guides through
-  UBO discovery, document solicitation, screening, and case approval.
-  Supports new cases and renewal reviews.
+  Open a KYC case for a client entity. This pack currently focuses on the
+  durable case creation boundary so the case can be handed into the BPMN
+  runtime cleanly. Follow-on workstream, screening, and document steps are
+  handled after the case exists.
 
 invocation_phrases:
   - "open a KYC case"
@@ -30,14 +31,18 @@ workspaces:
   - on_boarding
 
 allowed_verbs:
-  - kyc.create-case
+  - kyc-case.create
   - kyc.assign-reviewer
   - kyc.submit-case
   - kyc.approve-case
   - ubo.discover
+  - ownership.compute
   - document.solicit
   - document.solicit-batch
   - screening.run
+  - screening.sanctions
+  - screening.pep
+  - screening.adverse-media
   # KYC/screening/evidence macros
   - case.add-party
   - case.approve
@@ -136,56 +141,25 @@ optional_questions:
 
 stop_rules:
   - "KYC case created"
-  - "UBO discovery complete"
-  - "Required documents solicited"
-  - "Screening run"
 
 templates:
   - template_id: new-kyc-case
-    when_to_use: "New KYC case with UBO discovery and document solicitation"
+    when_to_use: "Create a new KYC case and hand it to the durable workflow"
     steps:
-      - verb: kyc.create-case
+      - verb: kyc-case.create
         args:
-          entity_ref: "{answers.entity_name}"
-          case_type: "new"
-          risk_rating: "{answers.risk_rating}"
-
-      - verb: ubo.discover
-        args:
-          entity_ref: "{answers.entity_name}"
-
-      - verb: document.solicit-batch
-        args:
-          entity_ref: "{answers.entity_name}"
-          doc_types: "{answers.document_types}"
-
-      - verb: screening.run
-        args:
-          entity_ref: "{answers.entity_name}"
-
-      - verb: kyc.assign-reviewer
-        when: "reviewer"
-        args:
-          reviewer_ref: "{answers.reviewer}"
+          cbu-id: "{answers.entity_name_id}"
+          client-group-id: "{context.client_group_id}"
+          case-type: "NEW_CLIENT"
 
   - template_id: renewal-kyc-case
-    when_to_use: "KYC renewal review for existing entity"
+    when_to_use: "Create a renewal KYC case and hand it to the durable workflow"
     steps:
-      - verb: kyc.create-case
+      - verb: kyc-case.create
         args:
-          entity_ref: "{answers.entity_name}"
-          case_type: "renewal"
-          risk_rating: "{answers.risk_rating}"
-
-      - verb: screening.run
-        args:
-          entity_ref: "{answers.entity_name}"
-
-      - verb: document.solicit-batch
-        when: "document_types"
-        args:
-          entity_ref: "{answers.entity_name}"
-          doc_types: "{answers.document_types}"
+          cbu-id: "{answers.entity_name_id}"
+          client-group-id: "{context.client_group_id}"
+          case-type: "RENEWAL"
 
 pack_summary_template: >
   KYC {{answers.case_type}} case for {{answers.entity_name}},

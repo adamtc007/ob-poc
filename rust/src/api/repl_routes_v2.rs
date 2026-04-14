@@ -594,16 +594,6 @@ pub(crate) async fn input_v2(
     }
 }
 
-/// POST /api/repl/v2/session/:id/input (legacy) — hard-blocked in unified-input cutover.
-async fn input_v2_legacy_blocked() -> (StatusCode, Json<serde_json::Value>) {
-    (
-        StatusCode::GONE,
-        Json(serde_json::json!({
-            "error": "Legacy endpoint removed. Use POST /api/session/:id/input with kind=repl_v2."
-        })),
-    )
-}
-
 /// DELETE /api/repl/v2/session/:id — Delete V2 session.
 async fn delete_session_v2(
     State(state): State<ReplV2RouteState>,
@@ -842,7 +832,7 @@ pub fn router() -> Router<ReplV2RouteState> {
             "/session/:id",
             get(get_session_v2).delete(delete_session_v2),
         )
-        .route("/session/:id/input", post(input_v2_legacy_blocked))
+        .route("/session/:id/input", post(input_v2))
         .route("/signal", post(signal_v2))
 }
 

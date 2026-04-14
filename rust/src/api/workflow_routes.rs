@@ -178,7 +178,9 @@ pub struct CreateDocumentRequest {
 /// Response after creating a document
 #[derive(Debug, Serialize)]
 pub struct CreateDocumentResponse {
+    pub requirement_id: Option<Uuid>,
     pub document_id: Uuid,
+    pub document_type_id: Option<Uuid>,
     pub document_type: String,
     pub created_at: DateTime<Utc>,
 }
@@ -214,6 +216,17 @@ async fn create_document(
     .execute(&state.pool)
     .await?;
 
+    let document_type_id = sqlx::query_scalar(
+        r#"
+        SELECT type_id
+        FROM "ob-poc".document_types
+        WHERE type_code = $1
+        "#,
+    )
+    .bind(&req.document_type)
+    .fetch_optional(&state.pool)
+    .await?;
+
     // Update requirement if linked
     if let Some(req_id) = req.requirement_id {
         sqlx::query(
@@ -230,7 +243,9 @@ async fn create_document(
     }
 
     Ok(Json(CreateDocumentResponse {
+        requirement_id: req.requirement_id,
         document_id,
+        document_type_id,
         document_type: req.document_type,
         created_at,
     }))
@@ -254,7 +269,9 @@ pub struct CreateVersionRequest {
 pub struct CreateVersionResponse {
     pub version_id: Uuid,
     pub document_id: Uuid,
+    pub document_type_id: Option<Uuid>,
     pub version_no: i32,
+    pub blob_ref: Option<String>,
     pub cargo_ref: String,
     pub created_at: DateTime<Utc>,
 }
@@ -302,6 +319,19 @@ async fn create_version(
 
     let version_no: i32 = version_row.try_get("version_no").unwrap_or(1);
 
+    let document_type_id = sqlx::query_scalar(
+        r#"
+        SELECT dt.type_id
+        FROM "ob-poc".documents d
+        LEFT JOIN "ob-poc".document_types dt
+          ON dt.type_code = d.document_type
+        WHERE d.document_id = $1
+        "#,
+    )
+    .bind(document_id)
+    .fetch_optional(&state.pool)
+    .await?;
+
     sqlx::query(
         r#"
         INSERT INTO "ob-poc".document_versions
@@ -332,7 +362,9 @@ async fn create_version(
     Ok(Json(CreateVersionResponse {
         version_id,
         document_id,
+        document_type_id,
         version_no,
+        blob_ref: req.blob_ref,
         cargo_ref: cargo_ref.to_uri(),
         created_at,
     }))

@@ -488,6 +488,7 @@ mod tests {
             tenant_id: "default".to_string(),
             domain_payload: payload.to_string().into(),
             domain_payload_hash: hash,
+            session_stack: ob_poc_types::session_stack::SessionStackState::default(),
             flags: BTreeMap::from([(0, Value::Bool(true)), (1, Value::I64(42))]),
             counters: BTreeMap::new(),
             join_expected: BTreeMap::new(),
@@ -521,6 +522,56 @@ mod tests {
         assert_eq!(loaded.flags[&0], Value::Bool(true));
         assert_eq!(loaded.flags[&1], Value::I64(42));
         assert_eq!(loaded.state, ProcessState::Running);
+    }
+
+    /// A2.T1b: Saving an instance copies session_stack by value.
+    #[tokio::test]
+    async fn test_instance_session_stack_is_not_aliased() {
+        let store = MemoryStore::new();
+        let id = Uuid::now_v7();
+        let original_session_id = Uuid::new_v4();
+        let original_scope_id = Uuid::new_v4();
+        let mutated_session_id = Uuid::new_v4();
+        let mutated_scope_id = Uuid::new_v4();
+
+        let mut inst = make_instance(id);
+        inst.session_stack = ob_poc_types::session_stack::SessionStackState {
+            session_id: original_session_id,
+            scope: Some(ob_poc_types::session_stack::SessionScopeState {
+                client_group_id: original_scope_id,
+                client_group_name: Some("Original".to_string()),
+            }),
+            active_workspace: Some(ob_poc_types::session_stack::SessionWorkspaceKind::Cbu),
+            workspace_stack: Vec::new(),
+            trace_sequence: 7,
+        };
+
+        store.save_instance(&inst).await.unwrap();
+
+        inst.session_stack.session_id = mutated_session_id;
+        inst.session_stack.scope = Some(ob_poc_types::session_stack::SessionScopeState {
+            client_group_id: mutated_scope_id,
+            client_group_name: Some("Mutated".to_string()),
+        });
+        inst.session_stack.active_workspace =
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Deal);
+        inst.session_stack.trace_sequence = 99;
+
+        let loaded = store.load_instance(id).await.unwrap().unwrap();
+        assert_eq!(loaded.session_stack.session_id, original_session_id);
+        assert_eq!(
+            loaded
+                .session_stack
+                .scope
+                .as_ref()
+                .map(|scope| scope.client_group_id),
+            Some(original_scope_id)
+        );
+        assert_eq!(
+            loaded.session_stack.active_workspace,
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Cbu)
+        );
+        assert_eq!(loaded.session_stack.trace_sequence, 7);
     }
 
     /// A2.T2: Save/load/delete fiber round-trip (including WaitState::Job)
@@ -591,6 +642,7 @@ mod tests {
     async fn test_job_queue() {
         let store = MemoryStore::new();
         let task_type = "create_case".to_string();
+        let session_id = Uuid::new_v4();
 
         for i in 0..3 {
             let instance_id = Uuid::now_v7();
@@ -603,6 +655,10 @@ mod tests {
                     service_task_id: format!("task-{i}"),
                     domain_payload: "{}".to_string(),
                     domain_payload_hash: [0u8; 32],
+                    session_stack: ob_poc_types::session_stack::SessionStackState {
+                        session_id,
+                        ..Default::default()
+                    },
                     orch_flags: BTreeMap::new(),
                     retries_remaining: 3,
                 })
@@ -618,6 +674,7 @@ mod tests {
         assert_eq!(batch1.len(), 2);
         assert_eq!(batch1[0].job_key, "job-0");
         assert_eq!(batch1[1].job_key, "job-1");
+        assert!(batch1.iter().all(|job| job.session_stack.session_id == session_id));
 
         // Ack one
         store.ack_job("job-0").await.unwrap();
@@ -629,6 +686,55 @@ mod tests {
             .unwrap();
         assert_eq!(batch2.len(), 1);
         assert_eq!(batch2[0].job_key, "job-2");
+        assert_eq!(batch2[0].session_stack.session_id, session_id);
+    }
+
+    /// A2.T5b: Enqueueing a job copies session_stack by value.
+    #[tokio::test]
+    async fn test_job_queue_session_stack_is_not_aliased() {
+        let store = MemoryStore::new();
+        let task_type = "create_case".to_string();
+        let instance_id = Uuid::now_v7();
+        let original_session_id = Uuid::new_v4();
+        let mutated_session_id = Uuid::new_v4();
+
+        store.save_instance(&make_instance(instance_id)).await.unwrap();
+
+        let mut activation = JobActivation {
+            job_key: "job-copy-test".to_string(),
+            process_instance_id: instance_id,
+            task_type: task_type.clone(),
+            service_task_id: "task-copy-test".to_string(),
+            domain_payload: "{}".to_string(),
+            domain_payload_hash: [0u8; 32],
+            session_stack: ob_poc_types::session_stack::SessionStackState {
+                session_id: original_session_id,
+                active_workspace: Some(ob_poc_types::session_stack::SessionWorkspaceKind::Kyc),
+                trace_sequence: 11,
+                ..Default::default()
+            },
+            orch_flags: BTreeMap::new(),
+            retries_remaining: 3,
+        };
+
+        store.enqueue_job(&activation).await.unwrap();
+
+        activation.session_stack.session_id = mutated_session_id;
+        activation.session_stack.active_workspace =
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Deal);
+        activation.session_stack.trace_sequence = 42;
+
+        let batch = store
+            .dequeue_jobs(std::slice::from_ref(&task_type), 1, "default")
+            .await
+            .unwrap();
+        assert_eq!(batch.len(), 1);
+        assert_eq!(batch[0].session_stack.session_id, original_session_id);
+        assert_eq!(
+            batch[0].session_stack.active_workspace,
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Kyc)
+        );
+        assert_eq!(batch[0].session_stack.trace_sequence, 11);
     }
 
     /// A2.T6: Event log: append 5 events, read from seq 3 returns 3 events

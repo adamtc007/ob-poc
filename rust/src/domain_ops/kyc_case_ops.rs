@@ -34,8 +34,10 @@ use super::CustomOperation;
 pub struct KycCaseCreateResult {
     pub case_id: Uuid,
     pub case_ref: String,
+    pub cbu_id: Uuid,
     pub deal_id: Option<Uuid>,
     pub client_group_id: Option<Uuid>,
+    pub case_type: String,
     pub status: String,
 }
 
@@ -157,8 +159,10 @@ impl CustomOperation for KycCaseCreateOp {
         let result = KycCaseCreateResult {
             case_id,
             case_ref,
+            cbu_id,
             deal_id,
             client_group_id,
+            case_type,
             status: "INTAKE".to_string(),
         };
 
@@ -203,8 +207,10 @@ mod tests {
         let result = KycCaseCreateResult {
             case_id: Uuid::new_v4(),
             case_ref: "KYC-2026-0042".to_string(),
+            cbu_id: Uuid::new_v4(),
             deal_id: Some(Uuid::new_v4()),
             client_group_id: Some(Uuid::new_v4()),
+            case_type: "NEW_CLIENT".to_string(),
             status: "INTAKE".to_string(),
         };
 
@@ -223,6 +229,8 @@ mod tests {
             value["client_group_id"].is_string(),
             "client_group_id should serialize as string when Some"
         );
+        assert!(value["cbu_id"].is_string(), "cbu_id should serialize as string");
+        assert_eq!(value["case_type"], "NEW_CLIENT");
     }
 
     #[test]
@@ -230,8 +238,10 @@ mod tests {
         let result = KycCaseCreateResult {
             case_id: Uuid::new_v4(),
             case_ref: "KYC-2026-0001".to_string(),
+            cbu_id: Uuid::new_v4(),
             deal_id: None,
             client_group_id: None,
+            case_type: "REMEDIATION".to_string(),
             status: "INTAKE".to_string(),
         };
 
@@ -251,6 +261,7 @@ mod tests {
         let deserialized: KycCaseCreateResult =
             serde_json::from_value(value).expect("deserialization should succeed");
         assert_eq!(deserialized.case_ref, "KYC-2026-0001");
+        assert_eq!(deserialized.case_type, "REMEDIATION");
         assert!(deserialized.deal_id.is_none());
         assert!(deserialized.client_group_id.is_none());
     }

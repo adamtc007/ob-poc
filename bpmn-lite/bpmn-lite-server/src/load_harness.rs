@@ -499,6 +499,7 @@ async fn start_instances(
                 bytecode_version: fixture.bytecode_version.clone(),
                 domain_payload: payload,
                 domain_payload_hash: hash.to_vec(),
+                session_stack_json: String::new(),
                 orch_flags: Default::default(),
                 correlation_id: format!("{}-{}", fixture.fixture.key, idx),
             })

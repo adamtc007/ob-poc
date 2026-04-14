@@ -24,11 +24,20 @@ use crate::dsl_v2::{compile, parse_program, ExecutionContext, ExecutionResult};
 /// Lifecycle: parse → compile → execute → collect results as JSON.
 pub struct RealDslExecutor {
     pool: PgPool,
+    allow_durable_direct: bool,
 }
 
 impl RealDslExecutor {
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            allow_durable_direct: false,
+        }
+    }
+
+    pub fn allow_durable_direct(mut self) -> Self {
+        self.allow_durable_direct = true;
+        self
     }
 }
 
@@ -42,7 +51,11 @@ impl DslExecutor for RealDslExecutor {
         let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;
 
         // 3. Build execution context.
-        let mut ctx = ExecutionContext::new();
+        let mut ctx = if self.allow_durable_direct {
+            ExecutionContext::new().allow_durable_direct()
+        } else {
+            ExecutionContext::new()
+        };
         ctx.execution_id = Uuid::new_v4();
 
         // 4. Execute via the real dsl_v2 executor.

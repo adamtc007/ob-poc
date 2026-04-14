@@ -6,6 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
+use ob_poc_types::session_stack::SessionStackState;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -175,6 +176,7 @@ impl CustomOperation for BpmnStartOp {
                 bytecode_version: Vec::new(), // Service resolves by process_key
                 domain_payload: canonical,
                 domain_payload_hash: hash,
+                session_stack: SessionStackState::default(),
                 orch_flags: std::collections::HashMap::new(),
                 correlation_id: Uuid::new_v4(),
             })

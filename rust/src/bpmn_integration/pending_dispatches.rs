@@ -28,35 +28,38 @@ impl PendingDispatchStore {
     /// Insert a pending dispatch. Returns `false` if a pending dispatch
     /// with the same payload_hash already exists (idempotent).
     pub async fn insert(&self, dispatch: &PendingDispatch) -> Result<bool> {
-        let result = sqlx::query!(
+        let session_stack = serde_json::to_value(&dispatch.session_stack)
+            .context("Failed to serialize pending dispatch session_stack")?;
+        let result = sqlx::query(
             r#"
             INSERT INTO "ob-poc".bpmn_pending_dispatches
                 (dispatch_id, payload_hash, verb_fqn, process_key,
-                 bytecode_version, domain_payload, dsl_source,
+                 bytecode_version, domain_payload, session_stack, dsl_source,
                  entry_id, runbook_id, correlation_id, correlation_key,
                  domain_correlation_key, status, attempts, last_error,
                  created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             ON CONFLICT (payload_hash) WHERE status = 'pending'
             DO NOTHING
             "#,
-            dispatch.dispatch_id,
-            dispatch.payload_hash,
-            dispatch.verb_fqn,
-            dispatch.process_key,
-            dispatch.bytecode_version,
-            dispatch.domain_payload,
-            dispatch.dsl_source,
-            dispatch.entry_id,
-            dispatch.runbook_id,
-            dispatch.correlation_id,
-            dispatch.correlation_key,
-            dispatch.domain_correlation_key.as_deref(),
-            dispatch.status.as_str(),
-            dispatch.attempts,
-            dispatch.last_error.as_deref(),
-            dispatch.created_at,
         )
+        .bind(dispatch.dispatch_id)
+        .bind(&dispatch.payload_hash)
+        .bind(&dispatch.verb_fqn)
+        .bind(&dispatch.process_key)
+        .bind(&dispatch.bytecode_version)
+        .bind(&dispatch.domain_payload)
+        .bind(&session_stack)
+        .bind(&dispatch.dsl_source)
+        .bind(dispatch.entry_id)
+        .bind(dispatch.runbook_id)
+        .bind(dispatch.correlation_id)
+        .bind(&dispatch.correlation_key)
+        .bind(dispatch.domain_correlation_key.as_deref())
+        .bind(dispatch.status.as_str())
+        .bind(dispatch.attempts)
+        .bind(dispatch.last_error.as_deref())
+        .bind(dispatch.created_at)
         .execute(&self.pool)
         .await
         .context("Failed to insert bpmn_pending_dispatch")?;
@@ -75,10 +78,10 @@ impl PendingDispatchStore {
     ) -> Result<Vec<PendingDispatch>> {
         let backoff_secs = backoff.as_secs() as i32;
 
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             SELECT dispatch_id, payload_hash, verb_fqn, process_key,
-                   bytecode_version, domain_payload, dsl_source,
+                   bytecode_version, domain_payload, session_stack, dsl_source,
                    entry_id, runbook_id, correlation_id, correlation_key,
                    domain_correlation_key, status, attempts, last_error,
                    created_at, last_attempted_at, dispatched_at
@@ -90,37 +93,46 @@ impl PendingDispatchStore {
             LIMIT $2
             FOR UPDATE SKIP LOCKED
             "#,
-            backoff_secs as f64,
-            limit as i64,
         )
+        .bind(backoff_secs as f64)
+        .bind(limit as i64)
         .fetch_all(&self.pool)
         .await
         .context("Failed to claim pending dispatches")?;
 
         Ok(rows
             .into_iter()
-            .map(|r| PendingDispatch {
-                dispatch_id: r.dispatch_id,
-                payload_hash: r.payload_hash,
-                verb_fqn: r.verb_fqn,
-                process_key: r.process_key,
-                bytecode_version: r.bytecode_version,
-                domain_payload: r.domain_payload,
-                dsl_source: r.dsl_source,
-                entry_id: r.entry_id,
-                runbook_id: r.runbook_id,
-                correlation_id: r.correlation_id,
-                correlation_key: r.correlation_key,
-                domain_correlation_key: r.domain_correlation_key,
-                status: PendingDispatchStatus::parse(&r.status)
-                    .unwrap_or(PendingDispatchStatus::Pending),
-                attempts: r.attempts,
-                last_error: r.last_error,
-                created_at: r.created_at,
-                last_attempted_at: r.last_attempted_at,
-                dispatched_at: r.dispatched_at,
+            .map(|r| {
+                use sqlx::Row;
+                let status = r.get::<String, _>("status");
+                let session_stack = serde_json::from_value(
+                    r.get::<serde_json::Value, _>("session_stack"),
+                )
+                .context("Failed to deserialize pending dispatch session_stack")?;
+                Ok(PendingDispatch {
+                    dispatch_id: r.get("dispatch_id"),
+                    payload_hash: r.get("payload_hash"),
+                    verb_fqn: r.get("verb_fqn"),
+                    process_key: r.get("process_key"),
+                    bytecode_version: r.get("bytecode_version"),
+                    domain_payload: r.get("domain_payload"),
+                    session_stack,
+                    dsl_source: r.get("dsl_source"),
+                    entry_id: r.get("entry_id"),
+                    runbook_id: r.get("runbook_id"),
+                    correlation_id: r.get("correlation_id"),
+                    correlation_key: r.get("correlation_key"),
+                    domain_correlation_key: r.get("domain_correlation_key"),
+                    status: PendingDispatchStatus::parse(&status)
+                        .unwrap_or(PendingDispatchStatus::Pending),
+                    attempts: r.get("attempts"),
+                    last_error: r.get("last_error"),
+                    created_at: r.get("created_at"),
+                    last_attempted_at: r.get("last_attempted_at"),
+                    dispatched_at: r.get("dispatched_at"),
+                })
             })
-            .collect())
+            .collect::<Result<Vec<_>>>()?)
     }
 
     /// Mark a dispatch as successfully sent to bpmn-lite.
@@ -173,10 +185,10 @@ impl PendingDispatchStore {
 
     /// List all pending dispatches (for monitoring).
     pub async fn list_pending(&self) -> Result<Vec<PendingDispatch>> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             SELECT dispatch_id, payload_hash, verb_fqn, process_key,
-                   bytecode_version, domain_payload, dsl_source,
+                   bytecode_version, domain_payload, session_stack, dsl_source,
                    entry_id, runbook_id, correlation_id, correlation_key,
                    domain_correlation_key, status, attempts, last_error,
                    created_at, last_attempted_at, dispatched_at
@@ -191,27 +203,36 @@ impl PendingDispatchStore {
 
         Ok(rows
             .into_iter()
-            .map(|r| PendingDispatch {
-                dispatch_id: r.dispatch_id,
-                payload_hash: r.payload_hash,
-                verb_fqn: r.verb_fqn,
-                process_key: r.process_key,
-                bytecode_version: r.bytecode_version,
-                domain_payload: r.domain_payload,
-                dsl_source: r.dsl_source,
-                entry_id: r.entry_id,
-                runbook_id: r.runbook_id,
-                correlation_id: r.correlation_id,
-                correlation_key: r.correlation_key,
-                domain_correlation_key: r.domain_correlation_key,
-                status: PendingDispatchStatus::parse(&r.status)
-                    .unwrap_or(PendingDispatchStatus::Pending),
-                attempts: r.attempts,
-                last_error: r.last_error,
-                created_at: r.created_at,
-                last_attempted_at: r.last_attempted_at,
-                dispatched_at: r.dispatched_at,
+            .map(|r| {
+                use sqlx::Row;
+                let status = r.get::<String, _>("status");
+                let session_stack = serde_json::from_value(
+                    r.get::<serde_json::Value, _>("session_stack"),
+                )
+                .context("Failed to deserialize pending dispatch session_stack")?;
+                Ok(PendingDispatch {
+                    dispatch_id: r.get("dispatch_id"),
+                    payload_hash: r.get("payload_hash"),
+                    verb_fqn: r.get("verb_fqn"),
+                    process_key: r.get("process_key"),
+                    bytecode_version: r.get("bytecode_version"),
+                    domain_payload: r.get("domain_payload"),
+                    session_stack,
+                    dsl_source: r.get("dsl_source"),
+                    entry_id: r.get("entry_id"),
+                    runbook_id: r.get("runbook_id"),
+                    correlation_id: r.get("correlation_id"),
+                    correlation_key: r.get("correlation_key"),
+                    domain_correlation_key: r.get("domain_correlation_key"),
+                    status: PendingDispatchStatus::parse(&status)
+                        .unwrap_or(PendingDispatchStatus::Pending),
+                    attempts: r.get("attempts"),
+                    last_error: r.get("last_error"),
+                    created_at: r.get("created_at"),
+                    last_attempted_at: r.get("last_attempted_at"),
+                    dispatched_at: r.get("dispatched_at"),
+                })
             })
-            .collect())
+            .collect::<Result<Vec<_>>>()?)
     }
 }

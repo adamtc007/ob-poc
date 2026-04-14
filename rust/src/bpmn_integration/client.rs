@@ -4,6 +4,7 @@
 //! Connection is lazy by default (no network call until first RPC).
 
 use anyhow::{anyhow, Context, Result};
+use ob_poc_types::session_stack::SessionStackState;
 use std::collections::HashMap;
 use tonic::transport::Channel;
 use uuid::Uuid;
@@ -48,6 +49,7 @@ pub struct StartProcessRequest {
     pub bytecode_version: Vec<u8>,
     pub domain_payload: String,
     pub domain_payload_hash: Vec<u8>,
+    pub session_stack: SessionStackState,
     pub orch_flags: HashMap<String, OrchestratorFlag>,
     pub correlation_id: Uuid,
 }
@@ -95,6 +97,7 @@ pub struct JobActivation {
     pub service_task_id: String,
     pub domain_payload: String,
     pub domain_payload_hash: Vec<u8>,
+    pub session_stack: SessionStackState,
     pub orch_flags: HashMap<String, OrchestratorFlag>,
     pub retries_remaining: i32,
 }
@@ -209,12 +212,15 @@ impl BpmnLiteConnection {
     /// Start a new process instance. Returns the process instance ID.
     pub async fn start_process(&self, req: StartProcessRequest) -> Result<Uuid> {
         let mut client = self.client.clone();
+        let session_stack_json = serde_json::to_string(&req.session_stack)
+            .context("Failed to serialize session_stack for StartProcess RPC")?;
         let resp = client
             .start_process(proto::StartRequest {
                 process_key: req.process_key,
                 bytecode_version: req.bytecode_version,
                 domain_payload: req.domain_payload,
                 domain_payload_hash: req.domain_payload_hash,
+                session_stack_json,
                 orch_flags: to_proto_flags(&req.orch_flags),
                 correlation_id: req.correlation_id.to_string(),
             })
@@ -326,6 +332,12 @@ impl BpmnLiteConnection {
         let mut jobs = Vec::new();
 
         while let Some(msg) = stream.message().await.context("Job stream error")? {
+            let session_stack = if msg.session_stack_json.is_empty() {
+                SessionStackState::default()
+            } else {
+                serde_json::from_str(&msg.session_stack_json)
+                    .context("Failed to deserialize session_stack from JobActivationMsg")?
+            };
             jobs.push(JobActivation {
                 job_key: msg.job_key,
                 process_instance_id: msg.process_instance_id,
@@ -333,6 +345,7 @@ impl BpmnLiteConnection {
                 service_task_id: msg.service_task_id,
                 domain_payload: msg.domain_payload,
                 domain_payload_hash: msg.domain_payload_hash,
+                session_stack,
                 orch_flags: from_proto_flags(msg.orch_flags),
                 retries_remaining: msg.retries_remaining,
             });

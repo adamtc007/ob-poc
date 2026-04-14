@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use uuid::Uuid;
+use ob_poc_types::session_stack::SessionStackState;
 
 // ─── Scalar aliases ───────────────────────────────────────────
 
@@ -301,6 +302,8 @@ pub struct ProcessInstance {
     pub domain_payload: Arc<str>,
     /// SHA-256 of domain_payload.
     pub domain_payload_hash: [u8; 32],
+    /// Canonical session stack copied by value from ob-poc when BPMN starts.
+    pub session_stack: SessionStackState,
     /// Orchestration flags — flat primitives for branching.
     pub flags: BTreeMap<FlagKey, Value>,
     /// Bounded loop counters — separate from orchestration flags.
@@ -324,6 +327,7 @@ pub struct JobActivation {
     pub service_task_id: String,
     pub domain_payload: String,
     pub domain_payload_hash: [u8; 32],
+    pub session_stack: SessionStackState,
     pub orch_flags: BTreeMap<String, Value>,
     pub retries_remaining: u32,
 }

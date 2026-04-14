@@ -497,6 +497,7 @@ impl CustomOperation for TemplateBatchOp {
             pending_deal_id: None,
             pending_deal_name: None,
             cbu_scope_dirty: false,
+            allow_durable_direct: ctx.allow_durable_direct,
         };
 
         // 10. Create and run BatchExecutor

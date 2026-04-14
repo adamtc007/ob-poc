@@ -1,8 +1,30 @@
 # Session & Visualization Architecture
 
-> **Status:** ✅ Complete
-> **Last Updated:** 2026-01-18
+> **Status:** ✅ Implemented, with canonical session-stack projection
+> **Last Updated:** 2026-04-14
 > **Related:** CLAUDE.md
+
+## 2026-04 Update
+
+The active implementation is now centered on a canonical copy-by-value
+`SessionStackState` shared between ob-poc and BPMN-lite.
+
+- `ReplSessionV2` remains the canonical interactive session.
+- The observatory exposes `GET /api/observatory/session/:id/session-stack-graph`.
+- The UI renders a `Session Stack` tab from that canonical projection.
+- BPMN-lite persists its own independent `ProcessInstance.session_stack`.
+- The REPL copies the session stack into BPMN-lite only when a BPMN-routed verb
+  is dispatched.
+
+This means the older "session = set of CBUs" framing below is no longer the
+whole story. It still describes one important projection of session scope, but
+the durable runtime architecture now includes:
+
+- scope
+- active workspace
+- workspace stack
+- trace sequence
+- copy-by-value BPMN bridge state
 
 ---
 
@@ -382,4 +404,3 @@ Pending: Add CUSTODY product to 8 CBUs
 ; Navigate back
 (session.back)
 ```
-

@@ -58,6 +58,10 @@ impl SessionRepositoryV2 {
             "runbook_plan": session.runbook_plan,
             "runbook_plan_cursor": session.runbook_plan_cursor,
             "execution_log": session.execution_log,
+            "session_stack": session.session_stack,
+            "bindings": session.bindings,
+            "cbu_ids": session.cbu_ids,
+            "name": session.name,
         });
 
         let new_version = version + 1;
@@ -290,6 +294,15 @@ impl SessionRepositoryV2 {
                             .unwrap_or_else(|| serde_json::json!([])),
                     )
                     .context("Failed to deserialize execution_log")?,
+                    session_stack: serde_json::from_value(
+                        extended_state
+                            .get("session_stack")
+                            .cloned()
+                            .unwrap_or_else(|| serde_json::json!({
+                                "session_id": session_id,
+                            })),
+                    )
+                    .context("Failed to deserialize session_stack")?,
                     bindings: serde_json::from_value(
                         extended_state
                             .get("bindings")
@@ -463,5 +476,79 @@ fn runbook_plan_status_name(
         crate::runbook::plan_types::RunbookPlanStatus::Completed { .. } => "completed",
         crate::runbook::plan_types::RunbookPlanStatus::Failed { .. } => "failed",
         crate::runbook::plan_types::RunbookPlanStatus::Cancelled => "cancelled",
+    }
+}
+
+#[cfg(all(test, feature = "database"))]
+mod tests {
+    use super::*;
+
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_save_load_preserves_bindings_cbu_ids_name(pool: PgPool) {
+        let repo = SessionRepositoryV2::new(pool);
+        let mut session = ReplSessionV2::new();
+        let cbu_a = Uuid::new_v4();
+        let cbu_b = Uuid::new_v4();
+
+        session
+            .bindings
+            .insert("@acme".into(), serde_json::json!("uuid-1"));
+        session
+            .bindings
+            .insert("@lux".into(), serde_json::json!("uuid-2"));
+        session.cbu_ids = vec![cbu_a, cbu_b];
+        session.name = Some("Allianz Global Investors".into());
+
+        let version = repo.save_session(&session, 0).await.unwrap();
+        assert_eq!(version, 1);
+
+        let (loaded, loaded_version) = repo.load_session(session.id).await.unwrap().unwrap();
+        assert_eq!(loaded_version, 1);
+        assert_eq!(loaded.bindings, session.bindings);
+        assert_eq!(loaded.cbu_ids, session.cbu_ids);
+        assert_eq!(loaded.name, session.name);
+    }
+
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_save_session_stack_is_not_aliased(pool: PgPool) {
+        let repo = SessionRepositoryV2::new(pool);
+        let mut session = ReplSessionV2::new();
+        let original_scope_id = Uuid::new_v4();
+        let mutated_scope_id = Uuid::new_v4();
+
+        session.session_stack.scope = Some(ob_poc_types::session_stack::SessionScopeState {
+            client_group_id: original_scope_id,
+            client_group_name: Some("Original".into()),
+        });
+        session.session_stack.active_workspace =
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Cbu);
+        session.session_stack.trace_sequence = 12;
+
+        let version = repo.save_session(&session, 0).await.unwrap();
+        assert_eq!(version, 1);
+
+        session.session_stack.scope = Some(ob_poc_types::session_stack::SessionScopeState {
+            client_group_id: mutated_scope_id,
+            client_group_name: Some("Mutated".into()),
+        });
+        session.session_stack.active_workspace =
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Deal);
+        session.session_stack.trace_sequence = 99;
+
+        let (loaded, loaded_version) = repo.load_session(session.id).await.unwrap().unwrap();
+        assert_eq!(loaded_version, 1);
+        assert_eq!(
+            loaded
+                .session_stack
+                .scope
+                .as_ref()
+                .map(|scope| scope.client_group_id),
+            Some(original_scope_id)
+        );
+        assert_eq!(
+            loaded.session_stack.active_workspace,
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Cbu)
+        );
+        assert_eq!(loaded.session_stack.trace_sequence, 12);
     }
 }

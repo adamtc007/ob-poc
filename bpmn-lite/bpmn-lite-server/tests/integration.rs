@@ -345,6 +345,7 @@ async fn test_grpc_smoke() {
             bytecode_version: compile_resp.bytecode_version,
             domain_payload: payload.to_string(),
             domain_payload_hash: hash.to_vec(),
+            session_stack_json: String::new(),
             orch_flags: Default::default(),
             correlation_id: "smoke-corr-1".to_string(),
         })

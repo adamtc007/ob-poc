@@ -28,6 +28,7 @@ use uuid::Uuid;
 use crate::dsl_v2::macros::{
     expand_macro_fixpoint, MacroExpansionError, MacroRegistry, MacroSchema, EXPANSION_LIMITS,
 };
+use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
 use crate::dsl_v2::{quick_validate, runtime_registry_arc, Severity};
 use crate::journey::pack_manager::EffectiveConstraints;
 use crate::session::unified::UnifiedSession;
@@ -282,6 +283,15 @@ fn compile_macro(
         .enumerate()
         .map(|(i, dsl)| {
             let verb = extract_verb_from_dsl(dsl);
+            let execution_mode = match runtime_registry().get_by_name(&verb) {
+                Some(runtime_verb) => match runtime_verb.behavior {
+                    RuntimeBehavior::Durable(_) => ExecutionMode::Durable,
+                    RuntimeBehavior::Crud(_)
+                    | RuntimeBehavior::Plugin(_)
+                    | RuntimeBehavior::GraphQuery(_) => ExecutionMode::Sync,
+                },
+                None => ExecutionMode::Sync,
+            };
             let snapshot_id = verb_snapshot_pins
                 .and_then(|pins| pins.get(&verb))
                 .map(|(_obj_id, snap_id)| *snap_id);
@@ -292,7 +302,7 @@ fn compile_macro(
                 dsl: dsl.clone(),
                 args: std::collections::BTreeMap::new(),
                 depends_on: vec![],
-                execution_mode: ExecutionMode::Sync,
+                execution_mode,
                 write_set: vec![], // Populated in Step 5
                 verb_contract_snapshot_id: snapshot_id,
             }
@@ -460,7 +470,15 @@ fn compile_primitive(
         dsl: dsl.clone(),
         args: args.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
         depends_on: vec![],
-        execution_mode: ExecutionMode::Sync,
+        execution_mode: match runtime_registry().get_by_name(fqn) {
+            Some(runtime_verb) => match runtime_verb.behavior {
+                RuntimeBehavior::Durable(_) => ExecutionMode::Durable,
+                RuntimeBehavior::Crud(_)
+                | RuntimeBehavior::Plugin(_)
+                | RuntimeBehavior::GraphQuery(_) => ExecutionMode::Sync,
+            },
+            None => ExecutionMode::Sync,
+        },
         write_set: derive_write_set(fqn, args, None).into_iter().collect(),
         verb_contract_snapshot_id: snapshot_id,
     };
@@ -593,11 +611,19 @@ fn validate_expanded_macro_output(
 fn build_dsl_from_args(fqn: &str, args: &BTreeMap<String, String>) -> String {
     let mut parts = vec![format!("({}", fqn)];
     for (name, value) in args {
-        if value.contains(' ') {
-            parts.push(format!(" :{} \"{}\"", name, value.replace('"', "\\\"")));
+        let rendered = if value.starts_with('@')
+            || value.starts_with('(')
+            || value.starts_with('[')
+            || value == "true"
+            || value == "false"
+            || value.parse::<i64>().is_ok()
+            || value.parse::<f64>().is_ok()
+        {
+            value.clone()
         } else {
-            parts.push(format!(" :{} {}", name, value));
-        }
+            format!("\"{}\"", value.replace('"', "\\\""))
+        };
+        parts.push(format!(" :{} {}", name, rendered));
     }
     parts.push(")".to_string());
     parts.join("")

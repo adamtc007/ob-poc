@@ -82,21 +82,23 @@ impl ProcessStore for PostgresProcessStore {
         let counters = serde_json::to_value(&instance.counters)?;
         let join_expected = serde_json::to_value(&instance.join_expected)?;
         let state = serde_json::to_value(&instance.state)?;
+        let session_stack = serde_json::to_value(&instance.session_stack)?;
         let created_at = epoch_ms_to_datetime(instance.created_at);
 
         sqlx::query(
             r#"
             INSERT INTO process_instances (
                 instance_id, tenant_id, process_key, bytecode_version, domain_payload,
-                domain_payload_hash, flags, counters, join_expected, state,
+                domain_payload_hash, session_stack, flags, counters, join_expected, state,
                 correlation_id, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT (instance_id) DO UPDATE SET
                 tenant_id = EXCLUDED.tenant_id,
                 process_key = EXCLUDED.process_key,
                 bytecode_version = EXCLUDED.bytecode_version,
                 domain_payload = EXCLUDED.domain_payload,
                 domain_payload_hash = EXCLUDED.domain_payload_hash,
+                session_stack = EXCLUDED.session_stack,
                 flags = EXCLUDED.flags,
                 counters = EXCLUDED.counters,
                 join_expected = EXCLUDED.join_expected,
@@ -108,8 +110,9 @@ impl ProcessStore for PostgresProcessStore {
         .bind(&instance.tenant_id)
         .bind(&instance.process_key)
         .bind(&instance.bytecode_version[..])
-        .bind(&instance.domain_payload)
+        .bind(instance.domain_payload.as_ref())
         .bind(&instance.domain_payload_hash[..])
+        .bind(&session_stack)
         .bind(&flags)
         .bind(&counters)
         .bind(&join_expected)
@@ -126,9 +129,9 @@ impl ProcessStore for PostgresProcessStore {
         let row = sqlx::query(
             r#"
             SELECT instance_id, tenant_id, process_key, bytecode_version, domain_payload,
-                   domain_payload_hash, flags, counters, join_expected, state,
+                   domain_payload_hash, session_stack, flags, counters, join_expected, state,
                    correlation_id,
-                   EXTRACT(EPOCH FROM created_at) * 1000 AS created_at_ms
+                   (EXTRACT(EPOCH FROM created_at) * 1000)::BIGINT AS created_at_ms
             FROM process_instances
             WHERE instance_id = $1
             "#,
@@ -143,11 +146,12 @@ impl ProcessStore for PostgresProcessStore {
                 use sqlx::Row;
                 let bytecode_version: Vec<u8> = row.get("bytecode_version");
                 let domain_payload_hash: Vec<u8> = row.get("domain_payload_hash");
+                let session_stack_json: serde_json::Value = row.get("session_stack");
                 let flags_json: serde_json::Value = row.get("flags");
                 let counters_json: serde_json::Value = row.get("counters");
                 let join_expected_json: serde_json::Value = row.get("join_expected");
                 let state_json: serde_json::Value = row.get("state");
-                let created_at_ms: f64 = row.get("created_at_ms");
+                let created_at_ms: i64 = row.get("created_at_ms");
 
                 Ok(Some(ProcessInstance {
                     instance_id: row.get("instance_id"),
@@ -156,12 +160,13 @@ impl ProcessStore for PostgresProcessStore {
                     bytecode_version: bytes_to_hash(bytecode_version)?,
                     domain_payload: Arc::<str>::from(row.get::<String, _>("domain_payload")),
                     domain_payload_hash: bytes_to_hash(domain_payload_hash)?,
+                    session_stack: serde_json::from_value(session_stack_json)?,
                     flags: serde_json::from_value(flags_json)?,
                     counters: serde_json::from_value(counters_json)?,
                     join_expected: serde_json::from_value(join_expected_json)?,
                     state: serde_json::from_value(state_json)?,
                     correlation_id: row.get("correlation_id"),
-                    created_at: created_at_ms as i64,
+                    created_at: created_at_ms,
                 }))
             }
         }
@@ -413,13 +418,14 @@ impl ProcessStore for PostgresProcessStore {
 
     async fn enqueue_job(&self, activation: &JobActivation) -> Result<()> {
         let orch_flags = serde_json::to_value(&activation.orch_flags)?;
+        let session_stack = serde_json::to_value(&activation.session_stack)?;
 
         sqlx::query(
             r#"
             INSERT INTO job_queue (
                 job_key, tenant_id, process_instance_id, task_type, service_task_id,
-                domain_payload, domain_payload_hash, orch_flags, retries_remaining
-            ) VALUES ($1, (SELECT tenant_id FROM process_instances WHERE instance_id = $2), $2, $3, $4, $5, $6, $7, $8)
+                domain_payload, domain_payload_hash, session_stack, orch_flags, retries_remaining
+            ) VALUES ($1, (SELECT tenant_id FROM process_instances WHERE instance_id = $2), $2, $3, $4, $5, $6, $7, $8, $9)
             "#,
         )
         .bind(&activation.job_key)
@@ -428,6 +434,7 @@ impl ProcessStore for PostgresProcessStore {
         .bind(&activation.service_task_id)
         .bind(&activation.domain_payload)
         .bind(&activation.domain_payload_hash[..])
+        .bind(&session_stack)
         .bind(&orch_flags)
         .bind(activation.retries_remaining as i32)
         .execute(&self.pool)
@@ -464,6 +471,7 @@ impl ProcessStore for PostgresProcessStore {
                       job_queue.service_task_id,
                       job_queue.domain_payload,
                       job_queue.domain_payload_hash,
+                      job_queue.session_stack,
                       job_queue.orch_flags,
                       job_queue.retries_remaining
             "#,
@@ -478,6 +486,7 @@ impl ProcessStore for PostgresProcessStore {
         for row in rows {
             use sqlx::Row;
             let hash: Vec<u8> = row.get("domain_payload_hash");
+            let session_stack_json: serde_json::Value = row.get("session_stack");
             let orch_flags_json: serde_json::Value = row.get("orch_flags");
             let retries: i32 = row.get("retries_remaining");
 
@@ -488,6 +497,7 @@ impl ProcessStore for PostgresProcessStore {
                 service_task_id: row.get("service_task_id"),
                 domain_payload: row.get("domain_payload"),
                 domain_payload_hash: bytes_to_hash(hash)?,
+                session_stack: serde_json::from_value(session_stack_json)?,
                 orch_flags: serde_json::from_value(orch_flags_json)?,
                 retries_remaining: retries as u32,
             });
@@ -769,8 +779,8 @@ impl ProcessStore for PostgresProcessStore {
             r#"
             SELECT incident_id, process_instance_id, fiber_id, service_task_id,
                    bytecode_addr, error_class, message, retry_count,
-                   EXTRACT(EPOCH FROM created_at) * 1000 AS created_at_ms,
-                   EXTRACT(EPOCH FROM resolved_at) * 1000 AS resolved_at_ms,
+                   (EXTRACT(EPOCH FROM created_at) * 1000)::BIGINT AS created_at_ms,
+                   (EXTRACT(EPOCH FROM resolved_at) * 1000)::BIGINT AS resolved_at_ms,
                    resolution
             FROM incidents
             WHERE process_instance_id = $1
@@ -787,8 +797,8 @@ impl ProcessStore for PostgresProcessStore {
             let bytecode_addr: i32 = row.get("bytecode_addr");
             let error_class_json: serde_json::Value = row.get("error_class");
             let retry_count: i32 = row.get("retry_count");
-            let created_at_ms: f64 = row.get("created_at_ms");
-            let resolved_at_ms: Option<f64> = row.get("resolved_at_ms");
+            let created_at_ms: i64 = row.get("created_at_ms");
+            let resolved_at_ms: Option<i64> = row.get("resolved_at_ms");
 
             incidents.push(Incident {
                 incident_id: row.get("incident_id"),
@@ -799,8 +809,8 @@ impl ProcessStore for PostgresProcessStore {
                 error_class: serde_json::from_value(error_class_json)?,
                 message: row.get("message"),
                 retry_count: retry_count as u32,
-                created_at: created_at_ms as i64,
-                resolved_at: resolved_at_ms.map(|ms| ms as i64),
+                created_at: created_at_ms,
+                resolved_at: resolved_at_ms,
                 resolution: row.get("resolution"),
             });
         }
@@ -822,22 +832,25 @@ impl ProcessStore for PostgresProcessStore {
         let counters = serde_json::to_value(&instance.counters)?;
         let join_expected = serde_json::to_value(&instance.join_expected)?;
         let state = serde_json::to_value(&instance.state)?;
+        let session_stack = serde_json::to_value(&instance.session_stack)?;
         let created_at = epoch_ms_to_datetime(instance.created_at);
 
         sqlx::query(
             r#"
             INSERT INTO process_instances (
-                instance_id, process_key, bytecode_version, domain_payload,
-                domain_payload_hash, flags, counters, join_expected, state,
+                instance_id, tenant_id, process_key, bytecode_version, domain_payload,
+                domain_payload_hash, session_stack, flags, counters, join_expected, state,
                 correlation_id, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             "#,
         )
         .bind(instance.instance_id)
+        .bind(&instance.tenant_id)
         .bind(&instance.process_key)
         .bind(&instance.bytecode_version[..])
-        .bind(&instance.domain_payload)
+        .bind(instance.domain_payload.as_ref())
         .bind(&instance.domain_payload_hash[..])
+        .bind(&session_stack)
         .bind(&flags)
         .bind(&counters)
         .bind(&join_expected)
@@ -910,20 +923,23 @@ impl ProcessStore for PostgresProcessStore {
         let counters = serde_json::to_value(&instance.counters)?;
         let join_expected = serde_json::to_value(&instance.join_expected)?;
         let state = serde_json::to_value(&instance.state)?;
+        let session_stack = serde_json::to_value(&instance.session_stack)?;
         let created_at = epoch_ms_to_datetime(instance.created_at);
 
         sqlx::query(
             r#"
             INSERT INTO process_instances (
-                instance_id, process_key, bytecode_version, domain_payload,
-                domain_payload_hash, flags, counters, join_expected, state,
+                instance_id, tenant_id, process_key, bytecode_version, domain_payload,
+                domain_payload_hash, session_stack, flags, counters, join_expected, state,
                 correlation_id, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT (instance_id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
                 process_key = EXCLUDED.process_key,
                 bytecode_version = EXCLUDED.bytecode_version,
                 domain_payload = EXCLUDED.domain_payload,
                 domain_payload_hash = EXCLUDED.domain_payload_hash,
+                session_stack = EXCLUDED.session_stack,
                 flags = EXCLUDED.flags,
                 counters = EXCLUDED.counters,
                 join_expected = EXCLUDED.join_expected,
@@ -932,10 +948,12 @@ impl ProcessStore for PostgresProcessStore {
             "#,
         )
         .bind(instance.instance_id)
+        .bind(&instance.tenant_id)
         .bind(&instance.process_key)
         .bind(&instance.bytecode_version[..])
-        .bind(&instance.domain_payload)
+        .bind(instance.domain_payload.as_ref())
         .bind(&instance.domain_payload_hash[..])
+        .bind(&session_stack)
         .bind(&flags)
         .bind(&counters)
         .bind(&join_expected)
@@ -969,7 +987,7 @@ impl ProcessStore for PostgresProcessStore {
         )
         .bind(instance.instance_id)
         .bind(&instance.domain_payload_hash[..])
-        .bind(&instance.domain_payload)
+        .bind(instance.domain_payload.as_ref())
         .execute(&mut *tx)
         .await?;
 
@@ -1041,9 +1059,12 @@ mod tests {
     use std::collections::BTreeMap;
     use std::sync::Arc;
 
+    const DEFAULT_TEST_DATABASE_URL: &str = "postgresql:///bpmn_lite_test";
+
     async fn setup() -> (PgPool, PostgresProcessStore) {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+        let url = std::env::var("BPMN_LITE_TEST_DATABASE_URL")
+            .or_else(|_| std::env::var("DATABASE_URL"))
+            .unwrap_or_else(|_| DEFAULT_TEST_DATABASE_URL.to_string());
         let pool = PgPool::connect(&url).await.expect("connect to db");
 
         // Run migrations
@@ -1110,6 +1131,7 @@ mod tests {
             bytecode_version: [0u8; 32],
             domain_payload: payload.to_string(),
             domain_payload_hash: hash,
+            session_stack: ob_poc_types::session_stack::SessionStackState::default(),
             flags: BTreeMap::from([(0, Value::Bool(true)), (1, Value::I64(42))]),
             counters: BTreeMap::from([(0, 5), (1, 10)]),
             join_expected: BTreeMap::from([(0, 3)]),
@@ -1145,6 +1167,53 @@ mod tests {
         assert_eq!(loaded.correlation_id, "runbook-entry-1");
         // Timestamp round-trip: allow 1s drift due to ms→timestamptz→ms
         assert!((loaded.created_at - inst.created_at).abs() < 1000);
+    }
+
+    /// T-PG-1b: Session stack persists independently as a copied value.
+    #[tokio::test]
+    #[ignore]
+    async fn test_pg_instance_session_stack_copy_round_trip() {
+        let (_pool, store) = setup().await;
+        let id = Uuid::now_v7();
+        let original_scope_id = Uuid::new_v4();
+        let mutated_scope_id = Uuid::new_v4();
+
+        let mut inst = make_instance(id);
+        inst.session_stack = ob_poc_types::session_stack::SessionStackState {
+            session_id: Uuid::now_v7(),
+            scope: Some(ob_poc_types::session_stack::SessionScopeState {
+                client_group_id: original_scope_id,
+                client_group_name: Some("Original".to_string()),
+            }),
+            active_workspace: Some(ob_poc_types::session_stack::SessionWorkspaceKind::Kyc),
+            workspace_stack: Vec::new(),
+            trace_sequence: 17,
+        };
+
+        store.save_instance(&inst).await.unwrap();
+
+        inst.session_stack.scope = Some(ob_poc_types::session_stack::SessionScopeState {
+            client_group_id: mutated_scope_id,
+            client_group_name: Some("Mutated".to_string()),
+        });
+        inst.session_stack.active_workspace =
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Deal);
+        inst.session_stack.trace_sequence = 99;
+
+        let loaded = store.load_instance(id).await.unwrap().unwrap();
+        assert_eq!(
+            loaded
+                .session_stack
+                .scope
+                .as_ref()
+                .map(|scope| scope.client_group_id),
+            Some(original_scope_id)
+        );
+        assert_eq!(
+            loaded.session_stack.active_workspace,
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Kyc)
+        );
+        assert_eq!(loaded.session_stack.trace_sequence, 17);
     }
 
     /// T-PG-2: Fiber round-trip
@@ -1244,6 +1313,7 @@ mod tests {
                     service_task_id: format!("task-{i}"),
                     domain_payload: "{}".to_string(),
                     domain_payload_hash: [0u8; 32],
+                    session_stack: ob_poc_types::session_stack::SessionStackState::default(),
                     orch_flags: BTreeMap::new(),
                     retries_remaining: 3,
                 })
@@ -1520,6 +1590,7 @@ mod tests {
                     service_task_id: format!("task-{i}"),
                     domain_payload: "{}".to_string(),
                     domain_payload_hash: [0u8; 32],
+                    session_stack: ob_poc_types::session_stack::SessionStackState::default(),
                     orch_flags: BTreeMap::new(),
                     retries_remaining: 3,
                 })
@@ -1665,6 +1736,7 @@ mod tests {
                     service_task_id: format!("task-a-{i}"),
                     domain_payload: "{}".to_string(),
                     domain_payload_hash: [0u8; 32],
+                    session_stack: ob_poc_types::session_stack::SessionStackState::default(),
                     orch_flags: BTreeMap::new(),
                     retries_remaining: 3,
                 })
@@ -1679,6 +1751,7 @@ mod tests {
                 service_task_id: "task-b-0".to_string(),
                 domain_payload: "{}".to_string(),
                 domain_payload_hash: [0u8; 32],
+                session_stack: ob_poc_types::session_stack::SessionStackState::default(),
                 orch_flags: BTreeMap::new(),
                 retries_remaining: 3,
             })

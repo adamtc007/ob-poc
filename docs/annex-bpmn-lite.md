@@ -37,7 +37,7 @@ bpmn-lite/                              # Standalone Rust workspace
 │   │       ├── publish.rs              # Atomic compile + persist
 │   │       ├── lints.rs                # Structural warnings
 │   │       └── registry.rs             # TemplateStore trait
-│   └── migrations/                     # 14 SQL migrations (001–014)
+│   └── migrations/                     # 15 SQL migrations (001–015)
 ├── bpmn-lite-server/
 │   ├── src/
 │   │   ├── grpc.rs                     # BpmnLiteService impl
@@ -71,6 +71,20 @@ cargo x bpmn-lite start --database-url postgresql:///data_designer
 cd bpmn-lite && cargo run -p xtask -- smoke --spawn-server
 cd bpmn-lite && cargo run -p xtask -- stress --spawn-server --instances 300 --workers 16
 ```
+
+### 2026-04 Integration Status
+
+The current ob-poc integration now includes:
+
+- copy-by-value `SessionStackState` handoff from REPL dispatch into BPMN-lite
+- independent BPMN persistence of `ProcessInstance.session_stack`
+- signal relay from BPMN terminal events back into `ReplOrchestratorV2`
+- verified happy-path choreography and return-path tests
+
+Verified tests:
+
+- `e2e_03_full_happy_path_choreography`
+- `e2e_08_signal_relay_bounces_to_orchestrator`
 
 ### Current hardening status
 

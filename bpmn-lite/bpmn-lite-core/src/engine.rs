@@ -5,6 +5,7 @@ use crate::store::ProcessStore;
 use crate::types::*;
 use crate::vm::{apply_completion, compute_hash, TickOutcome, Vm};
 use anyhow::{anyhow, Result};
+use ob_poc_types::session_stack::SessionStackState;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 #[allow(unused_imports)]
@@ -177,6 +178,27 @@ impl BpmnLiteEngine {
         domain_payload_hash: [u8; 32],
         correlation_id: &str,
     ) -> Result<Uuid> {
+        self.start_with_session_stack(
+            process_key,
+            bytecode_version,
+            domain_payload,
+            domain_payload_hash,
+            correlation_id,
+            SessionStackState::default(),
+        )
+        .await
+    }
+
+    /// Start a new process instance with a copied canonical session stack.
+    pub async fn start_with_session_stack(
+        &self,
+        process_key: &str,
+        bytecode_version: [u8; 32],
+        domain_payload: &str,
+        domain_payload_hash: [u8; 32],
+        correlation_id: &str,
+        session_stack: SessionStackState,
+    ) -> Result<Uuid> {
         // Verify program exists
         let _program = self
             .store
@@ -192,6 +214,7 @@ impl BpmnLiteEngine {
             bytecode_version,
             domain_payload: domain_payload.to_string().into(),
             domain_payload_hash,
+            session_stack,
             flags: BTreeMap::new(),
             counters: BTreeMap::new(),
             join_expected: BTreeMap::new(),
@@ -1248,6 +1271,74 @@ mod tests {
         // 9. Verify events
         let events = engine.read_events(instance_id, 0).await.unwrap();
         assert!(events.len() >= 2); // At least InstanceStarted + Completed
+    }
+
+    #[tokio::test]
+    async fn test_start_with_session_stack_copies_value() {
+        let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
+        let engine = BpmnLiteEngine::new(store.clone());
+
+        let bpmn = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                          xmlns:zeebe="http://camunda.org/schema/zeebe/1.0">
+          <bpmn:process id="copy_proc" isExecutable="true">
+            <bpmn:startEvent id="start" />
+            <bpmn:endEvent id="end" />
+            <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="end" />
+          </bpmn:process>
+        </bpmn:definitions>"#;
+
+        let compile_result = engine.compile(bpmn).await.unwrap();
+        let payload = r#"{"case":"copy"}"#;
+        let hash = compute_hash(payload);
+        let original_scope_id = Uuid::new_v4();
+        let mutated_scope_id = Uuid::new_v4();
+
+        let mut session_stack = SessionStackState {
+            session_id: Uuid::new_v4(),
+            scope: Some(ob_poc_types::session_stack::SessionScopeState {
+                client_group_id: original_scope_id,
+                client_group_name: Some("Original".to_string()),
+            }),
+            active_workspace: Some(ob_poc_types::session_stack::SessionWorkspaceKind::Kyc),
+            workspace_stack: Vec::new(),
+            trace_sequence: 5,
+        };
+
+        let instance_id = engine
+            .start_with_session_stack(
+                "copy_proc",
+                compile_result.bytecode_version,
+                payload,
+                hash,
+                "corr-copy",
+                session_stack.clone(),
+            )
+            .await
+            .unwrap();
+
+        session_stack.scope = Some(ob_poc_types::session_stack::SessionScopeState {
+            client_group_id: mutated_scope_id,
+            client_group_name: Some("Mutated".to_string()),
+        });
+        session_stack.active_workspace =
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Deal);
+        session_stack.trace_sequence = 77;
+
+        let loaded = store.load_instance(instance_id).await.unwrap().unwrap();
+        assert_eq!(
+            loaded
+                .session_stack
+                .scope
+                .as_ref()
+                .map(|scope| scope.client_group_id),
+            Some(original_scope_id)
+        );
+        assert_eq!(
+            loaded.session_stack.active_workspace,
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Kyc)
+        );
+        assert_eq!(loaded.session_stack.trace_sequence, 5);
     }
 
     // ── Shared BPMN fixture for T-CANCEL tests ──
@@ -2893,6 +2984,7 @@ mod tests {
             tenant_id: "default".to_string(),
             domain_payload: "{}".to_string().into(),
             domain_payload_hash: [0u8; 32],
+            session_stack: SessionStackState::default(),
             flags: BTreeMap::new(),
             counters: BTreeMap::new(),
             join_expected: BTreeMap::new(),

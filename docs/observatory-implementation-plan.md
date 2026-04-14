@@ -1,10 +1,28 @@
 # Observatory Implementation Plan
 
-> **Version:** 2.0 — 2026-04-04
+> **Version:** 2.1 — 2026-04-14
 > **Spec:** `THE_OBSERVATORY_v1.0.md`
 > **Author:** Claude (planning session, no code)
-> **Rendering:** egui/eframe → WASM, full-window separate browser tab
-> **Revision:** v2.0 — revised from React-shell to full-egui (Option A)
+> **Rendering:** React observatory shell with session-stack graph endpoint
+> **Revision:** v2.1 — reconciled with implemented session-stack work
+
+## Current Implementation Status
+
+This document originally proposed a full egui/WASM observatory surface. That is
+not the currently deployed path.
+
+What is implemented today:
+
+- `GET /api/observatory/session/:id/session-stack-graph`
+- React observatory integration with a dedicated `Session Stack` tab
+- canonical `SessionStackState` projection from `ReplSessionV2`
+- BPMN copy-by-value session-stack visibility through the shared type model
+
+What remains planning-only here:
+
+- standalone egui/WASM observatory shell
+- graph-scene renderer migration
+- React-shell replacement
 
 ---
 

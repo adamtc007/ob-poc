@@ -608,6 +608,7 @@ async fn test_stub_executor_adapts_via_blanket_impl() {
             "(cbu.create :name \"test\")",
             Uuid::new_v4(),
             Uuid::new_v4(),
+            None,
         )
         .await;
     match outcome {
@@ -628,7 +629,7 @@ async fn test_parkable_executor_parks_on_marker() {
     let entry_id = Uuid::new_v4();
     let runbook_id = Uuid::new_v4();
     let outcome = exec
-        .execute_v2("(cbu.create :park)", entry_id, runbook_id)
+        .execute_v2("(cbu.create :park)", entry_id, runbook_id, None)
         .await;
     match outcome {
         DslExecutionOutcome::Parked {
@@ -656,6 +657,7 @@ async fn test_parkable_executor_completes_on_normal_dsl() {
             "(cbu.create :name \"test\")",
             Uuid::new_v4(),
             Uuid::new_v4(),
+            None,
         )
         .await;
     match outcome {

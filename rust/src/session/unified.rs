@@ -3,6 +3,12 @@
 //! Single source of truth for session state.
 //! Replaces: SessionContext, SessionState, SubSessionType, BatchContext, CbuSession, DslSheet
 //!
+//! POLICY:
+//! `ReplSessionV2` is the sole canonical interactive session model.
+//! `UnifiedSession` is retained only as a legacy execution-context bridge.
+//! Do not add new conversational or durable session state here without an
+//! explicit adapter boundary from `ReplSessionV2`.
+//!
 //! The session is the REPL DSL "sheet" with:
 //! - Universe (client) - the constraint cascade anchor
 //! - CBU sets - entity_scope.cbu_ids
@@ -18,10 +24,16 @@ use uuid::Uuid;
 
 use crate::sage::PendingMutation;
 
-/// The unified session - single source of truth
+/// Legacy execution-context bridge retained for older call sites.
 ///
-/// Session = REPL DSL sheet with universe (client), CBU sets, and CBU state keys.
-/// The constraint cascade flows: client → structure_type → current_structure → verb schema filtering
+/// `ReplSessionV2` is the canonical interactive session model. `UnifiedSession`
+/// remains as an adapter surface for execution paths that have not yet been
+/// narrowed or retired. Do not add new conversational or durable business
+/// state here unless it is intentionally bridged from `ReplSessionV2`.
+///
+/// Session = REPL DSL sheet with universe (client), CBU sets, and CBU state
+/// keys. The constraint cascade flows: client → structure_type →
+/// current_structure → verb schema filtering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedSession {
     // === Identity ===

@@ -516,6 +516,14 @@ pub struct ExecutionContext {
     /// Whether CBU scope was modified during this execution.
     /// When true, orchestrator syncs session_cbu_ids back to session.cbu_ids.
     pub cbu_scope_dirty: bool,
+    /// Allow durable verbs to execute directly inside an already-orchestrated
+    /// BPMN worker context.
+    ///
+    /// Normal REPL/user execution must still route durable verbs through the
+    /// WorkflowDispatcher. This flag exists only so a BPMN service task can
+    /// call the underlying direct implementation of a durable verb without
+    /// trying to start a nested orchestration.
+    pub allow_durable_direct: bool,
 }
 
 impl Default for ExecutionContext {
@@ -551,6 +559,7 @@ impl Default for ExecutionContext {
             pending_deal_id: None,
             pending_deal_name: None,
             cbu_scope_dirty: false,
+            allow_durable_direct: false,
         }
     }
 }
@@ -687,7 +696,15 @@ impl ExecutionContext {
             pending_deal_id: None,
             pending_deal_name: None,
             cbu_scope_dirty: false,
+            allow_durable_direct: self.allow_durable_direct,
         }
+    }
+
+    /// Mark this context as running inside a BPMN worker so durable verbs may
+    /// use their direct implementation instead of starting nested workflows.
+    pub fn allow_durable_direct(mut self) -> Self {
+        self.allow_durable_direct = true;
+        self
     }
 
     /// Check if we're currently in a batch iteration
@@ -1297,8 +1314,33 @@ impl DslExecutor {
             ));
         }
 
-        // Durable verbs require the V2 REPL / WorkflowDispatcher infrastructure
+        // Durable verbs normally require the V2 REPL / WorkflowDispatcher
+        // infrastructure. Inside a BPMN worker, however, we may need to invoke
+        // the direct implementation of a durable verb as an internal service
+        // task without starting a nested orchestration.
         if let RuntimeBehavior::Durable(d) = &runtime_verb.behavior {
+            if ctx.allow_durable_direct {
+                tracing::debug!(
+                    "execute_verb: allowing direct execution of durable verb {}.{} inside BPMN worker",
+                    vc.domain,
+                    vc.verb
+                );
+                if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
+                    let result = op.execute(vc, ctx, &self.pool).await;
+                    tracing::debug!(
+                        "execute_verb: durable direct plugin returned {:?}",
+                        result.is_ok()
+                    );
+                    return result;
+                }
+
+                return Err(anyhow!(
+                    "Durable verb {}.{} is executing inside BPMN worker but has no direct custom-op implementation",
+                    vc.domain,
+                    vc.verb
+                ));
+            }
+
             return Err(anyhow!(
                 "Durable verb {}.{} (process_key={}) requires V2 REPL with WorkflowDispatcher. \
                  Use /api/repl/v2/ endpoints instead.",

@@ -20,7 +20,7 @@ import { ConstellationCanvas } from "./components/ConstellationCanvas";
 import { MermaidPanel } from "./components/MermaidPanel";
 import type { ObservatoryAction } from "../../types/observatory";
 
-type Tab = "observe" | "mission_control";
+type Tab = "observe" | "session_stack" | "mission_control";
 
 export function ObservatoryPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -47,6 +47,13 @@ export function ObservatoryPage() {
     queryKey: queryKeys.observatory.graphScene(sessionId!),
     queryFn: () => observatoryApi.getGraphScene(sessionId!),
     enabled: !!sessionId,
+  });
+
+  const { data: sessionStackGraph } = useQuery({
+    queryKey: queryKeys.observatory.sessionStackGraph(sessionId!),
+    queryFn: () => observatoryApi.getSessionStackGraph(sessionId!),
+    enabled: !!sessionId,
+    refetchInterval: 5000,
   });
 
   // Fetch navigation history (includes cursor position)
@@ -216,6 +223,16 @@ export function ObservatoryPage() {
           Observe
         </button>
         <button
+          onClick={() => setActiveTab("session_stack")}
+          className={`px-3 py-1 text-xs font-medium rounded ${
+            activeTab === "session_stack"
+              ? "bg-[var(--bg-active)] text-[var(--text-primary)]"
+              : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+          }`}
+        >
+          Session Stack
+        </button>
+        <button
           onClick={() => setActiveTab("mission_control")}
           className={`px-3 py-1 text-xs font-medium rounded ${
             activeTab === "mission_control"
@@ -274,6 +291,16 @@ export function ObservatoryPage() {
               </div>
             </div>
           )}
+        </div>
+      ) : activeTab === "session_stack" ? (
+        <div className="flex flex-1 min-h-0">
+          <div className="flex-1 min-w-0">
+            <ConstellationCanvas
+              graphScene={sessionStackGraph ?? null}
+              viewLevel={orientation?.view_level ?? "system"}
+              onAction={handleCanvasAction}
+            />
+          </div>
         </div>
       ) : (
         <MissionControl sessionId={sessionId} />

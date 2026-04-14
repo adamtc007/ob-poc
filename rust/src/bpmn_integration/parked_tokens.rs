@@ -15,6 +15,7 @@ use uuid::Uuid;
 use super::types::{ParkedToken, ParkedTokenStatus};
 
 /// Postgres-backed store for parked tokens.
+#[derive(Clone)]
 pub struct ParkedTokenStore {
     pool: PgPool,
 }

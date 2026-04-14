@@ -5,6 +5,7 @@ CREATE TABLE process_instances (
     bytecode_version  BYTEA NOT NULL,
     domain_payload    TEXT NOT NULL,
     domain_payload_hash BYTEA NOT NULL,
+    session_stack     JSONB NOT NULL DEFAULT '{}',
     flags             JSONB NOT NULL DEFAULT '{}',
     counters          JSONB NOT NULL DEFAULT '{}',
     join_expected     JSONB NOT NULL DEFAULT '{}',

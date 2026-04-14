@@ -262,6 +262,8 @@ pub struct PendingDispatch {
     pub bytecode_version: Vec<u8>,
     /// Canonical JSON domain payload for StartProcess.
     pub domain_payload: String,
+    /// Canonical session stack copied by value from the REPL session.
+    pub session_stack: ob_poc_types::session_stack::SessionStackState,
     /// Original DSL string (audit trail).
     pub dsl_source: String,
     /// Runbook entry ID that triggered the dispatch.

@@ -15,6 +15,7 @@ use uuid::Uuid;
 use super::types::{CorrelationRecord, CorrelationStatus};
 
 /// Postgres-backed store for BPMN correlation records.
+#[derive(Clone)]
 pub struct CorrelationStore {
     pool: PgPool,
 }

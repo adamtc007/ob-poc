@@ -55,6 +55,86 @@ use entity_gateway::{
     GatewayConfig,
 };
 
+async fn register_bpmn_models(
+    client: &ob_poc::bpmn_integration::client::BpmnLiteConnection,
+    config_index: &mut ob_poc::bpmn_integration::config::WorkflowConfigIndex,
+    config_dir: &std::path::Path,
+) {
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fallback_model_dir = manifest_dir.join("../../tests/models");
+    let explicit_model_dir = std::env::var("BPMN_MODEL_DIR")
+        .ok()
+        .map(std::path::PathBuf::from);
+
+    let workflows: Vec<(String, String)> = config_index
+        .orchestrated_workflows()
+        .into_iter()
+        .filter_map(|binding| {
+            binding
+                .process_key
+                .as_ref()
+                .map(|process_key| (binding.verb_fqn.clone(), process_key.clone()))
+        })
+        .collect();
+
+    for (verb_fqn, process_key) in workflows {
+        let model_file = explicit_model_dir
+            .as_ref()
+            .map(|dir| dir.join(format!("{process_key}.bpmn")))
+            .filter(|path| path.exists())
+            .or_else(|| {
+                let candidate = config_dir.join("bpmn").join(format!("{process_key}.bpmn"));
+                candidate.exists().then_some(candidate)
+            })
+            .or_else(|| {
+                let candidate = fallback_model_dir.join(format!("{process_key}.bpmn"));
+                candidate.exists().then_some(candidate)
+            });
+
+        let Some(model_file) = model_file else {
+            tracing::warn!(
+                verb_fqn = %verb_fqn,
+                process_key = %process_key,
+                "No BPMN model file found for orchestrated workflow"
+            );
+            continue;
+        };
+
+        match std::fs::read_to_string(&model_file) {
+            Ok(bpmn_xml) => match client.compile(&bpmn_xml).await {
+                Ok(result) => {
+                    config_index.register_bytecode(&process_key, result.bytecode_version.clone());
+                    tracing::info!(
+                        verb_fqn = %verb_fqn,
+                        process_key = %process_key,
+                        model = %model_file.display(),
+                        diagnostics = result.diagnostics.len(),
+                        "Registered BPMN bytecode for orchestrated workflow"
+                    );
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        verb_fqn = %verb_fqn,
+                        process_key = %process_key,
+                        model = %model_file.display(),
+                        error = %error,
+                        "Failed to compile BPMN model for orchestrated workflow"
+                    );
+                }
+            },
+            Err(error) => {
+                tracing::warn!(
+                    verb_fqn = %verb_fqn,
+                    process_key = %process_key,
+                    model = %model_file.display(),
+                    error = %error,
+                    "Failed to read BPMN model for orchestrated workflow"
+                );
+            }
+        }
+    }
+}
+
 /// Locate the observatory-wasm/pkg directory.
 fn observatory_wasm_dir() -> String {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -488,7 +568,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     // BPMN-Lite Integration (before REPL V2 — determines executor)
     // =========================================================================
-    let bpmn_executor_v2: Option<Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>> = {
+    let (bpmn_executor_v2, bpmn_dispatcher, orchestrated_verbs): (
+        Option<Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>>,
+        Option<Arc<ob_poc::bpmn_integration::dispatcher::WorkflowDispatcher>>,
+        std::collections::HashSet<String>,
+    ) = {
         use ob_poc::bpmn_integration::{
             client::BpmnLiteConnection, config::WorkflowConfigIndex, correlation::CorrelationStore,
             dispatcher::WorkflowDispatcher, job_frames::JobFrameStore,
@@ -508,7 +592,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let manifest_dir = env!("CARGO_MANIFEST_DIR");
                             format!("{}/../../config", manifest_dir)
                         });
-                        let config_path = std::path::Path::new(&config_dir).join("workflows.yaml");
+                        let config_dir_path = std::path::PathBuf::from(&config_dir);
+                        let config_path = config_dir_path.join("workflows.yaml");
 
                         match WorkflowConfigIndex::load_from_file(&config_path) {
                             Ok(mut config_index) => {
@@ -545,6 +630,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     }
                                 }
 
+                                register_bpmn_models(&client, &mut config_index, &config_dir_path)
+                                    .await;
+
+                                let orchestrated_verbs: std::collections::HashSet<String> =
+                                    config_index
+                                        .orchestrated_workflows()
+                                        .into_iter()
+                                        .map(|binding| binding.verb_fqn.clone())
+                                        .collect();
+
                                 let config_index = Arc::new(config_index);
 
                                 // Inner executor for direct verb execution
@@ -554,7 +649,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // WorkflowDispatcher — routes Direct vs Orchestrated.
                                 // Each store wraps a PgPool (cheap Arc clone), so we
                                 // create separate instances per consumer.
-                                let dispatcher = WorkflowDispatcher::new(
+                                let dispatcher = Arc::new(WorkflowDispatcher::new(
                                     inner,
                                     config_index.clone(),
                                     client.clone(),
@@ -562,14 +657,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     ParkedTokenStore::new(pool.clone()),
                                     PendingDispatchStore::new(pool.clone()),
                                 )
-                                .with_pool(pool.clone());
+                                .with_pool(pool.clone()));
 
                                 // Spawn JobWorker (long-poll job activation loop)
                                 let (job_shutdown_tx, job_shutdown_rx) =
                                     tokio::sync::watch::channel(false);
                                 let worker_executor: Arc<
                                     dyn ob_poc::repl::orchestrator_v2::DslExecutorV2,
-                                > = Arc::new(RealDslExecutor::new(pool.clone()));
+                                > = Arc::new(
+                                    RealDslExecutor::new(pool.clone()).allow_durable_direct(),
+                                );
                                 let job_worker = JobWorker::new(
                                     format!("ob-poc-worker-{}", std::process::id()),
                                     client.clone(),
@@ -602,8 +699,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     config_index.all_task_types()
                                 );
 
-                                Some(Arc::new(dispatcher)
-                                    as Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>)
+                                (
+                                    Some(
+                                        dispatcher.clone()
+                                            as Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>,
+                                    ),
+                                    Some(dispatcher),
+                                    orchestrated_verbs,
+                                )
                             }
                             Err(e) => {
                                 tracing::warn!(
@@ -614,20 +717,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 tracing::warn!(
                                     "BPMN-Lite disabled — WorkflowDispatcher not available"
                                 );
-                                None
+                                (None, None, std::collections::HashSet::new())
                             }
                         }
                     }
                     Err(e) => {
                         tracing::warn!("Failed to create BPMN-Lite client: {}", e);
                         tracing::warn!("BPMN-Lite integration disabled");
-                        None
+                        (None, None, std::collections::HashSet::new())
                     }
                 }
             }
             Err(_) => {
                 tracing::debug!("BPMN-Lite integration disabled (BPMN_LITE_GRPC_URL not set)");
-                None
+                (None, None, std::collections::HashSet::new())
             }
         }
     };
@@ -673,7 +776,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let mut orchestrator = ReplOrchestratorV2::new(pack_router, legacy_executor)
             .with_pool(pool.clone())
-            .with_runbook_store(runbook_store);
+            .with_runbook_store(runbook_store)
+            .with_orchestrated_verbs(orchestrated_verbs);
 
         // Wire the V2 executor that supports parking (WorkflowDispatcher or RealDslExecutor)
         if let Some(ref bpmn_exec) = bpmn_executor_v2 {
@@ -942,6 +1046,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let repl_v2_orchestrator = Arc::new(orchestrator);
+        if let Some(ref dispatcher) = bpmn_dispatcher {
+            dispatcher.attach_orchestrator(repl_v2_orchestrator.clone());
+        }
         tracing::info!("REPL V2 orchestrator initialized with semantic intent service");
         repl_v2_orchestrator
     };

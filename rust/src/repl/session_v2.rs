@@ -16,8 +16,8 @@ use super::decision_log::SessionDecisionLog;
 use super::proposal_engine::ProposalSet;
 use super::runbook::{ArgExtractionAudit, Runbook, SlotSource};
 use super::types_v2::{
-    AgentMode, ConversationMode, ReplStateV2, SessionFeedback, SessionScope, SubjectRef, VerbRef,
-    WorkspaceFrame, WorkspaceHint, WorkspaceKind, WorkspaceStateView,
+    AgentMode, ConversationMode, ReplStateV2, SessionFeedback, SessionScope, SubjectKind,
+    SubjectRef, VerbRef, WorkspaceFrame, WorkspaceHint, WorkspaceKind, WorkspaceStateView,
 };
 use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
 use crate::journey::handoff::PackHandoff;
@@ -90,6 +90,9 @@ pub struct ReplSessionV2 {
     /// Results of executed plan steps.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub execution_log: Vec<crate::runbook::plan_types::StepResult>,
+    /// Canonical stack/context value shared with BPMN-lite by copy.
+    #[serde(default)]
+    pub session_stack: ob_poc_types::session_stack::SessionStackState,
     /// Symbol table for @reference resolution (`:as @myEntity` bindings).
     /// Session-scoped — persists across workspace switches.
     /// Synced from ExecutionContext.pending_session.bindings after verb execution.
@@ -164,6 +167,10 @@ impl ReplSessionV2 {
             runbook_plan: None,
             runbook_plan_cursor: None,
             execution_log: Vec::new(),
+            session_stack: ob_poc_types::session_stack::SessionStackState {
+                session_id: id,
+                ..Default::default()
+            },
             bindings: std::collections::HashMap::new(),
             cbu_ids: Vec::new(),
             name: None,
@@ -254,6 +261,7 @@ impl ReplSessionV2 {
             timestamp: Utc::now(),
         });
         self.last_active_at = Utc::now();
+        self.sync_session_stack_state();
     }
 
     /// Transition to a new state.
@@ -273,6 +281,7 @@ impl ReplSessionV2 {
         self.state = new_state;
         self.append_trace(super::session_trace::TraceOp::StateTransition { from, to });
         self.last_active_at = Utc::now();
+        self.sync_session_stack_state();
     }
 
     /// Set the client scope (client group id).
@@ -289,6 +298,7 @@ impl ReplSessionV2 {
     pub fn set_client_scope(&mut self, client_group_id: Uuid) {
         self.runbook.client_group_id = Some(client_group_id);
         self.last_active_at = Utc::now();
+        self.sync_session_stack_state();
     }
 
     /// Set the active workspace and replace the stack with a root frame.
@@ -312,6 +322,7 @@ impl ReplSessionV2 {
                 .push(WorkspaceFrame::new(workspace, scope));
         }
         self.last_active_at = Utc::now();
+        self.sync_session_stack_state();
     }
 
     /// Alias for setting the root workspace frame.
@@ -394,6 +405,7 @@ impl ReplSessionV2 {
         if let Some(tos) = self.workspace_stack.last_mut() {
             tos.writes_since_push += 1;
         }
+        self.sync_session_stack_state();
     }
 
     /// Build a lightweight snapshot of the current workspace stack for trace entries.
@@ -519,6 +531,7 @@ impl ReplSessionV2 {
         self.workspace_stack.push(frame);
         self.append_trace(super::session_trace::TraceOp::StackPush { workspace: ws });
         self.last_active_at = Utc::now();
+        self.sync_session_stack_state();
         Ok(())
     }
 
@@ -541,6 +554,7 @@ impl ReplSessionV2 {
             self.active_workspace = Some(tos.workspace.clone());
         }
         self.last_active_at = Utc::now();
+        self.sync_session_stack_state();
     }
 
     // ── Viewport state accessors (observation frame, NOT resource truth) ──
@@ -558,6 +572,7 @@ impl ReplSessionV2 {
         if let Some(tos) = self.workspace_stack.last_mut() {
             tos.view_level = level;
         }
+        self.sync_session_stack_state();
     }
 
     /// Current focus slot path from TOS.
@@ -572,6 +587,7 @@ impl ReplSessionV2 {
         if let Some(tos) = self.workspace_stack.last_mut() {
             tos.focus_slot_path = path;
         }
+        self.sync_session_stack_state();
     }
 
     /// Push a viewport snapshot to TOS navigation history (for back/forward).
@@ -600,6 +616,7 @@ impl ReplSessionV2 {
                 let snap = &tos.nav_snapshots[tos.nav_cursor];
                 tos.view_level = snap.view_level;
                 tos.focus_slot_path = snap.focus_slot_path.clone();
+                self.sync_session_stack_state();
                 return true;
             }
         }
@@ -614,6 +631,7 @@ impl ReplSessionV2 {
                 let snap = &tos.nav_snapshots[tos.nav_cursor];
                 tos.view_level = snap.view_level;
                 tos.focus_slot_path = snap.focus_slot_path.clone();
+                self.sync_session_stack_state();
                 return true;
             }
         }
@@ -651,6 +669,7 @@ impl ReplSessionV2 {
             self.active_workspace = Some(tos.workspace.clone());
         }
         self.last_active_at = Utc::now();
+        self.sync_session_stack_state();
         popped
     }
 
@@ -681,6 +700,7 @@ impl ReplSessionV2 {
             self.append_trace(super::session_trace::TraceOp::StackCommit);
         }
         self.last_active_at = Utc::now();
+        self.sync_session_stack_state();
     }
 
     /// Build session feedback from the current top-of-stack state.
@@ -871,6 +891,58 @@ impl ReplSessionV2 {
             }
         }
         self.runbook.rebuild_invocation_index();
+        self.sync_session_stack_state();
+    }
+
+    /// Rebuild the canonical session-stack value from the interactive REPL state.
+    pub fn sync_session_stack_state(&mut self) {
+        self.session_stack = self.build_session_stack_state();
+    }
+
+    /// Build the canonical stack/context value shared with BPMN-lite.
+    pub fn build_session_stack_state(&self) -> ob_poc_types::session_stack::SessionStackState {
+        use ob_poc_types::session_stack::{
+            ConstraintCascadeState, SessionScopeState, SessionStackFrame, SessionStackState,
+        };
+
+        let scope = self.session_scope().map(|scope| SessionScopeState {
+            client_group_id: scope.client_group_id,
+            client_group_name: scope.client_group_name,
+        });
+
+        let workspace_stack = self
+            .workspace_stack
+            .iter()
+            .map(|frame| SessionStackFrame {
+                workspace: workspace_kind_to_shared(&frame.workspace),
+                constellation_family: frame.constellation_family.clone(),
+                constellation_map: frame.constellation_map.clone(),
+                subject_kind: frame.subject_kind.as_ref().map(subject_kind_to_shared),
+                subject_id: frame.subject_id,
+                pushed_at: frame.pushed_at,
+                stale: frame.stale,
+                writes_since_push: frame.writes_since_push,
+                is_peek: frame.is_peek,
+                constraints: ConstraintCascadeState {
+                    structure_id: frame.current_structure_id,
+                    structure_name: frame.current_structure_name.clone(),
+                    case_id: frame.current_case_id,
+                    mandate_id: frame.current_mandate_id,
+                    deal_id: frame.deal_id,
+                    deal_name: frame.deal_name.clone(),
+                },
+                view_level: frame.view_level,
+                focus_slot_path: frame.focus_slot_path.clone(),
+            })
+            .collect();
+
+        SessionStackState {
+            session_id: self.id,
+            scope,
+            active_workspace: self.active_workspace.as_ref().map(workspace_kind_to_shared),
+            workspace_stack,
+            trace_sequence: self.trace_sequence,
+        }
     }
 }
 
@@ -895,6 +967,41 @@ fn workspace_hints() -> Vec<WorkspaceHint> {
         .collect()
 }
 
+fn workspace_kind_to_shared(
+    workspace: &WorkspaceKind,
+) -> ob_poc_types::session_stack::SessionWorkspaceKind {
+    use ob_poc_types::session_stack::SessionWorkspaceKind;
+
+    match workspace {
+        WorkspaceKind::ProductMaintenance => SessionWorkspaceKind::ProductMaintenance,
+        WorkspaceKind::Deal => SessionWorkspaceKind::Deal,
+        WorkspaceKind::Cbu => SessionWorkspaceKind::Cbu,
+        WorkspaceKind::Kyc => SessionWorkspaceKind::Kyc,
+        WorkspaceKind::InstrumentMatrix => SessionWorkspaceKind::InstrumentMatrix,
+        WorkspaceKind::OnBoarding => SessionWorkspaceKind::OnBoarding,
+        WorkspaceKind::SemOsMaintenance => SessionWorkspaceKind::SemOsMaintenance,
+    }
+}
+
+fn subject_kind_to_shared(
+    subject_kind: &SubjectKind,
+) -> ob_poc_types::session_stack::SessionSubjectKind {
+    use ob_poc_types::session_stack::SessionSubjectKind;
+
+    match subject_kind {
+        SubjectKind::ClientGroup => SessionSubjectKind::ClientGroup,
+        SubjectKind::Cbu => SessionSubjectKind::Cbu,
+        SubjectKind::Deal => SessionSubjectKind::Deal,
+        SubjectKind::Case => SessionSubjectKind::Case,
+        SubjectKind::Handoff => SessionSubjectKind::Handoff,
+        SubjectKind::Matrix => SessionSubjectKind::Matrix,
+        SubjectKind::Product => SessionSubjectKind::Product,
+        SubjectKind::Service => SessionSubjectKind::Service,
+        SubjectKind::Resource => SessionSubjectKind::Resource,
+        SubjectKind::Attribute => SessionSubjectKind::Attribute,
+    }
+}
+
 /// A single message in the session conversation history.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
@@ -917,6 +1024,7 @@ pub enum MessageRole {
 #[allow(deprecated)]
 mod tests {
     use super::*;
+    use ob_poc_types::galaxy::ViewLevel;
 
     fn sample_pack() -> Arc<PackManifest> {
         let yaml = r#"
@@ -994,5 +1102,53 @@ required_context:
         let pack = sample_pack();
         session.activate_pack(pack.clone(), "hash".to_string(), None);
         assert_eq!(session.active_pack_id(), Some(pack.id.clone()));
+    }
+
+    #[test]
+    fn test_session_stack_sync_tracks_scope_and_workspace_frames() {
+        let mut session = ReplSessionV2::new();
+        let client_group_id = Uuid::new_v4();
+        let subject_id = Uuid::new_v4();
+
+        session.set_client_scope(client_group_id);
+        session.set_workspace_root(WorkspaceKind::Cbu);
+        if let Some(tos) = session.workspace_stack.last_mut() {
+            tos.subject_kind = Some(SubjectKind::Cbu);
+            tos.subject_id = Some(subject_id);
+            tos.constellation_family = "operating".to_string();
+            tos.constellation_map = "struct.lux.ucits.sicav".to_string();
+        }
+        session.set_tos_view_level(ViewLevel::Surface);
+        session.set_tos_focus_slot(Some("overview.summary".to_string()));
+
+        assert_eq!(session.session_stack.session_id, session.id);
+        assert_eq!(
+            session
+                .session_stack
+                .scope
+                .as_ref()
+                .map(|scope| scope.client_group_id),
+            Some(client_group_id)
+        );
+        assert_eq!(
+            session.session_stack.active_workspace,
+            Some(ob_poc_types::session_stack::SessionWorkspaceKind::Cbu)
+        );
+        assert_eq!(session.session_stack.workspace_stack.len(), 1);
+
+        let frame = &session.session_stack.workspace_stack[0];
+        assert_eq!(
+            frame.workspace,
+            ob_poc_types::session_stack::SessionWorkspaceKind::Cbu
+        );
+        assert_eq!(
+            frame.subject_kind,
+            Some(ob_poc_types::session_stack::SessionSubjectKind::Cbu)
+        );
+        assert_eq!(frame.subject_id, Some(subject_id));
+        assert_eq!(frame.constellation_family, "operating");
+        assert_eq!(frame.constellation_map, "struct.lux.ucits.sicav");
+        assert_eq!(frame.view_level, ViewLevel::Surface);
+        assert_eq!(frame.focus_slot_path.as_deref(), Some("overview.summary"));
     }
 }

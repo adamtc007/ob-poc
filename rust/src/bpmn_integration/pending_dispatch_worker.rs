@@ -133,6 +133,7 @@ impl PendingDispatchWorker {
                 bytecode_version,
                 domain_payload: dispatch.domain_payload.clone(),
                 domain_payload_hash: dispatch.payload_hash.clone(),
+                session_stack: dispatch.session_stack.clone(),
                 orch_flags: std::collections::HashMap::new(),
                 correlation_id: dispatch.correlation_id,
             })

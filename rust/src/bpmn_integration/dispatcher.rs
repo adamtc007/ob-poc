@@ -11,13 +11,16 @@ use super::canonical::canonical_json_with_hash;
 use super::client::{BpmnLiteConnection, StartProcessRequest};
 use super::config::WorkflowConfigIndex;
 use super::correlation::CorrelationStore;
+use super::event_bridge::EventBridge;
 use super::parked_tokens::ParkedTokenStore;
 use super::pending_dispatches::PendingDispatchStore;
+use super::signal_relay::SignalRelay;
 use super::types::{
     CorrelationRecord, CorrelationStatus, ExecutionRoute, ParkedToken, ParkedTokenStatus,
     PendingDispatch, PendingDispatchStatus,
 };
-use crate::repl::orchestrator_v2::{DslExecutionOutcome, DslExecutorV2};
+use crate::repl::orchestrator_v2::{DslExecutionOutcome, DslExecutorV2, ReplOrchestratorV2};
+use ob_poc_types::session_stack::SessionStackState;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -48,6 +51,9 @@ pub struct WorkflowDispatcher {
     parked_tokens: ParkedTokenStore,
     /// Pending dispatch queue for BPMN resilience.
     pending_dispatches: PendingDispatchStore,
+    /// Optional orchestrator handle used to relay BPMN terminal events back
+    /// into parked REPL runbooks.
+    signal_orchestrator: Arc<std::sync::RwLock<Option<Arc<ReplOrchestratorV2>>>>,
     /// Database pool for dual-write bridge (outstanding_requests).
     #[cfg(feature = "database")]
     pool: Option<PgPool>,
@@ -69,6 +75,7 @@ impl WorkflowDispatcher {
             correlations,
             parked_tokens,
             pending_dispatches,
+            signal_orchestrator: Arc::new(std::sync::RwLock::new(None)),
             #[cfg(feature = "database")]
             pool: None,
         }
@@ -79,6 +86,14 @@ impl WorkflowDispatcher {
     pub fn with_pool(mut self, pool: PgPool) -> Self {
         self.pool = Some(pool);
         self
+    }
+
+    /// Attach the REPL orchestrator so BPMN terminal events can resume parked
+    /// runbooks automatically.
+    pub fn attach_orchestrator(&self, orchestrator: Arc<ReplOrchestratorV2>) {
+        if let Ok(mut guard) = self.signal_orchestrator.write() {
+            *guard = Some(orchestrator);
+        }
     }
 
     /// Dual-write bridge: create a legacy `outstanding_requests` row alongside
@@ -230,6 +245,7 @@ impl WorkflowDispatcher {
         entry_id: Uuid,
         runbook_id: Uuid,
         verb_fqn: &str,
+        session_stack: SessionStackState,
     ) -> DslExecutionOutcome {
         let binding = match self.config.binding_for_verb(verb_fqn) {
             Some(b) => b,
@@ -263,7 +279,7 @@ impl WorkflowDispatcher {
             .map(|b| b.to_vec())
             .unwrap_or_default();
 
-        let correlation_id = Uuid::new_v4();
+        let correlation_id = Uuid::now_v7();
         let correlation_key = format!("{}:{}:{}", runbook_id, entry_id, correlation_id);
 
         // 3. Extract domain_correlation_key from DSL args using the binding's
@@ -284,7 +300,7 @@ impl WorkflowDispatcher {
 
         // 4. Start BPMN process via gRPC.
         //    On failure, queue for retry instead of returning Failed.
-        let dispatch_id = Uuid::new_v4();
+        let dispatch_id = Uuid::now_v7();
         let (process_instance_id, queued) = match self
             .bpmn_client
             .start_process(StartProcessRequest {
@@ -292,6 +308,7 @@ impl WorkflowDispatcher {
                 bytecode_version: bytecode_version.clone(),
                 domain_payload: canonical_json.clone(),
                 domain_payload_hash: hash.clone(),
+                session_stack: session_stack.clone(),
                 orch_flags: std::collections::HashMap::new(),
                 correlation_id,
             })
@@ -314,6 +331,7 @@ impl WorkflowDispatcher {
                     process_key: process_key.clone(),
                     bytecode_version,
                     domain_payload: canonical_json.clone(),
+                    session_stack: session_stack.clone(),
                     dsl_source: dsl.to_string(),
                     entry_id,
                     runbook_id,
@@ -348,7 +366,7 @@ impl WorkflowDispatcher {
         let record = CorrelationRecord {
             correlation_id,
             process_instance_id,
-            session_id: Uuid::nil(), // Resolved at server wiring layer
+            session_id: session_stack.session_id,
             runbook_id,
             entry_id,
             process_key: process_key.clone(),
@@ -369,9 +387,9 @@ impl WorkflowDispatcher {
 
         // 6. Park a token for the REPL entry.
         let token = ParkedToken {
-            token_id: Uuid::new_v4(),
+            token_id: Uuid::now_v7(),
             correlation_key: correlation_key.clone(),
-            session_id: Uuid::nil(), // Resolved at server wiring layer
+            session_id: session_stack.session_id,
             entry_id,
             process_instance_id,
             expected_signal: format!("process_completed:{}", process_key),
@@ -383,6 +401,37 @@ impl WorkflowDispatcher {
 
         if let Err(e) = self.parked_tokens.insert(&token).await {
             tracing::error!("Failed to park token for entry {}: {}", entry_id, e);
+        }
+
+        if !queued {
+            let maybe_orchestrator = self
+                .signal_orchestrator
+                .read()
+                .ok()
+                .and_then(|guard| guard.clone());
+            if let Some(orchestrator) = maybe_orchestrator {
+                let bridge = EventBridge::new(
+                    self.bpmn_client.clone(),
+                    self.correlations.clone(),
+                    self.parked_tokens.clone(),
+                );
+                let relay = SignalRelay::new(orchestrator, self.correlations.clone());
+                let (outcome_tx, outcome_rx) = tokio::sync::mpsc::channel(32);
+                tokio::spawn(async move {
+                    relay.run(outcome_rx).await;
+                });
+                tokio::spawn(async move {
+                    if let Err(error) =
+                        bridge.subscribe_instance(process_instance_id, outcome_tx).await
+                    {
+                        tracing::error!(
+                            process_instance_id = %process_instance_id,
+                            error = %error,
+                            "EventBridge subscription failed"
+                        );
+                    }
+                });
+            }
         }
 
         // 7. Dual-write bridge: create legacy outstanding_requests row.
@@ -428,13 +477,22 @@ impl WorkflowDispatcher {
 
 #[async_trait::async_trait]
 impl DslExecutorV2 for WorkflowDispatcher {
-    async fn execute_v2(&self, dsl: &str, entry_id: Uuid, runbook_id: Uuid) -> DslExecutionOutcome {
+    async fn execute_v2(
+        &self,
+        dsl: &str,
+        entry_id: Uuid,
+        runbook_id: Uuid,
+        session_stack: Option<SessionStackState>,
+    ) -> DslExecutionOutcome {
         // 1. Extract verb FQN from DSL.
         let verb_fqn = match Self::extract_verb_fqn(dsl) {
             Some(fqn) => fqn,
             None => {
                 // Can't parse verb — delegate to inner executor as-is.
-                return self.inner.execute_v2(dsl, entry_id, runbook_id).await;
+                return self
+                    .inner
+                    .execute_v2(dsl, entry_id, runbook_id, session_stack)
+                    .await;
             }
         };
 
@@ -442,11 +500,19 @@ impl DslExecutorV2 for WorkflowDispatcher {
         match self.config.route_for_verb(&verb_fqn) {
             ExecutionRoute::Direct => {
                 // Direct path — delegate to inner executor.
-                self.inner.execute_v2(dsl, entry_id, runbook_id).await
+                self.inner
+                    .execute_v2(dsl, entry_id, runbook_id, session_stack)
+                    .await
             }
             ExecutionRoute::Orchestrated => {
                 // Orchestrated path — dispatch through bpmn-lite.
-                self.execute_orchestrated(dsl, entry_id, runbook_id, &verb_fqn)
+                self.execute_orchestrated(
+                    dsl,
+                    entry_id,
+                    runbook_id,
+                    &verb_fqn,
+                    session_stack.unwrap_or_default(),
+                )
                     .await
             }
         }
