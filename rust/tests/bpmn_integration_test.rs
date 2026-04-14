@@ -27,6 +27,7 @@ use ob_poc::bpmn_integration::{
     pending_dispatches::PendingDispatchStore,
     types::{CorrelationRecord, CorrelationStatus, ExecutionRoute, ParkedToken, ParkedTokenStatus},
 };
+use ob_poc_types::session_stack::SessionStackState;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -127,6 +128,9 @@ async fn b3_02_start_process_instance() {
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
             correlation_id: Uuid::new_v4(),
+            session_stack: SessionStackState::default(),
+            entry_id: Uuid::new_v4(),
+            runbook_id: Uuid::new_v4(),
         })
         .await
         .expect("StartProcess failed");
@@ -163,6 +167,9 @@ async fn b3_03_full_happy_path() {
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
             correlation_id: Uuid::new_v4(),
+            session_stack: SessionStackState::default(),
+            entry_id: Uuid::new_v4(),
+            runbook_id: Uuid::new_v4(),
         })
         .await
         .expect("StartProcess failed");
@@ -379,6 +386,9 @@ async fn b3_06_cancellation() {
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
             correlation_id: Uuid::new_v4(),
+            session_stack: SessionStackState::default(),
+            entry_id: Uuid::new_v4(),
+            runbook_id: Uuid::new_v4(),
         })
         .await
         .expect("StartProcess failed");
@@ -436,6 +446,9 @@ async fn b3_07_crash_recovery() {
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
             correlation_id: Uuid::new_v4(),
+            session_stack: SessionStackState::default(),
+            entry_id: Uuid::new_v4(),
+            runbook_id: Uuid::new_v4(),
         })
         .await
         .expect("StartProcess failed");
@@ -629,6 +642,9 @@ async fn b3_10_stream_disconnect_redeliver() {
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
             correlation_id: Uuid::new_v4(),
+            session_stack: SessionStackState::default(),
+            entry_id: Uuid::new_v4(),
+            runbook_id: Uuid::new_v4(),
         })
         .await
         .expect("StartProcess failed");
@@ -705,6 +721,9 @@ async fn b3_11_early_signal() {
             domain_payload_hash: hash,
             orch_flags: HashMap::new(),
             correlation_id: Uuid::new_v4(),
+            session_stack: SessionStackState::default(),
+            entry_id: Uuid::new_v4(),
+            runbook_id: Uuid::new_v4(),
         })
         .await
         .expect("StartProcess failed");

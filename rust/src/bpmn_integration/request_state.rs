@@ -237,33 +237,6 @@ impl RequestStateStore {
         row.map(Self::row_to_record).transpose()
     }
 
-    /// Find a request-state projection by originating runbook entry.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// let row = store.find_by_entry_id(entry_id).await?;
-    /// ```
-    pub async fn find_by_entry_id(&self, entry_id: Uuid) -> Result<Option<RequestStateRecord>> {
-        let row = sqlx::query(
-            r#"
-            SELECT request_key, correlation_key, session_id, runbook_id, entry_id,
-                   process_key, process_instance_id, status, requested_at,
-                   started_at, completed_at, failed_at, killed_at, last_error
-            FROM "ob-poc".bpmn_request_states
-            WHERE entry_id = $1
-            ORDER BY requested_at DESC
-            LIMIT 1
-            "#,
-        )
-        .bind(entry_id)
-        .fetch_optional(&self.pool)
-        .await
-        .context("Failed to query bpmn_request_state by entry_id")?;
-
-        row.map(Self::row_to_record).transpose()
-    }
-
     fn row_to_record(row: sqlx::postgres::PgRow) -> Result<RequestStateRecord> {
         use sqlx::Row;
 

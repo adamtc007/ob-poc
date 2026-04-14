@@ -348,6 +348,8 @@ async fn test_grpc_smoke() {
             session_stack_json: String::new(),
             orch_flags: Default::default(),
             correlation_id: "smoke-corr-1".to_string(),
+            entry_id: uuid::Uuid::new_v4().to_string(),
+            runbook_id: uuid::Uuid::new_v4().to_string(),
         })
         .await
         .expect("StartProcess RPC failed")

@@ -90,45 +90,6 @@ impl CorrelationStore {
         }))
     }
 
-    /// Find a correlation by session and entry IDs.
-    ///
-    /// Used by the REPL to look up the process instance for a parked entry
-    /// (e.g., for cancellation or inspection).
-    pub async fn find_by_session_entry(
-        &self,
-        session_id: Uuid,
-        entry_id: Uuid,
-    ) -> Result<Option<CorrelationRecord>> {
-        let row = sqlx::query!(
-            r#"
-            SELECT correlation_id, process_instance_id, session_id, runbook_id,
-                   entry_id, process_key, domain_payload_hash, status,
-                   created_at, completed_at, domain_correlation_key
-            FROM "ob-poc".bpmn_correlations
-            WHERE session_id = $1 AND entry_id = $2
-            "#,
-            session_id,
-            entry_id,
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .context("Failed to query bpmn_correlation by session_entry")?;
-
-        Ok(row.map(|r| CorrelationRecord {
-            correlation_id: r.correlation_id,
-            process_instance_id: r.process_instance_id,
-            session_id: r.session_id,
-            runbook_id: r.runbook_id,
-            entry_id: r.entry_id,
-            process_key: r.process_key,
-            domain_payload_hash: r.domain_payload_hash,
-            status: CorrelationStatus::parse(&r.status).unwrap_or(CorrelationStatus::Active),
-            created_at: r.created_at,
-            completed_at: r.completed_at,
-            domain_correlation_key: r.domain_correlation_key,
-        }))
-    }
-
     /// Update the status of a correlation record.
     ///
     /// Sets `completed_at` to now when transitioning to a terminal state

@@ -131,16 +131,16 @@ impl BpmnLite for BpmnLiteService {
 
         let instance_id = self
             .engine
-            .start_with_session_stack(
-                &req.process_key,
+            .start_with_params(bpmn_lite_core::engine::StartParams {
+                process_key: req.process_key.clone(),
                 bytecode_version,
-                &req.domain_payload,
-                hash,
-                &req.correlation_id,
+                domain_payload: req.domain_payload.clone(),
+                domain_payload_hash: hash,
+                correlation_id: req.correlation_id.clone(),
                 session_stack,
-                parse_uuid(&req.entry_id)?,
-                parse_uuid(&req.runbook_id)?,
-            )
+                entry_id: parse_uuid(&req.entry_id)?,
+                runbook_id: parse_uuid(&req.runbook_id)?,
+            })
             .await
             .map_err(engine_err)?;
 

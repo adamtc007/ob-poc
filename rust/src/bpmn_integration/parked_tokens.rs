@@ -84,45 +84,6 @@ impl ParkedTokenStore {
         }))
     }
 
-    /// Find all parked tokens for a process instance.
-    ///
-    /// Used by the EventBridge to resolve all tokens when a process completes.
-    pub async fn find_by_process_instance(
-        &self,
-        process_instance_id: Uuid,
-    ) -> Result<Vec<ParkedToken>> {
-        let rows = sqlx::query!(
-            r#"
-            SELECT token_id, correlation_key, session_id, entry_id,
-                   process_instance_id, expected_signal, status,
-                   created_at, resolved_at, result_payload
-            FROM "ob-poc".bpmn_parked_tokens
-            WHERE process_instance_id = $1
-            ORDER BY created_at ASC
-            "#,
-            process_instance_id,
-        )
-        .fetch_all(&self.pool)
-        .await
-        .context("Failed to query bpmn_parked_tokens by process_instance_id")?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| ParkedToken {
-                token_id: r.token_id,
-                correlation_key: r.correlation_key,
-                session_id: r.session_id,
-                entry_id: r.entry_id,
-                process_instance_id: r.process_instance_id,
-                expected_signal: r.expected_signal,
-                status: ParkedTokenStatus::parse(&r.status).unwrap_or(ParkedTokenStatus::Waiting),
-                created_at: r.created_at,
-                resolved_at: r.resolved_at,
-                result_payload: r.result_payload,
-            })
-            .collect())
-    }
-
     /// Resolve a parked token by its correlation key.
     ///
     /// Sets status to 'resolved', records the resolution timestamp,
@@ -172,72 +133,4 @@ impl ParkedTokenStore {
         Ok(result.rows_affected())
     }
 
-    /// List all waiting tokens (for monitoring and startup reconnection).
-    pub async fn list_waiting(&self) -> Result<Vec<ParkedToken>> {
-        let rows = sqlx::query!(
-            r#"
-            SELECT token_id, correlation_key, session_id, entry_id,
-                   process_instance_id, expected_signal, status,
-                   created_at, resolved_at, result_payload
-            FROM "ob-poc".bpmn_parked_tokens
-            WHERE status = 'waiting'
-            ORDER BY created_at ASC
-            "#,
-        )
-        .fetch_all(&self.pool)
-        .await
-        .context("Failed to list waiting bpmn_parked_tokens")?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| ParkedToken {
-                token_id: r.token_id,
-                correlation_key: r.correlation_key,
-                session_id: r.session_id,
-                entry_id: r.entry_id,
-                process_instance_id: r.process_instance_id,
-                expected_signal: r.expected_signal,
-                status: ParkedTokenStatus::parse(&r.status).unwrap_or(ParkedTokenStatus::Waiting),
-                created_at: r.created_at,
-                resolved_at: r.resolved_at,
-                result_payload: r.result_payload,
-            })
-            .collect())
-    }
-
-    /// List waiting tokens for a specific session.
-    ///
-    /// Used by the REPL to show parked entries to the user.
-    pub async fn list_waiting_for_session(&self, session_id: Uuid) -> Result<Vec<ParkedToken>> {
-        let rows = sqlx::query!(
-            r#"
-            SELECT token_id, correlation_key, session_id, entry_id,
-                   process_instance_id, expected_signal, status,
-                   created_at, resolved_at, result_payload
-            FROM "ob-poc".bpmn_parked_tokens
-            WHERE session_id = $1 AND status = 'waiting'
-            ORDER BY created_at ASC
-            "#,
-            session_id,
-        )
-        .fetch_all(&self.pool)
-        .await
-        .context("Failed to list waiting bpmn_parked_tokens for session")?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| ParkedToken {
-                token_id: r.token_id,
-                correlation_key: r.correlation_key,
-                session_id: r.session_id,
-                entry_id: r.entry_id,
-                process_instance_id: r.process_instance_id,
-                expected_signal: r.expected_signal,
-                status: ParkedTokenStatus::parse(&r.status).unwrap_or(ParkedTokenStatus::Waiting),
-                created_at: r.created_at,
-                resolved_at: r.resolved_at,
-                result_payload: r.result_payload,
-            })
-            .collect())
-    }
 }

@@ -567,16 +567,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     // BPMN-Lite Integration (before REPL V2 — determines executor)
     // =========================================================================
-    let (bpmn_executor_v2, bpmn_dispatcher, orchestrated_verbs): (
+    type BpmnSetup = (
         Option<Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>>,
         Option<Arc<ob_poc::bpmn_integration::dispatcher::WorkflowDispatcher>>,
         std::collections::HashSet<String>,
-    ) = {
+    );
+    let (bpmn_executor_v2, bpmn_dispatcher, orchestrated_verbs): BpmnSetup = {
         use ob_poc::bpmn_integration::{
             client::BpmnLiteConnection, config::WorkflowConfigIndex, correlation::CorrelationStore,
             dispatcher::WorkflowDispatcher, job_frames::JobFrameStore,
             parked_tokens::ParkedTokenStore, pending_dispatch_worker::PendingDispatchWorker,
-            pending_dispatches::PendingDispatchStore, worker::JobWorker,
+            pending_dispatches::PendingDispatchStore, request_state::RequestStateStore,
+            worker::JobWorker,
         };
         use ob_poc::repl::executor_bridge::RealDslExecutor;
 
@@ -656,6 +658,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         CorrelationStore::new(pool.clone()),
                                         ParkedTokenStore::new(pool.clone()),
                                         PendingDispatchStore::new(pool.clone()),
+                                        RequestStateStore::new(pool.clone()),
                                     )
                                     .with_pool(pool.clone()),
                                 );
@@ -687,6 +690,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     client.clone(),
                                     PendingDispatchStore::new(pool.clone()),
                                     CorrelationStore::new(pool.clone()),
+                                    RequestStateStore::new(pool.clone()),
                                     config_index.clone(),
                                 );
                                 tokio::spawn(async move {

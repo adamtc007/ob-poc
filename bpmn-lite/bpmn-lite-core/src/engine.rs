@@ -18,6 +18,18 @@ pub struct BpmnLiteEngine {
     tenant_id: String,
 }
 
+/// Parameters for starting a new process instance.
+pub struct StartParams {
+    pub process_key: String,
+    pub bytecode_version: [u8; 32],
+    pub domain_payload: String,
+    pub domain_payload_hash: [u8; 32],
+    pub correlation_id: String,
+    pub session_stack: SessionStackState,
+    pub entry_id: Uuid,
+    pub runbook_id: Uuid,
+}
+
 /// Result of compiling BPMN XML.
 #[derive(Debug, Clone)]
 pub struct CompileResult {
@@ -178,35 +190,24 @@ impl BpmnLiteEngine {
         domain_payload_hash: [u8; 32],
         correlation_id: &str,
     ) -> Result<Uuid> {
-        self.start_with_session_stack(
-            process_key,
+        self.start_with_params(StartParams {
+            process_key: process_key.to_string(),
             bytecode_version,
-            domain_payload,
+            domain_payload: domain_payload.to_string(),
             domain_payload_hash,
-            correlation_id,
-            SessionStackState::default(),
-            Uuid::nil(),
-            Uuid::nil(),
-        )
+            correlation_id: correlation_id.to_string(),
+            session_stack: SessionStackState::default(),
+            entry_id: Uuid::nil(),
+            runbook_id: Uuid::nil(),
+        })
         .await
     }
 
-    /// Start a new process instance with a copied canonical session stack.
-    pub async fn start_with_session_stack(
-        &self,
-        process_key: &str,
-        bytecode_version: [u8; 32],
-        domain_payload: &str,
-        domain_payload_hash: [u8; 32],
-        correlation_id: &str,
-        session_stack: SessionStackState,
-        entry_id: Uuid,
-        runbook_id: Uuid,
-    ) -> Result<Uuid> {
-        // Verify program exists
+    /// Start a new process instance with full parameters including session stack.
+    pub async fn start_with_params(&self, params: StartParams) -> Result<Uuid> {
         let _program = self
             .store
-            .load_program(bytecode_version)
+            .load_program(params.bytecode_version)
             .await?
             .ok_or_else(|| anyhow!("No program found for bytecode version"))?;
 
@@ -214,32 +215,30 @@ impl BpmnLiteEngine {
         let instance = ProcessInstance {
             instance_id,
             tenant_id: self.tenant_id.clone(),
-            process_key: process_key.to_string(),
-            bytecode_version,
-            domain_payload: domain_payload.to_string().into(),
-            domain_payload_hash,
-            session_stack,
+            process_key: params.process_key,
+            bytecode_version: params.bytecode_version,
+            domain_payload: params.domain_payload.into(),
+            domain_payload_hash: params.domain_payload_hash,
+            session_stack: params.session_stack,
             flags: BTreeMap::new(),
             counters: BTreeMap::new(),
             join_expected: BTreeMap::new(),
             state: ProcessState::Running,
-            correlation_id: correlation_id.to_string(),
-            entry_id,
-            runbook_id,
+            correlation_id: params.correlation_id,
+            entry_id: params.entry_id,
+            runbook_id: params.runbook_id,
             created_at: now_ms(),
         };
-        // Create root fiber at pc=0
         let fiber_id = Uuid::now_v7();
         let root_fiber = Fiber::new(fiber_id, 0);
 
-        // Atomically persist instance + root fiber + InstanceStarted event
         self.store
             .atomic_start(
                 &instance,
                 &root_fiber,
                 &RuntimeEvent::InstanceStarted {
                     instance_id,
-                    bytecode_version,
+                    bytecode_version: params.bytecode_version,
                 },
             )
             .await?;
@@ -1312,16 +1311,16 @@ mod tests {
         };
 
         let instance_id = engine
-            .start_with_session_stack(
-                "copy_proc",
-                compile_result.bytecode_version,
-                payload,
-                hash,
-                "corr-copy",
-                session_stack.clone(),
-                Uuid::new_v4(),
-                Uuid::new_v4(),
-            )
+            .start_with_params(StartParams {
+                process_key: "copy_proc".to_string(),
+                bytecode_version: compile_result.bytecode_version,
+                domain_payload: payload.to_string(),
+                domain_payload_hash: hash,
+                correlation_id: "corr-copy".to_string(),
+                session_stack: session_stack.clone(),
+                entry_id: Uuid::new_v4(),
+                runbook_id: Uuid::new_v4(),
+            })
             .await
             .unwrap();
 
@@ -1372,16 +1371,16 @@ mod tests {
         let runbook_id = Uuid::new_v4();
 
         let instance_id = engine
-            .start_with_session_stack(
-                "lineage_proc",
-                compile_result.bytecode_version,
-                payload,
-                hash,
-                "corr-lineage",
-                SessionStackState::default(),
+            .start_with_params(StartParams {
+                process_key: "lineage_proc".to_string(),
+                bytecode_version: compile_result.bytecode_version,
+                domain_payload: payload.to_string(),
+                domain_payload_hash: hash,
+                correlation_id: "corr-lineage".to_string(),
+                session_stack: SessionStackState::default(),
                 entry_id,
                 runbook_id,
-            )
+            })
             .await
             .unwrap();
 
