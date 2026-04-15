@@ -129,10 +129,11 @@ fn project_orientation_from_repl_session(session: &ReplSessionV2) -> Orientation
     let hydrated = tos.and_then(|f| f.hydrated_state.as_ref());
     let constellation = hydrated.and_then(|h| h.hydrated_constellation.as_ref());
 
-    // available_actions from HydratedSlot.available_verbs — same source the compiler uses
+    // available_actions from HydratedSlot.available_verbs — same source the compiler uses.
+    // When no constellation is hydrated (session start), populate with bootstrap scoping verbs.
     let available_actions: Vec<ActionDescriptor> = constellation
         .map(|c| collect_actions_from_slots(&c.slots))
-        .unwrap_or_default();
+        .unwrap_or_else(universe_root_action_descriptors);
 
     // Focus identity from TOS workspace context
     let (focus_kind, focus_identity) = derive_focus_from_tos(tos, constellation);
@@ -543,8 +544,8 @@ async fn get_graph_scene(
         }
     }
 
-    // 3. No CBU in scope — return stub scene
-    Json(stub_graph_scene(Some(&label), ViewLevel::System)).into_response()
+    // 3. No CBU in scope — return universe scene showing all workspaces
+    Json(universe_graph_scene(Some(&label))).into_response()
 }
 
 /// GET /api/observatory/session/:id/session-stack-graph
@@ -913,10 +914,10 @@ async fn navigate(
                 1,
             )
         } else {
-            stub_graph_scene(label.as_deref(), galaxy_level)
+            universe_graph_scene(label.as_deref())
         }
     } else {
-        stub_graph_scene(label.as_deref(), galaxy_level)
+        universe_graph_scene(label.as_deref())
     };
 
     // 5. Record in navigation history
@@ -1007,33 +1008,98 @@ fn to_galaxy_view_level(level: ViewLevel) -> ob_poc_types::galaxy::ViewLevel {
 }
 
 /// Build a stub graph scene when no constellation is available.
-fn stub_graph_scene(
+fn universe_root_action_descriptors() -> Vec<ActionDescriptor> {
+    let scoping_verbs = [
+        ("session.start", "New Session"),
+        ("session.resume", "Resume Session"),
+        ("session.load-cbu", "Load Client Group"),
+        ("session.load-galaxy", "Load Galaxy"),
+        ("session.load-jurisdiction", "Load Jurisdiction"),
+        ("client-group.search", "Search Client Groups"),
+        ("gleif.search", "Search LEI Registry"),
+        ("session.info", "Session Info"),
+    ];
+    scoping_verbs
+        .iter()
+        .enumerate()
+        .map(|(i, (id, label))| ActionDescriptor {
+            action_id: id.to_string(),
+            label: label.to_string(),
+            action_kind: "scope".into(),
+            enabled: true,
+            disabled_reason: None,
+            rank_score: 1.0 - (i as f64 * 0.05),
+        })
+        .collect()
+}
+
+fn universe_graph_scene(
     label: Option<&str>,
-    level: ob_poc_types::galaxy::ViewLevel,
 ) -> ob_poc_types::graph_scene::GraphSceneModel {
+    use crate::repl::types_v2::WorkspaceKind;
     use ob_poc_types::graph_scene::*;
 
-    GraphSceneModel {
-        generation: 1,
-        level,
-        layout_strategy: LayoutStrategy::DeterministicOrbital,
-        nodes: vec![SceneNode {
-            id: "cbu".into(),
-            label: label.unwrap_or("Observatory").into(),
-            node_type: SceneNodeType::Cbu,
-            state: Some("filled".into()),
+    let root_label = label.unwrap_or("Universe");
+    let workspaces = WorkspaceKind::all();
+
+    let mut nodes = Vec::with_capacity(1 + workspaces.len());
+    let mut edges = Vec::with_capacity(workspaces.len());
+
+    nodes.push(SceneNode {
+        id: "universe".into(),
+        label: root_label.into(),
+        node_type: SceneNodeType::Aggregate,
+        state: Some("active".into()),
+        progress: 0,
+        blocking: false,
+        depth: 0,
+        position_hint: Some((0.0, 0.0)),
+        badges: vec![],
+        child_count: workspaces.len(),
+        group_id: None,
+    });
+
+    for ws in &workspaces {
+        let registry = ws.registry_entry();
+        let ws_id = format!("workspace:{}", ws.label());
+        nodes.push(SceneNode {
+            id: ws_id.clone(),
+            label: registry.display_name.to_string(),
+            node_type: SceneNodeType::Cluster,
+            state: Some("available".into()),
             progress: 0,
             blocking: false,
-            depth: 0,
-            position_hint: Some((0.0, 0.0)),
+            depth: 1,
+            position_hint: None,
             badges: vec![],
             child_count: 0,
             group_id: None,
-        }],
-        edges: vec![],
+        });
+        edges.push(SceneEdge {
+            source: "universe".into(),
+            target: ws_id.clone(),
+            edge_type: SceneEdgeType::ParentChild,
+            label: Some(ws.label().to_string()),
+            weight: 1.0,
+        });
+    }
+
+    GraphSceneModel {
+        generation: 1,
+        level: ob_poc_types::galaxy::ViewLevel::Universe,
+        layout_strategy: LayoutStrategy::DeterministicOrbital,
+        nodes,
+        edges,
         groups: vec![],
-        drill_targets: vec![],
-        max_depth: 0,
+        drill_targets: workspaces
+            .iter()
+            .map(|ws| DrillTarget {
+                node_id: format!("workspace:{}", ws.label()),
+                target_level: ob_poc_types::galaxy::ViewLevel::System,
+                drill_label: ws.registry_entry().display_name.to_string(),
+            })
+            .collect(),
+        max_depth: 1,
     }
 }
 

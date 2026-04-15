@@ -334,6 +334,7 @@ export interface ChatSession {
   updated_at: string;
   messages: ChatMessage[];
   context?: SessionContext;
+  initial_session_feedback?: SessionFeedback;
 }
 
 /** Session context */

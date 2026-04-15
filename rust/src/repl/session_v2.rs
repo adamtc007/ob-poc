@@ -16,8 +16,9 @@ use super::decision_log::SessionDecisionLog;
 use super::proposal_engine::ProposalSet;
 use super::runbook::{ArgExtractionAudit, Runbook, SlotSource};
 use super::types_v2::{
-    AgentMode, ConversationMode, ReplStateV2, SessionFeedback, SessionScope, SubjectKind,
-    SubjectRef, VerbRef, WorkspaceFrame, WorkspaceHint, WorkspaceKind, WorkspaceStateView,
+    ActionHint, AgentMode, ConversationMode, ReplStateV2, SessionFeedback, SessionScope,
+    SubjectKind, SubjectRef, VerbRef, WorkspaceFrame, WorkspaceHint, WorkspaceKind,
+    WorkspaceStateView,
 };
 use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
 use crate::journey::handoff::PackHandoff;
@@ -713,7 +714,7 @@ impl ReplSessionV2 {
     /// ```
     pub fn build_session_feedback(&self, tos_is_peek_override: bool) -> SessionFeedback {
         let fallback_workspace = self.active_workspace.clone().unwrap_or(WorkspaceKind::Cbu);
-        let fallback_registry = fallback_workspace.registry_entry();
+        let _fallback_registry = fallback_workspace.registry_entry();
         let (hydrated, stale_warning) = if let Some(tos) = self.workspace_stack.last() {
             (
                 tos.hydrated_state
@@ -737,15 +738,13 @@ impl ReplSessionV2 {
             (
                 WorkspaceStateView {
                     workspace: fallback_workspace.clone(),
-                    constellation_family: fallback_registry
-                        .default_constellation_family
-                        .to_string(),
-                    constellation_map: fallback_registry.default_constellation_map.to_string(),
+                    constellation_family: "universe".to_string(),
+                    constellation_map: "universe.root".to_string(),
                     subject_ref: None,
                     hydrated_constellation: None,
-                    scoped_verb_surface: Vec::new(),
+                    scoped_verb_surface: universe_root_verbs(),
                     progress_summary: None,
-                    available_actions: Vec::new(),
+                    available_actions: universe_root_actions(),
                 },
                 false,
             )
@@ -950,6 +949,63 @@ impl Default for ReplSessionV2 {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn universe_root_verbs() -> Vec<VerbRef> {
+    vec![
+        VerbRef {
+            verb_fqn: "session.start".into(),
+            display_name: "New Session".into(),
+        },
+        VerbRef {
+            verb_fqn: "session.resume".into(),
+            display_name: "Resume Session".into(),
+        },
+        VerbRef {
+            verb_fqn: "session.load-cbu".into(),
+            display_name: "Load Client Group".into(),
+        },
+        VerbRef {
+            verb_fqn: "session.load-galaxy".into(),
+            display_name: "Load Galaxy".into(),
+        },
+        VerbRef {
+            verb_fqn: "session.load-jurisdiction".into(),
+            display_name: "Load Jurisdiction".into(),
+        },
+        VerbRef {
+            verb_fqn: "client-group.search".into(),
+            display_name: "Search Client Groups".into(),
+        },
+        VerbRef {
+            verb_fqn: "gleif.search".into(),
+            display_name: "Search LEI Registry".into(),
+        },
+        VerbRef {
+            verb_fqn: "session.info".into(),
+            display_name: "Session Info".into(),
+        },
+    ]
+}
+
+fn universe_root_actions() -> Vec<ActionHint> {
+    vec![
+        ActionHint {
+            label: "Select a client group".into(),
+            verb_fqn: Some("session.load-cbu".into()),
+            action_type: "scope".into(),
+        },
+        ActionHint {
+            label: "Search for a client group".into(),
+            verb_fqn: Some("client-group.search".into()),
+            action_type: "scope".into(),
+        },
+        ActionHint {
+            label: "SemOS infrastructure maintenance".into(),
+            verb_fqn: None,
+            action_type: "workspace".into(),
+        },
+    ]
 }
 
 fn workspace_hints() -> Vec<WorkspaceHint> {

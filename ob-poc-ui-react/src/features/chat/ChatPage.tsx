@@ -5,7 +5,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useCallback, useMemo, useState } from "react";
-import { Loader2, BookOpen, Telescope } from "lucide-react";
+import { Loader2, BookOpen } from "lucide-react";
 import { chatApi } from "../../api/chat";
 import { scopeApi, type CbuSummary } from "../../api/scope";
 import { observatoryApi } from "../../api/observatory";
@@ -21,9 +21,12 @@ import {
   ScopePanel,
   VerbBrowser,
 } from "./components";
+import { NarrationPanel } from "./components/NarrationPanel";
 import { RunbookPlanReview } from "./RunbookPlanReview";
 import { runbookPlanApi } from "../../api/runbookPlan";
 import { DealPanel } from "../deal/components";
+import { ConstellationCanvas } from "../observatory/components/ConstellationCanvas";
+import type { ObservatoryAction } from "../../types/observatory";
 import type { DecisionReply, DiscoverySelection } from "../../types/chat";
 import type { SessionFeedback } from "../../api/replV2";
 
@@ -58,13 +61,68 @@ export function ChatPage() {
       !isSessionMissingError(err) && failureCount < 2,
   });
 
-  // Observatory orientation for Flight Deck
+  // Observatory orientation for Flight Deck + canvas
   const { data: orientation } = useQuery({
     queryKey: queryKeys.observatory.orientation(sessionId!),
     queryFn: () => observatoryApi.getOrientation(sessionId!),
     enabled: !!sessionId,
     refetchInterval: 5000,
   });
+
+  // Graph scene for embedded egui canvas
+  const { data: graphScene } = useQuery({
+    queryKey: queryKeys.observatory.graphScene(sessionId!),
+    queryFn: () => observatoryApi.getGraphScene(sessionId!),
+    enabled: !!sessionId,
+    refetchInterval: 5000,
+  });
+
+  // Handle canvas interactions — route semantic actions through REPL input
+  const handleCanvasAction = useCallback(
+    async (action: ObservatoryAction) => {
+      if (!sessionId) return;
+
+      let verb: string | null = null;
+      let args: Record<string, unknown> = {};
+
+      switch (action.type) {
+        case "drill":
+          verb = "nav.drill";
+          args = { target_id: action.node_id, target_level: action.target_level };
+          break;
+        case "semantic_zoom_out":
+          verb = "nav.zoom-out";
+          break;
+        case "navigate_history":
+          verb = action.direction === "back" ? "nav.history-back" : "nav.history-forward";
+          break;
+        case "select_node":
+          verb = "nav.select";
+          args = { target_id: action.node_id };
+          break;
+        case "invoke_verb":
+          verb = action.verb_fqn;
+          break;
+        default:
+          return;
+      }
+
+      if (!verb) return;
+      const message = args && Object.keys(args).length > 0
+        ? `${verb} ${Object.values(args).join(" ")}`
+        : verb;
+
+      try {
+        await chatApi.sendMessage(sessionId, { message });
+        queryClient.invalidateQueries({ queryKey: queryKeys.observatory.all(sessionId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
+      } catch (err) {
+        console.error("Canvas navigation failed:", err);
+      }
+    },
+    [sessionId],
+  );
 
   useEffect(() => {
     if (!sessionId || !sessionMissing) return;
@@ -147,12 +205,21 @@ export function ChatPage() {
       setStreaming(true);
     },
     onSuccess: (response) => {
-      // Add the assistant response message to the current session.
-      // We don't call setCurrentSession(response.session) because the backend
-      // may not persist all messages (e.g. /commands) into the session history,
-      // which would overwrite our optimistically-added user message and lose
-      // the assistant response entirely.
       addMessage(response.message);
+
+      // Detect session.start/resume — navigate to the new session
+      try {
+        const content = response.message?.content ?? "";
+        if (content.includes("Session ID:")) {
+          const match = content.match(/Session ID: ([0-9a-f-]{36})/);
+          if (match?.[1] && match[1] !== sessionId) {
+            queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
+            navigate(`/chat/${match[1]}`);
+            setStreaming(false);
+            return;
+          }
+        }
+      } catch { /* ignore parse errors */ }
       if (response.available_verbs?.length) {
         setAvailableVerbs(
           response.available_verbs,
@@ -266,9 +333,17 @@ export function ChatPage() {
 
   const handleSend = useCallback(
     (message: string) => {
+      if (message === "New Session" || message === "session.start") {
+        chatApi.createSession().then((newSession) => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
+          queryClient.setQueryData(queryKeys.chat.session(newSession.id), newSession);
+          navigate(`/chat/${newSession.id}`);
+        });
+        return;
+      }
       sendMutation.mutate(message);
     },
-    [sendMutation],
+    [sendMutation, navigate],
   );
 
   const latestSessionFeedback = useMemo<SessionFeedback | undefined>(() => {
@@ -277,6 +352,17 @@ export function ChatPage() {
       const feedback = messages[index]?.session_feedback;
       if (feedback) {
         return feedback;
+      }
+    }
+    return currentSession?.initial_session_feedback;
+  }, [currentSession?.messages, currentSession?.initial_session_feedback]);
+
+  const latestNarration = useMemo(() => {
+    const messages = currentSession?.messages ?? [];
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const narration = messages[index]?.narration;
+      if (narration && narration.verbosity !== "silent") {
+        return narration;
       }
     }
     return undefined;
@@ -324,13 +410,133 @@ export function ChatPage() {
   );
 
   return (
-    <div className="flex h-full">
-      {/* Left sidebar - Session list */}
-      <ChatSidebar className="w-64 flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)]" />
+    <div className="flex h-screen bg-[var(--bg-primary)]">
+      {/* Left: Session icons + Chat cockpit (cause) */}
+      <ChatSidebar />
 
-      {/* Main chat area */}
-      <div className="flex flex-1 flex-col">
-        {/* Flight Deck — Observatory control panel */}
+      {!sessionMissing && (
+        <div className="w-[28rem] flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
+          {/* Chat messages (scrollable) */}
+          <div className="flex-1 overflow-auto p-3 min-h-0">
+            {isLoading ? (
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--accent-blue)]" />
+              </div>
+            ) : error ? (
+              <div className="flex h-full items-center justify-center">
+                <p className="text-sm text-[var(--accent-red)]">
+                  {error instanceof Error ? error.message : "Failed to load session"}
+                </p>
+              </div>
+            ) : currentSession ? (
+              <div className="space-y-3">
+                {currentSession.messages.map((message) => (
+                  <ChatMessage
+                    key={message.id}
+                    message={message}
+                    onDecisionReply={handleDecisionReply}
+                    onDiscoverySelection={handleDiscoverySelection}
+                    onSendMessage={(msg) => sendMutation.mutate(msg)}
+                  />
+                ))}
+
+                {isStreaming && (
+                  <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span className="text-xs">Thinking...</span>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            ) : null}
+          </div>
+
+          {/* Chat input */}
+          <ChatInput
+            onSend={handleSend}
+            onCancel={handleCancel}
+            isStreaming={isStreaming}
+            disabled={
+              !sessionId ||
+              sendMutation.isPending ||
+              discoverySelectionMutation.isPending
+            }
+            placeholder={
+              sessionId ? "Type a message..." : "Select or create a session first"
+            }
+          />
+
+          {/* Panels below input (scrollable) */}
+          <div className="border-t border-[var(--border-primary)] overflow-auto" style={{ maxHeight: "40%" }}>
+            {sessionId && <DealPanel sessionId={sessionId} />}
+
+            <ScopePanel
+              sessionId={sessionId}
+              selectedCbuId={selectedCbu?.id ?? null}
+              onSelectCbu={setSelectedCbu}
+            />
+
+            <ConstellationPanel
+              selectedCbu={selectedCbu}
+              sessionFeedback={latestSessionFeedback}
+              className="min-h-0"
+              onPromptAgent={handleSend}
+            />
+
+            {latestNarration && (
+              <div className="border-t border-[var(--border-primary)]">
+                <NarrationPanel
+                  narration={latestNarration}
+                  onSendMessage={(msg) => sendMutation.mutate(msg)}
+                />
+              </div>
+            )}
+
+            {sessionId && (
+              <div className="flex items-center gap-2 border-t border-[var(--border-primary)] px-3 py-2">
+                <button
+                  onClick={showRunbookPlan ? () => setShowRunbookPlan(false) : handleCompileRunbook}
+                  className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-secondary)]"
+                >
+                  <BookOpen size={14} />
+                  {showRunbookPlan ? "Hide Plan" : "Compile Plan"}
+                </button>
+              </div>
+            )}
+
+            {sessionId && showRunbookPlan && (
+              <div className="border-t border-[var(--border-primary)] overflow-auto max-h-[40vh] p-3">
+                <RunbookPlanReview
+                  sessionId={sessionId}
+                  onApproved={() => {
+                    if (sessionId) {
+                      queryClient.invalidateQueries({ queryKey: queryKeys.chat.session(sessionId) });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
+                    }
+                  }}
+                  onCancelled={() => setShowRunbookPlan(false)}
+                  onCompleted={() => {
+                    if (sessionId) {
+                      queryClient.invalidateQueries({ queryKey: queryKeys.chat.session(sessionId) });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
+                    }
+                  }}
+                />
+              </div>
+            )}
+
+            <VerbBrowser
+              className="border-t border-[var(--border-primary)]"
+              onVerbSubmit={handleVerbSubmit}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Right: Observatory canvas (effect/visualization) */}
+      <div className="flex flex-1 flex-col min-w-0">
         {sessionId && (
           <FlightDeck
             orientation={orientation ?? null}
@@ -338,22 +544,15 @@ export function ChatPage() {
           />
         )}
 
-        {/* Messages */}
-        <div className="flex-1 overflow-auto p-4">
-          {isLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-blue)]" />
-            </div>
-          ) : error ? (
-            <div className="flex h-full items-center justify-center">
-              <p className="text-[var(--accent-red)]">
-                {error instanceof Error
-                  ? error.message
-                  : "Failed to load session"}
-              </p>
-            </div>
-          ) : !currentSession ? (
-            <div className="flex h-full items-center justify-center">
+        <div className="flex-1 min-h-0">
+          {sessionId ? (
+            <ConstellationCanvas
+              graphScene={graphScene ?? null}
+              viewLevel={orientation?.view_level ?? "system"}
+              onAction={handleCanvasAction}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center bg-[var(--bg-primary)]">
               <div className="text-center">
                 <h2 className="text-xl font-semibold text-[var(--text-primary)]">
                   Start a Conversation
@@ -363,129 +562,9 @@ export function ChatPage() {
                 </p>
               </div>
             </div>
-          ) : (
-            <div className="space-y-4 max-w-3xl mx-auto">
-              {currentSession.messages.length === 0 ? (
-                <div className="py-12 text-center">
-                  <h3 className="text-lg font-medium text-[var(--text-primary)]">
-                    Loading...
-                  </h3>
-                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                    Setting up your session.
-                  </p>
-                </div>
-              ) : (
-                currentSession.messages.map((message) => (
-                  <ChatMessage
-                    key={message.id}
-                    message={message}
-                    onDecisionReply={handleDecisionReply}
-                    onDiscoverySelection={handleDiscoverySelection}
-                    onSendMessage={(msg) => sendMutation.mutate(msg)}
-                  />
-                ))
-              )}
-
-              {/* Streaming indicator */}
-              {isStreaming && (
-                <div className="flex items-center gap-2 text-[var(--text-muted)]">
-                  <Loader2 size={16} className="animate-spin" />
-                  <span className="text-sm">Thinking...</span>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
           )}
         </div>
-
-        {/* Input area */}
-        <ChatInput
-          onSend={handleSend}
-          onCancel={handleCancel}
-          isStreaming={isStreaming}
-          disabled={
-            !sessionId ||
-            sendMutation.isPending ||
-            discoverySelectionMutation.isPending
-          }
-          placeholder={
-            sessionId ? "Type a message..." : "Select or create a session first"
-          }
-        />
       </div>
-
-      {/* Right sidebar - Scope, Verbs, and Deal panels */}
-      {!sessionMissing && (
-        <div className="w-[32rem] flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
-          {/* Deal context panel */}
-          {sessionId && <DealPanel sessionId={sessionId} />}
-
-          {/* Scope panel showing loaded CBUs */}
-          <ScopePanel
-            sessionId={sessionId}
-            selectedCbuId={selectedCbu?.id ?? null}
-            onSelectCbu={setSelectedCbu}
-          />
-
-          <ConstellationPanel
-            selectedCbu={selectedCbu}
-            sessionFeedback={latestSessionFeedback}
-            className="min-h-0"
-            onPromptAgent={handleSend}
-          />
-
-          {/* Runbook plan + Observatory controls */}
-          {sessionId && (
-            <div className="flex items-center gap-2 border-t border-[var(--border-primary)] px-3 py-2">
-              <button
-                onClick={showRunbookPlan ? () => setShowRunbookPlan(false) : handleCompileRunbook}
-                className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-secondary)]"
-              >
-                <BookOpen size={14} />
-                {showRunbookPlan ? "Hide Plan" : "Compile Plan"}
-              </button>
-              <button
-                onClick={() => navigate(`/observatory/${sessionId}`)}
-                className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-secondary)]"
-                title="Open Observatory"
-              >
-                <Telescope size={14} />
-                Observatory
-              </button>
-            </div>
-          )}
-
-          {/* Runbook plan review panel */}
-          {sessionId && showRunbookPlan && (
-            <div className="border-t border-[var(--border-primary)] overflow-auto max-h-[40vh] p-3">
-              <RunbookPlanReview
-                sessionId={sessionId}
-                onApproved={() => {
-                  if (sessionId) {
-                    queryClient.invalidateQueries({ queryKey: queryKeys.chat.session(sessionId) });
-                    queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
-                  }
-                }}
-                onCancelled={() => setShowRunbookPlan(false)}
-                onCompleted={() => {
-                  if (sessionId) {
-                    queryClient.invalidateQueries({ queryKey: queryKeys.chat.session(sessionId) });
-                    queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
-                    queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
-                  }
-                }}
-              />
-            </div>
-          )}
-
-          {/* Available commands / verb browser */}
-          <VerbBrowser
-            className="border-t border-[var(--border-primary)]"
-            onVerbSubmit={handleVerbSubmit}
-          />
-        </div>
-      )}
     </div>
   );
 }

@@ -10,23 +10,40 @@
 
 > **UI Migration:** The UI has been migrated from egui/WASM to React/TypeScript. The old `ob-poc-ui` and `esper_egui` crates are deprecated.
 
-### Architecture
+### Architecture — Cockpit Layout
+
+The primary UI is a **cockpit layout**: the egui WASM constellation canvas occupies the center column (always visible), chat messages and panels occupy the right column. The canvas is the "windscreen" — navigation happens by interacting with nodes directly (hover, click, double-click).
 
 ```
 ob-poc-ui-react/
 ├── src/
-│   ├── api/              # API client (chat.ts, scope.ts, semOs.ts)
+│   ├── api/              # API client (chat.ts, scope.ts, semOs.ts, observatory.ts)
 │   ├── features/
-│   │   ├── chat/         # Agent chat UI with scope panel
-│   │   ├── semantic-os/  # Semantic OS workflow UI
+│   │   ├── chat/         # Cockpit UI: egui canvas center + chat & panels right
+│   │   ├── observatory/  # Full-screen Observatory (standalone option at /observatory/:id)
 │   │   ├── inspector/    # Projection inspector (tree + detail)
 │   │   └── settings/     # App settings
 │   ├── stores/           # Zustand state management
-│   ├── types/            # TypeScript types
+│   ├── types/            # TypeScript types (observatory.ts, chat.ts)
 │   └── lib/              # Utilities, query client
 ├── dist/                 # Production build (served by Rust)
 └── package.json
 ```
+
+**ChatPage cockpit layout:**
+```
+[Sessions w-64] | [egui Canvas flex-1     ] | [Chat + Panels w-[28rem]]
+                  [FlightDeck status bar   ]   [Messages (scrollable)  ]
+                  [Canvas (60fps WASM)     ]   [ChatInput              ]
+                                               [Scope, Constellation   ]
+                                               [Narration, Verbs       ]
+```
+
+- egui canvas renders `GraphSceneModel` from Observatory API (polled 5s)
+- Canvas actions (drill, select, zoom) route through standard REPL input pipeline
+- FlightDeck defaults to collapsed 1-line status bar (expand on click for lens controls)
+- At session start, canvas shows universe root with 7 workspace nodes
+- `SessionFeedback` populated from session creation with scoping verbs
 
 ### Key Endpoints (Backend → React)
 

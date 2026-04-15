@@ -4,10 +4,11 @@
 
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, MessageSquare, Trash2, Loader2 } from "lucide-react";
+import { Plus, MessageSquare, Trash2, Loader2, PanelLeftOpen, PanelLeftClose } from "lucide-react";
+import { useState } from "react";
 import { chatApi } from "../../../api/chat";
 import { queryKeys, queryClient } from "../../../lib/query";
-import { cn, formatDate, truncate } from "../../../lib/utils";
+import { cn, formatDate } from "../../../lib/utils";
 import type { ChatSessionSummary } from "../../../types/chat";
 
 interface ChatSidebarProps {
@@ -29,6 +30,10 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
     mutationFn: () => chatApi.createSession(),
     onSuccess: (newSession) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.sessions() });
+      queryClient.setQueryData(
+        queryKeys.chat.session(newSession.id),
+        newSession,
+      );
       navigate(`/chat/${newSession.id}`);
     },
   });
@@ -77,79 +82,125 @@ export function ChatSidebar({ className }: ChatSidebarProps) {
     }
   };
 
-  return (
-    <div className={cn("flex flex-col", className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--border-primary)] px-4 py-3">
-        <h2 className="font-semibold text-[var(--text-primary)]">Sessions</h2>
+  const [expanded, setExpanded] = useState(false);
+
+  if (!expanded) {
+    return (
+      <div className={cn("flex flex-col w-10 flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)] items-center py-2 gap-1", className)}>
+        <button
+          onClick={() => setExpanded(true)}
+          className="rounded p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+          title="Show sessions"
+        >
+          <PanelLeftOpen size={16} />
+        </button>
         <button
           onClick={() => createMutation.mutate()}
           disabled={createMutation.isPending}
-          className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-50"
+          className="rounded p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-50"
           title="New session"
         >
           {createMutation.isPending ? (
-            <Loader2 size={18} className="animate-spin" />
+            <Loader2 size={14} className="animate-spin" />
           ) : (
-            <Plus size={18} />
+            <Plus size={14} />
           )}
         </button>
+        <div className="flex-1 overflow-auto flex flex-col items-center gap-1 mt-1">
+          {(sessions ?? []).map((session: ChatSessionSummary) => (
+            <button
+              key={session.id}
+              onClick={() => handleSessionClick(session)}
+              className={cn(
+                "rounded p-1.5 transition-colors",
+                sessionId === session.id
+                  ? "bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]"
+                  : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]",
+              )}
+              title={session.client_group_name || session.title || `Session ${session.id.slice(0, 8)}`}
+            >
+              <MessageSquare size={14} />
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("flex flex-col w-56 flex-shrink-0 border-r border-[var(--border-primary)] bg-[var(--bg-secondary)]", className)}>
+      <div className="flex items-center justify-between border-b border-[var(--border-primary)] px-3 py-2">
+        <h2 className="text-sm font-semibold text-[var(--text-primary)]">Sessions</h2>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => createMutation.mutate()}
+            disabled={createMutation.isPending}
+            className="rounded p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-50"
+            title="New session"
+          >
+            {createMutation.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Plus size={14} />
+            )}
+          </button>
+          <button
+            onClick={() => setExpanded(false)}
+            className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+            title="Collapse"
+          >
+            <PanelLeftClose size={14} />
+          </button>
+        </div>
       </div>
 
-      {/* Session list */}
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 overflow-auto p-1.5">
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-[var(--text-muted)]" />
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
           </div>
         ) : sessions && sessions.length > 0 ? (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {sessions.map((session: ChatSessionSummary) => (
               <button
                 key={session.id}
                 onClick={() => handleSessionClick(session)}
                 className={cn(
-                  "group flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors",
+                  "group flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors",
                   sessionId === session.id
                     ? "bg-[var(--accent-blue)]/10 text-[var(--text-primary)]"
                     : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]",
                 )}
               >
-                <MessageSquare size={16} className="mt-0.5 flex-shrink-0" />
+                <MessageSquare size={14} className="mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
+                  <p className="text-xs font-medium truncate">
                     {session.client_group_name
                       ? `${session.client_group_name}${session.workspace ? ` / ${session.workspace}` : ""}`
                       : session.title || `Session ${session.id.slice(0, 8)}`}
                   </p>
-                  {session.last_message_preview && (
-                    <p className="text-xs text-[var(--text-muted)] truncate">
-                      {truncate(session.last_message_preview, 50)}
-                    </p>
-                  )}
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {formatDate(session.updated_at)} · {session.message_count}{" "}
-                    messages
+                  <p className="text-[10px] text-[var(--text-muted)]">
+                    {formatDate(session.updated_at)} · {session.message_count} msgs
                   </p>
                 </div>
                 <button
                   onClick={(e) => handleDelete(e, session.id)}
-                  className="opacity-0 group-hover:opacity-100 rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-red)]"
+                  className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-red)]"
                   title="Delete session"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={12} />
                 </button>
               </button>
             ))}
           </div>
         ) : (
-          <div className="py-8 text-center text-sm text-[var(--text-muted)]">
+          <div className="py-6 text-center text-xs text-[var(--text-muted)]">
             <p>No sessions yet</p>
             <button
               onClick={() => createMutation.mutate()}
-              className="mt-2 text-[var(--accent-blue)] hover:underline"
+              className="mt-1 text-[var(--accent-blue)] hover:underline"
             >
-              Create your first session
+              Create first session
             </button>
           </div>
         )}

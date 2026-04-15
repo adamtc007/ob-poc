@@ -273,15 +273,28 @@ Search Priority (9-tier):
 
 ## React Frontend
 
+**Cockpit layout:** The ChatPage is the primary UI — egui WASM constellation canvas (center, always visible) + chat messages & panels (right column). The Observatory page remains as a full-screen option.
+
 ```
 ob-poc-ui-react/src/
-├── api/              # API client (chat.ts, scope.ts, semOs.ts)
-├── features/chat/    # Agent chat UI with scope panel + constellation panel
-├── features/semantic-os/  # Semantic OS workflow UI (/semantic-os route)
+├── api/              # API client (chat.ts, scope.ts, semOs.ts, observatory.ts)
+├── features/chat/    # Cockpit UI: egui canvas center + chat right + panels
+├── features/observatory/  # Full-screen Observatory (standalone option)
 ├── features/inspector/    # Projection inspector (tree + detail)
 ├── stores/           # Zustand state management
 └── types/            # TypeScript types
 ```
+
+**ChatPage layout (cockpit):**
+```
+[Sessions w-64] | [egui Canvas flex-1     ] | [Chat + Panels w-[28rem]]
+                  [FlightDeck status bar   ]   [Messages (scrollable)  ]
+                  [Canvas (60fps WASM)     ]   [ChatInput              ]
+                                               [Scope, Constellation   ]
+                                               [Narration, Verbs       ]
+```
+
+The egui canvas renders `GraphSceneModel` from the Observatory API (polled every 5s). Navigation is direct: hover/click/double-click nodes on the canvas fires verbs through the standard REPL input pipeline.
 
 **Key Endpoints:**
 
@@ -326,7 +339,7 @@ npm run build && npm run typecheck && npm run lint
 
 **Complete (✅):** React Migration (077), V2 REPL (7-state, 320 tests), Runbook Compilation, Candle Semantic Pipeline, Agent Pipeline + PolicyGate, Solar Navigation (038), Promotion Pipeline (043), Teaching (044), Client Group Resolver (048), Workflow Task Queue (049), Transactional Execution (050), CustomOp Auto-Registration (051), Client Group Research (055), REPL Viewport Feedback (056), Verb Disambiguation UI (057), Unified Architecture (058), Playbook System (059), LSP (060/063), CBU Structure Macros (064), Unified Lookup (074), Lexicon (072), Entity Linking (073), Clarification UX (075), Inspector-First (076), Deal Record & Fee Billing (067), BPMN-Lite (all phases incl. Phase 4 PostgresProcessStore + Phase 5A Inclusive Gateway), BPMN-Lite Integration (Phase B), BPMN-Lite Authoring (Phases B-D), KYC/UBO Skeleton (S1-S2), Semantic OS (Phases 0-9 + Standalone v1.1 + Stewardship Phase 0-1), Governed Registry Authoring (v0.4, migrations 099-102), CCIR + SessionVerbSurface, Loopback Calibration (v0.3), Onboarding State View, Verb Disambiguation UX, Constellation Orphan Remediation, SemOS Grounded Action Surface, Pipeline Leak Remediation, Sage Intent Skeleton (Phase 1), Entity-First Utterance Parsing, Coder Rewrite (Phase 2), Sage-Primary Chat Narration, SemTaxonomy Three-Step, NLCI CBU Cutover, CBU Role Surface Reconciliation, Phase 0 Vocabulary Rationalization (Batches 1-3), Schema Consolidation (115-121), Domain Metadata Coverage (306/306 tables), Scenario-Based Intent Resolution (Phases 0.5-5), AffinityGraph & Diagram Generation, Discovery Pipeline (Phase 2), Utterance API Coverage Harness, Unified Session Input Cutover, Workspace-Scoped REPL Navigation, SemOS Attribute DSL + Schema Cleanup, SemOS Footprint Hydration S6, SemOS Document Governance Bootstrap (122-123), StateGraph Pipeline (Phase 0-3 substrate), Session Stack Machine Runbook Architecture (R1-R9, migrations 125-128), Unified Session Pipeline (ADR 040 — tollgates enforced, 149/149 tests, response adapter, dead code removal -4,480 lines), Derived Attribute Persistence (D0-D12 — canonical two-table model, staleness propagation, CBU projection view), SemOS-First Hub Implementation (Phases 1-7 — AttributeDefBody complete, SemOS-first write path, materialization trigger, identity resolution inverted, 7 new verbs, SemOS Maintenance workspace), Sage Proactive Narration (ADR 043 — NarrationEngine, contextual query intercept, post-execution narration, NarrationPanel React component, narration boost signal, end-to-end wiring), Verb/Noun Separation (S-expression aligned — assemble-cbu macro_selector, analyse-ubo verb_selector, action stem extractor), Instrument Matrix Two-Stage (group template + CBU instance), Session Recovery (resume with fresh scope), Two-Tier Attribute Model (AttributeVisibility External/Internal, attribute.define-internal + attribute.update-internal, migration 130, operational-tier auto-approved), BPMN-Lite Durability Fixes (transaction atomicity via atomic_start/atomic_complete, job claim timeout + reclaim, tick_all orchestrator, dedupe cache TTL pruning, 3 background housekeeping tasks), Cross-Workspace State Consistency (P1-P10 — shared atom registry with lifecycle FSM, shared fact versioning, workspace fact refs with staleness propagation, constellation replay types, remediation events with FSM, external call idempotency envelope, provider capabilities, compensation records, YAML seeds for 5 initial atoms, platform DAG derivation; 12 shared-atom verbs + 4 remediation verbs, 8 migrations, 10 cross_workspace modules, 10 macros (8 shared-atom + 2 remediation incl. batch foreach), 6 scenario routes, 24 constellation slots)
 
-**In Progress / Parked (⚠️):** Observatory (Phases 1-6 complete — Rust backend types/projection/routes, React shell with typed viewports/headers/dashboard, egui WASM canvas-only with 5 level renderers embedded in React via wasm-bindgen, DAG Identity implemented: all Observatory endpoints project from `tos.hydrated_state`, viewport state on WorkspaceFrame, nav verbs mutate viewport state through orchestrator, cross-cache invalidation, OnboardingStateView DAG-sourced path, `/navigate` collapsed to REPL input; Phases 7-8 pending), Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), StateGraph Phase 1 reconciliation (parked pending external correction table)
+**In Progress / Parked (⚠️):** Observatory (Phases 1-7 complete — Rust backend types/projection/routes, egui WASM canvas embedded directly in ChatPage cockpit layout (always visible, center column), 5 level renderers, DAG Identity: all endpoints project from `tos.hydrated_state`, universe root node at session start with 7 workspace children + scoping verbs, canvas navigation via hover/click/double-click routes through REPL input, FlightDeck collapsed status bar, NarrationPanel wired into sidebar; Phase 8 diagrams pending), Sage/Coder GATE 5 (existing 43%, Sage+Coder 5% — vocabulary/routing work needed), Three-Step Harness (7.95% exact / 71% grounded — metadata quality is limiter), StateGraph Phase 1 reconciliation (parked pending external correction table)
 
 **Removed (❌):** V1 Staged Runbook (054), ESPER Navigation Crates (065 — retained for reference), ECIR / NounIndex (Tier -1 noun taxonomy — replaced by ConstellationVerbIndex + workspace pack constraints)
 

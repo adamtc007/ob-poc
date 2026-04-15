@@ -60,7 +60,7 @@ interface FlightDeckProps {
 }
 
 export function FlightDeck({ orientation, onSendMessage }: FlightDeckProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   if (!orientation) return null;
 

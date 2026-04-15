@@ -140,6 +140,7 @@ export const chatApi = {
     const backend = await api.post<
       BackendSession & {
         welcome_message?: string;
+        session_feedback?: Record<string, unknown>;
         decision?: {
           packet_id: string;
           kind: string;
@@ -167,6 +168,7 @@ export const chatApi = {
         role: "assistant",
         content: backend.welcome_message,
         timestamp: session.created_at,
+        session_feedback: backend.session_feedback as unknown as ChatMessage["session_feedback"],
         decision_packet: {
           id: backend.decision.packet_id,
           kind: "clarification",
@@ -182,10 +184,23 @@ export const chatApi = {
           confirm_token: backend.decision.confirm_token,
         },
       };
-      // Only add if mapBackendSession didn't already produce messages
       if (session.messages.length === 0) {
         session.messages.push(initialMessage);
+      } else {
+        // Server already stored the greeting — enrich it with session_feedback
+        // and decision_packet from the creation response
+        const first = session.messages[0];
+        if (!first.session_feedback && backend.session_feedback) {
+          first.session_feedback = backend.session_feedback as unknown as ChatMessage["session_feedback"];
+        }
+        if (!first.decision_packet) {
+          first.decision_packet = initialMessage.decision_packet;
+        }
       }
+    }
+
+    if (backend.session_feedback) {
+      session.initial_session_feedback = backend.session_feedback as unknown as ChatSession["initial_session_feedback"];
     }
 
     // Store session ID locally for listing

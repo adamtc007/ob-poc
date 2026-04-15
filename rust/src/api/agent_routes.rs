@@ -384,6 +384,7 @@ async fn create_session(
             state: SessionState::New.into(),
             welcome_message: "Welcome to Semantic OS. What would you like to work on?".to_string(),
             decision,
+            session_feedback: None,
         };
         return Ok(Json(response));
     }
@@ -489,12 +490,23 @@ async fn create_session(
         }
     }
 
+    let session_feedback = if let Some(ref orchestrator) = state.repl_v2_orchestrator {
+        orchestrator
+            .get_session(session_id)
+            .await
+            .map(|s| s.build_session_feedback(false))
+            .and_then(|fb| serde_json::to_value(fb).ok())
+    } else {
+        None
+    };
+
     let response = CreateSessionResponse {
         session_id,
         created_at,
         state: final_state.into(),
         welcome_message,
         decision,
+        session_feedback,
     };
     tracing::info!(
         "Returning CreateSessionResponse: session_id={}, state={:?}, welcome_message={}",

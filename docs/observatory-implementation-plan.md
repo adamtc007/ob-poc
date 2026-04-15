@@ -1,41 +1,42 @@
 # Observatory Implementation Plan
 
-> **Version:** 2.1 — 2026-04-14
+> **Version:** 3.0 — 2026-04-15
 > **Spec:** `THE_OBSERVATORY_v1.0.md`
-> **Author:** Claude (planning session, no code)
-> **Rendering:** React observatory shell with session-stack graph endpoint
-> **Revision:** v2.1 — reconciled with implemented session-stack work
+> **Rendering:** Cockpit layout — egui WASM canvas embedded in ChatPage (always visible)
+> **Revision:** v3.0 — egui canvas embedded in ChatPage cockpit layout
 
 ## Current Implementation Status
 
-This document originally proposed a full egui/WASM observatory surface. That is
-not the currently deployed path.
+The egui WASM constellation canvas is **embedded directly in the ChatPage** as the center column (the "windscreen"). The chat messages and panels occupy the right column (the "cockpit controls"). The Observatory is always visible — no separate navigation required.
 
-What is implemented today:
+What is implemented:
 
-- `GET /api/observatory/session/:id/session-stack-graph`
-- React observatory integration with a dedicated `Session Stack` tab
-- canonical `SessionStackState` projection from `ReplSessionV2`
-- BPMN copy-by-value session-stack visibility through the shared type model
-
-What remains planning-only here:
-
-- standalone egui/WASM observatory shell
-- graph-scene renderer migration
-- React-shell replacement
+- egui WASM canvas (`observatory-wasm/`) embedded in `ChatPage.tsx` center column
+- `GraphSceneModel` polled every 5s from `/api/observatory/session/:id/graph-scene`
+- Universe root node at session start: 7 workspace children + scoping verbs
+- Canvas navigation: click=select, double-click=drill, scroll=zoom, drag=pan — all semantic actions route through REPL input pipeline
+- FlightDeck collapsed status bar (1-line: level · focus · mode · actions)
+- `SessionFeedback` populated at session creation with universe root state
+- NarrationPanel wired into right sidebar
+- Standalone Observatory page (`/observatory/:sessionId`) remains as full-screen option
+- Session Stack tab, Mission Control tab on standalone page
 
 ---
 
-## Architecture Decision: Full egui Application
+## Architecture Decision: Embedded egui Canvas in Cockpit Layout
 
-The Observatory renders as a **standalone egui application** compiled to WASM, served in a separate browser tab at `/observatory/:sessionId`. It does NOT embed inside the React chat UI.
+The Observatory renders as an **egui canvas embedded in the ChatPage** center column. React owns structural UI (right column: messages, input, panels). egui owns the constellation canvas (60fps, immediate mode).
 
-**Rationale:**
-- egui's immediate mode IS the dumb-client invariant: every frame, paint the current struct
-- No React reconciliation layer between server data and pixels
-- One event loop, one coordinate system, one invalidation boundary
-- Camera, panels, canvas, and transitions share the same frame loop
-- Communication via server (both tabs talk to same session), not inter-tab messaging
+**Cockpit layout:**
+```
+[Sessions w-64] | [egui Canvas flex-1     ] | [Chat + Panels w-[28rem]]
+                  [FlightDeck status bar   ]   [Messages (scrollable)  ]
+                  [Canvas (60fps WASM)     ]   [ChatInput              ]
+                                               [Scope, Constellation   ]
+                                               [Narration, Verbs       ]
+```
+
+**Communication:** React pushes `GraphSceneModel` to WASM via `set_scene(json)` into a thread-local mailbox. egui polls the mailbox each frame (loosely coupled). Canvas actions fire back to React via JS callback, routed through `chatApi.sendMessage` — same single input surface as chat text.
 
 **Boundary:**
 

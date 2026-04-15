@@ -6,7 +6,7 @@
  * to resolve the import at build time.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   GraphSceneModel,
   ViewLevel,
@@ -87,13 +87,14 @@ export function ConstellationCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const actionCallbackRef = useRef(onAction);
   actionCallbackRef.current = onAction;
+  const [ready, setReady] = useState(wasmReady);
 
   // Initialize WASM canvas
   useEffect(() => {
     let cancelled = false;
 
     async function init() {
-      if (wasmReady) return;
+      if (wasmReady) { setReady(true); return; }
       try {
         const wasm = await loadWasmModule();
         if (cancelled) return;
@@ -108,6 +109,7 @@ export function ConstellationCanvas({
           }
         });
         wasmReady = true;
+        setReady(true);
       } catch (e) {
         console.error("Failed to init observatory WASM:", e);
       }
@@ -119,19 +121,19 @@ export function ConstellationCanvas({
     };
   }, []);
 
-  // Push scene to WASM when it changes
+  // Push scene to WASM when it changes OR when WASM becomes ready
   useEffect(() => {
-    if (wasmReady && wasmModule && graphScene) {
+    if (ready && wasmModule && graphScene) {
       wasmModule.set_scene(JSON.stringify(graphScene));
     }
-  }, [graphScene]);
+  }, [graphScene, ready]);
 
-  // Push view level to WASM when orientation changes
+  // Push view level to WASM when orientation changes OR when WASM becomes ready
   useEffect(() => {
-    if (wasmReady && wasmModule) {
+    if (ready && wasmModule) {
       wasmModule.set_view_level(viewLevel);
     }
-  }, [viewLevel]);
+  }, [viewLevel, ready]);
 
   return (
     <canvas

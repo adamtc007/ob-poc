@@ -26,8 +26,39 @@ function App() {
             />
 
             {/* Main app with navigation shell */}
+            {/* Chat routes — full viewport cockpit, no AppShell nav */}
+            <Route index element={<Navigate to="/chat" replace />} />
+            <Route
+              path="chat"
+              element={
+                <ErrorBoundary>
+                  <ChatPage />
+                </ErrorBoundary>
+              }
+            />
+            <Route
+              path="chat/:sessionId"
+              element={
+                <ErrorBoundary>
+                  <ChatPage />
+                </ErrorBoundary>
+              }
+            />
+            <Route path="semantic-os" element={<Navigate to="/chat" replace />} />
+            <Route path="semantic-os/:sessionId" element={<Navigate to="/chat" replace />} />
+
+            {/* Observatory full-screen option */}
+            <Route
+              path="observatory/:sessionId"
+              element={
+                <ErrorBoundary>
+                  <ObservatoryPage />
+                </ErrorBoundary>
+              }
+            />
+
+            {/* Secondary views — keep AppShell nav */}
             <Route path="/" element={<AppShell />}>
-              <Route index element={<Navigate to="/chat" replace />} />
               <Route
                 path="inspector"
                 element={
@@ -45,24 +76,6 @@ function App() {
                 }
               />
               <Route
-                path="chat"
-                element={
-                  <ErrorBoundary>
-                    <ChatPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="chat/:sessionId"
-                element={
-                  <ErrorBoundary>
-                    <ChatPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route path="semantic-os" element={<Navigate to="/chat" replace />} />
-              <Route path="semantic-os/:sessionId" element={<Navigate to="/chat" replace />} />
-              <Route
                 path="settings"
                 element={
                   <ErrorBoundary>
@@ -75,14 +88,6 @@ function App() {
                 element={
                   <ErrorBoundary>
                     <DealPage />
-                  </ErrorBoundary>
-                }
-              />
-              <Route
-                path="observatory/:sessionId"
-                element={
-                  <ErrorBoundary>
-                    <ObservatoryPage />
                   </ErrorBoundary>
                 }
               />

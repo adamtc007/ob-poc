@@ -1300,6 +1300,11 @@ impl ReplOrchestratorV2 {
                     return self.complete_infrastructure_scope_gate(session).await;
                 }
 
+                // session.start — create new or resume previous session.
+                if let Some(start_result) = self.try_session_start(&content, session).await {
+                    return start_result;
+                }
+
                 // Numeric "2" with no pending candidates → infrastructure shortcut.
                 if content.trim() == "2" && pending_candidates.is_none() {
                     return self.complete_infrastructure_scope_gate(session).await;
@@ -2447,6 +2452,150 @@ impl ReplOrchestratorV2 {
     /// Sets the nil-UUID scope sentinel, jumps directly to
     /// `JourneySelection` with workspace pinned to `SemOsMaintenance`,
     /// and returns the available packs for that workspace.
+    async fn try_session_start(
+        &self,
+        content: &str,
+        session: &mut ReplSessionV2,
+    ) -> Option<ReplResponseV2> {
+        let lower = content.trim().to_lowercase();
+
+        let is_new = lower == "session.start"
+            || lower == "new session"
+            || lower == "start new session"
+            || lower == "start fresh"
+            || lower == "start over"
+            || lower == "restart"
+            || lower.starts_with("session.start :mode new");
+
+        let is_resume = lower == "resume"
+            || lower == "resume session"
+            || lower == "resume last session"
+            || lower == "continue where i left off"
+            || lower == "pick up where i left off"
+            || lower.starts_with("session.start :mode resume");
+
+        if !is_new && !is_resume {
+            return None;
+        }
+
+        if is_new {
+            let new_id = self.create_session().await;
+            let message = format!(
+                "New session created. Session ID: {new_id}\n\n\
+                 Which client group would you like to work with?"
+            );
+            return Some(ReplResponseV2 {
+                state: session.state.clone(),
+                kind: ReplResponseKindV2::Info {
+                    detail: serde_json::json!({
+                        "verb": "session.start",
+                        "mode": "new",
+                        "session_id": new_id.to_string(),
+                    })
+                    .to_string(),
+                },
+                message,
+                runbook_summary: None,
+                step_count: 0,
+                session_feedback: Some(session.build_session_feedback(false)),
+                narration: None,
+            });
+        }
+
+        // Resume: find the most recent session with saved scope context
+        let sessions = self.sessions.read().await;
+        let resume_candidate = sessions
+            .iter()
+            .filter(|(id, _)| **id != session.id)
+            .filter(|(_, s)| !s.workspace_stack.is_empty())
+            .max_by_key(|(_, s)| s.created_at);
+
+        if let Some((old_id, old_session)) = resume_candidate {
+            let group_id = old_session
+                .session_scope()
+                .map(|s| s.client_group_id);
+            let workspace = old_session
+                .workspace_stack
+                .last()
+                .map(|f| f.workspace.clone());
+            let group_name = old_session
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("session {}", old_id));
+            let ws_label = workspace
+                .as_ref()
+                .map(|w| w.label().to_string())
+                .unwrap_or_default();
+            let old_id = *old_id;
+            drop(sessions);
+
+            let new_id = self.create_session().await;
+            {
+                let mut sessions = self.sessions.write().await;
+                if let Some(new_session) = sessions.get_mut(&new_id) {
+                    if let Some(gid) = group_id {
+                        new_session.set_client_scope(gid);
+                    }
+                    if let Some(ws) = workspace {
+                        new_session.set_workspace_root(ws);
+                        new_session
+                            .set_state(ReplStateV2::JourneySelection { candidates: None });
+                    }
+                }
+            }
+
+            let message = format!(
+                "Resumed session with fresh state ({group_name} / {ws_label}).\n\
+                 Session ID: {new_id}\n\n\
+                 Constellation re-hydrated from current database state."
+            );
+            return Some(ReplResponseV2 {
+                state: session.state.clone(),
+                kind: ReplResponseKindV2::Info {
+                    detail: serde_json::json!({
+                        "verb": "session.start",
+                        "mode": "resume",
+                        "session_id": new_id.to_string(),
+                        "resumed_from": old_id.to_string(),
+                        "client_group_name": group_name,
+                        "workspace": ws_label,
+                    })
+                    .to_string(),
+                },
+                message,
+                runbook_summary: None,
+                step_count: 0,
+                session_feedback: Some(session.build_session_feedback(false)),
+                narration: None,
+            });
+        }
+
+        drop(sessions);
+
+        // No resumable session found — fall back to new
+        let new_id = self.create_session().await;
+        let message = format!(
+            "No previous session to resume. Created new session: {new_id}\n\n\
+             Which client group would you like to work with?"
+        );
+        Some(ReplResponseV2 {
+            state: session.state.clone(),
+            kind: ReplResponseKindV2::Info {
+                detail: serde_json::json!({
+                    "verb": "session.start",
+                    "mode": "new",
+                    "session_id": new_id.to_string(),
+                })
+                .to_string(),
+            },
+            message,
+            runbook_summary: None,
+            step_count: 0,
+            session_feedback: Some(session.build_session_feedback(false)),
+            narration: None,
+        })
+    }
+
     async fn complete_infrastructure_scope_gate(
         &self,
         session: &mut ReplSessionV2,

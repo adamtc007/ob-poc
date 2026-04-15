@@ -536,8 +536,9 @@ async fn create_session_v2(
         .await
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Build a full ReplResponseV2 with ScopeRequired kind so the
-    // frontend can render the client group selector immediately.
+    // Build session_feedback BEFORE moving session.state so the UI sees
+    // the universe root state (available workspaces, bootstrap verbs).
+    let session_feedback = session.build_session_feedback(false);
     let response = ReplResponseV2 {
         state: session.state,
         kind: crate::repl::response_v2::ReplResponseKindV2::ScopeRequired {
@@ -546,7 +547,7 @@ async fn create_session_v2(
         message: greeting,
         runbook_summary: None,
         step_count: 0,
-        session_feedback: None,
+        session_feedback: Some(session_feedback),
         narration: None,
     };
 

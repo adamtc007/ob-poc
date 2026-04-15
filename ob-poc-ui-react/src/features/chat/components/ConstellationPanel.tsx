@@ -970,17 +970,63 @@ export function ConstellationPanel({
   }
 
   if (!selectedCbu) {
+    const workspaces = sessionFeedback?.available_workspaces ?? [];
+    const verbs = sessionFeedback?.scoped_verb_surface ?? [];
     return (
       <div className={cn("border-t border-[var(--border-primary)]", className)}>
         <div className="px-4 py-4">
-          <div className="text-sm font-medium text-[var(--text-primary)]">
-            Constellation
+          <div className="text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+            {sessionFeedback ? "Universe" : "Constellation"}
           </div>
-          <div className="mt-2 rounded-xl border border-dashed border-[var(--border-primary)] px-4 py-5 text-sm text-[var(--text-muted)]">
-            Load or select a CBU from session scope to inspect the operating
-            constellation. Group clearance and linked delta-KYC context can be
-            layered onto this view when present.
-          </div>
+          {sessionFeedback?.tos.constellation_map === "universe.root" && (
+            <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">
+              Select a workspace or client group
+            </div>
+          )}
+          {workspaces.length > 0 ? (
+            <div className="mt-3 space-y-1.5">
+              {workspaces.map((ws) => (
+                <button
+                  key={ws.workspace}
+                  onClick={() => onPromptAgent?.(ws.label)}
+                  className="w-full flex items-start gap-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-primary)] px-3 py-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  <Waypoints size={14} className="mt-0.5 text-[var(--accent-blue)] shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-[var(--text-primary)]">
+                      {ws.label}
+                    </div>
+                    <div className="mt-0.5 text-xs text-[var(--text-muted)] truncate">
+                      {ws.default_constellation_family}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-2 rounded-xl border border-dashed border-[var(--border-primary)] px-4 py-5 text-sm text-[var(--text-muted)]">
+              Load or select a CBU from session scope to inspect the operating
+              constellation.
+            </div>
+          )}
+          {verbs.length > 0 && (
+            <div className="mt-3 border-t border-[var(--border-primary)] pt-3">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)] mb-1.5">
+                Available Actions
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {verbs.map((v) => (
+                  <button
+                    key={v.verb_fqn}
+                    onClick={() => onPromptAgent?.(v.display_name)}
+                    className="px-2 py-1 rounded text-xs border border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  >
+                    {v.display_name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

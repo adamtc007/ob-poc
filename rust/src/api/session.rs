@@ -3064,6 +3064,9 @@ pub struct CreateSessionResponse {
     /// Decision packet for client group selection (populated on new sessions without initial_client)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decision: Option<ob_poc_types::DecisionPacket>,
+    /// Session feedback (universe root state — workspace options + bootstrap verbs)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_feedback: Option<serde_json::Value>,
 }
 
 // ChatRequest is now in ob-poc-types - SINGLE source of truth

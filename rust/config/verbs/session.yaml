@@ -21,6 +21,52 @@ domains:
 
     verbs:
       # ============================================
+      # Session lifecycle
+      # ============================================
+
+      start:
+        description: Start a new session or resume a previous one with fresh state
+        behavior: plugin
+        handler: SessionStartOp
+        invocation_phrases:
+        - "new session"
+        - "start new session"
+        - "start fresh"
+        - "resume session"
+        - "resume"
+        - "resume last session"
+        - "continue where I left off"
+        - "pick up where I left off"
+        - "start over"
+        - "restart"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session
+          tags: [session, lifecycle, start, resume]
+          subject_kinds: []
+          phase_tags: [navigation]
+          side_effects: state_write
+        args:
+        - name: mode
+          type: string
+          required: true
+          description: "new (blank slate) or resume (pre-load scope from previous session)"
+        - name: from
+          type: string
+          required: false
+          description: "Session ID to resume from, or 'last' for most recent. Only used with mode=resume."
+        sentences:
+          step:
+          - "Start {mode} session"
+          clarify:
+            mode: "New session or resume a previous one? (new/resume)"
+        confirm_policy: skip
+        returns:
+          type: record
+          fields: [session_id, mode, client_group_name, workspace]
+
+      # ============================================
       # Load CBUs into session (mutates state, pushes history)
       # Organized by astro scale: Universe → Galaxy → Cluster → System
       # ============================================
