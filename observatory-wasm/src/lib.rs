@@ -43,6 +43,11 @@ pub fn set_scene(json: &str) {
         state::SCENE_MAILBOX.with(|m| {
             *m.borrow_mut() = Some(scene);
         });
+        state::EGUI_CTX.with(|c| {
+            if let Some(ctx) = c.borrow().as_ref() {
+                ctx.request_repaint();
+            }
+        });
     }
 }
 
@@ -55,6 +60,11 @@ pub fn set_view_level(level: &str) {
     {
         state::LEVEL_MAILBOX.with(|m| {
             *m.borrow_mut() = Some(vl);
+        });
+        state::EGUI_CTX.with(|c| {
+            if let Some(ctx) = c.borrow().as_ref() {
+                ctx.request_repaint();
+            }
         });
     }
 }

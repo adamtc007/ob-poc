@@ -14,6 +14,7 @@ thread_local! {
     pub static SCENE_MAILBOX: RefCell<Option<GraphSceneModel>> = RefCell::new(None);
     pub static LEVEL_MAILBOX: RefCell<Option<ViewLevel>> = RefCell::new(None);
     pub static ACTION_CALLBACK: RefCell<Option<js_sys::Function>> = RefCell::new(None);
+    pub static EGUI_CTX: RefCell<Option<egui::Context>> = RefCell::new(None);
 }
 
 // ── Observation Frame (client-owned) ──
@@ -120,6 +121,11 @@ impl Default for CanvasApp {
 
 impl eframe::App for CanvasApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Store context for external repaint requests (set_scene, set_view_level)
+        EGUI_CTX.with(|c| {
+            *c.borrow_mut() = Some(ctx.clone());
+        });
+
         // ── 1. Process mailbox (React → egui) ──
         SCENE_MAILBOX.with(|m| {
             if let Some(scene) = m.borrow_mut().take() {

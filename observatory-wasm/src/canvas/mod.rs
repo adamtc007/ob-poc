@@ -70,6 +70,24 @@ pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
         return Some(ctrl_action);
     }
 
+    // ── Hover detection + tooltip ──
+    // Request continuous repaint when pointer is over canvas so hover detection is responsive
+    if response.hovered() {
+        ui.ctx().request_repaint();
+    }
+    if let Some(pointer_pos) = ui.ctx().pointer_hover_pos() {
+        if response.rect.contains(pointer_pos) {
+            let world_pos = transform.inverse().transform_pos(pointer_pos);
+            if let Some(ref scene) = app.scene {
+                if let Some(hovered_id) = hit_test(scene, world_pos) {
+                    if let Some(node) = scene.nodes.iter().find(|n| n.id == hovered_id) {
+                        paint_node_tooltip(ui, pointer_pos, node, scene);
+                    }
+                }
+            }
+        }
+    }
+
     // ── Handle interaction ──
     let mut action = None;
 
@@ -130,6 +148,171 @@ pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
     }
 
     action
+}
+
+/// Paint a rich tooltip for a hovered node.
+fn paint_node_tooltip(
+    ui: &mut Ui,
+    screen_pos: egui::Pos2,
+    node: &ob_poc_types::graph_scene::SceneNode,
+    scene: &ob_poc_types::graph_scene::GraphSceneModel,
+) {
+    let tooltip_id = egui::Id::new("node_tooltip");
+    egui::Area::new(tooltip_id)
+        .fixed_pos(egui::Pos2::new(screen_pos.x + 16.0, screen_pos.y + 16.0))
+        .order(egui::Order::Tooltip)
+        .show(ui.ctx(), |ui| {
+            egui::Frame::popup(ui.style())
+                .fill(egui::Color32::from_rgba_premultiplied(20, 24, 33, 240))
+                .corner_radius(6.0)
+                .inner_margin(10.0)
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(55, 65, 81)))
+                .show(ui, |ui| {
+                    ui.set_max_width(280.0);
+
+                    // Title
+                    ui.label(
+                        egui::RichText::new(&node.label)
+                            .strong()
+                            .size(14.0)
+                            .color(egui::Color32::from_rgb(229, 231, 235)),
+                    );
+
+                    ui.add_space(4.0);
+
+                    // Node type + state
+                    let type_str = format!("{:?}", node.node_type);
+                    let state_str = node.state.as_deref().unwrap_or("—");
+                    ui.horizontal(|ui| {
+                        badge(ui, &type_str, egui::Color32::from_rgb(99, 102, 241));
+                        badge(ui, state_str, if node.blocking {
+                            egui::Color32::from_rgb(239, 68, 68)
+                        } else {
+                            egui::Color32::from_rgb(34, 197, 94)
+                        });
+                    });
+
+                    ui.add_space(4.0);
+                    ui.separator();
+                    ui.add_space(4.0);
+
+                    // Fields grid
+                    egui::Grid::new("tooltip_grid")
+                        .num_columns(2)
+                        .spacing([8.0, 2.0])
+                        .show(ui, |ui| {
+                            tooltip_row(ui, "ID", &node.id);
+                            tooltip_row(ui, "Progress", &format!("{}%", node.progress));
+                            tooltip_row(ui, "Blocking", if node.blocking { "YES" } else { "no" });
+                            tooltip_row(ui, "Depth", &node.depth.to_string());
+                            tooltip_row(ui, "Children", &node.child_count.to_string());
+                            if let Some(ref group) = node.group_id {
+                                tooltip_row(ui, "Group", group);
+                            }
+                        });
+
+                    // Badges
+                    if !node.badges.is_empty() {
+                        ui.add_space(4.0);
+                        ui.horizontal_wrapped(|ui| {
+                            for b in &node.badges {
+                                badge(ui, &b.label, egui::Color32::from_rgb(251, 191, 36));
+                            }
+                        });
+                    }
+
+                    // Connected edges
+                    let edges: Vec<_> = scene.edges.iter().filter(|e| {
+                        e.source == node.id || e.target == node.id
+                    }).collect();
+                    if !edges.is_empty() {
+                        ui.add_space(4.0);
+                        ui.separator();
+                        ui.add_space(2.0);
+                        ui.label(
+                            egui::RichText::new("Connections")
+                                .size(11.0)
+                                .color(egui::Color32::from_rgb(156, 163, 175)),
+                        );
+                        for edge in edges.iter().take(6) {
+                            let peer = if edge.source == node.id { &edge.target } else { &edge.source };
+                            let label = edge.label.as_deref().unwrap_or("");
+                            let dir = if edge.source == node.id { "→" } else { "←" };
+                            ui.label(
+                                egui::RichText::new(format!("  {dir} {peer} ({label})"))
+                                    .size(10.0)
+                                    .color(egui::Color32::from_rgb(156, 163, 175)),
+                            );
+                        }
+                        if edges.len() > 6 {
+                            ui.label(
+                                egui::RichText::new(format!("  ... +{} more", edges.len() - 6))
+                                    .size(10.0)
+                                    .color(egui::Color32::from_rgb(107, 114, 128)),
+                            );
+                        }
+                    }
+
+                    // Drill targets
+                    let drills: Vec<_> = scene.drill_targets.iter().filter(|d| d.node_id == node.id).collect();
+                    if !drills.is_empty() {
+                        ui.add_space(4.0);
+                        ui.separator();
+                        ui.add_space(2.0);
+                        ui.label(
+                            egui::RichText::new("Drill Targets")
+                                .size(11.0)
+                                .color(egui::Color32::from_rgb(156, 163, 175)),
+                        );
+                        for d in &drills {
+                            ui.label(
+                                egui::RichText::new(format!("  ⬇ {} → {:?}", d.drill_label, d.target_level))
+                                    .size(10.0)
+                                    .color(egui::Color32::from_rgb(129, 140, 248)),
+                            );
+                        }
+                    }
+
+                    // Hint
+                    ui.add_space(6.0);
+                    ui.label(
+                        egui::RichText::new("Click to select · Double-click to drill")
+                            .size(9.0)
+                            .italics()
+                            .color(egui::Color32::from_rgb(107, 114, 128)),
+                    );
+                });
+        });
+}
+
+fn badge(ui: &mut egui::Ui, text: &str, color: egui::Color32) {
+    let bg = egui::Color32::from_rgba_premultiplied(color.r() / 4, color.g() / 4, color.b() / 4, 200);
+    egui::Frame::NONE
+        .fill(bg)
+        .corner_radius(3.0)
+        .inner_margin(egui::Margin::symmetric(5, 1))
+        .stroke(egui::Stroke::new(0.5, color))
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new(text)
+                    .size(10.0)
+                    .color(color),
+            );
+        });
+}
+
+fn tooltip_row(ui: &mut egui::Ui, label: &str, value: &str) {
+    ui.label(
+        egui::RichText::new(label)
+            .size(10.0)
+            .color(egui::Color32::from_rgb(156, 163, 175)),
+    );
+    ui.label(
+        egui::RichText::new(value)
+            .size(10.0)
+            .color(egui::Color32::from_rgb(229, 231, 235)),
+    );
+    ui.end_row();
 }
 
 /// Compute world-to-screen transform from camera state.
