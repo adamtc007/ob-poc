@@ -77,10 +77,30 @@ export function ChatPage() {
     refetchInterval: 5000,
   });
 
-  // Handle canvas interactions — route semantic actions through REPL input
+  // Handle canvas interactions — route semantic actions through REPL input.
+  // Workspace nodes (id starts with "workspace:") are sent as plain labels
+  // so the orchestrator's ScopeGate/WorkspaceSelection handlers process them
+  // directly — clicking "KYC" on the canvas = typing "KYC" in chat.
   const handleCanvasAction = useCallback(
     async (action: ObservatoryAction) => {
       if (!sessionId) return;
+
+      // Workspace node click — send label as utterance for tollgate processing
+      const nodeId = action.type === "drill" || action.type === "select_node" || action.type === "anchor_node"
+        ? action.node_id : undefined;
+      if (nodeId?.startsWith("workspace:") && (action.type === "drill" || action.type === "select_node")) {
+        const label = nodeId.replace("workspace:", "");
+        try {
+          const response = await chatApi.sendMessage(sessionId, { message: label });
+          addMessage(response.message);
+          queryClient.invalidateQueries({ queryKey: queryKeys.observatory.all(sessionId) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope(sessionId) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.constellation.all });
+        } catch (err) {
+          console.error("Workspace selection failed:", err);
+        }
+        return;
+      }
 
       let verb: string | null = null;
       let args: Record<string, unknown> = {};
@@ -88,7 +108,7 @@ export function ChatPage() {
       switch (action.type) {
         case "drill":
           verb = "nav.drill";
-          args = { target_id: action.node_id, target_level: action.target_level };
+          args = { target_id: nodeId, target_level: action.target_level };
           break;
         case "semantic_zoom_out":
           verb = "nav.zoom-out";
@@ -98,7 +118,7 @@ export function ChatPage() {
           break;
         case "select_node":
           verb = "nav.select";
-          args = { target_id: action.node_id };
+          args = { target_id: nodeId };
           break;
         case "invoke_verb":
           verb = action.verb_fqn;
@@ -121,7 +141,7 @@ export function ChatPage() {
         console.error("Canvas navigation failed:", err);
       }
     },
-    [sessionId],
+    [sessionId, addMessage],
   );
 
   useEffect(() => {
