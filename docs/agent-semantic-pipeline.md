@@ -28,6 +28,20 @@ orchestrator::handle_utterance()
 OrchestratorOutcome → ChatResponse
 ```
 
+### SEM-OS Discovery Rule
+
+The active action surface is SEM-OS grounded, not registry derived.
+
+- Workspaces resolve to a default constellation map via `WorkspaceKind::registry_entry()`.
+- The server hydrates that constellation against scoped session context.
+- The REPL/UI scoped verb surface is flattened from the hydrated SEM-OS slots.
+- The agent constrained path loads the SEM-OS constellation stack and combines it
+  with recovered entity states to compute the legal verbs for the turn.
+
+That means a verb being present in YAML or in the runtime registry is not enough.
+For deterministic agent use it must be reachable from the current SEM-OS
+workspace/domain/state context.
+
 **Key files:**
 
 | File | Purpose |
@@ -146,6 +160,25 @@ Falls back to `DeterministicSage` on LLM failure. System prompt constrains LLM t
 2. Coder arg extraction (tool calls, ~200-500ms)
 
 **LLM is NEVER used for:** verb selection, verb search, scoring, governance decisions.
+
+### SEM-OS-Scoped Constrained Resolution
+
+Before open search, the orchestrator attempts a deterministic SEM-OS-scoped
+resolution path when a client group and constellation are in scope.
+
+Implementation path:
+
+- `agent::orchestrator` loads the active SEM-OS constellation stack
+- entity states are recovered for the scoped client group
+- `sage::valid_verb_set` computes the legal verb union across the stack
+- constrained matching runs only within that legal set
+
+For structural constellations the active stack is intentionally multi-DAG:
+
+`group.ownership + struct.* + kyc.onboarding`
+
+This is how shared verbs such as `cbu.read`, `ubo.*`, and `case.*` remain legal
+across multiple grounded contexts without bypassing SEM-OS.
 
 **Latency:**
 - Verb search (Candle): 5–15ms

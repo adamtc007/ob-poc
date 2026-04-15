@@ -38,7 +38,11 @@ transitions:
     to: terminated
     verbs: [fund.delete-vehicle]
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: fund_vehicles
+      join: fund_id
+      provides: [fund_status]
   conditions:
     status_is:
       expr: "scope.fund_status = $1"

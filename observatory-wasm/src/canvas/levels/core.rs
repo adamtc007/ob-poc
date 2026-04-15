@@ -6,16 +6,13 @@
 //! edge.weight (clamped 1-4px). Colors: purple for ownership, blue for control.
 //! UBO readability: clear hierarchy, no overlapping labels.
 
-use std::collections::HashMap;
-
 use egui::{Color32, Painter, Pos2, Stroke, Vec2};
 
 use ob_poc_types::graph_scene::{GraphSceneModel, SceneEdge, SceneEdgeType, SceneNode};
 
+use crate::canvas::layout::LayoutCache;
 use crate::state::CanvasApp;
 
-const HORIZONTAL_GAP: f32 = 140.0; // minimum gap between sibling subtrees
-const VERTICAL_SPACING: f32 = 120.0;
 const NODE_WIDTH: f32 = 120.0;
 const NODE_HEIGHT: f32 = 36.0;
 
@@ -24,6 +21,7 @@ pub fn paint(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     scene: &GraphSceneModel,
+    cache: &LayoutCache,
     app: &CanvasApp,
 ) {
     let nodes = &scene.nodes;
@@ -33,159 +31,19 @@ pub fn paint(
         return;
     }
 
-    // ── Build adjacency and compute tree layout ──
-    let positions = compute_tree_layout(nodes, edges);
-
     // ── Paint edges with ownership/control styling ──
-    for edge in edges {
-        paint_edge(painter, transform, edge, nodes, &positions);
+    for (edge, geom) in edges.iter().zip(&cache.edges) {
+        paint_edge(painter, transform, edge, geom, cache);
     }
 
     // ── Paint nodes as rounded rectangles ──
     for (i, node) in nodes.iter().enumerate() {
-        let (x, y) = positions[i];
-        let screen_pos = transform.transform_pos(Pos2::new(x, y));
+        let screen_pos = transform.transform_pos(cache.nodes[i].center);
         let is_selected = app.interaction.selected_node.as_deref() == Some(&node.id);
         let is_hovered = app.interaction.hovered_node.as_deref() == Some(&node.id);
 
         paint_node(painter, screen_pos, node, is_selected, is_hovered);
     }
-}
-
-// ── Tree layout computation ──────────────────────────────────
-
-/// Compute positions for all nodes using a recursive subtree-width algorithm.
-/// Root(s) at top center, children arranged below proportional to subtree width.
-fn compute_tree_layout(nodes: &[SceneNode], edges: &[SceneEdge]) -> Vec<(f32, f32)> {
-    let n = nodes.len();
-    if n == 0 {
-        return vec![];
-    }
-
-    // Build parent→children adjacency from edges (source is parent, target is child).
-    let id_to_idx: HashMap<&str, usize> = nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.id.as_str(), i))
-        .collect();
-
-    let mut children: Vec<Vec<usize>> = vec![vec![]; n];
-    let mut has_parent = vec![false; n];
-
-    for edge in edges {
-        if let (Some(&pi), Some(&ci)) = (id_to_idx.get(edge.source.as_str()), id_to_idx.get(edge.target.as_str())) {
-            children[pi].push(ci);
-            has_parent[ci] = true;
-        }
-    }
-
-    // Identify roots (nodes with no incoming edges)
-    let roots: Vec<usize> = (0..n).filter(|&i| !has_parent[i]).collect();
-
-    // If no roots found (cycle), treat first node as root
-    let roots = if roots.is_empty() { vec![0] } else { roots };
-
-    // Compute subtree widths (in units of HORIZONTAL_GAP)
-    let mut widths = vec![1.0f32; n];
-    let mut visited = vec![false; n];
-
-    fn compute_width(
-        idx: usize,
-        children: &[Vec<usize>],
-        widths: &mut [f32],
-        visited: &mut [bool],
-    ) {
-        if visited[idx] {
-            return;
-        }
-        visited[idx] = true;
-        if children[idx].is_empty() {
-            widths[idx] = 1.0;
-            return;
-        }
-        let mut total = 0.0f32;
-        for &c in &children[idx] {
-            compute_width(c, children, widths, visited);
-            total += widths[c];
-        }
-        widths[idx] = total;
-    }
-
-    for &root in &roots {
-        compute_width(root, &children, &mut widths, &mut visited);
-    }
-
-    // Assign positions recursively
-    let mut positions = vec![(0.0f32, 0.0f32); n];
-    let mut assigned = vec![false; n];
-
-    fn assign_positions(
-        idx: usize,
-        x: f32,
-        y: f32,
-        children: &[Vec<usize>],
-        widths: &[f32],
-        positions: &mut [(f32, f32)],
-        assigned: &mut [bool],
-    ) {
-        if assigned[idx] {
-            return;
-        }
-        assigned[idx] = true;
-        positions[idx] = (x, y);
-
-        if children[idx].is_empty() {
-            return;
-        }
-
-        let total_width = children[idx].iter().map(|&c| widths[c]).sum::<f32>();
-        let mut cursor_x = x - (total_width * HORIZONTAL_GAP) / 2.0;
-
-        for &c in &children[idx] {
-            let child_center_x = cursor_x + (widths[c] * HORIZONTAL_GAP) / 2.0;
-            assign_positions(
-                c,
-                child_center_x,
-                y + VERTICAL_SPACING,
-                children,
-                widths,
-                positions,
-                assigned,
-            );
-            cursor_x += widths[c] * HORIZONTAL_GAP;
-        }
-    }
-
-    // Layout each root tree side by side
-    let total_root_width: f32 = roots.iter().map(|&r| widths[r]).sum();
-    let mut cursor_x = -(total_root_width * HORIZONTAL_GAP) / 2.0;
-
-    for &root in &roots {
-        let root_center_x = cursor_x + (widths[root] * HORIZONTAL_GAP) / 2.0;
-        assign_positions(
-            root,
-            root_center_x,
-            0.0,
-            &children,
-            &widths,
-            &mut positions,
-            &mut assigned,
-        );
-        cursor_x += widths[root] * HORIZONTAL_GAP;
-    }
-
-    // Handle orphaned nodes (in cycles or disconnected) — place them in a row below
-    let max_y = positions.iter().map(|(_, y)| *y).fold(0.0f32, f32::max);
-    let mut orphan_x = 0.0f32;
-    for i in 0..n {
-        if !assigned[i] {
-            assigned[i] = true;
-            positions[i] = (orphan_x, max_y + VERTICAL_SPACING);
-            orphan_x += HORIZONTAL_GAP;
-        }
-    }
-
-    positions
 }
 
 // ── Node painting (rounded rectangles) ───────────────────────
@@ -272,18 +130,11 @@ fn paint_edge(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     edge: &SceneEdge,
-    nodes: &[SceneNode],
-    positions: &[(f32, f32)],
+    geom: &crate::canvas::layout::EdgeGeometry,
+    cache: &LayoutCache,
 ) {
-    let src_idx = nodes.iter().position(|n| n.id == edge.source);
-    let tgt_idx = nodes.iter().position(|n| n.id == edge.target);
-
-    let (Some(si), Some(ti)) = (src_idx, tgt_idx) else {
-        return;
-    };
-
-    let src_pos = transform.transform_pos(Pos2::new(positions[si].0, positions[si].1));
-    let tgt_pos = transform.transform_pos(Pos2::new(positions[ti].0, positions[ti].1));
+    let src_pos = transform.transform_pos(cache.nodes[geom.source_idx].center);
+    let tgt_pos = transform.transform_pos(cache.nodes[geom.target_idx].center);
 
     // Edge color: purple for ownership, blue for control
     let edge_color = match edge.edge_type {

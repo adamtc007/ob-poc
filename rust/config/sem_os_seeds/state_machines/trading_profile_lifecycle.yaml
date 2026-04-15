@@ -41,7 +41,11 @@ transitions:
     to: draft
     verbs: [trading-profile.create-draft]
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: cbu_trading_profiles
+      join: profile_id
+      provides: [profile_status]
   conditions:
     status_is:
       expr: "scope.profile_status = $1"

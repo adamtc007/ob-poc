@@ -631,6 +631,7 @@ impl TestHarness {
 
 #[cfg(feature = "database")]
 #[tokio::test]
+#[ignore = "requires running API server and seeded clarification environment"]
 async fn test_clarification_learning_flow() -> Result<()> {
     // Requires running server
     let base_url =
@@ -691,6 +692,7 @@ async fn test_clarification_learning_flow() -> Result<()> {
 
 #[cfg(feature = "database")]
 #[tokio::test]
+#[ignore = "requires learning tables populated by explicit clarification flow runs"]
 async fn test_verify_learning_signals_stored() -> Result<()> {
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
@@ -700,7 +702,7 @@ async fn test_verify_learning_signals_stored() -> Result<()> {
     // Check user_learned_phrases
     let learned_count: (i64,) = sqlx::query_as(
         r#"
-        SELECT COUNT(*) FROM agent.user_learned_phrases
+        SELECT COUNT(*) FROM "ob-poc".user_learned_phrases
         WHERE source IN ('user_disambiguation', 'generated_variant')
         "#,
     )

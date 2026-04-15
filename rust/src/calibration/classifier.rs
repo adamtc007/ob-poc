@@ -24,7 +24,7 @@ pub struct CalibrationUtteranceRow {
 ///
 /// # Examples
 /// ```rust
-/// use ob_poc::calibration::{classify_outcome, CalibrationExecutionShape, CalibrationMode, CalibrationScenario, CalibrationUtteranceRow, ExpectedOutcome, GovernanceStatus};
+/// use ob_poc::calibration::{classify_outcome, CalibrationExecutionShape, CalibrationMode, CalibrationScenario, CalibrationUtteranceRow, CalibrationVerdict, ExpectedOutcome, GovernanceStatus};
 /// use ob_poc::traceability::{SurfaceVersions, TraceKind, TraceOutcome, UtteranceTraceRecord};
 /// use chrono::Utc;
 /// use uuid::Uuid;

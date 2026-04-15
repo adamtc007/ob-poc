@@ -30,6 +30,15 @@ The most recent commit (`e440bfd`) substantially advanced the architecture by ad
 
 However, a key architectural gap remains: the platform lacks a **SessionVerbSurface** — a first-class type that composes all governance layers into a single, queryable, time-varying set that answers the question: *"What can I do right now, given my session state, loaded CBUs, active entity, workflow phase, and role?"* This paper defines the vision, audits current capabilities, and provides a prioritised remediation plan.
 
+As of the April 2026 SEM-OS cleanup, the active path is more specific than the
+original paper:
+
+- the surfaced verb set is SEM-OS grounded from the active workspace
+- structural constellations intentionally compose a multi-DAG stack
+  (`group.ownership + struct.* + kyc.onboarding`)
+- runtime discovery is driven by recovered entity state, not by raw verb
+  registry presence
+
 ---
 
 ## 2. Vision & Scope
@@ -142,6 +151,17 @@ This section provides a factual audit of the codebase as of commit `e440bfd`. Ea
 **Stage 4 — Verb Selection & DSL Generation.** The top-ranked surviving candidate is selected. The LLM generates a DSL s-expression. The verb executor validates lifecycle preconditions at execution time.
 
 > **Observation:** The governance is reactive — applied after the user speaks. The `/commands` and VerbBrowser paths run the same pipeline (`resolve_options` → `resolve_sem_reg_verbs`), producing a correct verb set, but this computation is triggered by explicit user request, not maintained as a session-resident, always-current surface.
+
+### 3.3 Current Grounding Rule
+
+The current implementation should be read with one additional invariant:
+
+`workspace -> constellation_map -> typed SEM-OS nodes -> UUID-bound entities -> recovered state -> legal verbs`
+
+This is the action-surface contract used by the REPL, constrained matching, and
+the observatory scoped verb surface. A verb defined in YAML but not connected to
+the current grounded SEM-OS context is not part of the usable deterministic
+surface.
 
 ---
 

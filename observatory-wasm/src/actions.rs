@@ -22,7 +22,7 @@ pub enum ObservatoryAction {
     /// Semantic zoom out — go up one level.
     SemanticZoomOut,
     /// Navigate to a history entry.
-    NavigateHistory { index: usize },
+    NavigateHistory { direction: HistoryDirection },
     /// Invoke a maintenance or navigation verb.
     InvokeVerb { verb_fqn: String },
 
@@ -41,4 +41,12 @@ pub enum ObservatoryAction {
     ClearAnchor,
     /// Reset camera to default position.
     ResetView,
+}
+
+/// Navigation history direction.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HistoryDirection {
+    Back,
+    Forward,
 }

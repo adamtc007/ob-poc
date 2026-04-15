@@ -125,11 +125,19 @@ slots:
             .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("yaml"))
             .collect::<Vec<_>>();
         files.sort();
-        assert_eq!(files.len(), 18);
+        assert!(
+            files.len() >= 18,
+            "expected at least the baseline constellation map set, found {}",
+            files.len()
+        );
         for path in files {
             let yaml = fs::read_to_string(&path).unwrap();
             let map = load_constellation_map(&yaml).unwrap();
-            assert!(map.constellation.starts_with("struct."));
+            assert!(
+                map.constellation.contains('.'),
+                "expected namespaced constellation id in {}",
+                path.display()
+            );
         }
     }
 

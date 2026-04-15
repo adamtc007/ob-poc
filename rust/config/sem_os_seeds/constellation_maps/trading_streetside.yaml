@@ -55,16 +55,14 @@ slots:
       reject: { verb: trading-profile.reject, when: filled }
       archive: { verb: trading-profile.archive, when: filled }
       # Matrix overlay — configuration layer on the trading profile
-      overlay_create: { verb: matrix-overlay.create, when: [empty, filled] }
-      overlay_read: { verb: matrix-overlay.read, when: filled }
-      overlay_list: { verb: matrix-overlay.list, when: filled }
-      overlay_update: { verb: matrix-overlay.update, when: filled }
-      overlay_apply: { verb: matrix-overlay.apply, when: filled }
+      overlay_add: { verb: matrix-overlay.add, when: [empty, filled] }
       overlay_remove: { verb: matrix-overlay.remove, when: filled }
-      overlay_diff: { verb: matrix-overlay.diff, when: filled }
-      overlay_preview: { verb: matrix-overlay.preview, when: filled }
-      overlay_list_active: { verb: matrix-overlay.list-active, when: filled }
-    overlays: [matrix_overlay]
+      overlay_suspend: { verb: matrix-overlay.suspend, when: filled }
+      overlay_activate: { verb: matrix-overlay.activate, when: filled }
+      overlay_list: { verb: matrix-overlay.list, when: filled }
+      overlay_effective: { verb: matrix-overlay.effective-matrix, when: filled }
+      overlay_gaps: { verb: matrix-overlay.unified-gaps, when: filled }
+      overlay_compare: { verb: matrix-overlay.compare-products, when: filled }
   custody:
     type: entity
     entity_kinds: [cbu]
@@ -72,14 +70,14 @@ slots:
     cardinality: optional
     depends_on: [trading_profile]
     verbs:
-      list_universe: { verb: custody.list-universe, when: [empty, filled] }
-      list_ssis: { verb: custody.list-ssis, when: filled }
-      list_booking_rules: { verb: custody.list-booking-rules, when: filled }
-      list_overrides: { verb: custody.list-agent-overrides, when: filled }
-      derive_coverage: { verb: custody.derive-required-coverage, when: filled }
-      validate: { verb: custody.validate-booking-coverage, when: filled }
-      lookup_ssi: { verb: custody.lookup-ssi, when: filled }
-      setup_ssi: { verb: custody.setup-ssi, when: [empty, filled] }
+      list_universe: { verb: cbu-custody.list-universe, when: [empty, filled] }
+      list_ssis: { verb: cbu-custody.list-ssis, when: filled }
+      list_booking_rules: { verb: cbu-custody.list-booking-rules, when: filled }
+      list_overrides: { verb: cbu-custody.list-agent-overrides, when: filled }
+      derive_coverage: { verb: cbu-custody.derive-required-coverage, when: filled }
+      validate: { verb: cbu-custody.validate-booking-coverage, when: filled }
+      lookup_ssi: { verb: cbu-custody.lookup-ssi, when: filled }
+      setup_ssi: { verb: cbu-custody.setup-ssi, when: [empty, filled] }
   booking_principal:
     type: entity
     entity_kinds: [company]
@@ -135,17 +133,8 @@ slots:
     depends_on: [cbu]
     verbs:
       create: { verb: service-intent.create, when: empty }
-      read: { verb: service-intent.read, when: filled }
       list: { verb: service-intent.list, when: [empty, filled] }
-      update: { verb: service-intent.update, when: filled }
-      approve: { verb: service-intent.approve, when: filled }
-      reject: { verb: service-intent.reject, when: filled }
-      cancel: { verb: service-intent.cancel, when: filled }
-      list_available: { verb: service-intent.list-available, when: [empty, filled] }
-      list_by_status: { verb: service-intent.list-by-status, when: filled }
-      activate: { verb: service-intent.activate, when: filled }
-      deactivate: { verb: service-intent.deactivate, when: filled }
-      clone: { verb: service-intent.clone, when: filled }
+      supersede: { verb: service-intent.supersede, when: filled }
   # matrix_overlay is a configuration layer ON the trading profile,
   # not a separate positioned entity. Verbs moved to trading_profile slot.
   booking_location:
@@ -156,7 +145,7 @@ slots:
     depends_on: [booking_principal]
     verbs:
       create: { verb: booking-location.create, when: empty }
-      read: { verb: booking-location.read, when: filled }
+      read: { verb: booking-location.list, when: filled }
       list: { verb: booking-location.list, when: [empty, filled] }
   legal_entity:
     type: entity
@@ -166,7 +155,7 @@ slots:
     depends_on: [booking_principal]
     verbs:
       create: { verb: legal-entity.create, when: empty }
-      read: { verb: legal-entity.read, when: filled }
+      read: { verb: legal-entity.list, when: filled }
       list: { verb: legal-entity.list, when: [empty, filled] }
   product:
     type: entity
@@ -175,7 +164,7 @@ slots:
     cardinality: optional
     depends_on: [cbu]
     verbs:
-      create: { verb: product.create, when: empty }
+      read: { verb: product.read, when: filled }
       list: { verb: product.list, when: [empty, filled] }
   delivery:
     type: entity
@@ -184,6 +173,6 @@ slots:
     cardinality: optional
     depends_on: [cbu]
     verbs:
-      create: { verb: delivery.create, when: empty }
-      read: { verb: delivery.read, when: filled }
-      list: { verb: delivery.list, when: [empty, filled] }
+      create: { verb: delivery.record, when: [empty, filled] }
+      complete: { verb: delivery.complete, when: filled }
+      fail: { verb: delivery.fail, when: filled }

@@ -1042,8 +1042,9 @@ fn universe_graph_scene(
     let root_label = label.unwrap_or("Universe");
     let workspaces = WorkspaceKind::all();
 
-    let mut nodes = Vec::with_capacity(1 + workspaces.len());
-    let mut edges = Vec::with_capacity(workspaces.len());
+    let satellite_count = workspaces.len() + 1; // workspaces + "New Session"
+    let mut nodes = Vec::with_capacity(1 + satellite_count);
+    let mut edges = Vec::with_capacity(satellite_count);
 
     nodes.push(SceneNode {
         id: "universe".into(),
@@ -1055,7 +1056,7 @@ fn universe_graph_scene(
         depth: 0,
         position_hint: Some((0.0, 0.0)),
         badges: vec![],
-        child_count: workspaces.len(),
+        child_count: satellite_count,
         group_id: None,
     });
 
@@ -1084,6 +1085,43 @@ fn universe_graph_scene(
         });
     }
 
+    // "New Session" satellite — same verb profile as SemOS Maintenance
+    let new_session_id = "workspace:new-session".to_string();
+    nodes.push(SceneNode {
+        id: new_session_id.clone(),
+        label: "New Session".into(),
+        node_type: SceneNodeType::Cluster,
+        state: Some("available".into()),
+        progress: 0,
+        blocking: false,
+        depth: 1,
+        position_hint: None,
+        badges: vec![],
+        child_count: 0,
+        group_id: None,
+    });
+    edges.push(SceneEdge {
+        source: "universe".into(),
+        target: new_session_id,
+        edge_type: SceneEdgeType::ParentChild,
+        label: Some("new-session".into()),
+        weight: 1.0,
+    });
+
+    let mut drill_targets: Vec<DrillTarget> = workspaces
+        .iter()
+        .map(|ws| DrillTarget {
+            node_id: format!("workspace:{}", ws.label()),
+            target_level: ob_poc_types::galaxy::ViewLevel::System,
+            drill_label: ws.registry_entry().display_name.to_string(),
+        })
+        .collect();
+    drill_targets.push(DrillTarget {
+        node_id: "workspace:new-session".into(),
+        target_level: ob_poc_types::galaxy::ViewLevel::System,
+        drill_label: "New Session".into(),
+    });
+
     GraphSceneModel {
         generation: 1,
         level: ob_poc_types::galaxy::ViewLevel::Universe,
@@ -1091,15 +1129,32 @@ fn universe_graph_scene(
         nodes,
         edges,
         groups: vec![],
-        drill_targets: workspaces
-            .iter()
-            .map(|ws| DrillTarget {
-                node_id: format!("workspace:{}", ws.label()),
-                target_level: ob_poc_types::galaxy::ViewLevel::System,
-                drill_label: ws.registry_entry().display_name.to_string(),
-            })
-            .collect(),
+        drill_targets,
         max_depth: 1,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::universe_graph_scene;
+    use crate::repl::types_v2::WorkspaceKind;
+    use ob_poc_types::galaxy::ViewLevel;
+    use ob_poc_types::graph_scene::LayoutStrategy;
+
+    #[test]
+    fn universe_graph_scene_includes_all_startup_satellites() {
+        let scene = universe_graph_scene(Some("Universe"));
+
+        assert_eq!(scene.level, ViewLevel::Universe);
+        assert_eq!(scene.layout_strategy, LayoutStrategy::DeterministicOrbital);
+        assert_eq!(scene.nodes.len(), WorkspaceKind::all().len() + 2);
+        assert_eq!(scene.drill_targets.len(), WorkspaceKind::all().len() + 1);
+        assert!(scene.nodes.iter().any(|node| node.id == "workspace:new-session"));
+        assert!(scene
+            .drill_targets
+            .iter()
+            .any(|target| target.node_id == "workspace:new-session"
+                && target.target_level == ViewLevel::System));
     }
 }
 

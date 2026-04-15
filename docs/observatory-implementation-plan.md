@@ -13,7 +13,9 @@ What is implemented:
 
 - egui WASM canvas (`observatory-wasm/`) embedded in `ChatPage.tsx` center column
 - `GraphSceneModel` polled every 5s from `/api/observatory/session/:id/graph-scene`
-- Universe root node at session start: 7 workspace children + scoping verbs
+- Universe root node at session start: 8 satellites total
+  - 7 workspace nodes
+  - `new-session`
 - Canvas navigation: click=select, double-click=drill, scroll=zoom, drag=pan — all semantic actions route through REPL input pipeline
 - FlightDeck collapsed status bar (1-line: level · focus · mode · actions)
 - `SessionFeedback` populated at session creation with universe root state
@@ -46,6 +48,18 @@ The Observatory renders as an **egui canvas embedded in the ChatPage** center co
 | Observatory workspace | egui/eframe WASM (new) | 60fps, same Rust types, no translation layer |
 
 **Communication:** Both tabs share the session ID. Both call the same REST API. Server is the synchronization point. No postMessage, no SharedWorker.
+
+### Current egui Rendering Contract
+
+The critical rendering rule is now explicit:
+
+- per-level renderers compute layout once into a shared derived cache
+- paint and interaction both consume that cache
+- hit testing is shape-aware, not a fixed-radius fallback
+- drill targets are taken from scene metadata, not a default level
+
+This replaced the earlier split where level renderers painted one geometry while
+hover/inspection/minimap logic hit-tested a different fallback layout.
 
 ---
 
@@ -187,6 +201,18 @@ Rebuild Phase 1 viewports as egui panels:
 - Camera: zoom, pan (observation frame only, no semantic effect)
 
 **SIGN-OFF:** GraphSceneModel is projection of HydratedConstellation. Drill round-trips through server.
+
+### Implemented Cleanup Notes
+
+The current canvas implementation already includes the critical cleanup that was
+missing from the original plan:
+
+- shared layout cache for render + interaction
+- layout-strategy aware dispatch for startup universe rendering
+- shape-aware hit testing
+- drill target resolution from `scene.drill_targets`
+- debug HUD for scene generation, layout strategy, hovered node, selected node,
+  zoom, and pan
 
 ### Phase 6: Full Level Renderers
 

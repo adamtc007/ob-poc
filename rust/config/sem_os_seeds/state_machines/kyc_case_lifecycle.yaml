@@ -68,7 +68,11 @@ transitions:
     to: review
     verbs: [kyc-case.reopen]
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: cases
+      join: case_id
+      provides: [case_status]
   conditions:
     status_is:
       expr: "scope.case_status = $1"

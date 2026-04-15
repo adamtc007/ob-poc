@@ -17,6 +17,13 @@ pub fn paint_controls(
     app: &CanvasApp,
 ) -> Option<ObservatoryAction> {
     let mut action = None;
+    let world_bounds = app
+        .render_cache
+        .as_ref()
+        .map(|cache| cache.world_bounds)
+        .unwrap_or_else(super::default_world_bounds);
+
+    paint_debug_hud(painter, canvas_rect, app);
 
     // ── Zoom indicator (bottom-left) ──
     let zoom_pos = Pos2::new(canvas_rect.left() + 12.0, canvas_rect.bottom() - 12.0);
@@ -40,15 +47,12 @@ pub fn paint_controls(
         );
 
         // ── Anchor line: dashed line from viewport center to anchored node ──
-        if let Some(ref scene) = app.scene {
-            if let Some(anchor_world_pos) = find_node_position(scene, anchor_id) {
+        if let (Some(scene), Some(cache)) = (app.scene.as_ref(), app.render_cache.as_ref()) {
+            if let Some(anchor_world_pos) = cache.center_for_node(scene, anchor_id) {
                 let viewport_center = canvas_rect.center();
                 // Convert anchor world pos to screen pos using the same transform
-                let transform = super::world_to_screen(&app.camera, canvas_rect);
-                let anchor_screen = transform.transform_pos(Pos2::new(
-                    anchor_world_pos.0,
-                    anchor_world_pos.1,
-                ));
+                let transform = super::world_to_screen(&app.camera, canvas_rect, world_bounds);
+                let anchor_screen = transform.transform_pos(anchor_world_pos);
 
                 // Draw dashed line (simulated via segments)
                 draw_dashed_line(
@@ -65,13 +69,10 @@ pub fn paint_controls(
 
     // ── Focus-lock ring: pulsing ring around locked node ──
     if let Some(ref focus_id) = app.camera.focus_lock_node_id {
-        if let Some(ref scene) = app.scene {
-            if let Some(focus_world_pos) = find_node_position(scene, focus_id) {
-                let transform = super::world_to_screen(&app.camera, canvas_rect);
-                let focus_screen = transform.transform_pos(Pos2::new(
-                    focus_world_pos.0,
-                    focus_world_pos.1,
-                ));
+        if let (Some(scene), Some(cache)) = (app.scene.as_ref(), app.render_cache.as_ref()) {
+            if let Some(focus_world_pos) = cache.center_for_node(scene, focus_id) {
+                let transform = super::world_to_screen(&app.camera, canvas_rect, world_bounds);
+                let focus_screen = transform.transform_pos(focus_world_pos);
 
                 // Pulsing effect via time
                 let t = ui.input(|i| i.time) as f32;
@@ -135,23 +136,20 @@ pub fn paint_controls(
     );
 
     // Minimap: show node dots + viewport indicator
-    if let Some(ref scene) = app.scene {
-        let scene_bounds = compute_scene_bounds(scene);
+    if let (Some(_scene), Some(cache)) = (app.scene.as_ref(), app.render_cache.as_ref()) {
+        let scene_bounds = cache.world_bounds;
         if scene_bounds.width() > 0.0 && scene_bounds.height() > 0.0 {
             let mini_transform =
                 egui::emath::RectTransform::from_to(scene_bounds, minimap_rect.shrink(4.0));
 
-            for node in &scene.nodes {
-                if let Some((x, y)) = node.position_hint {
-                    let pos = mini_transform.transform_pos(Pos2::new(x, y));
-                    painter.circle_filled(pos, 2.0, Color32::from_rgb(148, 163, 184));
-                }
+            for geom in &cache.nodes {
+                let pos = mini_transform.transform_pos(geom.center);
+                painter.circle_filled(pos, 2.0, Color32::from_rgb(148, 163, 184));
             }
 
             // Viewport indicator on minimap
             let cam = &app.camera;
-            let vp_size = Vec2::splat(200.0 / cam.zoom);
-            let vp_rect = Rect::from_center_size(Pos2::new(cam.pan_x, cam.pan_y), vp_size);
+            let vp_rect = super::camera_world_rect(cam, canvas_rect, scene_bounds);
             let mini_vp = Rect::from_min_max(
                 mini_transform.transform_pos(vp_rect.min),
                 mini_transform.transform_pos(vp_rect.max),
@@ -187,9 +185,9 @@ pub fn paint_controls(
 
     // ── Reset view label (top-left) — actual button handled in canvas interaction ──
     painter.text(
-        Pos2::new(canvas_rect.left() + 12.0, canvas_rect.top() + 12.0),
+        Pos2::new(canvas_rect.left() + 12.0, canvas_rect.top() + 110.0),
         egui::Align2::LEFT_TOP,
-        "[R] Reset View",
+        "[R] Reset View  [Esc] Deselect",
         egui::FontId::proportional(10.0),
         Color32::from_rgb(100, 116, 139),
     );
@@ -197,18 +195,61 @@ pub fn paint_controls(
     action
 }
 
-/// Find a node's world position by ID.
-fn find_node_position(
-    scene: &ob_poc_types::graph_scene::GraphSceneModel,
-    node_id: &str,
-) -> Option<(f32, f32)> {
-    let positions = super::compute_node_positions(&scene.nodes);
-    for (i, node) in scene.nodes.iter().enumerate() {
-        if node.id == node_id {
-            return Some(positions[i]);
-        }
+fn paint_debug_hud(painter: &Painter, canvas_rect: &Rect, app: &CanvasApp) {
+    let (layout_strategy, generation, node_count, edge_count) = app
+        .scene
+        .as_ref()
+        .map(|scene| {
+            (
+                format!("{:?}", scene.layout_strategy),
+                scene.generation,
+                scene.nodes.len(),
+                scene.edges.len(),
+            )
+        })
+        .unwrap_or_else(|| ("none".into(), 0, 0, 0));
+
+    let hovered = app.interaction.hovered_node.as_deref().unwrap_or("—");
+    let selected = app.interaction.selected_node.as_deref().unwrap_or("—");
+    let focus = app.camera.focus_lock_node_id.as_deref().unwrap_or("—");
+    let debug_lines = [
+        format!("scene gen: {generation}"),
+        format!("layout: {layout_strategy}"),
+        format!("nodes/edges: {node_count}/{edge_count}"),
+        format!("hovered: {hovered}"),
+        format!("selected: {selected}"),
+        format!("focus: {focus}"),
+        format!("zoom: {:.2}", app.camera.zoom),
+        format!("pan: {:.1}, {:.1}", app.camera.pan_x, app.camera.pan_y),
+    ];
+
+    let anchor = Pos2::new(canvas_rect.left() + 12.0, canvas_rect.top() + 12.0);
+    let line_height = 12.0;
+    let panel_height = debug_lines.len() as f32 * line_height + 10.0;
+    let panel_width = 220.0;
+    let panel_rect = Rect::from_min_size(anchor, Vec2::new(panel_width, panel_height));
+
+    painter.rect_filled(
+        panel_rect,
+        4.0,
+        Color32::from_rgba_premultiplied(15, 23, 42, 190),
+    );
+    painter.rect_stroke(
+        panel_rect,
+        4.0,
+        Stroke::new(1.0, Color32::from_rgb(51, 65, 85)),
+        egui::StrokeKind::Outside,
+    );
+
+    for (idx, line) in debug_lines.iter().enumerate() {
+        painter.text(
+            Pos2::new(anchor.x + 6.0, anchor.y + 5.0 + idx as f32 * line_height),
+            egui::Align2::LEFT_TOP,
+            line,
+            egui::FontId::monospace(10.0),
+            Color32::from_rgb(148, 163, 184),
+        );
     }
-    None
 }
 
 /// Draw a dashed line between two screen-space points.
@@ -234,33 +275,4 @@ fn draw_dashed_line(
         painter.line_segment([seg_start, seg_end], stroke);
         dist = seg_end_dist + gap_len;
     }
-}
-
-/// Compute bounding rect of all node positions in the scene.
-fn compute_scene_bounds(
-    scene: &ob_poc_types::graph_scene::GraphSceneModel,
-) -> Rect {
-    let mut min_x = f32::MAX;
-    let mut min_y = f32::MAX;
-    let mut max_x = f32::MIN;
-    let mut max_y = f32::MIN;
-
-    for node in &scene.nodes {
-        if let Some((x, y)) = node.position_hint {
-            min_x = min_x.min(x);
-            min_y = min_y.min(y);
-            max_x = max_x.max(x);
-            max_y = max_y.max(y);
-        }
-    }
-
-    if min_x > max_x {
-        return Rect::from_center_size(Pos2::ZERO, Vec2::splat(100.0));
-    }
-
-    let padding = 50.0;
-    Rect::from_min_max(
-        Pos2::new(min_x - padding, min_y - padding),
-        Pos2::new(max_x + padding, max_y + padding),
-    )
 }

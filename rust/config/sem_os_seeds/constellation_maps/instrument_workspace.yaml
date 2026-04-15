@@ -71,15 +71,15 @@ slots:
       gw_set_fallback: { verb: trade-gateway.set-fallback, when: filled }
       gw_list_fallbacks: trade-gateway.list-fallbacks
       # Cash sweep
-      cash_sweep_set: { verb: cash-sweep.set, when: [empty, filled] }
+      cash_sweep_configure: { verb: cash-sweep.configure, when: [empty, filled] }
+      cash_sweep_link_resource: { verb: cash-sweep.link-resource, when: filled }
       cash_sweep_list: cash-sweep.list
-      cash_sweep_read: cash-sweep.read
-      cash_sweep_activate: { verb: cash-sweep.activate, when: filled }
       cash_sweep_suspend: { verb: cash-sweep.suspend, when: filled }
-      cash_sweep_execute: { verb: cash-sweep.execute, when: filled }
-      cash_sweep_list_history: cash-sweep.list-history
-      cash_sweep_set_threshold: { verb: cash-sweep.set-threshold, when: filled }
-      cash_sweep_preview: cash-sweep.preview
+      cash_sweep_reactivate: { verb: cash-sweep.reactivate, when: filled }
+      cash_sweep_remove: { verb: cash-sweep.remove, when: filled }
+      cash_sweep_update_threshold: { verb: cash-sweep.update-threshold, when: filled }
+      cash_sweep_update_timing: { verb: cash-sweep.update-timing, when: filled }
+      cash_sweep_change_vehicle: { verb: cash-sweep.change-vehicle, when: filled }
       # Instruction profile
       ip_create_template: { verb: instruction-profile.create-template, when: [empty, filled] }
       ip_read_template: instruction-profile.read-template

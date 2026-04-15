@@ -34,7 +34,11 @@ transitions:
     to: reviewed
     verbs: [phrase.review-proposals]
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: phrase_proposals
+      join: proposal_id
+      provides: [collision_report_exists, quality_gates_passed]
   conditions:
     has_collision_report:
       expr: "scope.collision_report_exists = true"

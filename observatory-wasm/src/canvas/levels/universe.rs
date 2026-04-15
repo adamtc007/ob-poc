@@ -9,6 +9,7 @@ use egui::{Color32, Painter, Pos2, Stroke, Vec2};
 
 use ob_poc_types::graph_scene::{GraphSceneModel, SceneEdge, SceneNode, SceneNodeType};
 
+use crate::canvas::layout::LayoutCache;
 use crate::state::CanvasApp;
 
 /// Paint Universe-level: cluster bubbles with force-directed layout.
@@ -16,6 +17,7 @@ pub fn paint(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     scene: &GraphSceneModel,
+    cache: &LayoutCache,
     app: &CanvasApp,
 ) {
     let nodes = &scene.nodes;
@@ -24,9 +26,6 @@ pub fn paint(
     if nodes.is_empty() {
         return;
     }
-
-    // ── Compute force-directed positions ──
-    let positions = fruchterman_reingold(nodes, edges);
 
     // ── Paint group boundaries (if any) ──
     for group in &scene.groups {
@@ -38,10 +37,10 @@ pub fn paint(
             .node_ids
             .iter()
             .filter_map(|nid| {
-                nodes
-                    .iter()
-                    .position(|n| n.id == *nid)
-                    .map(|idx| positions[idx])
+                cache.index_for_node(nid).map(|idx| {
+                    let center = cache.nodes[idx].center;
+                    (center.x, center.y)
+                })
             })
             .collect();
         if member_positions.is_empty() {
@@ -78,117 +77,18 @@ pub fn paint(
     }
 
     // ── Paint edges (below nodes) ──
-    for edge in edges {
-        paint_edge(painter, transform, edge, nodes, &positions);
+    for (edge, geom) in edges.iter().zip(&cache.edges) {
+        paint_edge(painter, transform, edge, geom, cache);
     }
 
     // ── Paint nodes ──
     for (i, node) in nodes.iter().enumerate() {
-        let (x, y) = positions[i];
-        let screen_pos = transform.transform_pos(Pos2::new(x, y));
+        let screen_pos = transform.transform_pos(cache.nodes[i].center);
         let is_selected = app.interaction.selected_node.as_deref() == Some(&node.id);
         let is_hovered = app.interaction.hovered_node.as_deref() == Some(&node.id);
 
         paint_node(painter, screen_pos, node, is_selected, is_hovered);
     }
-}
-
-// ── Fruchterman-Reingold force simulation ────────────────────
-
-fn fruchterman_reingold(nodes: &[SceneNode], edges: &[SceneEdge]) -> Vec<(f32, f32)> {
-    let n = nodes.len();
-    if n == 0 {
-        return vec![];
-    }
-    if n == 1 {
-        return vec![(0.0, 0.0)];
-    }
-
-    // Area and optimal distance
-    let area = 800.0 * 800.0;
-    let k = (area / n as f32).sqrt(); // optimal distance
-
-    // Initialize positions deterministically from node index (spiral)
-    let mut pos: Vec<(f32, f32)> = nodes
-        .iter()
-        .enumerate()
-        .map(|(i, node)| {
-            if let Some(hint) = node.position_hint {
-                hint
-            } else {
-                let angle = i as f32 * 2.399; // golden angle
-                let r = 50.0 * (i as f32).sqrt();
-                (angle.cos() * r, angle.sin() * r)
-            }
-        })
-        .collect();
-
-    let damping = 0.9f32;
-    let iterations = 150;
-    let mut temperature = 200.0f32;
-    let cooling = temperature / iterations as f32;
-
-    // Build edge index for O(1) lookup
-    let edge_pairs: Vec<(usize, usize)> = edges
-        .iter()
-        .filter_map(|e| {
-            let si = nodes.iter().position(|n| n.id == e.source)?;
-            let ti = nodes.iter().position(|n| n.id == e.target)?;
-            Some((si, ti))
-        })
-        .collect();
-
-    for _ in 0..iterations {
-        // Displacement accumulator
-        let mut disp: Vec<(f32, f32)> = vec![(0.0, 0.0); n];
-
-        // Repulsive forces (Coulomb) between all pairs
-        for i in 0..n {
-            for j in (i + 1)..n {
-                let dx = pos[i].0 - pos[j].0;
-                let dy = pos[i].1 - pos[j].1;
-                let dist = (dx * dx + dy * dy).sqrt().max(0.01);
-                let force = (k * k) / dist; // repulsion
-                let fx = (dx / dist) * force;
-                let fy = (dy / dist) * force;
-                disp[i].0 += fx;
-                disp[i].1 += fy;
-                disp[j].0 -= fx;
-                disp[j].1 -= fy;
-            }
-        }
-
-        // Attractive forces (spring) along edges
-        for &(si, ti) in &edge_pairs {
-            let dx = pos[si].0 - pos[ti].0;
-            let dy = pos[si].1 - pos[ti].1;
-            let dist = (dx * dx + dy * dy).sqrt().max(0.01);
-            let force = (dist * dist) / k; // attraction
-            let fx = (dx / dist) * force;
-            let fy = (dy / dist) * force;
-            disp[si].0 -= fx;
-            disp[si].1 -= fy;
-            disp[ti].0 += fx;
-            disp[ti].1 += fy;
-        }
-
-        // Apply displacement with temperature clamping and damping
-        for i in 0..n {
-            let dx = disp[i].0;
-            let dy = disp[i].1;
-            let mag = (dx * dx + dy * dy).sqrt().max(0.01);
-            let clamped = mag.min(temperature);
-            pos[i].0 += (dx / mag) * clamped * damping;
-            pos[i].1 += (dy / mag) * clamped * damping;
-        }
-
-        temperature -= cooling;
-        if temperature < 0.1 {
-            break;
-        }
-    }
-
-    pos
 }
 
 // ── Node painting ────────────────────────────────────────────
@@ -262,18 +162,11 @@ fn paint_edge(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     edge: &SceneEdge,
-    nodes: &[SceneNode],
-    positions: &[(f32, f32)],
+    geom: &crate::canvas::layout::EdgeGeometry,
+    cache: &LayoutCache,
 ) {
-    let src_idx = nodes.iter().position(|n| n.id == edge.source);
-    let tgt_idx = nodes.iter().position(|n| n.id == edge.target);
-
-    let (Some(si), Some(ti)) = (src_idx, tgt_idx) else {
-        return;
-    };
-
-    let src_pos = transform.transform_pos(Pos2::new(positions[si].0, positions[si].1));
-    let tgt_pos = transform.transform_pos(Pos2::new(positions[ti].0, positions[ti].1));
+    let src_pos = transform.transform_pos(cache.nodes[geom.source_idx].center);
+    let tgt_pos = transform.transform_pos(cache.nodes[geom.target_idx].center);
 
     // Thin cross-cluster edges
     let alpha = ((edge.weight * 80.0) as u8).max(40).min(120);

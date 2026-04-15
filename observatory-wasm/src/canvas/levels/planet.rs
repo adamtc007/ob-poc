@@ -12,16 +12,15 @@ use egui::{Color32, Painter, Pos2, Stroke, Vec2};
 
 use ob_poc_types::graph_scene::{GraphSceneModel, SceneEdge, SceneNode, SceneNodeType};
 
+use crate::canvas::layout::LayoutCache;
 use crate::state::CanvasApp;
-
-const HORIZONTAL_SPACING: f32 = 120.0;
-const VERTICAL_SPACING: f32 = 150.0;
 
 /// Paint Planet-level: entity center + tiered relationship nodes.
 pub fn paint(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     scene: &GraphSceneModel,
+    cache: &LayoutCache,
     app: &CanvasApp,
 ) {
     let nodes = &scene.nodes;
@@ -31,60 +30,19 @@ pub fn paint(
         return;
     }
 
-    // ── Compute tiered positions using node.depth ──
-    let positions = compute_tiered_positions(nodes);
-
     // ── Paint edges with directional arrows ──
-    for edge in edges {
-        paint_edge(painter, transform, edge, nodes, &positions);
+    for (edge, geom) in edges.iter().zip(&cache.edges) {
+        paint_edge(painter, transform, edge, geom, nodes, cache);
     }
 
     // ── Paint nodes ──
     for (i, node) in nodes.iter().enumerate() {
-        let (x, y) = positions[i];
-        let screen_pos = transform.transform_pos(Pos2::new(x, y));
+        let screen_pos = transform.transform_pos(cache.nodes[i].center);
         let is_selected = app.interaction.selected_node.as_deref() == Some(&node.id);
         let is_hovered = app.interaction.hovered_node.as_deref() == Some(&node.id);
 
         paint_node(painter, screen_pos, node, is_selected, is_hovered);
     }
-}
-
-// ── Tiered position computation ──────────────────────────────
-
-fn compute_tiered_positions(nodes: &[SceneNode]) -> Vec<(f32, f32)> {
-    let mut positions = vec![(0.0f32, 0.0f32); nodes.len()];
-
-    if nodes.is_empty() {
-        return positions;
-    }
-
-    // Group nodes by tier (depth)
-    let max_depth = nodes.iter().map(|n| n.depth).max().unwrap_or(0);
-
-    for tier in 0..=max_depth {
-        let tier_nodes: Vec<usize> = nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, n)| n.depth == tier)
-            .map(|(i, _)| i)
-            .collect();
-
-        if tier_nodes.is_empty() {
-            continue;
-        }
-
-        let count = tier_nodes.len();
-        let total_width = (count as f32 - 1.0) * HORIZONTAL_SPACING;
-        let start_x = -total_width / 2.0;
-        let y = tier as f32 * VERTICAL_SPACING;
-
-        for (j, &idx) in tier_nodes.iter().enumerate() {
-            positions[idx] = (start_x + j as f32 * HORIZONTAL_SPACING, y);
-        }
-    }
-
-    positions
 }
 
 // ── Node painting ────────────────────────────────────────────
@@ -184,18 +142,12 @@ fn paint_edge(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     edge: &SceneEdge,
+    geom: &crate::canvas::layout::EdgeGeometry,
     nodes: &[SceneNode],
-    positions: &[(f32, f32)],
+    cache: &LayoutCache,
 ) {
-    let src_idx = nodes.iter().position(|n| n.id == edge.source);
-    let tgt_idx = nodes.iter().position(|n| n.id == edge.target);
-
-    let (Some(si), Some(ti)) = (src_idx, tgt_idx) else {
-        return;
-    };
-
-    let src_pos = transform.transform_pos(Pos2::new(positions[si].0, positions[si].1));
-    let tgt_pos = transform.transform_pos(Pos2::new(positions[ti].0, positions[ti].1));
+    let src_pos = transform.transform_pos(cache.nodes[geom.source_idx].center);
+    let tgt_pos = transform.transform_pos(cache.nodes[geom.target_idx].center);
 
     let edge_color = match edge.edge_type {
         ob_poc_types::graph_scene::SceneEdgeType::Dependency => {
@@ -218,7 +170,7 @@ fn paint_edge(
     let perp = Vec2::new(-dir.y, dir.x);
     let arrow_size = 7.0;
     // Pull arrow back from target center by approximate node radius
-    let target_radius = if nodes[ti].depth == 0 { 28.0 } else { 14.0 };
+    let target_radius = if nodes[geom.target_idx].depth == 0 { 28.0 } else { 14.0 };
     let arrow_tip = tgt_pos - dir * target_radius;
     let arrow_base = arrow_tip - dir * arrow_size;
 

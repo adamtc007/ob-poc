@@ -26,6 +26,16 @@ the durable runtime architecture now includes:
 - trace sequence
 - copy-by-value BPMN bridge state
 
+There is also a stricter SEM-OS rule on the action surface:
+
+- session/workspace navigation selects a SEM-OS constellation map
+- concrete UUID-backed entities are bound into typed nodes
+- reducer/state-machine position is recovered from those entities
+- legal verbs are discovered from that grounded SEM-OS path
+
+So session visualization and verb discovery are now aligned around the same
+workspace/domain/state model, rather than around raw registry membership.
+
 ---
 
 ## Overview

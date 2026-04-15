@@ -34,12 +34,6 @@ slots:
       set_base_currency: { verb: trading-profile.set-base-currency, when: filled }
       # Validation (pre-attachment)
       validate_coverage: { verb: trading-profile.validate-universe-coverage, when: filled }
-      # Matrix overlays (template-level defaults)
-      overlay_create: { verb: matrix-overlay.create, when: [empty, filled] }
-      overlay_read: { verb: matrix-overlay.read, when: filled }
-      overlay_list: { verb: matrix-overlay.list, when: filled }
-      overlay_update: { verb: matrix-overlay.update, when: filled }
-      overlay_diff: { verb: matrix-overlay.diff, when: filled }
   settlement_pattern:
     type: entity
     entity_kinds: [settlement]
@@ -63,6 +57,7 @@ slots:
   isda_framework:
     type: entity
     entity_kinds: [contract]
+    join: { via: cbu_trading_profiles, parent_fk: profile_id, child_fk: profile_id }
     cardinality: optional
     depends_on: [trading_profile]
     verbs:
@@ -75,6 +70,7 @@ slots:
   corporate_action_policy:
     type: entity
     entity_kinds: [policy]
+    join: { via: cbu_trading_profiles, parent_fk: profile_id, child_fk: profile_id }
     cardinality: optional
     depends_on: [trading_profile]
     verbs:
@@ -96,6 +92,7 @@ slots:
   trade_gateway:
     type: entity
     entity_kinds: [gateway]
+    join: { via: cbu_trading_profiles, parent_fk: profile_id, child_fk: profile_id }
     cardinality: optional
     depends_on: [trading_profile]
     verbs:

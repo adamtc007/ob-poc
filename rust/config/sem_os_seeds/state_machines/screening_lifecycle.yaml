@@ -13,9 +13,6 @@ states:
     executing,
     all_clear,
     has_hits,
-    adjudicating,
-    escalated,
-    resolved,
   ]
 initial: not_started
 transitions:
@@ -46,46 +43,39 @@ transitions:
   # At least one provider returned a hit
   - from: executing
     to: has_hits
-    verbs: [screening.update-status]
+    verbs: [screening.complete]
 
   # Phase 2: Adjudication (sequential analyst review)
   - from: has_hits
-    to: adjudicating
+    to: has_hits
     verbs: [screening.review-hit]
-  - from: adjudicating
-    to: adjudicating
-    verbs: [screening.review-hit]
-  - from: adjudicating
+  - from: has_hits
     to: all_clear
-    verbs: [screening.resolve]
-  - from: adjudicating
-    to: escalated
-    verbs: [screening.escalate]
-  - from: escalated
-    to: resolved
-    verbs: [screening.resolve]
+    verbs: [screening.complete]
 
   # Read/list available in any active state
   - from: executing
     to: executing
-    verbs: [screening.read, screening.list, screening.list-by-workstream]
+    verbs: [screening.list-by-workstream]
   - from: has_hits
     to: has_hits
-    verbs: [screening.read, screening.list, screening.list-by-workstream]
-  - from: adjudicating
-    to: adjudicating
-    verbs: [screening.read, screening.list, screening.list-by-workstream]
+    verbs: [screening.list-by-workstream]
 
-  # Rescreen (start over from all_clear or resolved)
+  # Rescreen (start over from all_clear)
   - from: all_clear
-    to: not_started
-    verbs: [screening.run]
-  - from: resolved
     to: not_started
     verbs: [screening.run]
 
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: screenings
+      join: workstream_id
+      provides: [sanctions_status, pep_status, media_status]
+    screening_result:
+      table: screenings
+      join: workstream_id
+      provides: [sanctions_status, pep_status, media_status]
   conditions:
     has_sanctions:
       expr: "scope.sanctions_status IS NOT NULL"

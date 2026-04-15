@@ -5,13 +5,13 @@ initial: pending
 transitions:
   - from: pending
     to: draft
-    verbs: [kyc-agreement.create, kyc-agreement.update]
+    verbs: [kyc-agreement.create]
   - from: draft
     to: sent
     verbs: [kyc-agreement.update-status]
   - from: sent
     to: signed
-    verbs: [kyc-agreement.sign]
+    verbs: [kyc-agreement.update-status]
   - from: signed
     to: active
     verbs: [kyc-agreement.update-status]
@@ -21,3 +21,38 @@ transitions:
   - from: draft
     to: pending
     verbs: [kyc-agreement.update-status]
+reducer:
+  overlay_sources:
+    scope:
+      table: kyc_service_agreements
+      join: agreement_id
+      provides: [agreement_status]
+  conditions:
+    status_is:
+      expr: "scope.agreement_status = $1"
+      parameterized: true
+    pending_status:
+      expr: "status_is('PENDING')"
+    draft_status:
+      expr: "status_is('DRAFT')"
+    sent_status:
+      expr: "status_is('SENT')"
+    signed_status:
+      expr: "status_is('SIGNED')"
+    active_status:
+      expr: "status_is('ACTIVE')"
+    terminated_status:
+      expr: "status_is('TERMINATED')"
+  rules:
+    - state: terminated
+      requires: [terminated_status]
+    - state: active
+      requires: [active_status]
+    - state: signed
+      requires: [signed_status]
+    - state: sent
+      requires: [sent_status]
+    - state: draft
+      requires: [draft_status]
+    - state: pending
+      requires: []

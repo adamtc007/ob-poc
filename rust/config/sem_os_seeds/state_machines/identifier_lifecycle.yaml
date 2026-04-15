@@ -5,13 +5,38 @@ initial: empty
 transitions:
   - from: empty
     to: captured
-    verbs: [identifier.add, identifier.search]
+    verbs: [identifier.attach, identifier.attach-lei, identifier.attach-clearstream]
   - from: failed
     to: captured
-    verbs: [identifier.add, identifier.search]
+    verbs: [identifier.attach, identifier.attach-lei, identifier.attach-clearstream]
   - from: captured
     to: verified
-    verbs: [identifier.verify, identifier.resolve]
+    verbs: [identifier.validate]
   - from: captured
     to: failed
-    verbs: [identifier.expire]
+    verbs: [identifier.invalidate]
+reducer:
+  overlay_sources:
+    scope:
+      table: entity_identifiers
+      join: identifier_id
+      provides: [identifier_status]
+  conditions:
+    status_is:
+      expr: "scope.identifier_status = $1"
+      parameterized: true
+    captured_status:
+      expr: "status_is('CAPTURED')"
+    verified_status:
+      expr: "status_is('VERIFIED')"
+    failed_status:
+      expr: "status_is('FAILED')"
+  rules:
+    - state: failed
+      requires: [failed_status]
+    - state: verified
+      requires: [verified_status]
+    - state: captured
+      requires: [captured_status]
+    - state: empty
+      requires: []

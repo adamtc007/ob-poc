@@ -61,7 +61,7 @@ domains:
           - "Start {mode} session"
           clarify:
             mode: "New session or resume a previous one? (new/resume)"
-        confirm_policy: skip
+        confirm_policy: quick_confirm
         returns:
           type: record
           fields: [session_id, mode, client_group_name, workspace]

@@ -11,6 +11,18 @@
 
 Semantic OS is the **single authoritative source of truth** for verb availability. It is not a separate system — it is integrated into the core orchestrator at Stage 2.5 (CCIR) and Stage 2.5 (SessionVerbSurface). All DSL verb discovery flows through it. No exceptions, no bypasses.
 
+The current runtime model is:
+
+`workspace/domain -> SEM-OS constellation map -> typed slot/node -> bound UUID entity -> recovered state -> grounded legal verbs`
+
+Two practical consequences follow.
+
+- A verb floating in YAML is not part of the deterministic agent surface unless
+  it is connected to a SEM-OS slot/state context.
+- Some verbs are intentionally multi-context. They may appear in more than one
+  constellation or slot path, but they are still surfaced only through the
+  currently grounded SEM-OS context.
+
 **Crates:**
 
 | Crate | Purpose |
@@ -176,6 +188,25 @@ pub struct GroundedActionSurface {
     pub dsl_candidates: Vec<DslCandidate>,
 }
 ```
+
+## Runtime Hydration Boundary
+
+The active workspace/session action surface is produced by server-side
+constellation hydration plus reducer/state-machine evaluation.
+
+- `api::constellation_routes::resolve_context()` picks the workspace default
+  constellation map.
+- `sem_os_runtime::hydrate_constellation()` binds concrete entities and reducer
+  state into that map.
+- `compute_action_surface()` produces slot-local legal verbs.
+- The REPL/UI scoped verb surface is the flattened union of those hydrated slot
+  verbs.
+
+This is the authoritative runtime path used by the UI and observatory.
+
+Note that the authored SEM-OS map corpus is broader than the currently
+implemented generic hydrator. The active agent/session discovery path is clean,
+but some non-primary authored joins still require future generic hydration work.
 
 ### Discovery Surface
 

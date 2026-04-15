@@ -8,6 +8,8 @@ use std::cell::RefCell;
 use ob_poc_types::galaxy::ViewLevel;
 use ob_poc_types::graph_scene::GraphSceneModel;
 
+use crate::canvas::layout::LayoutCache;
+
 // ── Thread-local mailboxes for React↔egui communication ──
 
 thread_local! {
@@ -101,6 +103,7 @@ impl ActiveTransition {
 /// All structural UI (headers, viewports, dashboard) lives in React.
 pub struct CanvasApp {
     pub scene: Option<GraphSceneModel>,
+    pub render_cache: Option<LayoutCache>,
     pub current_level: ViewLevel,
     pub camera: ObservationFrame,
     pub interaction: InteractionState,
@@ -111,6 +114,7 @@ impl Default for CanvasApp {
     fn default() -> Self {
         Self {
             scene: None,
+            render_cache: None,
             current_level: ViewLevel::default(),
             camera: ObservationFrame::default(),
             interaction: InteractionState::default(),
@@ -129,7 +133,27 @@ impl eframe::App for CanvasApp {
         // ── 1. Process mailbox (React → egui) ──
         SCENE_MAILBOX.with(|m| {
             if let Some(scene) = m.borrow_mut().take() {
+                let next_cache = LayoutCache::derive(&scene);
+                let sync_level = match &self.transition {
+                    Some(trans) if scene.level == trans.to_level => None,
+                    Some(_) => Some(scene.level),
+                    None => Some(scene.level),
+                };
+                let should_fit_camera = self
+                    .scene
+                    .as_ref()
+                    .map(|prev| prev.level != scene.level)
+                    .unwrap_or(true);
+
+                self.render_cache = Some(next_cache);
                 self.scene = Some(scene);
+                if let Some(level) = sync_level {
+                    self.current_level = level;
+                    self.transition = None;
+                }
+                if should_fit_camera {
+                    self.reset_camera_to_scene();
+                }
             }
         });
         LEVEL_MAILBOX.with(|m| {
@@ -193,9 +217,12 @@ impl CanvasApp {
             }
             ObservatoryAction::SelectNode { node_id } => {
                 self.interaction.selected_node = Some(node_id.clone());
+                self.camera.focus_lock_node_id = Some(node_id.clone());
+                ctx.request_repaint();
             }
             ObservatoryAction::DeselectNode => {
                 self.interaction.selected_node = None;
+                self.camera.focus_lock_node_id = None;
             }
             ObservatoryAction::AnchorNode { node_id } => {
                 self.camera.anchor_node_id = Some(node_id.clone());
@@ -204,7 +231,9 @@ impl CanvasApp {
                 self.camera.anchor_node_id = None;
             }
             ObservatoryAction::ResetView => {
-                self.camera = ObservationFrame::default();
+                self.reset_camera_to_scene();
+                self.interaction.selected_node = None;
+                self.camera.focus_lock_node_id = None;
                 ctx.request_repaint();
             }
             // ── Semantic actions → forward to React via callback ──
@@ -225,5 +254,21 @@ impl CanvasApp {
                 }
             });
         }
+    }
+
+    fn reset_camera_to_scene(&mut self) {
+        let bounds = self
+            .render_cache
+            .as_ref()
+            .map(|cache| cache.world_bounds)
+            .unwrap_or_else(crate::canvas::default_world_bounds);
+        let center = bounds.center();
+        self.camera.zoom = 1.0;
+        self.camera.target_zoom = 1.0;
+        self.camera.pan_x = center.x;
+        self.camera.pan_y = center.y;
+        self.camera.target_pan_x = center.x;
+        self.camera.target_pan_y = center.y;
+        self.camera.anchor_node_id = None;
     }
 }

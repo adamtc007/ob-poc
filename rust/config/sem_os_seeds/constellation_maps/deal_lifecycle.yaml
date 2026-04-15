@@ -206,22 +206,15 @@ slots:
       set_valuation:
         { verb: pricing-config.set-valuation-schedule, when: [empty, filled] }
       set_nav: { verb: pricing-config.set-nav-threshold, when: [empty, filled] }
-      set_settlement:
-        { verb: pricing-config.set-settlement-calendar, when: [empty, filled] }
-      set_holiday:
-        { verb: pricing-config.set-holiday-schedule, when: [empty, filled] }
-      set_reporting:
-        { verb: pricing-config.set-reporting, when: [empty, filled] }
-      set_tax: { verb: pricing-config.set-tax-status, when: [empty, filled] }
+      set_reporting: { verb: tax-config.set-reporting, when: [empty, filled] }
+      set_tax: { verb: tax-config.set-tax-status, when: [empty, filled] }
       set_reclaim:
-        { verb: pricing-config.set-reclaim-config, when: [empty, filled] }
+        { verb: tax-config.set-reclaim-config, when: [empty, filled] }
       find: { verb: pricing-config.find-for-instrument, when: filled }
-      list_jurisdictions:
-        { verb: pricing-config.list-jurisdictions, when: filled }
-      list_treaty_rates:
-        { verb: pricing-config.list-treaty-rates, when: filled }
-      list_tax_status: { verb: pricing-config.list-tax-status, when: filled }
-      list_reclaims: { verb: pricing-config.list-reclaim-configs, when: filled }
+      list_jurisdictions: { verb: tax-config.list-jurisdictions, when: filled }
+      list_treaty_rates: { verb: tax-config.list-treaty-rates, when: filled }
+      list_tax_status: { verb: tax-config.list-tax-status, when: filled }
+      list_reclaims: { verb: tax-config.list-reclaim-configs, when: filled }
   contract_template:
     type: entity
     entity_kinds: [contract]

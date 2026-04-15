@@ -117,22 +117,15 @@ slots:
     cardinality: optional
     depends_on: [fund]
     verbs:
-      create: { verb: manco.create, when: empty }
-      read: { verb: manco.read, when: filled }
-      list: { verb: manco.list, when: [empty, filled] }
-      derive: { verb: manco.derive-groups, when: filled }
-      bridge: { verb: manco.bridge-roles, when: filled }
-      list_members: { verb: manco.list-members, when: filled }
-      list_roles: { verb: manco.list-roles, when: filled }
-      assign_role: { verb: manco.assign-role, when: filled }
-      remove_role: { verb: manco.remove-role, when: filled }
-      link: { verb: manco.link-entity, when: filled }
-      unlink: { verb: manco.unlink-entity, when: filled }
-      set_regulatory: { verb: manco.set-regulatory-status, when: filled }
-      list_funds: { verb: manco.list-managed-funds, when: filled }
-      verify: { verb: manco.verify, when: filled }
-      compute_control: { verb: manco.compute-control-chain, when: filled }
-      refresh: { verb: manco.refresh, when: filled }
+      create: { verb: manco.group.create, when: empty }
+      list: { verb: manco.group.list, when: [empty, filled] }
+      derive: { verb: manco.group.derive, when: filled }
+      bridge_roles: { verb: ownership.bridge.manco-roles, when: filled }
+      list_members: { verb: manco.group.cbus, when: filled }
+      for_fund: { verb: manco.group.for-cbu, when: filled }
+      compute_control: { verb: manco.control-chain, when: filled }
+      summary: { verb: manco.book.summary, when: filled }
+      refresh: { verb: ownership.refresh, when: filled }
   trust:
     type: entity
     entity_kinds: [entity]
@@ -140,13 +133,13 @@ slots:
     cardinality: optional
     depends_on: [fund]
     verbs:
-      create: { verb: trust.create, when: empty }
-      read: { verb: trust.read, when: filled }
-      list: { verb: trust.list, when: [empty, filled] }
-      add_trustee: { verb: trust.add-trustee, when: filled }
-      remove_trustee: { verb: trust.remove-trustee, when: filled }
-      add_beneficiary: { verb: trust.add-beneficiary, when: filled }
-      add_settlor: { verb: trust.add-settlor, when: filled }
+      record_provision: { verb: trust.record-provision, when: [empty, filled] }
+      update_provision: { verb: trust.update-provision, when: filled }
+      end_provision: { verb: trust.end-provision, when: filled }
+      list_provisions: { verb: trust.list-provisions, when: filled }
+      list_by_holder: { verb: trust.list-by-holder, when: filled }
+      analyze_control: { verb: trust.analyze-control, when: filled }
+      classify: { verb: trust.classify, when: filled }
       identify_ubos: { verb: trust.identify-ubos, when: filled }
   partnership:
     type: entity
@@ -155,10 +148,10 @@ slots:
     cardinality: optional
     depends_on: [fund]
     verbs:
-      create: { verb: partnership.create, when: empty }
-      read: { verb: partnership.read, when: filled }
-      list: { verb: partnership.list, when: [empty, filled] }
-      add_partner: { verb: partnership.add-partner, when: filled }
-      remove_partner: { verb: partnership.remove-partner, when: filled }
-      set_gp: { verb: partnership.set-general-partner, when: filled }
+      add_partner: { verb: partnership.add-partner, when: [empty, filled] }
+      record_contribution: { verb: partnership.record-contribution, when: filled }
+      record_distribution: { verb: partnership.record-distribution, when: filled }
+      withdraw_partner: { verb: partnership.withdraw-partner, when: filled }
       list_partners: { verb: partnership.list-partners, when: filled }
+      reconcile: { verb: partnership.reconcile, when: filled }
+      analyze_control: { verb: partnership.analyze-control, when: filled }

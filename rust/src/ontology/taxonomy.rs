@@ -199,7 +199,7 @@ impl EntityTaxonomy {
     /// # Examples
     ///
     /// ```
-    /// use ob_poc::ontology::taxonomy::EntityTaxonomy;
+    /// use ob_poc::ontology::EntityTaxonomy;
     ///
     /// let yaml = r#"
     /// version: "1.0"

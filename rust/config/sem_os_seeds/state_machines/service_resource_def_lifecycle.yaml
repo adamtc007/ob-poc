@@ -22,7 +22,11 @@ transitions:
     to: gaps_found
     verbs: [service-resource.check-attribute-gaps]
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: service_resource_types
+      join: resource_type_id
+      provides: [synced_srdef_count, attribute_gap_count]
   conditions:
     has_synced_srdefs:
       expr: "scope.synced_srdef_count > 0"

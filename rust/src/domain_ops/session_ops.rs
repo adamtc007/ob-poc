@@ -34,6 +34,7 @@ use uuid::Uuid;
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
+use crate::session::UnifiedSession;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -204,6 +205,61 @@ fn get_optional_integer(verb_call: &VerbCall, key: &str) -> Option<i64> {
         .iter()
         .find(|a| a.key == key)
         .and_then(|a| a.value.as_integer())
+}
+
+// =============================================================================
+// START SESSION
+// =============================================================================
+
+#[register_custom_op]
+pub struct SessionStartOp;
+
+#[async_trait]
+impl CustomOperation for SessionStartOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "start"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Creates a fresh in-memory session state for DSL-driven session workflows"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let mode = get_required_string(verb_call, "mode")?;
+        let from = get_optional_string(verb_call, "from");
+
+        let session = UnifiedSession::new();
+        let session_id = session.id;
+        ctx.set_pending_session(session);
+
+        Ok(ExecutionResult::Record(json!({
+            "session_id": session_id,
+            "mode": mode,
+            "client_group_name": serde_json::Value::Null,
+            "workspace": from,
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
 }
 
 // =============================================================================

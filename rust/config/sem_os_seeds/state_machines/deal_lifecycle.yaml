@@ -64,7 +64,11 @@ transitions:
     to: cancelled
     verbs: [deal.cancel]
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: deals
+      join: deal_id
+      provides: [deal_status]
   conditions:
     status_is:
       expr: "scope.deal_status = $1"

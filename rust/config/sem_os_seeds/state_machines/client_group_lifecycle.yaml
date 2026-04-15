@@ -41,7 +41,20 @@ transitions:
     to: active
     verbs: [kyc-case.close]
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: client_group
+      join: group_id
+      provides:
+        [
+          gleif_import_count,
+          has_ubo_determination,
+          has_control_chain,
+          has_group_kyc_clearance,
+          cbu_count,
+          active_case_count,
+          all_cases_approved,
+        ]
   conditions:
     has_gleif_import:
       expr: "scope.gleif_import_count > 0"

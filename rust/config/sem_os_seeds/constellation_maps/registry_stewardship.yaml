@@ -3,9 +3,11 @@ description: SemOS registry governance constellation — changeset authoring, at
 jurisdiction: ALL
 slots:
   changeset:
-    type: entity
+    type: cbu
     entity_kinds: [registry]
-    cardinality: optional
+    table: sem_reg_changesets
+    pk: changeset_id
+    cardinality: root
     state_machine: changeset_lifecycle
     verbs:
       compose: { verb: changeset.compose, when: [empty, filled] }
@@ -26,6 +28,9 @@ slots:
   governance:
     type: entity
     entity_kinds: [registry]
+    table: sem_reg_changesets
+    pk: changeset_id
+    join: { via: sem_reg_changesets, parent_fk: changeset_id, child_fk: changeset_id }
     cardinality: optional
     depends_on: [changeset]
     verbs:
@@ -42,6 +47,9 @@ slots:
   attribute_def:
     type: entity
     entity_kinds: [attribute]
+    table: attribute_registry
+    pk: id
+    join: { via: sem_reg_changeset_items, parent_fk: changeset_id, child_fk: id }
     cardinality: optional
     state_machine: attribute_def_lifecycle
     verbs:
@@ -58,6 +66,9 @@ slots:
   derivation_spec:
     type: entity
     entity_kinds: [attribute]
+    table: derivation_specs
+    pk: derivation_id
+    join: { via: derivation_specs, parent_fk: id, child_fk: derivation_id }
     cardinality: optional
     depends_on: [attribute_def]
     state_machine: derivation_spec_lifecycle
@@ -67,6 +78,9 @@ slots:
   typed_attribute:
     type: entity
     entity_kinds: [attribute]
+    table: typed_attributes
+    pk: typed_attribute_id
+    join: { via: typed_attributes, parent_fk: id, child_fk: typed_attribute_id }
     cardinality: optional
     depends_on: [attribute_def]
     verbs:
@@ -77,6 +91,9 @@ slots:
   service_resource_def:
     type: entity
     entity_kinds: [resource_type]
+    table: service_resource_types
+    pk: resource_type_id
+    join: { via: sem_reg_changeset_items, parent_fk: changeset_id, child_fk: resource_type_id }
     cardinality: optional
     state_machine: service_resource_def_lifecycle
     verbs:
@@ -87,11 +104,13 @@ slots:
   phrase_authoring:
     type: entity
     entity_kinds: [phrase]
+    table: phrase_proposals
+    pk: proposal_id
+    join: { via: phrase_proposals, parent_fk: changeset_id, child_fk: proposal_id }
     cardinality: optional
     state_machine: phrase_authoring_lifecycle
     verbs:
       observe: { verb: phrase.observe-misses, when: [empty, filled] }
-      analyse: { verb: phrase.analyse-candidates, when: filled }
       propose: { verb: phrase.propose, when: [empty, filled] }
       batch_propose: { verb: phrase.batch-propose, when: [empty, filled] }
       check_collisions: { verb: phrase.check-collisions, when: [empty, filled] }
@@ -104,6 +123,9 @@ slots:
   registry:
     type: entity
     entity_kinds: [registry]
+    table: sem_reg_registry_objects
+    pk: object_id
+    join: { via: sem_reg_registry_objects, parent_fk: changeset_id, child_fk: object_id }
     cardinality: optional
     verbs:
       describe: { verb: registry.describe-object, when: filled }

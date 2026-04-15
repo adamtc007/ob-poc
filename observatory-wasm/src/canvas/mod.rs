@@ -4,6 +4,7 @@
 //! Level-specific renderers in canvas/levels/.
 
 pub mod controls;
+pub mod layout;
 pub mod levels;
 
 use egui::{Ui, Vec2};
@@ -12,7 +13,7 @@ use crate::actions::ObservatoryAction;
 use crate::state::CanvasApp;
 
 /// Render the central constellation canvas. Returns action on interaction.
-pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
+pub fn render(ui: &mut Ui, app: &mut CanvasApp) -> Option<ObservatoryAction> {
     let available = ui.available_size();
     let (response, painter) =
         ui.allocate_painter(available, egui::Sense::click_and_drag());
@@ -31,12 +32,22 @@ pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
         let b = (fb as f32 + (tb as f32 - fb as f32) * t) as u8;
         painter.rect_filled(response.rect, 0.0, egui::Color32::from_rgb(r, g, b));
     } else {
-        let depth_t = app.current_level as usize as f32 / 5.0;
+        let visible_level = app
+            .scene
+            .as_ref()
+            .map(|scene| scene.level)
+            .unwrap_or(app.current_level);
+        let depth_t = visible_level as usize as f32 / 5.0;
         let (r, g, b) = colors.color_at(depth_t);
         painter.rect_filled(response.rect, 0.0, egui::Color32::from_rgb(r, g, b));
     }
 
     // ── World-to-screen transform (with transition zoom interpolation) ──
+    let world_bounds = app
+        .render_cache
+        .as_ref()
+        .map(|cache| cache.world_bounds)
+        .unwrap_or_else(default_world_bounds);
     let transform = if let Some(ref trans) = app.transition {
         // Smoothly interpolate camera zoom toward the drill target during transition
         let t = trans.t();
@@ -46,16 +57,28 @@ pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
         let zoom_factor = 1.0 + level_delta * 0.3 * t;
         let mut cam = app.camera.clone();
         cam.zoom = (from_zoom * zoom_factor).clamp(0.05, 10.0);
-        world_to_screen(&cam, &response.rect)
+        world_to_screen(&cam, &response.rect, world_bounds)
     } else {
-        world_to_screen(&app.camera, &response.rect)
+        world_to_screen(&app.camera, &response.rect, world_bounds)
     };
+
+    // ── Hover detection (before painting so nodes get immediate visual feedback) ──
+    app.interaction.hovered_node = None;
+    if let Some(pointer_pos) = ui.ctx().pointer_hover_pos() {
+        if response.rect.contains(pointer_pos) {
+            let world_pos = transform.inverse().transform_pos(pointer_pos);
+            if let (Some(scene), Some(cache)) = (app.scene.as_ref(), app.render_cache.as_ref()) {
+                if let Some(hovered_id) = cache.hit_test(scene, world_pos) {
+                    app.interaction.hovered_node = Some(hovered_id.clone());
+                }
+            }
+        }
+    }
 
     // ── Paint scene by level ──
     if let Some(ref scene) = app.scene {
         levels::paint(&painter, &transform, scene, app);
     } else {
-        // No scene loaded — show placeholder
         painter.text(
             response.rect.center(),
             egui::Align2::CENTER_CENTER,
@@ -70,19 +93,12 @@ pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
         return Some(ctrl_action);
     }
 
-    // ── Hover detection + tooltip ──
-    // Request continuous repaint when pointer is over canvas so hover detection is responsive
-    if response.hovered() {
-        ui.ctx().request_repaint();
-    }
+    // ── Tooltip (painted after nodes so it appears on top) ──
     if let Some(pointer_pos) = ui.ctx().pointer_hover_pos() {
-        if response.rect.contains(pointer_pos) {
-            let world_pos = transform.inverse().transform_pos(pointer_pos);
+        if let Some(ref hovered_id) = app.interaction.hovered_node {
             if let Some(ref scene) = app.scene {
-                if let Some(hovered_id) = hit_test(scene, world_pos) {
-                    if let Some(node) = scene.nodes.iter().find(|n| n.id == hovered_id) {
-                        paint_node_tooltip(ui, pointer_pos, node, scene);
-                    }
+                if let Some(node) = scene.nodes.iter().find(|n| n.id == *hovered_id) {
+                    paint_node_tooltip(ui, pointer_pos, node, scene);
                 }
             }
         }
@@ -90,6 +106,13 @@ pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
 
     // ── Handle interaction ──
     let mut action = None;
+
+    if ui.input(|i| i.key_pressed(egui::Key::R)) {
+        return Some(ObservatoryAction::ResetView);
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        return Some(ObservatoryAction::DeselectNode);
+    }
 
     // Pan (drag)
     if response.dragged() {
@@ -112,18 +135,23 @@ pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
     if response.clicked() || response.double_clicked() {
         if let Some(pointer_pos) = response.hover_pos() {
             let world_pos = transform.inverse().transform_pos(pointer_pos);
-            if let Some(ref scene) = app.scene {
-                if let Some(node_id) = hit_test(scene, world_pos) {
+            if let (Some(scene), Some(cache)) = (app.scene.as_ref(), app.render_cache.as_ref()) {
+                if let Some(node_id) = cache.hit_test(scene, world_pos) {
                     if response.double_clicked() {
-                        // Semantic drill — requires server round-trip
-                        action = Some(ObservatoryAction::Drill {
-                            node_id: node_id.clone(),
-                            target_level: ob_poc_types::galaxy::ViewLevel::default(),
-                        });
+                        if let Some(drill) = resolve_drill_target(scene, &node_id) {
+                            action = Some(ObservatoryAction::Drill {
+                                node_id: node_id.clone(),
+                                target_level: drill,
+                            });
+                        } else {
+                            action = Some(ObservatoryAction::SelectNode { node_id });
+                        }
                     } else {
                         // Selection — local only, NOT semantic focus
                         action = Some(ObservatoryAction::SelectNode { node_id });
                     }
+                } else if response.clicked() {
+                    action = Some(ObservatoryAction::DeselectNode);
                 }
             }
         }
@@ -133,8 +161,8 @@ pub fn render(ui: &mut Ui, app: &CanvasApp) -> Option<ObservatoryAction> {
     if response.middle_clicked() {
         if let Some(pointer_pos) = response.hover_pos() {
             let world_pos = transform.inverse().transform_pos(pointer_pos);
-            if let Some(ref scene) = app.scene {
-                if let Some(node_id) = hit_test(scene, world_pos) {
+            if let (Some(scene), Some(cache)) = (app.scene.as_ref(), app.render_cache.as_ref()) {
+                if let Some(node_id) = cache.hit_test(scene, world_pos) {
                     // Middle-click on a node: anchor to it
                     action = Some(ObservatoryAction::AnchorNode { node_id });
                 } else {
@@ -273,16 +301,33 @@ fn paint_node_tooltip(
                         }
                     }
 
+                    let drill_target = resolve_drill_target(scene, &node.id);
+
                     // Hint
                     ui.add_space(6.0);
                     ui.label(
-                        egui::RichText::new("Click to select · Double-click to drill")
+                        egui::RichText::new(if drill_target.is_some() {
+                            "Click to select · Double-click to drill"
+                        } else {
+                            "Click to select"
+                        })
                             .size(9.0)
                             .italics()
                             .color(egui::Color32::from_rgb(107, 114, 128)),
                     );
                 });
         });
+}
+
+fn resolve_drill_target(
+    scene: &ob_poc_types::graph_scene::GraphSceneModel,
+    node_id: &str,
+) -> Option<ob_poc_types::galaxy::ViewLevel> {
+    scene
+        .drill_targets
+        .iter()
+        .find(|target| target.node_id == node_id)
+        .map(|target| target.target_level)
 }
 
 fn badge(ui: &mut egui::Ui, text: &str, color: egui::Color32) {
@@ -320,68 +365,75 @@ fn tooltip_row(ui: &mut egui::Ui, label: &str, value: &str) {
 pub(crate) fn world_to_screen(
     camera: &crate::state::ObservationFrame,
     canvas_rect: &egui::Rect,
+    world_bounds: egui::Rect,
 ) -> egui::emath::RectTransform {
-    let world_size = Vec2::splat(2000.0 / camera.zoom);
-    let world_rect = egui::Rect::from_center_size(
-        egui::Pos2::new(camera.pan_x, camera.pan_y),
-        world_size,
-    );
+    let world_rect = camera_world_rect(camera, canvas_rect, world_bounds);
     egui::emath::RectTransform::from_to(world_rect, *canvas_rect)
 }
 
-/// Hit test: find the nearest scene node to a world-space point.
-/// Computes positions using the same orbital algorithm as the level renderers.
-fn hit_test(
-    scene: &ob_poc_types::graph_scene::GraphSceneModel,
-    world_pos: egui::Pos2,
-) -> Option<String> {
-    let hit_radius = 30.0;
-    let positions = compute_node_positions(&scene.nodes);
-
-    let mut best: Option<(String, f32)> = None;
-    for (i, node) in scene.nodes.iter().enumerate() {
-        let (nx, ny) = positions[i];
-        let dist = ((world_pos.x - nx).powi(2) + (world_pos.y - ny).powi(2)).sqrt();
-        if dist < hit_radius {
-            if best.as_ref().map_or(true, |(_, d)| dist < *d) {
-                best = Some((node.id.clone(), dist));
-            }
-        }
-    }
-
-    best.map(|(id, _)| id)
+pub(crate) fn camera_world_rect(
+    camera: &crate::state::ObservationFrame,
+    canvas_rect: &egui::Rect,
+    world_bounds: egui::Rect,
+) -> egui::Rect {
+    let aspect = (canvas_rect.width() / canvas_rect.height().max(1.0)).max(0.1);
+    let margin = 1.2;
+    let base_width = world_bounds.width().max(200.0);
+    let base_height = world_bounds.height().max(200.0);
+    let world_width = (base_width.max(base_height * aspect) * margin) / camera.zoom.max(0.05);
+    let world_height =
+        (base_height.max(base_width / aspect) * margin) / camera.zoom.max(0.05);
+    egui::Rect::from_center_size(
+        egui::Pos2::new(camera.pan_x, camera.pan_y),
+        Vec2::new(world_width, world_height),
+    )
 }
 
-/// Compute node positions using the same orbital algorithm as the level renderers.
-/// First node at center, remaining in concentric rings.
-pub(crate) fn compute_node_positions(nodes: &[ob_poc_types::graph_scene::SceneNode]) -> Vec<(f32, f32)> {
-    use std::f32::consts::TAU;
-    let mut positions = Vec::with_capacity(nodes.len());
+pub(crate) fn default_world_bounds() -> egui::Rect {
+    egui::Rect::from_center_size(egui::Pos2::ZERO, Vec2::splat(400.0))
+}
 
-    for (i, node) in nodes.iter().enumerate() {
-        // Use server-provided position_hint if available
-        if let Some(pos) = node.position_hint {
-            positions.push(pos);
-            continue;
-        }
-        // Otherwise compute orbital position (same as system.rs)
-        if i == 0 {
-            positions.push((0.0, 0.0));
-        } else {
-            let orbital_idx = i - 1;
-            let ring_capacity = 12;
-            let ring = orbital_idx / ring_capacity;
-            let idx_in_ring = orbital_idx % ring_capacity;
-            let total = nodes.len() - 1;
-            let nodes_in_ring = if (ring + 1) * ring_capacity <= total {
-                ring_capacity
-            } else {
-                total - ring * ring_capacity
-            };
-            let ring_radius = 200.0 + (ring as f32) * 150.0;
-            let angle = (idx_in_ring as f32 / nodes_in_ring as f32) * TAU - TAU / 4.0;
-            positions.push((angle.cos() * ring_radius, angle.sin() * ring_radius));
+#[cfg(test)]
+mod tests {
+    use super::resolve_drill_target;
+    use ob_poc_types::galaxy::ViewLevel;
+    use ob_poc_types::graph_scene::{
+        DrillTarget, GraphSceneModel, LayoutStrategy, SceneEdge, SceneGroup, SceneNode, SceneNodeType,
+    };
+
+    fn scene_with_drill_targets() -> GraphSceneModel {
+        GraphSceneModel {
+            generation: 7,
+            level: ViewLevel::System,
+            layout_strategy: LayoutStrategy::DeterministicOrbital,
+            nodes: vec![SceneNode {
+                id: "cbu".into(),
+                label: "CBU".into(),
+                node_type: SceneNodeType::Cbu,
+                state: None,
+                progress: 0,
+                blocking: false,
+                depth: 0,
+                position_hint: Some((0.0, 0.0)),
+                badges: vec![],
+                child_count: 1,
+                group_id: None,
+            }],
+            edges: Vec::<SceneEdge>::new(),
+            groups: Vec::<SceneGroup>::new(),
+            drill_targets: vec![DrillTarget {
+                node_id: "cbu".into(),
+                target_level: ViewLevel::Planet,
+                drill_label: "View entities".into(),
+            }],
+            max_depth: 1,
         }
     }
-    positions
+
+    #[test]
+    fn resolve_drill_target_returns_declared_target_level() {
+        let scene = scene_with_drill_targets();
+        assert_eq!(resolve_drill_target(&scene, "cbu"), Some(ViewLevel::Planet));
+        assert_eq!(resolve_drill_target(&scene, "missing"), None);
+    }
 }

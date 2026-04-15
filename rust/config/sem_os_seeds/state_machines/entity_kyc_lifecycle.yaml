@@ -70,6 +70,10 @@ reducer:
       join: workstream_id
       provides: [request_type, status]
       cardinality: many
+    scope:
+      table: cases
+      join: case_id
+      provides: [case_status]
   conditions:
     entity_assigned:
       expr: "entity_ref.entity_id IS NOT NULL"

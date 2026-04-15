@@ -42,6 +42,33 @@ domains:
           type: record
           name: contract_pack
 
+      read:
+        description: "Read a contract pack by ID"
+        behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: contract_pack
+          phase_tags: [deal]
+          side_effects: facts_only
+        invocation_phrases:
+        - "show contract pack"
+        - "read contract pack"
+        - "view contract pack"
+        - "show template pack"
+        crud:
+          operation: select
+          table: contract_pack
+          schema: ob-poc
+        args:
+        - name: contract-pack-id
+          type: uuid
+          required: true
+          maps_to: contract_pack_id
+        returns:
+          type: record
+
       add-template:
         description: "Add a template to a contract pack"
         behavior: plugin

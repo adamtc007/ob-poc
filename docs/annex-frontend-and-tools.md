@@ -8,7 +8,9 @@
 
 ## React Frontend (ob-poc-ui-react)
 
-> **UI Migration:** The UI has been migrated from egui/WASM to React/TypeScript. The old `ob-poc-ui` and `esper_egui` crates are deprecated.
+> **Current split:** React owns structural application UI. `observatory-wasm`
+> owns the high-frequency constellation canvas. The older `ob-poc-ui` and
+> `esper_egui` crates remain deprecated.
 
 ### Architecture — Cockpit Layout
 
@@ -42,8 +44,23 @@ ob-poc-ui-react/
 - egui canvas renders `GraphSceneModel` from Observatory API (polled 5s)
 - Canvas actions (drill, select, zoom) route through standard REPL input pipeline
 - FlightDeck defaults to collapsed 1-line status bar (expand on click for lens controls)
-- At session start, canvas shows universe root with 7 workspace nodes
+- At session start, canvas shows the universe root with 8 satellites:
+  7 workspace nodes plus `new-session`
 - `SessionFeedback` populated from session creation with scoping verbs
+
+### egui Canvas Contract
+
+The egui canvas now uses a shared derived layout model for:
+
+- paint
+- hit testing
+- hover inspection
+- selection/drill
+- minimap and anchor helpers
+
+Renderers no longer rely on one geometry path while interaction uses another.
+Hover and inspection are only considered correct when both consume the same
+cached node shapes/positions.
 
 ### Key Endpoints (Backend → React)
 

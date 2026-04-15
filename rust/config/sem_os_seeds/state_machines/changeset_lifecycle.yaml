@@ -25,7 +25,11 @@ transitions:
     to: composing
     verbs: [changeset.compose]
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: sem_reg_changesets
+      join: changeset_id
+      provides: [changeset_item_count, changeset_validation_passed]
   conditions:
     has_items:
       expr: "scope.changeset_item_count > 0"

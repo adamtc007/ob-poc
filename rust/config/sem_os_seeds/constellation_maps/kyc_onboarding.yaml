@@ -72,7 +72,6 @@ slots:
         verbs:
           evaluate: { verb: tollgate.evaluate, when: empty }
           check_gate: { verb: tollgate.check-gate, when: [empty, filled] }
-          read: { verb: tollgate.read, when: filled }
           get_decision_readiness:
             { verb: tollgate.get-decision-readiness, when: filled }
           get_metrics: { verb: tollgate.get-metrics, when: filled }
@@ -151,31 +150,8 @@ slots:
               evidence_collected,
             ],
         }
-      flag_read: red-flag.read
-      flag_list: red-flag.list
-      flag_resolve:
-        {
-          verb: red-flag.resolve,
-          when: [screening_complete, evidence_collected, verified],
-        }
-      flag_escalate:
-        {
-          verb: red-flag.escalate,
-          when: [screening_initiated, screening_complete, evidence_collected],
-        }
-      flag_update:
-        {
-          verb: red-flag.update,
-          when:
-            [
-              open,
-              documents_requested,
-              screening_initiated,
-              screening_complete,
-              evidence_collected,
-            ],
-        }
-      flag_list_severity: red-flag.list-by-severity
+      flag_read: red-flag.list-by-workstream
+      flag_list: red-flag.list-by-workstream
       flag_close:
         {
           verb: red-flag.close,
@@ -259,12 +235,7 @@ slots:
         { verb: requirement.create, when: [open, documents_requested] }
       req_create_set:
         { verb: requirement.create-set, when: [open, documents_requested] }
-      req_check:
-        {
-          verb: requirement.check,
-          when: [documents_requested, evidence_collected, verified],
-        }
-      req_list: requirement.list
+      req_list: requirement.list-for-workflow
       req_for_entity: requirement.list-for-entity
       req_unsatisfied:
         {
@@ -273,7 +244,7 @@ slots:
         }
       req_waive: { verb: requirement.waive, when: [documents_requested] }
       req_reinstate:
-        { verb: requirement.reinstate, when: [evidence_collected, verified] }
+        { verb: requirement.reset, when: [evidence_collected, verified] }
       req_get: requirement.get
       req_list_for_workflow: requirement.list-for-workflow
       req_list_with_status: requirement.list-with-status
@@ -286,7 +257,7 @@ slots:
         }
       doc_solicit_batch:
         { verb: document.solicit-batch, when: [open, documents_requested] }
-      doc_upload: { verb: document.upload, when: [documents_requested] }
+      doc_upload: { verb: document.upload-version, when: [documents_requested] }
       doc_verify:
         {
           verb: document.verify,
@@ -297,8 +268,8 @@ slots:
           verb: document.reject,
           when: [documents_requested, screening_complete],
         }
-      doc_read: document.read
-      doc_list: document.list
+      doc_read: document.get
+      doc_list: document.for-entity
       doc_compute_reqs:
         {
           verb: document.compute-requirements,
@@ -358,13 +329,10 @@ slots:
       adverse_media:
         { verb: screening.adverse-media, when: [empty, not_started, filled] }
       bulk_refresh: { verb: screening.bulk-refresh, when: filled }
-      read: { verb: screening.read, when: filled }
-      list: { verb: screening.list, when: filled }
+      read: { verb: screening.list-by-workstream, when: filled }
+      list: { verb: screening.list-by-workstream, when: filled }
       list_by_workstream: { verb: screening.list-by-workstream, when: filled }
       review_hit: { verb: screening.review-hit, when: filled }
-      update: { verb: screening.update-status, when: filled }
-      escalate: { verb: screening.escalate, when: filled }
-      resolve: { verb: screening.resolve, when: filled }
       complete: { verb: screening.complete, when: filled }
   # Evidence/documents are NOT embedded here — they are a separate concern
   # owned by evidence.collection constellation. KYC depends on evidence
@@ -380,14 +348,11 @@ slots:
       create: { verb: kyc-agreement.create, when: [empty, pending] }
       read: kyc-agreement.read
       list: kyc-agreement.list
-      update:
-        { verb: kyc-agreement.update, when: [draft, sent, signed, active] }
       update_status:
         {
           verb: kyc-agreement.update-status,
           when: [draft, sent, signed, active],
         }
-      sign: { verb: kyc-agreement.sign, when: [sent, signed] }
   identifier:
     type: entity
     entity_kinds: [entity]
@@ -398,17 +363,13 @@ slots:
       - { slot: entity_workstream, min_state: open }
     state_machine: identifier_lifecycle
     verbs:
-      add: { verb: identifier.add, when: [empty, failed] }
+      add: { verb: identifier.attach, when: [empty, failed] }
       attach: { verb: identifier.attach, when: [empty, failed, captured] }
-      read: identifier.read
-      list: identifier.list
-      verify: { verb: identifier.verify, when: [captured] }
-      expire: { verb: identifier.expire, when: [captured, verified] }
-      update: { verb: identifier.update, when: [captured, verified] }
-      search: { verb: identifier.search, when: [empty, failed, captured] }
-      resolve: { verb: identifier.resolve, when: [captured, verified] }
-      list_by_type: identifier.list-by-type
-      set_primary: { verb: identifier.set-primary, when: [verified] }
+      read: identifier.list-by-entity
+      list: identifier.list-by-entity
+      verify: { verb: identifier.validate, when: [captured] }
+      expire: { verb: identifier.invalidate, when: [captured, verified] }
+      update: { verb: identifier.attach, when: [captured, verified] }
       remove: { verb: identifier.remove, when: [captured, verified, failed] }
       # Scheme-specific attachment and lookup
       attach_lei: { verb: identifier.attach-lei, when: [empty, failed, captured] }
@@ -431,13 +392,10 @@ slots:
     state_machine: document_request_lifecycle
     verbs:
       create: { verb: request.create, when: [empty, pending, returned] }
-      read: request.read
+      read: request.list
       list: request.list
-      update: { verb: request.update, when: [sent, received] }
-      complete: { verb: request.complete, when: [received] }
+      complete: { verb: request.fulfill, when: [received] }
       cancel: { verb: request.cancel, when: [pending, sent] }
-      assign: { verb: request.assign, when: [pending, sent, received] }
-      reopen: { verb: request.reopen, when: [returned, waived, fulfilled] }
       escalate: { verb: request.escalate, when: [sent, received] }
       # Request lifecycle extras
       fulfill: { verb: request.fulfill, when: [received] }

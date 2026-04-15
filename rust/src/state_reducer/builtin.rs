@@ -1,5 +1,6 @@
 use super::state_machine::ValidatedStateMachine;
 use super::{load_state_machine, ReducerResult};
+use std::path::PathBuf;
 
 const ENTITY_KYC_LIFECYCLE_YAML: &str =
     include_str!("../../config/sem_os_seeds/state_machines/entity_kyc_lifecycle.yaml");
@@ -24,10 +25,20 @@ pub fn load_builtin_state_machine(name: &str) -> ReducerResult<ValidatedStateMac
         "entity_kyc_lifecycle" => load_state_machine(ENTITY_KYC_LIFECYCLE_YAML),
         "kyc_case_lifecycle" => load_state_machine(KYC_CASE_LIFECYCLE_YAML),
         "ubo_epistemic_lifecycle" => load_state_machine(UBO_EPISTEMIC_LIFECYCLE_YAML),
-        other => Err(super::ReducerError::Validation(format!(
-            "unknown built-in state machine '{other}'"
-        ))),
+        other => load_builtin_state_machine_from_disk(other),
     }
+}
+
+fn load_builtin_state_machine_from_disk(name: &str) -> ReducerResult<ValidatedStateMachine> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("config/sem_os_seeds/state_machines")
+        .join(format!("{name}.yaml"));
+
+    let yaml = std::fs::read_to_string(&path).map_err(|_| {
+        super::ReducerError::Validation(format!("unknown built-in state machine '{name}'"))
+    })?;
+
+    load_state_machine(&yaml)
 }
 
 #[cfg(test)]

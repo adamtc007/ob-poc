@@ -3,7 +3,7 @@ description: Product-maintenance constellation for governed product, service, se
 jurisdiction: ALL
 slots:
   product:
-    type: entity
+    type: cbu
     entity_kinds: [product]
     table: products
     pk: product_id
@@ -41,6 +41,7 @@ slots:
     entity_kinds: [attribute]
     table: attribute_registry
     pk: id
+    join: { via: attribute_registry, parent_fk: resource_type_id, child_fk: id }
     cardinality: optional
     depends_on: [service_resource]
     verbs:

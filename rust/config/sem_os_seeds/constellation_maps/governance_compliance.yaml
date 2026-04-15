@@ -17,24 +17,15 @@ slots:
     cardinality: optional
     depends_on: [group]
     verbs:
-      create: { verb: sla.create, when: empty }
-      read: { verb: sla.read, when: filled }
       read_template: { verb: sla.read-template, when: filled }
-      list: { verb: sla.list, when: [empty, filled] }
       list_templates: { verb: sla.list-templates, when: [empty, filled] }
       list_commitments: { verb: sla.list-commitments, when: filled }
       list_measurements: { verb: sla.list-measurements, when: filled }
-      list_breaches: { verb: sla.list-breaches, when: filled }
       list_open_breaches: { verb: sla.list-open-breaches, when: filled }
-      update: { verb: sla.update, when: filled }
       bind: { verb: sla.bind, when: filled }
       commit: { verb: sla.commit, when: filled }
       record_measurement: { verb: sla.record-measurement, when: filled }
-      activate: { verb: sla.activate, when: filled }
-      suspend: { verb: sla.suspend, when: filled }
       suspend_commitment: { verb: sla.suspend-commitment, when: filled }
-      renew: { verb: sla.renew, when: filled }
-      breach: { verb: sla.record-breach, when: filled }
       report_breach: { verb: sla.report-breach, when: filled }
       escalate_breach: { verb: sla.escalate-breach, when: filled }
       resolve_breach: { verb: sla.resolve-breach, when: filled }
@@ -46,10 +37,7 @@ slots:
     cardinality: optional
     depends_on: [group]
     verbs:
-      create: { verb: access-review.create, when: empty }
       create_campaign: { verb: access-review.create-campaign, when: [empty, filled] }
-      read: { verb: access-review.read, when: filled }
-      list: { verb: access-review.list, when: [empty, filled] }
       list_items: { verb: access-review.list-items, when: filled }
       list_flagged: { verb: access-review.list-flagged, when: filled }
       my_pending: { verb: access-review.my-pending, when: filled }
@@ -63,10 +51,6 @@ slots:
       extend_access: { verb: access-review.extend-access, when: filled }
       revoke_access: { verb: access-review.revoke-access, when: filled }
       escalate_item: { verb: access-review.escalate-item, when: filled }
-      start: { verb: access-review.start, when: filled }
-      complete: { verb: access-review.complete, when: filled }
-      approve: { verb: access-review.approve, when: filled }
-      reject: { verb: access-review.reject, when: filled }
       bulk_confirm: { verb: access-review.bulk-confirm, when: filled }
       confirm_access: { verb: access-review.confirm-access, when: filled }
       confirm_all_clean: { verb: access-review.confirm-all-clean, when: filled }
@@ -77,15 +61,9 @@ slots:
     cardinality: optional
     depends_on: [group]
     verbs:
-      create: { verb: regulatory.create, when: empty }
       registration_add: { verb: regulatory.registration.add, when: [empty, filled] }
-      read: { verb: regulatory.read, when: filled }
-      list: { verb: regulatory.list, when: [empty, filled] }
       registration_list: { verb: regulatory.registration.list, when: filled }
-      registration_check: { verb: regulatory.registration.check, when: filled }
       registration_verify: { verb: regulatory.registration.verify, when: filled }
-      update: { verb: regulatory.update, when: filled }
-      submit: { verb: regulatory.submit, when: filled }
       registration_remove: { verb: regulatory.registration.remove, when: filled }
       status_check: regulatory.status.check
   ruleset:
@@ -96,7 +74,6 @@ slots:
     depends_on: [group]
     verbs:
       create: { verb: ruleset.create, when: empty }
-      read: { verb: ruleset.read, when: filled }
       publish: { verb: ruleset.publish, when: filled }
       retire: { verb: ruleset.retire, when: filled }
   delegation:
@@ -106,14 +83,10 @@ slots:
     cardinality: optional
     depends_on: [group]
     verbs:
-      create: { verb: delegation.create, when: empty }
       add: { verb: delegation.add, when: [empty, filled] }
-      read: { verb: delegation.read, when: filled }
-      list: { verb: delegation.list, when: [empty, filled] }
       list_delegates: { verb: delegation.list-delegates, when: filled }
       list_received: { verb: delegation.list-delegations-received, when: filled }
       end: { verb: delegation.end, when: filled }
-      revoke: { verb: delegation.revoke, when: filled }
   team:
     type: entity
     entity_kinds: [person]
@@ -123,24 +96,11 @@ slots:
     verbs:
       add: { verb: team.add-member, when: [empty, filled] }
       remove: { verb: team.remove-member, when: filled }
-      list: { verb: team.list-members, when: filled }
-      list_teams: { verb: team.list, when: [empty, filled] }
+      list_members: { verb: team.list-members, when: filled }
       create: { verb: team.create, when: empty }
       read: { verb: team.read, when: filled }
-      update: { verb: team.update, when: filled }
-      assign_role: { verb: team.assign-role, when: filled }
-      remove_role: { verb: team.remove-role, when: filled }
       transfer: { verb: team.transfer-member, when: filled }
-      list_by_role: { verb: team.list-by-role, when: filled }
-      set_lead: { verb: team.set-lead, when: filled }
       add_governance: { verb: team.add-governance-member, when: filled }
-      remove_governance: { verb: team.remove-governance-member, when: filled }
-      list_governance: { verb: team.list-governance-members, when: filled }
-      add_ops: { verb: team.add-ops-member, when: filled }
-      remove_ops: { verb: team.remove-ops-member, when: filled }
-      list_ops: { verb: team.list-ops-members, when: filled }
-      assign_capacity: { verb: team.assign-capacity, when: filled }
-      list_capacity: { verb: team.list-capacity, when: filled }
       add_cbu_access: { verb: team.add-cbu-access, when: filled }
       remove_cbu_access: { verb: team.remove-cbu-access, when: filled }
       list_cbus: team.list-cbus
@@ -156,10 +116,8 @@ slots:
     cardinality: optional
     depends_on: [ruleset]
     verbs:
-      create: { verb: rule.create, when: empty }
-      read: { verb: rule.read, when: filled }
-      update: { verb: rule.update, when: filled }
       add: { verb: rule.add, when: [empty, filled] }
+      update: { verb: rule.update, when: filled }
       disable: { verb: rule.disable, when: filled }
   rule_field:
     type: entity
@@ -169,5 +127,4 @@ slots:
     depends_on: [ruleset]
     verbs:
       list: { verb: rule-field.list, when: [empty, filled] }
-      read: { verb: rule-field.read, when: filled }
       register: { verb: rule-field.register, when: [empty, filled] }

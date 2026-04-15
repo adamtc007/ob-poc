@@ -119,7 +119,7 @@ fn macro_registry_with_structure_setup() -> MacroRegistry {
                     );
                     m.insert(
                         "client-id".to_string(),
-                        serde_json::Value::String("${scope.client_id}".to_string()),
+                        serde_json::Value::String("\"${scope.client_id}\"".to_string()),
                     );
                     m
                 },
@@ -199,17 +199,25 @@ fn macro_registry_with_multi_step() -> MacroRegistry {
                             "name".to_string(),
                             serde_json::Value::String("${arg.name}".to_string()),
                         );
+                        m.insert(
+                            "client-id".to_string(),
+                            serde_json::Value::String("\"${scope.client_id}\"".to_string()),
+                        );
                         m
                     },
                     bind_as: Some("@cbu".to_string()),
                 }),
                 MacroExpansionStep::VerbCall(VerbCallStep {
-                    verb: "trading-profile.create".to_string(),
+                    verb: "cbu.create".to_string(),
                     args: {
                         let mut m = HashMap::new();
                         m.insert(
-                            "cbu-id".to_string(),
-                            serde_json::Value::String("@cbu".to_string()),
+                            "name".to_string(),
+                            serde_json::Value::String("${arg.name} Secondary".to_string()),
+                        );
+                        m.insert(
+                            "client-id".to_string(),
+                            serde_json::Value::String("\"${scope.client_id}\"".to_string()),
                         );
                         m
                     },
@@ -566,8 +574,12 @@ async fn replay_determinism() {
     );
 
     // Both should compile
-    assert!(resp1.is_compiled());
-    assert!(resp2.is_compiled());
+    assert!(resp1.is_compiled(), "Expected first compile to succeed, got {:?}", resp1);
+    assert!(
+        resp2.is_compiled(),
+        "Expected second compile to succeed, got {:?}",
+        resp2
+    );
 
     let s1 = match resp1 {
         OrchestratorResponse::Compiled(s) => s,
@@ -904,14 +916,14 @@ async fn multi_step_macro_pipeline() {
     let (resp, exec_result) =
         compile_and_execute("structure.full-setup", args, &registry, &constraints).await;
 
-    assert!(resp.is_compiled());
+    assert!(resp.is_compiled(), "Expected Compiled, got {:?}", resp);
     let summary = match &resp {
         OrchestratorResponse::Compiled(s) => s,
         _ => unreachable!(),
     };
     assert_eq!(summary.step_count, 2);
     assert_eq!(summary.preview[0].verb, "cbu.create");
-    assert_eq!(summary.preview[1].verb, "trading-profile.create");
+    assert_eq!(summary.preview[1].verb, "cbu.create");
 
     let result = exec_result.unwrap();
     assert!(matches!(

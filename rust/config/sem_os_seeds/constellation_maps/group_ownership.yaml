@@ -113,7 +113,7 @@ slots:
       }
     cardinality: recursive
     max_depth: 5
-    depends_on: [gleif_import]
+    depends_on: [entity_research]
     state_machine: ubo_epistemic_lifecycle
     overlays: [registry, evidence, screenings]
     edge_overlays: [ownership]
@@ -127,7 +127,7 @@ slots:
       promote: { verb: ubo.promote, when: filled }
       approve: { verb: ubo.approve, when: filled }
       reject: { verb: ubo.reject, when: filled }
-      list: { verb: ubo.list, when: filled }
+      list: { verb: ubo.list-ubos, when: filled }
       list_ubos: { verb: ubo.list-ubos, when: filled }
       list_owned: { verb: ubo.list-owned, when: filled }
       list_owners: { verb: ubo.list-owners, when: filled }
@@ -169,8 +169,8 @@ slots:
       trace: { verb: ownership.trace-chain, when: empty }
       build: { verb: control.build-graph, when: [empty, filled] }
       refresh: { verb: ownership.refresh, when: filled }
-      read: { verb: control.read, when: filled }
-      list_links: { verb: control.list-links, when: filled }
+      read: { verb: control.analyze, when: filled }
+      list_links: { verb: ownership.control-links.list, when: filled }
       add: { verb: control.add, when: [empty, filled] }
       end: { verb: control.end, when: filled }
       analyze: { verb: control.analyze, when: filled }

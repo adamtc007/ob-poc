@@ -45,3 +45,50 @@ transitions:
   - from: verified
     to: open
     verbs: [entity-workstream.update-status]
+reducer:
+  overlay_sources:
+    red_flags:
+      table: red_flags
+      join: workstream_id
+      provides: [flag_type, severity, status]
+      cardinality: many
+    evidence:
+      table: kyc_ubo_evidence
+      join: workstream_id
+      provides: [evidence_type, status, verified_at]
+      cardinality: many
+    scope:
+      table: entity_workstreams
+      join: workstream_id
+      provides: [workstream_status]
+  conditions:
+    status_is:
+      expr: "scope.workstream_status = $1"
+      parameterized: true
+    documents_requested_status:
+      expr: "status_is('DOCUMENTS_REQUESTED')"
+    screening_initiated_status:
+      expr: "status_is('SCREENING_INITIATED')"
+    screening_complete_status:
+      expr: "status_is('SCREENING_COMPLETE')"
+    evidence_collected_status:
+      expr: "status_is('EVIDENCE_COLLECTED')"
+    verified_status:
+      expr: "status_is('VERIFIED')"
+    closed_status:
+      expr: "status_is('CLOSED')"
+  rules:
+    - state: closed
+      requires: [closed_status]
+    - state: verified
+      requires: [verified_status]
+    - state: evidence_collected
+      requires: [evidence_collected_status]
+    - state: screening_complete
+      requires: [screening_complete_status]
+    - state: screening_initiated
+      requires: [screening_initiated_status]
+    - state: documents_requested
+      requires: [documents_requested_status]
+    - state: open
+      requires: []

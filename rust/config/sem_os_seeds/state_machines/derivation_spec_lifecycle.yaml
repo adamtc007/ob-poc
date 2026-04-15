@@ -1,6 +1,6 @@
 state_machine: derivation_spec_lifecycle
 description: Derivation specification lifecycle — from draft through active computation
-states: [draft, active, stale, recomputed]
+states: [draft, active, stale]
 initial: draft
 transitions:
   - from: draft
@@ -12,11 +12,12 @@ transitions:
   - from: stale
     to: active
     verbs: [derivation.recompute-stale]
-  - from: recomputed
-    to: active
-    verbs: []
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: derivation_specs
+      join: derivation_id
+      provides: [derivation_snapshot_status, stale_derived_count]
   conditions:
     has_active_snapshot:
       expr: "scope.derivation_snapshot_status = 'active'"

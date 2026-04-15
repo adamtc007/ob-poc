@@ -3584,11 +3584,11 @@ impl GenericCrudExecutor {
         verb_prefix: &str,
     ) -> Result<String> {
         if let Some(tc) = &crud.type_code {
-            return Ok(tc.clone());
+            return Ok(Self::canonicalize_entity_type_code(tc));
         }
 
         if let Some(entity_type) = args.get("entity-type").and_then(JsonValue::as_str) {
-            return Ok(entity_type.trim().to_uppercase().replace('-', "_"));
+            return Ok(Self::canonicalize_entity_type_code(entity_type));
         }
 
         if let Some(fund_type) = args.get("fund-type").and_then(JsonValue::as_str) {
@@ -3600,8 +3600,16 @@ impl GenericCrudExecutor {
 
         verb.verb
             .strip_prefix(verb_prefix)
-            .map(|s| s.to_uppercase().replace('-', "_"))
+            .map(Self::canonicalize_entity_type_code)
             .ok_or_else(|| anyhow!("Invalid entity verb name: {}", verb.verb))
+    }
+
+    fn canonicalize_entity_type_code(raw: &str) -> String {
+        match raw.trim().to_uppercase().replace('-', "_").as_str() {
+            "LIMITED_COMPANY" => "LIMITED_COMPANY_PRIVATE".to_string(),
+            "PROPER_PERSON" => "PROPER_PERSON_NATURAL".to_string(),
+            other => other.to_string(),
+        }
     }
 
     /// Infer PK column name from table name (convention: singular_id)

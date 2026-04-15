@@ -1,8 +1,9 @@
-//! Regression checks for known high-value clash pairs exported by the Coder clash matrix.
+//! Regression checks for known high-value clash pairs in the Coder clash matrix.
 
 use std::fs;
 use std::path::Path;
 
+use ob_poc::sage::{build_clash_matrix, VerbMetadataIndex};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -22,23 +23,19 @@ fn fixture_path() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/coder_clash_regressions.toml")
 }
 
-fn clash_csv_path() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("target/coder-clash-matrix/clash_matrix.csv")
-}
-
 #[test]
 fn exported_clash_matrix_contains_regression_pairs() -> anyhow::Result<()> {
     let fixture: Fixture = toml::from_str(&fs::read_to_string(fixture_path())?)?;
-    let csv = fs::read_to_string(clash_csv_path())?;
+    let index = VerbMetadataIndex::load()?;
+    let rows = build_clash_matrix(&index);
 
     for case in fixture.case {
-        let needle_a = format!("{},{}", case.verb_a, case.verb_b);
-        let needle_b = format!("{},{}", case.verb_b, case.verb_a);
-        let matching_line = csv
-            .lines()
-            .find(|line| {
-                (line.starts_with(&needle_a) || line.starts_with(&needle_b))
-                    && line.contains(&case.expected_kind)
+        let matching_row = rows
+            .iter()
+            .find(|row| {
+                ((row.verb_a == case.verb_a && row.verb_b == case.verb_b)
+                    || (row.verb_a == case.verb_b && row.verb_b == case.verb_a))
+                    && format!("{:?}", row.clash_kind) == case.expected_kind
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -49,13 +46,7 @@ fn exported_clash_matrix_contains_regression_pairs() -> anyhow::Result<()> {
                     case.notes.unwrap_or_default()
                 )
             })?;
-        assert!(
-            matching_line.contains(&case.expected_kind),
-            "expected clash kind {} for {} / {}",
-            case.expected_kind,
-            case.verb_a,
-            case.verb_b
-        );
+        assert_eq!(format!("{:?}", matching_row.clash_kind), case.expected_kind);
     }
 
     Ok(())

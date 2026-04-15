@@ -1022,7 +1022,7 @@ mod tests {
         args.insert("name".to_string(), "Acme".to_string());
         let dsl = build_dsl_from_args("cbu.create", &args);
         assert!(dsl.starts_with("(cbu.create"));
-        assert!(dsl.contains(":name Acme"));
+        assert!(dsl.contains(":name \"Acme\""));
         assert!(dsl.ends_with(')'));
     }
 

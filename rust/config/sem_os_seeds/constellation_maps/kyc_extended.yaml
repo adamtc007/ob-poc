@@ -7,7 +7,7 @@ description: >
 jurisdiction: ALL
 slots:
   entity:
-    type: entity
+    type: cbu
     entity_kinds: [person, company, trust, partnership, llp]
     table: entities
     pk: entity_id

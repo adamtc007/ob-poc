@@ -4,12 +4,11 @@
 //! Slot positions encode role meaning (deterministic from slot index).
 //! Phase 3 proof of concept.
 
-use std::f32::consts::TAU;
-
 use egui::{Color32, Painter, Pos2, Stroke, Vec2};
 
 use ob_poc_types::graph_scene::{GraphSceneModel, SceneEdge, SceneNode, SceneNodeType};
 
+use crate::canvas::layout::LayoutCache;
 use crate::state::CanvasApp;
 
 /// Paint System-level constellation: central CBU + orbital entity slots.
@@ -17,6 +16,7 @@ pub fn paint(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     scene: &GraphSceneModel,
+    cache: &LayoutCache,
     app: &CanvasApp,
 ) {
     let nodes = &scene.nodes;
@@ -26,18 +26,14 @@ pub fn paint(
         return;
     }
 
-    // ── Compute orbital positions (deterministic from index) ──
-    let positions = compute_orbital_positions(nodes);
-
     // ── Paint edges first (below nodes) ──
-    for edge in edges {
-        paint_edge(painter, transform, edge, nodes, &positions);
+    for (edge, geom) in edges.iter().zip(&cache.edges) {
+        paint_edge(painter, transform, edge, geom, cache);
     }
 
     // ── Paint nodes ──
     for (i, node) in nodes.iter().enumerate() {
-        let (x, y) = positions[i];
-        let screen_pos = transform.transform_pos(Pos2::new(x, y));
+        let screen_pos = transform.transform_pos(cache.nodes[i].center);
         let is_selected = app
             .interaction
             .selected_node
@@ -51,48 +47,6 @@ pub fn paint(
 
         paint_node(painter, screen_pos, node, is_selected, is_hovered);
     }
-}
-
-/// Compute deterministic orbital positions.
-/// First node (CBU) at center. Remaining nodes in concentric rings.
-fn compute_orbital_positions(nodes: &[SceneNode]) -> Vec<(f32, f32)> {
-    let mut positions = Vec::with_capacity(nodes.len());
-
-    if nodes.is_empty() {
-        return positions;
-    }
-
-    // First node at center (root CBU)
-    positions.push((0.0, 0.0));
-
-    if nodes.len() == 1 {
-        return positions;
-    }
-
-    // Remaining nodes in orbital ring(s)
-    let orbital_nodes = nodes.len() - 1;
-    let ring_capacity = 12; // max nodes per ring
-    let ring_count = (orbital_nodes + ring_capacity - 1) / ring_capacity;
-
-    let mut placed = 0;
-    for ring in 0..ring_count {
-        let ring_radius = 200.0 + (ring as f32) * 150.0;
-        let nodes_in_ring = if ring < ring_count - 1 {
-            ring_capacity
-        } else {
-            orbital_nodes - placed
-        };
-
-        for j in 0..nodes_in_ring {
-            let angle = (j as f32 / nodes_in_ring as f32) * TAU - TAU / 4.0;
-            let x = angle.cos() * ring_radius;
-            let y = angle.sin() * ring_radius;
-            positions.push((x, y));
-            placed += 1;
-        }
-    }
-
-    positions
 }
 
 /// Paint a single node.
@@ -164,19 +118,11 @@ fn paint_edge(
     painter: &Painter,
     transform: &egui::emath::RectTransform,
     edge: &SceneEdge,
-    nodes: &[SceneNode],
-    positions: &[(f32, f32)],
+    geom: &crate::canvas::layout::EdgeGeometry,
+    cache: &LayoutCache,
 ) {
-    // Look up source and target positions by node ID
-    let src_idx = nodes.iter().position(|n| n.id == edge.source);
-    let tgt_idx = nodes.iter().position(|n| n.id == edge.target);
-
-    let (Some(si), Some(ti)) = (src_idx, tgt_idx) else {
-        return;
-    };
-
-    let src_pos = transform.transform_pos(Pos2::new(positions[si].0, positions[si].1));
-    let tgt_pos = transform.transform_pos(Pos2::new(positions[ti].0, positions[ti].1));
+    let src_pos = transform.transform_pos(cache.nodes[geom.source_idx].center);
+    let tgt_pos = transform.transform_pos(cache.nodes[geom.target_idx].center);
 
     let edge_color = match edge.edge_type {
         ob_poc_types::graph_scene::SceneEdgeType::Dependency => Color32::from_rgb(245, 158, 11), // amber

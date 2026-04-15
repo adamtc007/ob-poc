@@ -48,7 +48,11 @@ transitions:
     to: missing
     verbs: [document.cancel-request]
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: doc_requests
+      join: request_id
+      provides: [requirement_status]
   conditions:
     has_requirement:
       expr: "scope.requirement_status IS NOT NULL"

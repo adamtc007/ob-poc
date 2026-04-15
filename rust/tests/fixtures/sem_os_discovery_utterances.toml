@@ -51,7 +51,7 @@ name = "selected_domain_narrows_ambiguous_request"
 utterance = "I need help with this new client setup"
 selected_domain = "onboarding"
 expected_domain = "onboarding"
-expected_family = "fund_onboarding"
+expected_family = "cross_border_onboarding"
 expected_readiness = "family_ready"
 
 [[test]]

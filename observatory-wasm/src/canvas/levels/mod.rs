@@ -1,12 +1,11 @@
 //! Level-specific renderers.
 //!
 //! Each level has a different layout strategy and visual form.
-//! Dispatched by ViewLevel from the GraphSceneModel.
+//! Dispatched by LayoutStrategy from the GraphSceneModel.
 
 use egui::Painter;
 
-use ob_poc_types::galaxy::ViewLevel;
-use ob_poc_types::graph_scene::GraphSceneModel;
+use ob_poc_types::graph_scene::{GraphSceneModel, LayoutStrategy};
 
 use crate::state::CanvasApp;
 
@@ -23,12 +22,23 @@ pub fn paint(
     scene: &GraphSceneModel,
     app: &CanvasApp,
 ) {
-    match scene.level {
-        ViewLevel::Universe => universe::paint(painter, transform, scene, app),
-        ViewLevel::Cluster => cluster::paint(painter, transform, scene, app),
-        ViewLevel::System => system::paint(painter, transform, scene, app),
-        ViewLevel::Planet => planet::paint(painter, transform, scene, app),
-        ViewLevel::Surface => {
+    let Some(cache) = app.render_cache.as_ref() else {
+        return;
+    };
+
+    match scene.layout_strategy {
+        LayoutStrategy::ForceDirected => universe::paint(painter, transform, scene, cache, app),
+        LayoutStrategy::ForceWithinBoundary => {
+            cluster::paint(painter, transform, scene, cache, app)
+        }
+        LayoutStrategy::DeterministicOrbital => {
+            system::paint(painter, transform, scene, cache, app)
+        }
+        LayoutStrategy::HierarchicalGraph => {
+            planet::paint(painter, transform, scene, cache, app)
+        }
+        LayoutStrategy::TreeDag => core::paint(painter, transform, scene, cache, app),
+        LayoutStrategy::StructuredPanels => {
             // Surface is structured panels, not canvas — show indicator
             let center = transform.transform_pos(egui::Pos2::ZERO);
             painter.text(
@@ -39,6 +49,5 @@ pub fn paint(
                 egui::Color32::from_rgb(148, 163, 184),
             );
         }
-        ViewLevel::Core => core::paint(painter, transform, scene, app),
     }
 }

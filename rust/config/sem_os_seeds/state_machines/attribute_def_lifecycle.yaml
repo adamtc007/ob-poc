@@ -16,7 +16,11 @@ transitions:
     to: retired
     verbs: []
 reducer:
-  overlay_sources: {}
+  overlay_sources:
+    scope:
+      table: sem_reg_snapshots
+      join: snapshot_id
+      provides: [sem_reg_snapshot_id, snapshot_status]
   conditions:
     has_semos_snapshot:
       expr: "scope.sem_reg_snapshot_id IS NOT NULL"

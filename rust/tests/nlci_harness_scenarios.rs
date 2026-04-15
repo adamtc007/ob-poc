@@ -40,8 +40,8 @@ fn nlci_cbu_harness_suite_loads() {
         Some("NeedsUserInput")
     );
     assert_eq!(
-        suite.scenarios[6].steps[0].expect.outcome.as_deref(),
-        Some("NeedsUserInput")
+        suite.scenarios[6].steps[0].expect.chosen_verb.as_deref(),
+        Some("cbu.read")
     );
     assert_eq!(
         suite.scenarios[7].steps[0].expect.outcome.as_deref(),
