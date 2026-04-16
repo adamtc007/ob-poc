@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                e.entity_id,\n                e.name as entity_name,\n                r.name as role_name\n               FROM \"ob-poc\".cbu_entity_roles cer\n               JOIN \"ob-poc\".entities e ON e.entity_id = cer.entity_id\n               JOIN \"ob-poc\".roles r ON r.role_id = cer.role_id\n               WHERE cer.cbu_id = $1\n                 AND e.deleted_at IS NULL\n                 AND r.name IN ('INVESTMENT_MANAGER', 'DELEGATED_IM', 'SUB_ADVISOR')\n               ORDER BY e.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "role_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "42a905412cf9a24349b9afa75325f4c8c16a39a0fa1f44383f74e769f909cb7e"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT e.entity_id\n            FROM \"ob-poc\".cbu_entity_roles cer\n            JOIN \"ob-poc\".entities e ON e.entity_id = cer.entity_id\n            JOIN \"ob-poc\".roles r ON r.role_id = cer.role_id\n            WHERE cer.cbu_id = $1\n              AND e.deleted_at IS NULL\n              AND r.name IN ('Primary Entity', 'Main Entity', 'Client')\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ac9701098cc7222e318063a197e446582dfd1e2a3b04a0ca8a6f48a730dab565"
+}

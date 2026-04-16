@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".client_group_relationship_sources\n            SET is_canonical = false, updated_at = NOW()\n            WHERE relationship_id = (\n                SELECT relationship_id FROM \"ob-poc\".client_group_relationship_sources WHERE id = $1\n            ) AND is_canonical = true\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d6ecfbba910edf124e119a40fcf25f08b74d98267eb5e72dee6a6d21d04f18ee"
+}

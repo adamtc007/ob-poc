@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT csa_id, csa_type, is_active\n               FROM \"ob-poc\".csa_agreements\n               WHERE isda_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "csa_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "csa_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "is_active",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "0529955685cdb7d31b6004f239198ff1ae637aec299ab36505784db942ed1726"
+}

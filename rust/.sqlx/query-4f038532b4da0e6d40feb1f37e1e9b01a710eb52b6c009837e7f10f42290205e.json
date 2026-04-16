@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".investors\n            SET lifecycle_state = 'ACTIVE_HOLDER',\n                lifecycle_notes = $2,\n                updated_at = NOW()\n            WHERE investor_id = $1\n            RETURNING investor_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "investor_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4f038532b4da0e6d40feb1f37e1e9b01a710eb52b6c009837e7f10f42290205e"
+}

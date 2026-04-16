@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".failures\n            SET status = 'FIX_COMMITTED', fix_commit = $2, fix_notes = $3\n            WHERE fingerprint = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f54adc34b233a03e4819cc9dfbebd01c3a92be6ea74dcecfa45a2e8b9ddcdada"
+}

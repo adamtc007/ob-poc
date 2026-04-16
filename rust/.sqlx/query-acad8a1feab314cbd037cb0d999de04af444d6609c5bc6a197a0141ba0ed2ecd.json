@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".service_intents (cbu_id, product_id, service_id, options)\n            VALUES ($1, $2, $3, $4)\n            RETURNING intent_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "intent_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "acad8a1feab314cbd037cb0d999de04af444d6609c5bc6a197a0141ba0ed2ecd"
+}

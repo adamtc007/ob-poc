@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                        INSERT INTO \"ob-poc\".client_group_entity_roles\n                            (cge_id, role_id, assigned_by, source_record_id)\n                        VALUES ($1, $2, 'gleif', $3)\n                        ON CONFLICT (cge_id, role_id, COALESCE(target_entity_id, '00000000-0000-0000-0000-000000000000'))\n                        DO NOTHING\n                        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "50ea96b5bac7da45a2d497aba8d0cbe015bf6f63643ad04bf860faed976c7ce0"
+}

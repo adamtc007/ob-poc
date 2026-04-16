@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH RECURSIVE ownership_chain AS (\n                -- Base case: direct owners of the target entity\n                SELECT\n                    r.from_entity_id as entity_id,\n                    r.percentage as ownership_percent,\n                    ARRAY[r.from_entity_id] as path,\n                    1 as depth\n                FROM \"ob-poc\".entity_relationships r\n                WHERE r.to_entity_id = $1\n                AND r.relationship_type = 'ownership'\n                AND r.ownership_type IN ('DIRECT', 'BENEFICIAL', 'direct', 'beneficial')\n                AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)\n\n                UNION ALL\n\n                -- Recursive case: owners of owners\n                SELECT\n                    r2.from_entity_id as entity_id,\n                    (oc.ownership_percent * r2.percentage / 100)::numeric(5,2) as ownership_percent,\n                    oc.path || r2.from_entity_id,\n                    oc.depth + 1\n                FROM ownership_chain oc\n                JOIN \"ob-poc\".entity_relationships r2 ON r2.to_entity_id = oc.entity_id\n                WHERE oc.depth < 10\n                AND r2.relationship_type = 'ownership'\n                AND NOT r2.from_entity_id = ANY(oc.path)\n                AND (r2.effective_to IS NULL OR r2.effective_to > CURRENT_DATE)\n            )\n            SELECT\n                entity_id,\n                SUM(ownership_percent) as total_ownership\n            FROM ownership_chain\n            GROUP BY entity_id\n            HAVING SUM(ownership_percent) >= $2\n            ORDER BY total_ownership DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "total_ownership",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "e55af9ec6e0c771b022b34e8d84053a5f701c92755dea28d687378efa3e27332"
+}

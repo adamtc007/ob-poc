@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".access_review_campaigns\n            SET revoked_items = COALESCE(revoked_items, 0) + 1,\n                reviewed_items = COALESCE(reviewed_items, 0) + 1,\n                pending_items = GREATEST(COALESCE(pending_items, 0) - 1, 0)\n            WHERE campaign_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e83fafb57f5290452d64fc374a540a2247780811782e83f965754793cad26ce7"
+}

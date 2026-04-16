@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                e.entity_id as \"entity_id!: Uuid\",\n                pp.nationality,\n                pp.date_of_birth,\n                e.created_at,\n                e.updated_at\n            FROM \"ob-poc\".entities e\n            LEFT JOIN \"ob-poc\".entity_proper_persons pp ON e.entity_id = pp.entity_id\n            WHERE e.entity_id = ANY($1)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id!: Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "nationality",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "date_of_birth",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "a3e627cf67cf8ea537f8fd87f0527877c35c92fd5f112389f67a63bbf8db9e14"
+}

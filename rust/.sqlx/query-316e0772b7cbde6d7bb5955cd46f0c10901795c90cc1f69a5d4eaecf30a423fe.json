@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".holdings\n            SET status = 'closed',\n                updated_at = NOW()\n            WHERE investor_id = $1 AND status = 'active'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "316e0772b7cbde6d7bb5955cd46f0c10901795c90cc1f69a5d4eaecf30a423fe"
+}

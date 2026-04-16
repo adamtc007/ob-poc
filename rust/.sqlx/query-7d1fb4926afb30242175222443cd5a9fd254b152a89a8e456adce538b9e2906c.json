@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE \"ob-poc\".research_decisions\n                SET decision_type = 'USER_SELECTED',\n                    verified_at = NOW()\n                WHERE decision_id = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7d1fb4926afb30242175222443cd5a9fd254b152a89a8e456adce538b9e2906c"
+}

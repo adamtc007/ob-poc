@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                w.workstream_id as status_id,\n                w.entity_id,\n                w.status as kyc_status,\n                w.risk_rating,\n                NULL::date as next_review_date,\n                e.name as \"entity_name?\"\n               FROM \"ob-poc\".entity_workstreams w\n               JOIN \"ob-poc\".cases c ON c.case_id = w.case_id\n               JOIN \"ob-poc\".entities e ON e.entity_id = w.entity_id\n               WHERE c.cbu_id = $1\n                 AND e.deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "kyc_status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "risk_rating",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "next_review_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 5,
+        "name": "entity_name?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      null,
+      false
+    ]
+  },
+  "hash": "cc1a69cfb1dff8a473a784ef27c63bfdfcfa09e8dee8879cf9cef2a7b07252bf"
+}

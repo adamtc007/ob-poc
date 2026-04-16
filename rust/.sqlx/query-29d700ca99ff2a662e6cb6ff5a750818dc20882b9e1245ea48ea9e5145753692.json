@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".client_group_entity_tag\n                (group_id, entity_id, tag, tag_norm, persona, source, confidence)\n            VALUES ($1, $2, $3, $4, $5, 'manual', 1.0)\n            ON CONFLICT (group_id, entity_id, tag_norm, COALESCE(persona, ''))\n            DO UPDATE SET\n                confidence = GREATEST(client_group_entity_tag.confidence, 0.95),\n                source = 'user_confirmed'\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "29d700ca99ff2a662e6cb6ff5a750818dc20882b9e1245ea48ea9e5145753692"
+}

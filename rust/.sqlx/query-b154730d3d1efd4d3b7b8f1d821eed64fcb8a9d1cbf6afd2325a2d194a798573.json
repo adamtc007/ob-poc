@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT default_due_days, default_grace_days, blocks_by_default, max_reminders, description\n            FROM \"ob-poc\".request_types\n            WHERE request_type = 'DOCUMENT' AND request_subtype = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "default_due_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "default_grace_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "blocks_by_default",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "max_reminders",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "description",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "b154730d3d1efd4d3b7b8f1d821eed64fcb8a9d1cbf6afd2325a2d194a798573"
+}

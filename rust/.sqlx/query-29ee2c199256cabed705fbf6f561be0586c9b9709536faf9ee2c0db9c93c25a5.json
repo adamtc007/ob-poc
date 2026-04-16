@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT c.client_id, c.name, c.email, c.accessible_cbus, cr.credential_hash\n        FROM \"ob-poc\".clients c\n        JOIN \"ob-poc\".credentials cr ON c.client_id = cr.client_id\n        WHERE c.client_id = $1 AND c.is_active = true AND cr.is_active = true\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "client_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "accessible_cbus",
+        "type_info": "UuidArray"
+      },
+      {
+        "ordinal": 4,
+        "name": "credential_hash",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "29ee2c199256cabed705fbf6f561be0586c9b9709536faf9ee2c0db9c93c25a5"
+}

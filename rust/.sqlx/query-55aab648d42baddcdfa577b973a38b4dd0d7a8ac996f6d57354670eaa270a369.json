@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE \"ob-poc\".client_allegations\n                               SET verification_status = 'CONTRADICTED',\n                                   verified_by_observation_id = $2,\n                                   verified_at = NOW(),\n                                   verification_notes = 'Value does not match observation'\n                               WHERE allegation_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "55aab648d42baddcdfa577b973a38b4dd0d7a8ac996f6d57354670eaa270a369"
+}

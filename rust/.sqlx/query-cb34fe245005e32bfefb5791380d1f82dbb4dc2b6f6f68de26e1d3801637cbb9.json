@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".research_decisions\n            SET\n                decision_type = 'REJECTED',\n                selection_reasoning = selection_reasoning || ' | REJECTED: ' || $2,\n                verified_by = $3,\n                verified_at = NOW()\n            WHERE decision_id = $1\n            RETURNING decision_id, target_entity_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "decision_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "target_entity_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "cb34fe245005e32bfefb5791380d1f82dbb4dc2b6f6f68de26e1d3801637cbb9"
+}

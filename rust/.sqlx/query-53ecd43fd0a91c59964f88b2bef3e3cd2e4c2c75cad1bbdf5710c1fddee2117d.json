@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                r.regulator_code,\n                r.registration_type,\n                r.registration_number,\n                r.registration_verified,\n                r.verification_date,\n                r.verification_expires,\n                r.status,\n                reg.name AS regulator_name,\n                reg.tier AS regulatory_tier\n            FROM \"ob-poc\".entity_regulatory_registrations r\n            JOIN \"ob-poc\".regulators reg ON r.regulator_code = reg.regulator_code\n            WHERE r.entity_id = $1 AND r.status = 'ACTIVE'\n            ORDER BY r.registration_type\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "regulator_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "registration_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "registration_number",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "registration_verified",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "verification_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 5,
+        "name": "verification_expires",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 6,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "regulator_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "regulatory_tier",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "53ecd43fd0a91c59964f88b2bef3e3cd2e4c2c75cad1bbdf5710c1fddee2117d"
+}

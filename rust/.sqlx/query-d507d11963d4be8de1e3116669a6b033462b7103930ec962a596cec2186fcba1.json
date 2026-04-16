@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".memberships\n            SET effective_to = CURRENT_DATE\n            WHERE team_id = $1 AND user_id = $2 AND effective_to IS NULL\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d507d11963d4be8de1e3116669a6b033462b7103930ec962a596cec2186fcba1"
+}

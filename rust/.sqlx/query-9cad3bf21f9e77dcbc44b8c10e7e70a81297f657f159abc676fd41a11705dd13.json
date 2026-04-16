@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT cbu_id, name, jurisdiction, client_type, cbu_category, created_at, updated_at\n               FROM \"ob-poc\".cbus\n               WHERE deleted_at IS NULL\n               ORDER BY name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cbu_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "jurisdiction",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "client_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "cbu_category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "9cad3bf21f9e77dcbc44b8c10e7e70a81297f657f159abc676fd41a11705dd13"
+}

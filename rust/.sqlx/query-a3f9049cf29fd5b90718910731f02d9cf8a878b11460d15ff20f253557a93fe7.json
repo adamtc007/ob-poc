@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".bpmn_pending_dispatches\n            SET status = 'dispatched', dispatched_at = now()\n            WHERE dispatch_id = $1 AND status = 'pending'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a3f9049cf29fd5b90718910731f02d9cf8a878b11460d15ff20f253557a93fe7"
+}

@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".document_attribute_mappings (\n                mapping_id, document_type_id, attribute_uuid,\n                extraction_method, is_required, field_name\n            ) VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (document_type_id, attribute_uuid) DO NOTHING\n            RETURNING mapping_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "mapping_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Bool",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9b66ca81ea75bb8957e201d94e57f918644c509a5a50a03d80d62bf89e6453ce"
+}

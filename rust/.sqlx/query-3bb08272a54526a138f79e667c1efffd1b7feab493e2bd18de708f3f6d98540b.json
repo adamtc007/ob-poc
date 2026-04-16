@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".investors\n            SET lifecycle_state = 'REDEEMING',\n                redemption_type = $2,\n                lifecycle_notes = $3,\n                updated_at = NOW()\n            WHERE investor_id = $1\n            RETURNING investor_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "investor_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3bb08272a54526a138f79e667c1efffd1b7feab493e2bd18de708f3f6d98540b"
+}

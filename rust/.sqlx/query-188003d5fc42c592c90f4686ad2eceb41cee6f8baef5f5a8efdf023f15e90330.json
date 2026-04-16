@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.screening_id, w.entity_id, e.name as entity_name,\n                  s.screening_type, s.status, s.result_summary\n           FROM \"ob-poc\".screenings s\n           JOIN \"ob-poc\".entity_workstreams w ON w.workstream_id = s.workstream_id\n           JOIN \"ob-poc\".cases c ON c.case_id = w.case_id\n           JOIN \"ob-poc\".entities e ON e.entity_id = w.entity_id\n           WHERE c.cbu_id = $1 AND e.deleted_at IS NULL\n           ORDER BY s.screening_type, e.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "screening_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "entity_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "screening_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "result_summary",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "188003d5fc42c592c90f4686ad2eceb41cee6f8baef5f5a8efdf023f15e90330"
+}

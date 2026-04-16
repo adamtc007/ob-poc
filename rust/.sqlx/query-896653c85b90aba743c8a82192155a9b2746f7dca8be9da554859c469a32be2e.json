@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT s.dsl_source\n            FROM \"ob-poc\".dsl_snapshots s\n            JOIN \"ob-poc\".dsl_sessions sess ON s.session_id = sess.session_id\n            WHERE sess.cbu_id = $1 AND s.success = true\n            ORDER BY s.executed_at ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "dsl_source",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "896653c85b90aba743c8a82192155a9b2746f7dca8be9da554859c469a32be2e"
+}

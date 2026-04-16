@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT correlation_id, process_instance_id, session_id, runbook_id,\n                   entry_id, process_key, domain_payload_hash, status,\n                   created_at, completed_at, domain_correlation_key\n            FROM \"ob-poc\".bpmn_correlations\n            WHERE process_instance_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "correlation_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "process_instance_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "session_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "runbook_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "entry_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "process_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "domain_payload_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 7,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "domain_correlation_key",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "aa0309bda9a5f23d89a6ff1eaca1d260fbb45dc3f38538b9d66ac950b3585dea"
+}

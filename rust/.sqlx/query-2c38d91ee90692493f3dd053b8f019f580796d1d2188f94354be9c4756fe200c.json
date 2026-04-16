@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT p.product_code\n        FROM \"ob-poc\".cbu_product_subscriptions cps\n        JOIN \"ob-poc\".products p ON p.product_id = cps.product_id\n        WHERE cps.cbu_id = $1 AND cps.status = 'ACTIVE'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_code",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "2c38d91ee90692493f3dd053b8f019f580796d1d2188f94354be9c4756fe200c"
+}

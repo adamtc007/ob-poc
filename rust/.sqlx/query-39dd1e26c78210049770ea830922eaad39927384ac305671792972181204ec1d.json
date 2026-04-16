@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE \"ob-poc\".access_review_items\n                    SET status = 'AUTO_SUSPENDED', reviewed_at = NOW(),\n                        reviewer_notes = 'Auto-suspended: unreviewed past deadline'\n                    WHERE campaign_id = $1 AND status = 'PENDING'\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "39dd1e26c78210049770ea830922eaad39927384ac305671792972181204ec1d"
+}

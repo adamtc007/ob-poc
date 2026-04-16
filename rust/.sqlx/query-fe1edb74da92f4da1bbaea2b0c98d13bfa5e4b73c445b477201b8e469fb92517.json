@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".client_group\n            SET discovery_status = 'complete',\n                discovery_completed_at = NOW(),\n                entity_count = (\n                    SELECT COUNT(*) FROM \"ob-poc\".client_group_entity\n                    WHERE group_id = $1 AND membership_type != 'historical'\n                ),\n                updated_at = NOW()\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fe1edb74da92f4da1bbaea2b0c98d13bfa5e4b73c445b477201b8e469fb92517"
+}

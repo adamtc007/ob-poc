@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT e.entity_id, et.type_code as entity_type\n            FROM \"ob-poc\".entities e\n            JOIN \"ob-poc\".entity_types et ON et.entity_type_id = e.entity_type_id\n            WHERE e.entity_id = $1\n              AND e.deleted_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_type",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "4eaf703ff0ca305aeb6024f9134f776ccc416a7f62b1ce1c6506cd071e14d0cc"
+}

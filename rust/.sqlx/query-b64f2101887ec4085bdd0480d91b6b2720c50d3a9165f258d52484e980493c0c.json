@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT deal_id FROM \"ob-poc\".deals\n                    WHERE deal_name ILIKE '%' || $1 || '%'\n                    ORDER BY\n                        CASE WHEN deal_name ILIKE $1 THEN 0\n                             WHEN deal_name ILIKE $1 || '%' THEN 1\n                             ELSE 2 END,\n                        deal_name\n                    LIMIT 1\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "deal_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b64f2101887ec4085bdd0480d91b6b2720c50d3a9165f258d52484e980493c0c"
+}

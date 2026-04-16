@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"ob-poc\".submissions\n            (client_id, request_id, submission_type, document_type, file_reference, file_name)\n        VALUES ($1, $2, 'DOCUMENT', $3, $4, $5)\n        RETURNING submission_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "submission_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a6ebf5fb8f5d53c2fe394d82c575725dac44fea4fada01a9ee3934afda95fa87"
+}

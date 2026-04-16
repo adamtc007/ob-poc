@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                e.entity_id,\n                e.name,\n                et.name as entity_type,\n                et.type_code,\n                lc.company_name as \"company_name?\",\n                lc.registration_number as \"registration_number?\",\n                lc.jurisdiction as \"company_jurisdiction?\",\n                lc.incorporation_date as \"incorporation_date?\",\n                pp.first_name as \"first_name?\",\n                pp.last_name as \"last_name?\",\n                pp.date_of_birth as \"date_of_birth?\",\n                pp.nationality as \"nationality?\"\n            FROM \"ob-poc\".entities e\n            JOIN \"ob-poc\".entity_types et ON e.entity_type_id = et.entity_type_id\n            LEFT JOIN \"ob-poc\".entity_limited_companies lc ON e.entity_id = lc.entity_id\n            LEFT JOIN \"ob-poc\".entity_proper_persons pp ON e.entity_id = pp.entity_id\n            WHERE e.entity_id = $1\n              AND e.deleted_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "entity_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "type_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "company_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "registration_number?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "company_jurisdiction?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "incorporation_date?",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 8,
+        "name": "first_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "last_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "date_of_birth?",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 11,
+        "name": "nationality?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "7d316a04da08f48ab1ca410945f24aed20b308e5eb36ddcd514c6957f9c1e54e"
+}

@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO \"ob-poc\".cbu_layout_overrides\n                    (cbu_id, user_id, view_mode, positions, sizes, updated_at)\n               VALUES ($1, $2, $3, $4, $5, NOW())\n               ON CONFLICT (cbu_id, user_id, view_mode)\n               DO UPDATE SET positions = EXCLUDED.positions,\n                             sizes = EXCLUDED.sizes,\n                             updated_at = NOW()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Jsonb",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a35cda2f97f3ec268d94734f3351db8f096c23568049179b82092a6edcfba148"
+}

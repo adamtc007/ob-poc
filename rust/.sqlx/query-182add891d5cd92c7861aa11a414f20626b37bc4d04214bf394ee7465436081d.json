@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT m.mic, u.currencies, u.settlement_types\n               FROM \"ob-poc\".cbu_instrument_universe u\n               JOIN \"ob-poc\".markets m ON u.market_id = m.market_id\n               WHERE u.cbu_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "mic",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "currencies",
+        "type_info": "VarcharArray"
+      },
+      {
+        "ordinal": 2,
+        "name": "settlement_types",
+        "type_info": "VarcharArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "182add891d5cd92c7861aa11a414f20626b37bc4d04214bf394ee7465436081d"
+}

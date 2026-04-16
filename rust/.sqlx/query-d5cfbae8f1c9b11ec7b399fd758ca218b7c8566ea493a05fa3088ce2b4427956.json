@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".entity_regulatory_registrations\n            SET\n                registration_verified = TRUE,\n                verification_date = CURRENT_DATE,\n                verification_method = $3,\n                verification_reference = $4,\n                verification_expires = $5,\n                updated_at = NOW()\n            WHERE entity_id = $1 AND regulator_code = $2 AND status = 'ACTIVE'\n            RETURNING registration_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "registration_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d5cfbae8f1c9b11ec7b399fd758ca218b7c8566ea493a05fa3088ce2b4427956"
+}

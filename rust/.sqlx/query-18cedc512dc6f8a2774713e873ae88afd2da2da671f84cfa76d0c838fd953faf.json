@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT ar.id as attr_id\n            FROM \"ob-poc\".document_attribute_links dal\n            JOIN \"ob-poc\".attribute_registry ar ON ar.uuid = dal.attribute_id\n            WHERE dal.document_type_id = $1 AND dal.direction IN ('SOURCE', 'BOTH')\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "attr_id",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "18cedc512dc6f8a2774713e873ae88afd2da2da671f84cfa76d0c838fd953faf"
+}

@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".dsl_sessions\n            SET\n                named_refs = named_refs || $2::jsonb,\n                cbu_id = COALESCE($3, cbu_id),\n                kyc_case_id = COALESCE($4, kyc_case_id),\n                primary_domain = COALESCE($5, primary_domain),\n                last_activity_at = now()\n            WHERE session_id = $1 AND status = 'active'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Uuid",
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "424739c80cfdd9ffacff3a673d7f50c0222909bce6ed75f25a95854c1e43a593"
+}

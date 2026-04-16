@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".repl_invocation_records\n            SET status = 'completed', resumed_at = now()\n            WHERE correlation_key = $1 AND status = 'active'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4c4b35392d97cb924b4a81122eba8d5f5f1806fec141f6077b80a9ab7ce482ad"
+}

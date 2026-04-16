@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT class_id, code FROM \"ob-poc\".instrument_classes",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "class_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "code",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "ac3d7af089123a7f47483b2522a617543db954de3bfbf2e71f5f9960905080dc"
+}

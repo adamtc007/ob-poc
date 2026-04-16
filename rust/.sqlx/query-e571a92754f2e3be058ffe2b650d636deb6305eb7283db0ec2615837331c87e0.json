@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                u.ubo_id,\n                u.subject_entity_id,\n                u.ubo_proper_person_id,\n                u.relationship_type,\n                u.ownership_percentage,\n                u.control_type,\n                u.verification_status,\n                se.name as \"subject_name?\",\n                pe.name as \"ubo_name?\"\n               FROM \"ob-poc\".ubo_registry u\n               LEFT JOIN \"ob-poc\".entities se ON se.entity_id = u.subject_entity_id AND se.deleted_at IS NULL\n               LEFT JOIN \"ob-poc\".entities pe ON pe.entity_id = u.ubo_proper_person_id AND pe.deleted_at IS NULL\n               WHERE u.cbu_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ubo_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "subject_entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "ubo_proper_person_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "relationship_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "ownership_percentage",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "control_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "verification_status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "subject_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "ubo_name?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "e571a92754f2e3be058ffe2b650d636deb6305eb7283db0ec2615837331c87e0"
+}

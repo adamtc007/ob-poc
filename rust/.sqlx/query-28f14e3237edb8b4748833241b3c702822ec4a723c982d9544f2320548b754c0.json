@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO \"ob-poc\".client_group_entity\n                        (group_id, entity_id, membership_type, added_by)\n                    VALUES ($1, $2, 'in_group', 'role_assignment')\n                    RETURNING id\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "28f14e3237edb8b4748833241b3c702822ec4a723c982d9544f2320548b754c0"
+}

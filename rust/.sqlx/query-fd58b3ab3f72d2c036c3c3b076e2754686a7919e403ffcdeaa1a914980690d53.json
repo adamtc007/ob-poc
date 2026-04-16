@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE \"ob-poc\".learning_candidates\n                SET status = 'applied', applied_at = NOW()\n                WHERE id = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fd58b3ab3f72d2c036c3c3b076e2754686a7919e403ffcdeaa1a914980690d53"
+}

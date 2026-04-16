@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".access_review_campaigns\n            SET total_items = $2, pending_items = $2, status = 'READY'\n            WHERE campaign_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7e6735ebc3f72afd3304dabb7abc997e0214a1ae99aa8ff3802c095ad503b8f7"
+}

@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                r.relationship_id as \"ownership_id!\",\n                r.from_entity_id as \"owner_entity_id!\",\n                r.to_entity_id as \"owned_entity_id!\",\n                COALESCE(r.source, 'direct') as \"ownership_type!\",\n                COALESCE(r.percentage, 0) as \"ownership_percent!\",\n                owner.name as \"owner_name?\",\n                owned.name as \"owned_name?\"\n               FROM \"ob-poc\".entity_relationships r\n               LEFT JOIN \"ob-poc\".entities owner ON owner.entity_id = r.from_entity_id AND owner.deleted_at IS NULL\n               LEFT JOIN \"ob-poc\".entities owned ON owned.entity_id = r.to_entity_id AND owned.deleted_at IS NULL\n               WHERE r.relationship_type = 'ownership'\n               AND (r.to_entity_id IN (\n                   SELECT cer.entity_id\n                   FROM \"ob-poc\".cbu_entity_roles cer\n                   JOIN \"ob-poc\".entities e ON e.entity_id = cer.entity_id\n                   WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL\n               )\n               OR r.from_entity_id IN (\n                   SELECT cer.entity_id\n                   FROM \"ob-poc\".cbu_entity_roles cer\n                   JOIN \"ob-poc\".entities e ON e.entity_id = cer.entity_id\n                   WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL\n               ))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ownership_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "owner_entity_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "owned_entity_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "ownership_type!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "ownership_percent!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "owner_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "owned_name?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      null,
+      null,
+      true,
+      false
+    ]
+  },
+  "hash": "35e831611369ffd6ec871405f7500d39476b18ab4d1ae9fee94d49216f27784d"
+}

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".investors\n            SET lifecycle_state = 'KYC_APPROVED',\n                kyc_status = 'APPROVED',\n                kyc_approved_at = NOW(),\n                kyc_risk_rating = COALESCE($2, kyc_risk_rating),\n                lifecycle_notes = $3,\n                updated_at = NOW()\n            WHERE investor_id = $1\n            RETURNING investor_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "investor_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a932f2cbf5236fc8da4fbf372eb4988cbe98c743fe39ede8d65fc91349b1dcb6"
+}

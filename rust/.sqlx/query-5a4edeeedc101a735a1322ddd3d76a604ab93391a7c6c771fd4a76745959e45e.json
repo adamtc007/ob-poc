@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".access_attestations (\n                campaign_id, attester_user_id, attester_name, attester_email,\n                attestation_scope, items_count,\n                attestation_text, attested_at, signature_hash\n            )\n            VALUES ($1, '00000000-0000-0000-0000-000000000000'::uuid, 'System', 'system@local',\n                    $2, $3, $4, $5, $6)\n            RETURNING attestation_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "attestation_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Int4",
+        "Text",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5a4edeeedc101a735a1322ddd3d76a604ab93391a7c6c771fd4a76745959e45e"
+}

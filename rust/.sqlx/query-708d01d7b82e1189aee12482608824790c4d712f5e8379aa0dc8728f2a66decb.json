@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            sc.id as share_class_id,\n            sc.name,\n            COALESCE(sc.instrument_kind, 'FUND_UNIT') as \"instrument_kind!\",\n            COALESCE(sc.votes_per_unit, 1.0) as \"votes_per_unit!\",\n            COALESCE(scs.issued_units, 0) as \"issued_units!\"\n        FROM \"ob-poc\".share_classes sc\n        LEFT JOIN \"ob-poc\".share_class_supply scs ON scs.share_class_id = sc.id\n            AND scs.as_of_date = (SELECT MAX(as_of_date) FROM \"ob-poc\".share_class_supply WHERE share_class_id = sc.id)\n        WHERE sc.issuer_entity_id = $1\n          AND sc.status = 'active'\n        ORDER BY sc.name\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "share_class_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "instrument_kind!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "votes_per_unit!",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "issued_units!",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "708d01d7b82e1189aee12482608824790c4d712f5e8379aa0dc8728f2a66decb"
+}

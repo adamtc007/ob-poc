@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT decision_id, search_query, decision_type, created_at\n            FROM \"ob-poc\".research_decisions\n            WHERE session_id = $1\n              AND search_query LIKE 'agent:%'\n            ORDER BY created_at DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "decision_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "search_query",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "decision_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "9dd22a671453be2774f405422f15010275b8907faef4468dac603b126fbfb1ec"
+}

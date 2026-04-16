@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE \"ob-poc\".client_group_entity\n                SET membership_type = 'historical', updated_at = now()\n                WHERE group_id = $1 AND entity_id = $2\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0a18577e27faa8cf911acd8869d4a1459e25fb4513ebb0f88c624b00d90b367a"
+}

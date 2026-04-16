@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*) as \"count!\"\n        FROM \"ob-poc\".entities e\n        WHERE NOT EXISTS (\n            SELECT 1 FROM \"ob-poc\".entity_names en WHERE en.entity_id = e.entity_id\n        )",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a5f1857a508d1f9a248eaccbb2dd43447bbc8d0df34b3a2b05c299e8fda62bc3"
+}

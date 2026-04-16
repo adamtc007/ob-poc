@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".commitments\n                (client_id, request_id, commitment_text, expected_date, reminder_date)\n            VALUES ($1, $2, $3, $4, $5)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f9a92a6360bed3cfdf1bff4b0cf2e55e0c3fe74f741296cf1f6d8b77501a6959"
+}

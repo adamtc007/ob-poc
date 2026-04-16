@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".dsl_sessions\n            SET\n                error_count = error_count + 1,\n                last_error = $2,\n                last_error_at = now(),\n                last_activity_at = now()\n            WHERE session_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c05bab1214c90d3fee2214f6f9aad42e2e780eb4c491789add2954fdec66320c"
+}

@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".research_decisions\n            SET\n                selected_key = $2,\n                selected_key_type = $3,\n                decision_type = 'USER_CONFIRMED',\n                verified_by = $4,\n                verified_at = NOW()\n            WHERE decision_id = $1\n            RETURNING decision_id, target_entity_id, source_provider\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "decision_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "target_entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "source_provider",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "63aef43aed95ed0d7b01a22664503c526807ccbc22e49344a687b5abe7c35359"
+}

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".investors\n            SET lifecycle_state = 'SUBSCRIBED',\n                first_subscription_at = COALESCE(first_subscription_at, NOW()),\n                lifecycle_notes = $2,\n                updated_at = NOW()\n            WHERE investor_id = $1\n            RETURNING investor_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "investor_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e3d4a96a0e11ba8be174b3c05ad344cedf2c7cbd5d4e71601decc8bc0ca2f30a"
+}

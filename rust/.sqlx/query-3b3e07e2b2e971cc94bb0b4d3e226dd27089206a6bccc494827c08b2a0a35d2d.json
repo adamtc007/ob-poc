@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT m.mic\n            FROM \"ob-poc\".cbu_instrument_universe u\n            JOIN \"ob-poc\".markets m ON m.market_id = u.market_id\n            WHERE u.cbu_id = $1 AND u.market_id IS NOT NULL\n            ORDER BY m.mic\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "mic",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3b3e07e2b2e971cc94bb0b4d3e226dd27089206a6bccc494827c08b2a0a35d2d"
+}

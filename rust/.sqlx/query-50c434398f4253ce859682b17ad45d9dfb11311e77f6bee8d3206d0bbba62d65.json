@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT p.product_id, p.name, p.product_code, p.product_category, p.is_active\n               FROM \"ob-poc\".products p\n               JOIN \"ob-poc\".service_delivery_map sdm ON sdm.product_id = p.product_id\n               WHERE sdm.cbu_id = $1\n               ORDER BY p.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "product_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "product_category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_active",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "50c434398f4253ce859682b17ad45d9dfb11311e77f6bee8d3206d0bbba62d65"
+}

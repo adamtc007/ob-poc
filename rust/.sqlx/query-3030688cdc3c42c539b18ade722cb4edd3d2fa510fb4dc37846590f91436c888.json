@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".client_group_relationship\n                (group_id, parent_entity_id, child_entity_id, relationship_kind, effective_from)\n            VALUES ($1, $2, $3, $4, $5)\n            ON CONFLICT (group_id, parent_entity_id, child_entity_id, relationship_kind)\n            DO UPDATE SET\n                effective_from = COALESCE(EXCLUDED.effective_from, client_group_relationship.effective_from),\n                updated_at = NOW()\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3030688cdc3c42c539b18ade722cb4edd3d2fa510fb4dc37846590f91436c888"
+}

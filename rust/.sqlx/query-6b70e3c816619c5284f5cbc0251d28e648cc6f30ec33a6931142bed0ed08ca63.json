@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                cg.id as group_id,\n                cg.canonical_name as \"group_name!\",\n                cga.confidence as \"confidence!\",\n                (cga.alias_norm = $1) as \"exact_match!\"\n            FROM \"ob-poc\".client_group_alias cga\n            JOIN \"ob-poc\".client_group cg ON cg.id = cga.group_id\n            WHERE cga.alias_norm = $1\n               OR cga.alias_norm ILIKE '%' || $1 || '%'\n               OR similarity(cga.alias_norm, $1) > 0.3\n            ORDER BY\n                (cga.alias_norm = $1) DESC,\n                cga.confidence DESC,\n                similarity(cga.alias_norm, $1) DESC\n            LIMIT 5\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "group_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "group_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "confidence!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 3,
+        "name": "exact_match!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "6b70e3c816619c5284f5cbc0251d28e648cc6f30ec33a6931142bed0ed08ca63"
+}

@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".outstanding_requests\n            SET status = 'WAIVED',\n                fulfilled_at = NOW(),\n                fulfillment_type = 'WAIVER',\n                fulfillment_notes = $2,\n                fulfilled_by_user_id = $3\n            WHERE request_id = $1 AND status = 'PENDING'\n            RETURNING workstream_id, blocks_subject\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "workstream_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "blocks_subject",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "078eea1be116ba84265c7351cf658d26ff6ae25698a64000b4ef55aeb804ccb0"
+}

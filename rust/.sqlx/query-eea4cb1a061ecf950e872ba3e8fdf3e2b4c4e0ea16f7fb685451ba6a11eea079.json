@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO \"ob-poc\".invocation_phrases (phrase, verb, source)\n                    VALUES ($1, $2, 'manual_approval')\n                    ON CONFLICT (phrase, verb) DO UPDATE SET\n                        occurrence_count = \"ob-poc\".invocation_phrases.occurrence_count + 1,\n                        updated_at = NOW()\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "eea4cb1a061ecf950e872ba3e8fdf3e2b4c4e0ea16f7fb685451ba6a11eea079"
+}

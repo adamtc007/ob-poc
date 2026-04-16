@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) as \"count!\"\n            FROM \"ob-poc\".access_review_items\n            WHERE campaign_id = $1\n              AND (flag_no_legal_link = true OR flag_dormant_account = true OR flag_never_logged_in = true)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2b1560cb5139c11702096245d0dd58c36534976b84475e1100556b2a7245ada7"
+}

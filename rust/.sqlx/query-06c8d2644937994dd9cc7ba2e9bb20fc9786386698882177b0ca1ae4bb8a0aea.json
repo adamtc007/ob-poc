@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                c.cbu_id,\n                c.name,\n                c.jurisdiction,\n                c.client_type,\n                c.cbu_category,\n                (SELECT COUNT(*)\n                   FROM \"ob-poc\".cbu_entity_roles cer\n                   JOIN \"ob-poc\".entities e ON e.entity_id = cer.entity_id\n                  WHERE cer.cbu_id = c.cbu_id\n                    AND e.deleted_at IS NULL) as \"entity_count!\",\n                (SELECT COUNT(DISTINCT role_id) FROM \"ob-poc\".cbu_entity_roles cer WHERE cer.cbu_id = c.cbu_id) as \"role_count!\"\n            FROM \"ob-poc\".cbus c\n            WHERE c.cbu_id = $1\n              AND c.deleted_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cbu_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "jurisdiction",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "client_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "cbu_category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "entity_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "role_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "06c8d2644937994dd9cc7ba2e9bb20fc9786386698882177b0ca1ae4bb8a0aea"
+}

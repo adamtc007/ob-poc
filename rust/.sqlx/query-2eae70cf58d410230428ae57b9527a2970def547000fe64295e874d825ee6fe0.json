@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO \"ob-poc\".cbu_entity_roles\n               (cbu_id, entity_id, role_id, target_entity_id, ownership_percentage,\n                created_at, updated_at)\n               VALUES ($1, $2, $3, $4, $5, NOW(), NOW())\n               ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET\n                   target_entity_id = EXCLUDED.target_entity_id,\n                   ownership_percentage = EXCLUDED.ownership_percentage,\n                   updated_at = NOW()\n               RETURNING cbu_entity_role_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cbu_entity_role_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Numeric"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2eae70cf58d410230428ae57b9527a2970def547000fe64295e874d825ee6fe0"
+}

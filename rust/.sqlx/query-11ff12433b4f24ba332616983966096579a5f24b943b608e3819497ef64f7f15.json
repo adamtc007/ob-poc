@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE \"ob-poc\".cbu_trading_profiles\n        SET status = $1, rejected_at = $2, rejected_by = $3, rejection_reason = $4,\n            validated_at = NULL, validated_by = NULL,\n            submitted_at = NULL, submitted_by = NULL\n        WHERE profile_id = $5\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Timestamptz",
+        "Varchar",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "11ff12433b4f24ba332616983966096579a5f24b943b608e3819497ef64f7f15"
+}

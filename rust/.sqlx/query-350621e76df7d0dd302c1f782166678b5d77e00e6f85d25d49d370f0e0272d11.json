@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT mapping_id FROM \"ob-poc\".document_attribute_mappings\n            WHERE document_type_id = $1 AND attribute_uuid = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "mapping_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "350621e76df7d0dd302c1f782166678b5d77e00e6f85d25d49d370f0e0272d11"
+}

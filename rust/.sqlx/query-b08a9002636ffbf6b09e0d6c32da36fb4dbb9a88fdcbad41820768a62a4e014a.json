@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM \"ob-poc\".dsl_session_locks WHERE session_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b08a9002636ffbf6b09e0d6c32da36fb4dbb9a88fdcbad41820768a62a4e014a"
+}

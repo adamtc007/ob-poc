@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT type_code, type_hierarchy_path\n               FROM \"ob-poc\".entity_types\n               WHERE type_code IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "type_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "type_hierarchy_path",
+        "type_info": "TextArray"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "709623c3049802b73cbab4b10780d87c1993dac0589bc215a41f1b1ddb0650d7"
+}

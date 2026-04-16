@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT job_key, process_instance_id, task_type, worker_id,\n                   status, activated_at, completed_at, attempts\n            FROM \"ob-poc\".bpmn_job_frames\n            WHERE process_instance_id = $1 AND status = 'active'\n            ORDER BY activated_at ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "job_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "process_instance_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "task_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "worker_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "activated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "attempts",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "66afa42c9571f38ce781e814cec2a57a30d15d57e7a8499b43b027a624875cb5"
+}

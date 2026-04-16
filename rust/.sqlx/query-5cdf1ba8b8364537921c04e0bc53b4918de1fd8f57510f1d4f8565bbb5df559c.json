@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".bpmn_parked_tokens\n            SET status = 'resolved', resolved_at = now()\n            WHERE process_instance_id = $1 AND status = 'waiting'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5cdf1ba8b8364537921c04e0bc53b4918de1fd8f57510f1d4f8565bbb5df559c"
+}

@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT cer.entity_id, r.name as role_name\n           FROM \"ob-poc\".cbu_entity_roles cer\n           JOIN \"ob-poc\".roles r ON cer.role_id = r.role_id\n           WHERE cer.cbu_id = $1\n           AND (cer.effective_from IS NULL OR cer.effective_from <= $2)\n           AND (cer.effective_to IS NULL OR cer.effective_to >= $2)\n           ORDER BY cer.entity_id, r.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "role_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "287f9ee539e55de83de34b513c3a3591c2ba42e6aff7420b8f90259b4ea60fd1"
+}

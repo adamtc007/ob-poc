@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".outstanding_requests\n            SET last_reminder_at = NOW(),\n                reminder_count = COALESCE(reminder_count, 0) + 1,\n                communication_log = communication_log || $2::jsonb\n            WHERE request_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7335cf920fcee9cd8bc4eb610cc84904636f00ff7f04764be4e89e1512b2aed5"
+}

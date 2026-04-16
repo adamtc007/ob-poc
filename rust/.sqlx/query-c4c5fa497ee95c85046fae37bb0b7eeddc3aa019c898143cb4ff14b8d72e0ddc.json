@@ -1,0 +1,49 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            entity_id as \"entity_id!\",\n            entity_name as \"entity_name!\",\n            tag as \"tag!\",\n            confidence as \"confidence!\",\n            match_type as \"match_type!\"\n        FROM \"ob-poc\".search_entity_tags($1, $2, $3, $4, FALSE)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "tag!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "confidence!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "match_type!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "c4c5fa497ee95c85046fae37bb0b7eeddc3aa019c898143cb4ff14b8d72e0ddc"
+}

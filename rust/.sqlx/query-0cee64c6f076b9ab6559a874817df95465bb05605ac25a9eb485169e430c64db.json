@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM \"ob-poc\".client_group_entity\n            WHERE group_id = $1 AND entity_id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0cee64c6f076b9ab6559a874817df95465bb05605ac25a9eb485169e430c64db"
+}

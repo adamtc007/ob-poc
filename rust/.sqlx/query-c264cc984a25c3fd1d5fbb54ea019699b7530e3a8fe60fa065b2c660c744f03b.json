@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT lifecycle_state, COUNT(*) as count\n            FROM \"ob-poc\".investors\n            WHERE owning_cbu_id = $1\n            GROUP BY lifecycle_state\n            ORDER BY lifecycle_state\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "lifecycle_state",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "c264cc984a25c3fd1d5fbb54ea019699b7530e3a8fe60fa065b2c660c744f03b"
+}

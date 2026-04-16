@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*) as \"count!\" FROM \"ob-poc\".access_review_items\n                       WHERE campaign_id = $1 AND status = 'PENDING'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "4064e6f12e8f0fb09c7ba10445cb230f8e43f16b1ad8bad8176d0b9b185c2175"
+}

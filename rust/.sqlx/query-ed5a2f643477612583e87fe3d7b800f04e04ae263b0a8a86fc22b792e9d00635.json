@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.entity_id, e.name, pp.nationality, r.name as role_name\n               FROM \"ob-poc\".entities e\n               JOIN \"ob-poc\".entity_types et ON e.entity_type_id = et.entity_type_id\n               JOIN \"ob-poc\".cbu_entity_roles cer ON e.entity_id = cer.entity_id\n               JOIN \"ob-poc\".roles r ON cer.role_id = r.role_id\n               LEFT JOIN \"ob-poc\".entity_proper_persons pp ON e.entity_id = pp.entity_id\n               WHERE cer.cbu_id = $1\n                 AND et.type_code LIKE 'PROPER_PERSON%'\n                 AND e.deleted_at IS NULL\n               ORDER BY e.name, r.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "nationality",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "role_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "ed5a2f643477612583e87fe3d7b800f04e04ae263b0a8a86fc22b792e9d00635"
+}

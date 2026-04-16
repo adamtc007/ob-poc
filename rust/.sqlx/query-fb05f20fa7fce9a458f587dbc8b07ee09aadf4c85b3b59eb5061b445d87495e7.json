@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".client_group_alias\n                (group_id, alias, alias_norm, confidence, source)\n            VALUES ($1, $2, $3, 0.9, 'user_confirmed')\n            ON CONFLICT (group_id, alias_norm) DO UPDATE SET\n                confidence = LEAST(client_group_alias.confidence + 0.05, 1.0),\n                source = 'user_confirmed'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fb05f20fa7fce9a458f587dbc8b07ee09aadf4c85b3b59eb5061b445d87495e7"
+}

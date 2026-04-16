@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT type_code, applicability\n               FROM \"ob-poc\".document_types\n               WHERE applicability IS NOT NULL AND applicability != '{}'::jsonb",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "type_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "applicability",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "5f2b3ea17fb1db705c58959405c18961e874736cb0db3ae972c2509db1551aff"
+}

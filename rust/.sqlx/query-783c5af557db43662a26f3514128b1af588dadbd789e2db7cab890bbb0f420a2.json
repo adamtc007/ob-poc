@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO \"ob-poc\".attribute_observations\n                   (observation_id, entity_id, attribute_id, value_text, source_type,\n                    source_document_id, extraction_method, confidence, is_authoritative, status)\n                   VALUES ($1, $2, $3, $4, 'DOCUMENT', $5, $6, $7, $8, 'ACTIVE')\n                   ON CONFLICT (entity_id, attribute_id, source_type, source_document_id)\n                   WHERE status = 'ACTIVE'\n                   DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Varchar",
+        "Numeric",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "783c5af557db43662a26f3514128b1af588dadbd789e2db7cab890bbb0f420a2"
+}

@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                cps.subscription_id as id,\n                p.product_id,\n                p.name as product_name,\n                p.product_code,\n                cps.status,\n                cps.created_at\n            FROM \"ob-poc\".cbu_product_subscriptions cps\n            JOIN \"ob-poc\".products p ON p.product_id = cps.product_id\n            WHERE cps.cbu_id = $1\n              AND cps.status = 'ACTIVE'\n            ORDER BY p.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "product_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "product_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "product_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "f8b0c218fb2b17d5f7971b9f05789b528ab227b500b510ee4877ffc936ab0ca7"
+}

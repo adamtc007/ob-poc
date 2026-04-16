@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) as \"count!\"\n        FROM \"ob-poc\".outstanding_requests\n        WHERE workstream_id = $1\n          AND status = 'PENDING'\n          AND blocks_subject = TRUE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "60fd323c5372651cdf6ad8d4bfb8c58d0de67e4002e0ac7eb2b795597e52b094"
+}

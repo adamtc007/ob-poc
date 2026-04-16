@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT m.mic\n           FROM \"ob-poc\".cbu_instrument_universe u\n           JOIN \"ob-poc\".markets m ON u.market_id = m.market_id\n           WHERE u.cbu_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "mic",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "99156a2a710bd33c6f2b35017b5171cfb78544809cfa13364489b3f8aa8a955e"
+}

@@ -1,0 +1,172 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id, failure_id,\n                action as \"action: AuditAction\",\n                actor_type as \"actor_type: ActorType\",\n                actor_id, details, evidence, evidence_hash,\n                previous_status as \"previous_status: IssueStatus\",\n                new_status as \"new_status: IssueStatus\",\n                created_at\n            FROM \"ob-poc\".audit_log\n            WHERE failure_id = $1\n            ORDER BY created_at ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "failure_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "action: AuditAction",
+        "type_info": {
+          "Custom": {
+            "name": "\"ob-poc\".audit_action",
+            "kind": {
+              "Enum": [
+                "CAPTURED",
+                "CLASSIFIED",
+                "DEDUPLICATED",
+                "RUNTIME_ATTEMPT",
+                "RUNTIME_SUCCESS",
+                "RUNTIME_EXHAUSTED",
+                "REPRO_GENERATED",
+                "REPRO_VERIFIED_FAILS",
+                "REPRO_VERIFICATION_FAILED",
+                "TODO_CREATED",
+                "TODO_ASSIGNED",
+                "FIX_COMMITTED",
+                "REPRO_VERIFIED_PASSES",
+                "DEPLOYED",
+                "SEMANTIC_REPLAY_PASSED",
+                "SEMANTIC_REPLAY_FAILED",
+                "RESOLVED",
+                "MARKED_WONT_FIX",
+                "MARKED_DUPLICATE",
+                "REOPENED",
+                "COMMENT_ADDED"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "actor_type: ActorType",
+        "type_info": {
+          "Custom": {
+            "name": "\"ob-poc\".actor_type",
+            "kind": {
+              "Enum": [
+                "SYSTEM",
+                "MCP_AGENT",
+                "REPL_USER",
+                "EGUI_USER",
+                "CI_PIPELINE",
+                "CLAUDE_CODE",
+                "CRON_JOB"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "actor_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "details",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "evidence",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "evidence_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "previous_status: IssueStatus",
+        "type_info": {
+          "Custom": {
+            "name": "\"ob-poc\".issue_status",
+            "kind": {
+              "Enum": [
+                "NEW",
+                "RUNTIME_RESOLVED",
+                "RUNTIME_ESCALATED",
+                "REPRO_GENERATED",
+                "REPRO_VERIFIED",
+                "TODO_CREATED",
+                "IN_PROGRESS",
+                "FIX_COMMITTED",
+                "FIX_VERIFIED",
+                "DEPLOYED_STAGING",
+                "DEPLOYED_PROD",
+                "RESOLVED",
+                "WONT_FIX",
+                "DUPLICATE",
+                "INVALID"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "new_status: IssueStatus",
+        "type_info": {
+          "Custom": {
+            "name": "\"ob-poc\".issue_status",
+            "kind": {
+              "Enum": [
+                "NEW",
+                "RUNTIME_RESOLVED",
+                "RUNTIME_ESCALATED",
+                "REPRO_GENERATED",
+                "REPRO_VERIFIED",
+                "TODO_CREATED",
+                "IN_PROGRESS",
+                "FIX_COMMITTED",
+                "FIX_VERIFIED",
+                "DEPLOYED_STAGING",
+                "DEPLOYED_PROD",
+                "RESOLVED",
+                "WONT_FIX",
+                "DUPLICATE",
+                "INVALID"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "72f117cb546f5c9d7d1b38590d9d4687367a8c72796f272ab43cba1ae8f616ac"
+}

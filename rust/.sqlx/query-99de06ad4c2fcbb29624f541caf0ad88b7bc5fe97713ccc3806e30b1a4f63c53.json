@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                r.from_entity_id as \"entity_id!: Uuid\",\n                e.name as owned_name,\n                r.percentage as ownership_percent,\n                r.ownership_type\n            FROM \"ob-poc\".entity_relationships r\n            JOIN \"ob-poc\".entities e ON r.to_entity_id = e.entity_id\n            WHERE r.from_entity_id = ANY($1)\n            AND r.relationship_type = 'ownership'\n            AND (r.effective_to IS NULL OR r.effective_to > CURRENT_DATE)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id!: Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "owned_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "ownership_percent",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "ownership_type",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "99de06ad4c2fcbb29624f541caf0ad88b7bc5fe97713ccc3806e30b1a4f63c53"
+}

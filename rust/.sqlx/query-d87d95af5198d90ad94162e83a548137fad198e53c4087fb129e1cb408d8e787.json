@@ -1,0 +1,211 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id, fingerprint, fingerprint_version,\n                error_type as \"error_type: ErrorType\",\n                remediation_path as \"remediation_path: RemediationPath\",\n                status as \"status: IssueStatus\",\n                verb, source, error_message, error_context,\n                user_intent, command_sequence,\n                repro_type, repro_path, repro_verified,\n                fix_commit, fix_notes,\n                occurrence_count, first_seen_at, last_seen_at, resolved_at,\n                created_at, updated_at\n            FROM \"ob-poc\".failures\n            WHERE fingerprint = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "fingerprint",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "fingerprint_version",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "error_type: ErrorType",
+        "type_info": {
+          "Custom": {
+            "name": "\"ob-poc\".error_type",
+            "kind": {
+              "Enum": [
+                "TIMEOUT",
+                "RATE_LIMITED",
+                "CONNECTION_RESET",
+                "SERVICE_UNAVAILABLE",
+                "POOL_EXHAUSTED",
+                "ENUM_DRIFT",
+                "SCHEMA_DRIFT",
+                "PARSE_ERROR",
+                "HANDLER_PANIC",
+                "HANDLER_ERROR",
+                "DSL_PARSE_ERROR",
+                "API_ENDPOINT_MOVED",
+                "API_AUTH_CHANGED",
+                "VALIDATION_FAILED",
+                "UNKNOWN"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "remediation_path: RemediationPath",
+        "type_info": {
+          "Custom": {
+            "name": "\"ob-poc\".remediation_path",
+            "kind": {
+              "Enum": [
+                "RUNTIME",
+                "CODE",
+                "LOG_ONLY"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "status: IssueStatus",
+        "type_info": {
+          "Custom": {
+            "name": "\"ob-poc\".issue_status",
+            "kind": {
+              "Enum": [
+                "NEW",
+                "RUNTIME_RESOLVED",
+                "RUNTIME_ESCALATED",
+                "REPRO_GENERATED",
+                "REPRO_VERIFIED",
+                "TODO_CREATED",
+                "IN_PROGRESS",
+                "FIX_COMMITTED",
+                "FIX_VERIFIED",
+                "DEPLOYED_STAGING",
+                "DEPLOYED_PROD",
+                "RESOLVED",
+                "WONT_FIX",
+                "DUPLICATE",
+                "INVALID"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "verb",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "source",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "error_context",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 10,
+        "name": "user_intent",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "command_sequence",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 12,
+        "name": "repro_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "repro_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "repro_verified",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 15,
+        "name": "fix_commit",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "fix_notes",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "occurrence_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 18,
+        "name": "first_seen_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 19,
+        "name": "last_seen_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 20,
+        "name": "resolved_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 21,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 22,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "d87d95af5198d90ad94162e83a548137fad198e53c4087fb129e1cb408d8e787"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT cbu_category, client_type FROM \"ob-poc\".cbus WHERE cbu_id = $1 AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cbu_category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "client_type",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "98e86ad5df32ac1adcba03ed67952bb563077218a2f488f8676660851ae71a1e"
+}

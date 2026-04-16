@@ -1,0 +1,120 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                request_id,\n                request_type,\n                request_subtype,\n                subject_type,\n                subject_id,\n                workstream_id,\n                case_id,\n                cbu_id,\n                requested_from_label,\n                requested_at,\n                due_date,\n                grace_period_days,\n                status,\n                reminder_count,\n                escalation_level,\n                blocker_message,\n                CURRENT_DATE - due_date as days_overdue\n            FROM \"ob-poc\".outstanding_requests\n            WHERE status = 'PENDING'\n              AND ($1::uuid IS NULL OR case_id = $1)\n              AND ($2::uuid IS NULL OR cbu_id = $2)\n              AND (\n                  CASE WHEN $3 THEN\n                      due_date + (grace_period_days || ' days')::interval < CURRENT_DATE\n                  ELSE\n                      due_date < CURRENT_DATE\n                  END\n              )\n            ORDER BY due_date ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "request_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "request_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "request_subtype",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "subject_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "subject_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "workstream_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "case_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "cbu_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "requested_from_label",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "requested_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "due_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 11,
+        "name": "grace_period_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 13,
+        "name": "reminder_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "escalation_level",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 15,
+        "name": "blocker_message",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 16,
+        "name": "days_overdue",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "8b7adb952222e7469fb99deba5fc7dfbe47f76bfcc77228bb11c22a4ba3359be"
+}

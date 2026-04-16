@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE \"ob-poc\".client_allegations ca\n                       SET verification_status = 'VERIFIED',\n                           verified_at = NOW(),\n                           verification_notes = 'Auto-verified by document extraction'\n                       WHERE ca.cbu_id = $1 AND ca.entity_id = $2\n                         AND ca.verification_status = 'PENDING'\n                         AND EXISTS (\n                           SELECT 1 FROM \"ob-poc\".attribute_observations ao\n                           WHERE ao.entity_id = ca.entity_id\n                             AND ao.attribute_id = ca.attribute_id\n                             AND ao.source_document_id = $3\n                             AND ao.status = 'ACTIVE'\n                         )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "174260821697f014ac1d4033202f59bc57d2a09834eb10a757326584a2c10c41"
+}

@@ -1,0 +1,71 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT ar.id as attr_id, ar.display_name, ar.category, ar.value_type,\n                   dal.direction, dal.extraction_method, dal.is_authoritative,\n                   dal.proof_strength, dal.extraction_confidence_default\n            FROM \"ob-poc\".document_attribute_links dal\n            JOIN \"ob-poc\".document_types dt ON dt.type_id = dal.document_type_id\n            JOIN \"ob-poc\".attribute_registry ar ON ar.uuid = dal.attribute_id\n            WHERE dt.type_code = $1 AND ($2::text IS NULL OR dal.direction = $2)\n            ORDER BY dal.direction, ar.category, ar.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "attr_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "display_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "category",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "value_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "direction",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "extraction_method",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "is_authoritative",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "proof_strength",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "extraction_confidence_default",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "ee17ecfa6bf31710c623ef453a8923b376e540e62a2b56a463b7b0f4a79c4695"
+}

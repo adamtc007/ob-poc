@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT rt.resource_id, rt.name, rt.resource_type, rt.resource_code, src.is_active\n               FROM \"ob-poc\".service_resource_types rt\n               JOIN \"ob-poc\".service_resource_capabilities src ON src.resource_id = rt.resource_id\n               WHERE src.service_id = $1\n               ORDER BY src.priority, rt.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "resource_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "resource_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "resource_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_active",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "b9f3bd5d3b014d85c65b1f1db2d3653d6bc7a0cc303eb3e00bdc1fb3f75aeacf"
+}

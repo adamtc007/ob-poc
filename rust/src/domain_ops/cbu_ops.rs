@@ -1265,240 +1265,12 @@ impl CustomOperation for CbuInspectOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use chrono::NaiveDate;
-        use uuid::Uuid;
-
-        // Get CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else if let Some(uuid_val) = a.value.as_uuid() {
-                    Some(uuid_val)
-                } else if let Some(str_val) = a.value.as_string() {
-                    Uuid::parse_str(str_val).ok()
-                } else {
-                    None
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing or invalid cbu-id argument"))?;
-
-        // Get as-of-date (optional, defaults to today)
-        let as_of_date: NaiveDate = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "as-of-date")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+        use super::helpers::{extract_string_opt, extract_uuid};
+        let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
+        let as_of_date = extract_string_opt(verb_call, "as-of-date")
+            .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
-
-        // Get basic CBU info
-        let cbu = sqlx::query!(
-            r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category,
-                      nature_purpose, description, created_at, updated_at
-               FROM "ob-poc".cbus
-               WHERE cbu_id = $1
-                 AND deleted_at IS NULL"#,
-            cbu_id
-        )
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
-
-        // Get entities with their roles (filtered by as_of_date)
-        let entities = sqlx::query!(
-            r#"SELECT DISTINCT e.entity_id, e.name, et.type_code as entity_type,
-                      COALESCE(lc.jurisdiction, pp.nationality, p.jurisdiction, t.jurisdiction) as jurisdiction
-               FROM "ob-poc".cbu_entity_roles cer
-               JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
-               JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-               LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
-               LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
-               LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
-               LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
-               WHERE cer.cbu_id = $1
-                 AND e.deleted_at IS NULL
-                 AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
-                 AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
-               ORDER BY e.name"#,
-            cbu_id,
-            as_of_date
-        )
-        .fetch_all(pool)
-        .await?;
-
-        // Get roles per entity (filtered by as_of_date)
-        let roles = sqlx::query!(
-            r#"SELECT cer.entity_id, r.name as role_name
-               FROM "ob-poc".cbu_entity_roles cer
-               JOIN "ob-poc".roles r ON cer.role_id = r.role_id
-               WHERE cer.cbu_id = $1
-               AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
-               AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
-               ORDER BY cer.entity_id, r.name"#,
-            cbu_id,
-            as_of_date
-        )
-        .fetch_all(pool)
-        .await?;
-
-        // Build entity list with roles
-        let entity_list: Vec<serde_json::Value> = entities
-            .iter()
-            .map(|e| {
-                let entity_roles: Vec<String> = roles
-                    .iter()
-                    .filter(|r| r.entity_id == e.entity_id)
-                    .map(|r| r.role_name.clone())
-                    .collect();
-                serde_json::json!({
-                    "entity_id": e.entity_id,
-                    "name": e.name,
-                    "entity_type": e.entity_type,
-                    "jurisdiction": e.jurisdiction,
-                    "roles": entity_roles
-                })
-            })
-            .collect();
-
-        // Get documents
-        let documents = sqlx::query!(
-            r#"SELECT dc.doc_id, dc.document_name, dt.type_code, dt.display_name, dc.status
-               FROM "ob-poc".document_catalog dc
-               LEFT JOIN "ob-poc".document_types dt ON dc.document_type_id = dt.type_id
-               WHERE dc.cbu_id = $1
-               ORDER BY dt.type_code"#,
-            cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let doc_list: Vec<serde_json::Value> = documents
-            .iter()
-            .map(|d| {
-                serde_json::json!({
-                    "doc_id": d.doc_id,
-                    "name": d.document_name,
-                    "type_code": d.type_code,
-                    "type_name": d.display_name,
-                    "status": d.status
-                })
-            })
-            .collect();
-
-        // Get screenings (via KYC workstreams)
-        let screenings = sqlx::query!(
-            r#"SELECT s.screening_id, w.entity_id, e.name as entity_name,
-                      s.screening_type, s.status, s.result_summary
-               FROM "ob-poc".screenings s
-               JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
-               JOIN "ob-poc".cases c ON c.case_id = w.case_id
-               JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
-               WHERE c.cbu_id = $1
-                 AND e.deleted_at IS NULL
-               ORDER BY s.screening_type, e.name"#,
-            cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let screening_list: Vec<serde_json::Value> = screenings
-            .iter()
-            .map(|s| {
-                serde_json::json!({
-                    "screening_id": s.screening_id,
-                    "entity_id": s.entity_id,
-                    "entity_name": s.entity_name,
-                    "screening_type": s.screening_type,
-                    "status": s.status,
-                    "result": s.result_summary
-                })
-            })
-            .collect();
-
-        // Get service deliveries
-        let services = sqlx::query!(
-            r#"SELECT sdm.delivery_id, p.name as product_name, p.product_code,
-                      s.name as service_name, sdm.delivery_status
-               FROM "ob-poc".service_delivery_map sdm
-               JOIN "ob-poc".products p ON p.product_id = sdm.product_id
-               JOIN "ob-poc".services s ON s.service_id = sdm.service_id
-               WHERE sdm.cbu_id = $1
-               ORDER BY p.name, s.name"#,
-            cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let service_list: Vec<serde_json::Value> = services
-            .iter()
-            .map(|s| {
-                serde_json::json!({
-                    "delivery_id": s.delivery_id,
-                    "product": s.product_name,
-                    "product_code": s.product_code,
-                    "service": s.service_name,
-                    "status": s.delivery_status
-                })
-            })
-            .collect();
-
-        // Get KYC cases
-        let cases = sqlx::query!(
-            r#"SELECT case_id, status, case_type, risk_rating, escalation_level,
-                      opened_at, closed_at
-               FROM "ob-poc".cases
-               WHERE cbu_id = $1
-               ORDER BY opened_at DESC"#,
-            cbu_id
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let case_list: Vec<serde_json::Value> = cases
-            .iter()
-            .map(|c| {
-                serde_json::json!({
-                    "case_id": c.case_id,
-                    "status": c.status,
-                    "case_type": c.case_type,
-                    "risk_rating": c.risk_rating,
-                    "escalation_level": c.escalation_level,
-                    "opened_at": c.opened_at.to_rfc3339(),
-                    "closed_at": c.closed_at.map(|t| t.to_rfc3339())
-                })
-            })
-            .collect();
-
-        // Build complete result
-        let result = serde_json::json!({
-            "cbu_id": cbu.cbu_id,
-            "name": cbu.name,
-            "jurisdiction": cbu.jurisdiction,
-            "client_type": cbu.client_type,
-            "category": cbu.cbu_category,
-            "nature_purpose": cbu.nature_purpose,
-            "description": cbu.description,
-            "created_at": cbu.created_at.map(|t| t.to_rfc3339()),
-            "updated_at": cbu.updated_at.map(|t| t.to_rfc3339()),
-            "as_of_date": as_of_date.to_string(),
-            "entities": entity_list,
-            "documents": doc_list,
-            "screenings": screening_list,
-            "services": service_list,
-            "kyc_cases": case_list,
-            "summary": {
-                "entity_count": entity_list.len(),
-                "document_count": doc_list.len(),
-                "screening_count": screening_list.len(),
-                "service_count": service_list.len(),
-                "case_count": case_list.len()
-            }
-        });
-
+        let result = cbu_inspect_impl(cbu_id, as_of_date, pool).await?;
         Ok(ExecutionResult::Record(result))
     }
 
@@ -1512,6 +1284,166 @@ impl CustomOperation for CbuInspectOp {
             "error": "Database required for cbu.inspect"
         })))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let as_of_date = json_extract_string_opt(args, "as-of-date")
+            .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+        let result = cbu_inspect_impl(cbu_id, as_of_date, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+/// Shared implementation for cbu.inspect — called by both execute() and execute_json().
+#[cfg(feature = "database")]
+async fn cbu_inspect_impl(
+    cbu_id: Uuid,
+    as_of_date: NaiveDate,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    let cbu = sqlx::query!(
+        r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category,
+                  nature_purpose, description, created_at, updated_at
+           FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
+        cbu_id
+    )
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
+
+    let entities = sqlx::query!(
+        r#"SELECT DISTINCT e.entity_id, e.name, et.type_code as entity_type,
+                  COALESCE(lc.jurisdiction, pp.nationality, p.jurisdiction, t.jurisdiction) as jurisdiction
+           FROM "ob-poc".cbu_entity_roles cer
+           JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
+           JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
+           LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
+           LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
+           LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
+           LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
+           WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL
+             AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
+             AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
+           ORDER BY e.name"#,
+        cbu_id, as_of_date
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let roles = sqlx::query!(
+        r#"SELECT cer.entity_id, r.name as role_name
+           FROM "ob-poc".cbu_entity_roles cer
+           JOIN "ob-poc".roles r ON cer.role_id = r.role_id
+           WHERE cer.cbu_id = $1
+           AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
+           AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
+           ORDER BY cer.entity_id, r.name"#,
+        cbu_id, as_of_date
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let entity_list: Vec<serde_json::Value> = entities.iter().map(|e| {
+        let entity_roles: Vec<String> = roles.iter()
+            .filter(|r| r.entity_id == e.entity_id)
+            .map(|r| r.role_name.clone()).collect();
+        serde_json::json!({
+            "entity_id": e.entity_id, "name": e.name,
+            "entity_type": e.entity_type, "jurisdiction": e.jurisdiction,
+            "roles": entity_roles
+        })
+    }).collect();
+
+    let documents = sqlx::query!(
+        r#"SELECT dc.doc_id, dc.document_name, dt.type_code, dt.display_name, dc.status
+           FROM "ob-poc".document_catalog dc
+           LEFT JOIN "ob-poc".document_types dt ON dc.document_type_id = dt.type_id
+           WHERE dc.cbu_id = $1 ORDER BY dt.type_code"#,
+        cbu_id
+    ).fetch_all(pool).await?;
+
+    let doc_list: Vec<serde_json::Value> = documents.iter().map(|d| {
+        serde_json::json!({"doc_id": d.doc_id, "name": d.document_name,
+            "type_code": d.type_code, "type_name": d.display_name, "status": d.status})
+    }).collect();
+
+    let screenings = sqlx::query!(
+        r#"SELECT s.screening_id, w.entity_id, e.name as entity_name,
+                  s.screening_type, s.status, s.result_summary
+           FROM "ob-poc".screenings s
+           JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
+           JOIN "ob-poc".cases c ON c.case_id = w.case_id
+           JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
+           WHERE c.cbu_id = $1 AND e.deleted_at IS NULL
+           ORDER BY s.screening_type, e.name"#,
+        cbu_id
+    ).fetch_all(pool).await?;
+
+    let screening_list: Vec<serde_json::Value> = screenings.iter().map(|s| {
+        serde_json::json!({"screening_id": s.screening_id, "entity_id": s.entity_id,
+            "entity_name": s.entity_name, "screening_type": s.screening_type,
+            "status": s.status, "result": s.result_summary})
+    }).collect();
+
+    let services = sqlx::query!(
+        r#"SELECT sdm.delivery_id, p.name as product_name, p.product_code,
+                  s.name as service_name, sdm.delivery_status
+           FROM "ob-poc".service_delivery_map sdm
+           JOIN "ob-poc".products p ON p.product_id = sdm.product_id
+           JOIN "ob-poc".services s ON s.service_id = sdm.service_id
+           WHERE sdm.cbu_id = $1 ORDER BY p.name, s.name"#,
+        cbu_id
+    ).fetch_all(pool).await?;
+
+    let service_list: Vec<serde_json::Value> = services.iter().map(|s| {
+        serde_json::json!({"delivery_id": s.delivery_id, "product": s.product_name,
+            "product_code": s.product_code, "service": s.service_name, "status": s.delivery_status})
+    }).collect();
+
+    let cases = sqlx::query!(
+        r#"SELECT case_id, status, case_type, risk_rating, escalation_level,
+                  opened_at, closed_at
+           FROM "ob-poc".cases WHERE cbu_id = $1 ORDER BY opened_at DESC"#,
+        cbu_id
+    ).fetch_all(pool).await?;
+
+    let case_list: Vec<serde_json::Value> = cases.iter().map(|c| {
+        serde_json::json!({"case_id": c.case_id, "status": c.status,
+            "case_type": c.case_type, "risk_rating": c.risk_rating,
+            "escalation_level": c.escalation_level,
+            "opened_at": c.opened_at.to_rfc3339(),
+            "closed_at": c.closed_at.map(|t| t.to_rfc3339())})
+    }).collect();
+
+    Ok(serde_json::json!({
+        "cbu_id": cbu.cbu_id, "name": cbu.name,
+        "jurisdiction": cbu.jurisdiction, "client_type": cbu.client_type,
+        "category": cbu.cbu_category, "nature_purpose": cbu.nature_purpose,
+        "description": cbu.description,
+        "created_at": cbu.created_at.map(|t| t.to_rfc3339()),
+        "updated_at": cbu.updated_at.map(|t| t.to_rfc3339()),
+        "as_of_date": as_of_date.to_string(),
+        "entities": entity_list, "documents": doc_list,
+        "screenings": screening_list, "services": service_list,
+        "kyc_cases": case_list,
+        "summary": {
+            "entity_count": entity_list.len(), "document_count": doc_list.len(),
+            "screening_count": screening_list.len(), "service_count": service_list.len(),
+            "case_count": case_list.len()
+        }
+    }))
 }
 
 // ============================================================================

@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                ic.class_id,\n                ic.code,\n                ic.name,\n                COUNT(DISTINCT ciu.market_id) as \"mic_count!: i64\",\n                COUNT(DISTINCT sbr.ssi_id) as \"bic_count!: i64\",\n                bool_or(ciu.is_traded) as is_traded\n            FROM \"ob-poc\".instrument_classes ic\n            LEFT JOIN \"ob-poc\".cbu_instrument_universe ciu\n                ON ic.class_id = ciu.instrument_class_id AND ciu.cbu_id = $1 AND ciu.is_active = true\n            LEFT JOIN \"ob-poc\".ssi_booking_rules sbr\n                ON ic.class_id = sbr.instrument_class_id AND sbr.cbu_id = $1 AND sbr.is_active = true\n            GROUP BY ic.class_id, ic.code, ic.name\n            HAVING COUNT(DISTINCT ciu.universe_id) > 0\n            ORDER BY ic.code\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "class_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "mic_count!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "bic_count!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_traded",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "3de87e240ca544c7f48aa3c78dbe1a4ebc741f8a78acdd7545990dbd34ddd322"
+}

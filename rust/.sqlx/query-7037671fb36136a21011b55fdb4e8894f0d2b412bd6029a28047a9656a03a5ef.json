@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT type_code, display_name FROM \"ob-poc\".document_types ORDER BY type_code",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "type_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "display_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "7037671fb36136a21011b55fdb4e8894f0d2b412bd6029a28047a9656a03a5ef"
+}

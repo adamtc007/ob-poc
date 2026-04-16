@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".outstanding_requests (\n                subject_type, subject_id,\n                workstream_id, case_id, cbu_id, entity_id,\n                request_type, request_subtype, request_details,\n                requested_from_type, requested_from_label,\n                requested_by_agent,\n                due_date, grace_period_days, max_reminders,\n                blocks_subject, blocker_message,\n                created_by_verb\n            ) VALUES (\n                $1, $2,\n                $3, $4, $5, $6,\n                'DOCUMENT', $7, $8,\n                'CLIENT', $9,\n                TRUE,\n                $10, $11, $12,\n                $13, $14,\n                'document.request'\n            )\n            RETURNING request_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "request_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Jsonb",
+        "Varchar",
+        "Date",
+        "Int4",
+        "Int4",
+        "Bool",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5f9f12ca6419ce70ac7f14b1929163cfa0b89d13dfff0e95c9f5ba149ca61f68"
+}

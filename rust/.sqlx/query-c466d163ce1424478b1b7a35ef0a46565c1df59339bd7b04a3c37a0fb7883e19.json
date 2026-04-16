@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT sdm.delivery_id, p.name as product_name, p.product_code,\n                  s.name as service_name, sdm.delivery_status\n           FROM \"ob-poc\".service_delivery_map sdm\n           JOIN \"ob-poc\".products p ON p.product_id = sdm.product_id\n           JOIN \"ob-poc\".services s ON s.service_id = sdm.service_id\n           WHERE sdm.cbu_id = $1 ORDER BY p.name, s.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "delivery_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "product_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "product_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "service_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "delivery_status",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "c466d163ce1424478b1b7a35ef0a46565c1df59339bd7b04a3c37a0fb7883e19"
+}

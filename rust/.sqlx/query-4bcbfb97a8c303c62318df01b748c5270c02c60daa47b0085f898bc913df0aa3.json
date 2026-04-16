@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT cbu_id, name, jurisdiction\n                FROM \"ob-poc\".cbus\n                WHERE cbu_id = ANY($1)\n                  AND deleted_at IS NULL\n                  AND ($2::text IS NULL OR jurisdiction = $2)\n                ORDER BY name\n                LIMIT $3\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cbu_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "jurisdiction",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "4bcbfb97a8c303c62318df01b748c5270c02c60daa47b0085f898bc913df0aa3"
+}

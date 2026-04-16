@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO \"ob-poc\".client_group_entity\n                    (group_id, entity_id, membership_type, added_by)\n                VALUES ($1, $2, 'confirmed', 'user_confirmed')\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "949e264a51696608d1f0e95335fcb60922ef468e73fe990d34da5ce6be3c961e"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS(\n                SELECT 1 FROM \"ob-poc\".cbu_entity_roles cer\n                JOIN \"ob-poc\".roles r ON cer.role_id = r.role_id\n                WHERE cer.cbu_id = $1 AND r.role_category = 'CONTROL'\n            ) as \"exists!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "87c414bd1ea0a8427eafac6f430ad95df2cca5be772ecf03d46e28ff545e3eaf"
+}

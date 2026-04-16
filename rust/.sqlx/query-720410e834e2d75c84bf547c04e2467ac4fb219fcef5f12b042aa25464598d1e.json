@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                v.entity_id as \"entity_id!\",\n                v.entity_name as \"entity_name!\",\n                v.entity_type as \"entity_type!\",\n                v.entity_category,\n                v.jurisdiction,\n                v.roles,\n                v.role_categories,\n                v.primary_role,\n                v.max_role_priority as role_priority,\n                v.primary_role_category,\n                v.primary_layout_category,\n                v.effective_ubo_treatment,\n                v.effective_kyc_obligation,\n                pp.person_state as \"person_state?\"\n               FROM \"ob-poc\".v_cbu_entity_with_roles v\n               LEFT JOIN \"ob-poc\".entity_proper_persons pp ON v.entity_id = pp.entity_id\n               WHERE v.cbu_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "entity_type!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "entity_category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "jurisdiction",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "roles",
+        "type_info": "VarcharArray"
+      },
+      {
+        "ordinal": 6,
+        "name": "role_categories",
+        "type_info": "VarcharArray"
+      },
+      {
+        "ordinal": 7,
+        "name": "primary_role",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "role_priority",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "primary_role_category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "primary_layout_category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "effective_ubo_treatment",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "effective_kyc_obligation",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "person_state?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "720410e834e2d75c84bf547c04e2467ac4fb219fcef5f12b042aa25464598d1e"
+}

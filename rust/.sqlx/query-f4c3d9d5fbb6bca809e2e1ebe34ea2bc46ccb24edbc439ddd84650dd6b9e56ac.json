@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, learning_type, input_pattern, suggested_output\n            FROM \"ob-poc\".learning_candidates\n            WHERE status = 'pending'\n              AND auto_applicable = TRUE\n              AND occurrence_count >= $1\n              AND risk_level = 'low'\n            ORDER BY occurrence_count DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "learning_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "input_pattern",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "suggested_output",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f4c3d9d5fbb6bca809e2e1ebe34ea2bc46ccb24edbc439ddd84650dd6b9e56ac"
+}

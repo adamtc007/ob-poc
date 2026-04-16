@@ -1,0 +1,71 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                e.entity_id,\n                e.name as entity_name,\n                et.name as entity_type,\n                et.type_code as entity_type_code,\n                r.role_id,\n                r.name as role_name,\n                COALESCE(lc.jurisdiction, pp.nationality) as jurisdiction,\n                COALESCE(cer.ownership_percentage::float / 100.0, 1.0) as \"confidence!: f64\",\n                cer.created_at\n            FROM \"ob-poc\".cbu_entity_roles cer\n            JOIN \"ob-poc\".entities e ON cer.entity_id = e.entity_id\n            JOIN \"ob-poc\".entity_types et ON e.entity_type_id = et.entity_type_id\n            JOIN \"ob-poc\".roles r ON cer.role_id = r.role_id\n            LEFT JOIN \"ob-poc\".entity_limited_companies lc ON e.entity_id = lc.entity_id\n            LEFT JOIN \"ob-poc\".entity_proper_persons pp ON e.entity_id = pp.entity_id\n            WHERE cer.cbu_id = $1\n              AND e.deleted_at IS NULL\n              AND COALESCE(cer.ownership_percentage::float / 100.0, 1.0) >= $2\n            ORDER BY COALESCE(cer.ownership_percentage::float / 100.0, 1.0) DESC, r.name, e.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "entity_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "entity_type_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "role_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "role_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "jurisdiction",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "confidence!: f64",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      null,
+      null,
+      true
+    ]
+  },
+  "hash": "b11da62ca6a7ad62c5a28794e4d1fb1c4ea978e4bc10c34248c05e70a74cbd67"
+}

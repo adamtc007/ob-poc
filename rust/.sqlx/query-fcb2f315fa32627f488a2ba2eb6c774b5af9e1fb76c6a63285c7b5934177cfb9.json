@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".investors\n            SET lifecycle_state = 'SUSPENDED',\n                suspended_reason = $2,\n                pre_suspension_state = $3,\n                suspended_at = NOW(),\n                lifecycle_notes = $4,\n                updated_at = NOW()\n            WHERE investor_id = $1\n            RETURNING investor_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "investor_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Varchar",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "fcb2f315fa32627f488a2ba2eb6c774b5af9e1fb76c6a63285c7b5934177cfb9"
+}

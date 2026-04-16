@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".client_group_entity_roles\n            SET effective_to = CURRENT_DATE, updated_at = NOW()\n            WHERE id = $1 AND effective_to IS NULL\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "05f60366142dc270fd07db67a8d472eafc24aff87221c81ce3fcf523bf3c9a21"
+}

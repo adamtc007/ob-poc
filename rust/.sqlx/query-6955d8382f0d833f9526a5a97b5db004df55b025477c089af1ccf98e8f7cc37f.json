@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT cer.cbu_id, c.name as cbu_name\n               FROM \"ob-poc\".cbu_entity_roles cer\n               JOIN \"ob-poc\".cbus c ON cer.cbu_id = c.cbu_id\n               WHERE cer.entity_id = $1\n                 AND c.deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cbu_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "cbu_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "6955d8382f0d833f9526a5a97b5db004df55b025477c089af1ccf98e8f7cc37f"
+}

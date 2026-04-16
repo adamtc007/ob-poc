@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT instance_id FROM \"ob-poc\".cbu_resource_instances\n           WHERE cbu_id = $1 AND status IN ('ACTIVE', 'PENDING')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "instance_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "96315ee5252070f6672b3c255b0037445be59bbba90879ae1879ec7bccdf9e86"
+}

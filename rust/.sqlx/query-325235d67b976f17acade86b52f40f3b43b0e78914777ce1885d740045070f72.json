@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".access_review_items\n            SET status = 'CONFIRMED', reviewed_at = NOW(),\n                reviewer_notes = 'Auto-confirmed: no issues detected'\n            WHERE campaign_id = $1\n              AND status = 'PENDING'\n              AND flag_no_legal_link = false\n              AND flag_dormant_account = false\n              AND flag_never_logged_in = false\n              AND risk_score < 40\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "325235d67b976f17acade86b52f40f3b43b0e78914777ce1885d740045070f72"
+}

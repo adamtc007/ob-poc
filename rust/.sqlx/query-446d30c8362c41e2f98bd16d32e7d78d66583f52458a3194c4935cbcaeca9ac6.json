@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                epr.relationship_id,\n                epr.child_entity_id,\n                child_e.name as \"child_name!\",\n                child_et.type_code as \"child_type_code?\",\n                epr.parent_entity_id,\n                epr.parent_lei,\n                epr.parent_name,\n                parent_et.type_code as \"parent_type_code?\",\n                epr.relationship_type as \"relationship_type!\",\n                epr.relationship_status,\n                epr.source\n               FROM \"ob-poc\".entity_parent_relationships epr\n               JOIN \"ob-poc\".entities child_e ON epr.child_entity_id = child_e.entity_id\n               JOIN \"ob-poc\".entity_types child_et ON child_e.entity_type_id = child_et.entity_type_id\n               LEFT JOIN \"ob-poc\".entities parent_e ON epr.parent_entity_id = parent_e.entity_id AND parent_e.deleted_at IS NULL\n               LEFT JOIN \"ob-poc\".entity_types parent_et ON parent_e.entity_type_id = parent_et.entity_type_id\n               WHERE epr.relationship_type IN ('FUND_MANAGER', 'UMBRELLA_FUND', 'MASTER_FUND')\n               AND child_e.deleted_at IS NULL\n               AND epr.child_entity_id IN (\n                   SELECT cer.entity_id\n                   FROM \"ob-poc\".cbu_entity_roles cer\n                   JOIN \"ob-poc\".entities e ON e.entity_id = cer.entity_id\n                   WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL\n               )\n               ORDER BY epr.relationship_type, child_e.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "relationship_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "child_entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "child_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "child_type_code?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "parent_entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "parent_lei",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "parent_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "parent_type_code?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "relationship_type!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "relationship_status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "source",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "446d30c8362c41e2f98bd16d32e7d78d66583f52458a3194c4935cbcaeca9ac6"
+}

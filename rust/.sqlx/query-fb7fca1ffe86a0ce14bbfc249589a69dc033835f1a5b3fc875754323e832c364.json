@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".client_group_entity\n                (group_id, entity_id, membership_type, added_by)\n            VALUES ($1, $2, 'confirmed', 'tag_add')\n            ON CONFLICT (group_id, entity_id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fb7fca1ffe86a0ce14bbfc249589a69dc033835f1a5b3fc875754323e832c364"
+}

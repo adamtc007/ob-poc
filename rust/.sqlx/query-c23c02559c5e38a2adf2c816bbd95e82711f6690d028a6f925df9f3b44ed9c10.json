@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".repl_invocation_records\n                (invocation_id, session_id, entry_id, runbook_id, correlation_key,\n                 gate_type, task_id, status, parked_at, timeout_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9)\n            ON CONFLICT (invocation_id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c23c02559c5e38a2adf2c816bbd95e82711f6690d028a6f925df9f3b44ed9c10"
+}

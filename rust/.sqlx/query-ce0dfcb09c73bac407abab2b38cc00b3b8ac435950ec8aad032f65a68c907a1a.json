@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".dsl_sessions\n                (session_id, status, client_type, jurisdiction, created_at, last_activity_at, expires_at, named_refs)\n            VALUES ($1, 'active', $2, $3, $4, $4, $5, '{}'::jsonb)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ce0dfcb09c73bac407abab2b38cc00b3b8ac435950ec8aad032f65a68c907a1a"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".client_group\n            SET discovery_status = 'in_progress',\n                discovery_started_at = NOW(),\n                discovery_source = 'gleif',\n                discovery_root_lei = $2,\n                updated_at = NOW()\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "95dee2dfbba5fc59ad8f28d093857556bfd18ff30beb439efc5781f503ea7ff2"
+}

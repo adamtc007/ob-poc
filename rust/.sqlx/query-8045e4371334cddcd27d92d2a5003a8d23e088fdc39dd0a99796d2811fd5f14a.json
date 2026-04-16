@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT membership_id FROM \"ob-poc\".memberships\n            WHERE team_id = $1 AND user_id = $2 AND effective_to IS NULL\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "membership_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8045e4371334cddcd27d92d2a5003a8d23e088fdc39dd0a99796d2811fd5f14a"
+}

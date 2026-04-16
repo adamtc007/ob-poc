@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".outreach_requests\n            SET\n                status = 'RESPONDED',\n                response_type = $2,\n                response_received_at = NOW(),\n                response_document_id = $3,\n                resolution_notes = COALESCE($4, resolution_notes),\n                updated_at = NOW()\n            WHERE request_id = $1\n            RETURNING request_id, target_entity_id, request_type\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "request_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "target_entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "request_type",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e26836ab1e634e81f168ab1af8f9ebab04706f8224c5209dfcf81c68bef273fb"
+}

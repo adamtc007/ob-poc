@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT r.name\n                FROM \"ob-poc\".cbu_entity_roles cer\n                JOIN \"ob-poc\".roles r ON cer.role_id = r.role_id\n                WHERE cer.entity_id = $1 AND cer.cbu_id = $2\n                LIMIT 1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "799b2fbdd9ff6b658bb9b170822dc01e413ae5213aeb22307b6d0c37f1f1c8e6"
+}

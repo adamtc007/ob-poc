@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT profile_id, version, status, activated_at\n               FROM \"ob-poc\".cbu_trading_profiles\n               WHERE cbu_id = $1 AND status IN ('DRAFT', 'VALIDATED', 'PENDING_REVIEW')\n               ORDER BY version DESC\n               LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "profile_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "version",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "activated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "7b20b4cba27da109101b090a8b1f0ec05d3dde483d044b6c1d3a85d8208c3668"
+}

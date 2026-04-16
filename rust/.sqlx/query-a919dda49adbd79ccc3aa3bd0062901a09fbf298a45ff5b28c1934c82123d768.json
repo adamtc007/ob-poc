@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT screening_id FROM \"ob-poc\".screenings\n               WHERE workstream_id = $1 AND screening_type = 'SANCTIONS' AND status = 'PENDING'\n               LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "screening_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a919dda49adbd79ccc3aa3bd0062901a09fbf298a45ff5b28c1934c82123d768"
+}
