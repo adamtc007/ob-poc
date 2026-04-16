@@ -52,6 +52,12 @@ impl CrudExecutionPort for PgCrudExecutor {
 
         match crud.operation.as_str() {
             "select" => self.execute_select(schema, table, &contract.args, &args, &contract.returns).await,
+            "insert" => self.execute_insert(schema, table, crud, &contract.args, &args).await,
+            "update" => self.execute_update(schema, table, crud, &contract.args, &args).await,
+            "delete" => self.execute_delete(schema, table, crud, &contract.args, &args).await,
+            "upsert" => self.execute_upsert(schema, table, crud, &contract.args, &args).await,
+            "link" => self.execute_link(schema, table, crud, &contract.args, &args).await,
+            "unlink" => self.execute_unlink(schema, table, crud, &contract.args, &args).await,
             "list_by_fk" => self.execute_list_by_fk(schema, table, crud, &contract.args, &args).await,
             op => Err(SemOsError::InvalidInput(format!(
                 "CRUD operation '{}' not yet migrated to CrudExecutionPort (verb: {})",
@@ -137,6 +143,358 @@ impl PgCrudExecutor {
                 rows.iter().map(row_to_json).collect();
             Ok(VerbExecutionOutcome::RecordSet(records?))
         }
+    }
+
+    // ── INSERT ───────────────────────────────────────────────────
+
+    async fn execute_insert(
+        &self,
+        schema: &str,
+        table: &str,
+        crud: &VerbCrudMapping,
+        arg_defs: &[VerbArgDef],
+        args: &serde_json::Value,
+    ) -> sem_os_core::execution::Result<VerbExecutionOutcome> {
+        let args_map = args.as_object().cloned().unwrap_or_default();
+
+        let pk_col = crud
+            .returning
+            .as_deref()
+            .unwrap_or_else(|| infer_pk_column(table));
+
+        let new_id = Uuid::new_v4();
+        let mut columns = vec![format!("\"{}\"", pk_col)];
+        let mut placeholders = vec!["$1".to_string()];
+        let mut bind_values: Vec<SqlValue> = vec![SqlValue::Uuid(new_id)];
+        let mut idx = 2;
+
+        for arg_def in arg_defs {
+            if let Some(value) = args_map.get(&arg_def.name) {
+                if let Some(col) = &arg_def.maps_to {
+                    if col == pk_col {
+                        continue;
+                    }
+                    columns.push(format!("\"{}\"", col));
+                    placeholders.push(format!("${idx}"));
+                    bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                    idx += 1;
+                }
+            }
+        }
+
+        let returning = crud.returning.as_deref().unwrap_or(pk_col);
+
+        let sql = if !crud.conflict_keys.is_empty() {
+            let conflict_cols: Vec<String> = crud.conflict_keys.iter().map(|c| format!("\"{}\"", c)).collect();
+            format!(
+                r#"INSERT INTO "{schema}"."{table}" ({cols}) VALUES ({vals}) ON CONFLICT ({conflict}) DO UPDATE SET "{pk}" = "{table}"."{pk}" RETURNING "{ret}""#,
+                cols = columns.join(", "),
+                vals = placeholders.join(", "),
+                conflict = conflict_cols.join(", "),
+                pk = pk_col,
+                ret = returning,
+            )
+        } else {
+            format!(
+                r#"WITH ins AS (
+                    INSERT INTO "{schema}"."{table}" ({cols}) VALUES ({vals})
+                    ON CONFLICT DO NOTHING RETURNING "{ret}"
+                ) SELECT "{ret}" FROM ins
+                  UNION ALL SELECT "{ret}" FROM "{schema}"."{table}"
+                  WHERE NOT EXISTS (SELECT 1 FROM ins) LIMIT 1"#,
+                cols = columns.join(", "),
+                vals = placeholders.join(", "),
+                ret = returning,
+            )
+        };
+
+        debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort INSERT");
+
+        let row = execute_query_one(&self.pool, &sql, &bind_values).await?;
+        let uuid: Uuid = row.try_get(returning)
+            .map_err(|e| SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}")))?;
+        Ok(VerbExecutionOutcome::Uuid(uuid))
+    }
+
+    // ── UPDATE ──────────────────────────────────────────────────
+
+    async fn execute_update(
+        &self,
+        schema: &str,
+        table: &str,
+        crud: &VerbCrudMapping,
+        arg_defs: &[VerbArgDef],
+        args: &serde_json::Value,
+    ) -> sem_os_core::execution::Result<VerbExecutionOutcome> {
+        let args_map = args.as_object().cloned().unwrap_or_default();
+        let key_col = crud.key_column.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("Update requires key_column in crud_mapping".into())
+        })?;
+
+        let mut sets = Vec::new();
+        let mut bind_values: Vec<SqlValue> = Vec::new();
+        let mut key_value: Option<SqlValue> = None;
+        let mut idx = 1;
+
+        for arg_def in arg_defs {
+            if let Some(value) = args_map.get(&arg_def.name) {
+                if let Some(col) = &arg_def.maps_to {
+                    if col == key_col {
+                        key_value = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                    } else {
+                        sets.push(format!("\"{}\" = ${}", col, idx));
+                        bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                        idx += 1;
+                    }
+                }
+            }
+        }
+
+        let key_val = key_value.ok_or_else(|| {
+            SemOsError::InvalidInput("Missing key argument for update".into())
+        })?;
+
+        if sets.is_empty() {
+            return Err(SemOsError::InvalidInput("No columns to update".into()));
+        }
+
+        let mut sql = format!(
+            r#"UPDATE "{schema}"."{table}" SET {} WHERE "{key_col}" = ${idx}"#,
+            sets.join(", "),
+        );
+        if let Some(predicate) = soft_delete_predicate(schema, table) {
+            sql = format!("{sql} AND {predicate}");
+        }
+
+        debug!(sql = %sql, binds = bind_values.len() + 1, "CrudExecutionPort UPDATE");
+
+        bind_values.push(key_val);
+        let affected = execute_non_query(&self.pool, &sql, &bind_values).await?;
+        Ok(VerbExecutionOutcome::Affected(affected))
+    }
+
+    // ── DELETE ───────────────────────────────────────────────────
+
+    async fn execute_delete(
+        &self,
+        schema: &str,
+        table: &str,
+        crud: &VerbCrudMapping,
+        arg_defs: &[VerbArgDef],
+        args: &serde_json::Value,
+    ) -> sem_os_core::execution::Result<VerbExecutionOutcome> {
+        let args_map = args.as_object().cloned().unwrap_or_default();
+        let is_soft = soft_delete_predicate(schema, table).is_some();
+
+        let mut conditions = Vec::new();
+        let mut bind_values: Vec<SqlValue> = Vec::new();
+        let mut idx = 1;
+
+        // Use key_column if specified, otherwise all maps_to columns
+        if let Some(key_col) = crud.key_column.as_deref() {
+            let key_arg = arg_defs.iter()
+                .find(|a| a.maps_to.as_deref() == Some(key_col))
+                .ok_or_else(|| SemOsError::InvalidInput("Key arg not found".into()))?;
+            let value = args_map.get(&key_arg.name)
+                .ok_or_else(|| SemOsError::InvalidInput(format!("Missing key arg: {}", key_arg.name)))?;
+            conditions.push(format!("\"{key_col}\" = $1"));
+            bind_values.push(json_to_sql_value(value, &key_arg.arg_type, &key_arg.name)?);
+        } else {
+            for arg_def in arg_defs {
+                if let Some(col) = &arg_def.maps_to {
+                    if let Some(value) = args_map.get(&arg_def.name) {
+                        conditions.push(format!("\"{}\" = ${}", col, idx));
+                        bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                        idx += 1;
+                    }
+                }
+            }
+        }
+
+        if conditions.is_empty() {
+            return Err(SemOsError::InvalidInput("Delete requires at least one WHERE condition".into()));
+        }
+
+        if is_soft {
+            conditions.push("deleted_at IS NULL".to_string());
+        }
+
+        let sql = if is_soft {
+            format!(
+                r#"UPDATE "{schema}"."{table}" SET deleted_at = NOW() WHERE {}"#,
+                conditions.join(" AND ")
+            )
+        } else {
+            format!(
+                r#"DELETE FROM "{schema}"."{table}" WHERE {}"#,
+                conditions.join(" AND ")
+            )
+        };
+
+        debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort DELETE");
+
+        let affected = execute_non_query(&self.pool, &sql, &bind_values).await?;
+        Ok(VerbExecutionOutcome::Affected(affected))
+    }
+
+    // ── UPSERT ──────────────────────────────────────────────────
+
+    async fn execute_upsert(
+        &self,
+        schema: &str,
+        table: &str,
+        crud: &VerbCrudMapping,
+        arg_defs: &[VerbArgDef],
+        args: &serde_json::Value,
+    ) -> sem_os_core::execution::Result<VerbExecutionOutcome> {
+        let args_map = args.as_object().cloned().unwrap_or_default();
+
+        let pk_col = crud.returning.as_deref().unwrap_or_else(|| infer_pk_column(table));
+        let new_id = Uuid::new_v4();
+        let mut columns = vec![format!("\"{}\"", pk_col)];
+        let mut placeholders = vec!["$1".to_string()];
+        let mut bind_values: Vec<SqlValue> = vec![SqlValue::Uuid(new_id)];
+        let mut insert_cols: Vec<String> = vec![pk_col.to_string()];
+        let mut idx = 2;
+
+        for arg_def in arg_defs {
+            if let Some(value) = args_map.get(&arg_def.name) {
+                if let Some(col) = &arg_def.maps_to {
+                    if col == pk_col { continue; }
+                    columns.push(format!("\"{}\"", col));
+                    placeholders.push(format!("${idx}"));
+                    bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                    insert_cols.push(col.clone());
+                    idx += 1;
+                }
+            }
+        }
+
+        let conflict_cols = if !crud.conflict_keys.is_empty() {
+            crud.conflict_keys.iter().map(|c| format!("\"{}\"", c)).collect::<Vec<_>>().join(", ")
+        } else {
+            return Err(SemOsError::InvalidInput("Upsert requires conflict_keys".into()));
+        };
+
+        let updates: Vec<String> = insert_cols.iter()
+            .filter(|c| !crud.conflict_keys.contains(c) && *c != pk_col)
+            .map(|c| format!("\"{}\" = EXCLUDED.\"{}\"", c, c))
+            .collect();
+
+        let update_clause = if updates.is_empty() {
+            format!("\"{}\" = \"{}\".\"{}\"", pk_col, table, pk_col)
+        } else {
+            updates.join(", ")
+        };
+
+        let returning = crud.returning.as_deref().unwrap_or(pk_col);
+        let sql = format!(
+            r#"INSERT INTO "{schema}"."{table}" ({cols}) VALUES ({vals}) ON CONFLICT ({conflict}) DO UPDATE SET {update} RETURNING "{ret}""#,
+            cols = columns.join(", "),
+            vals = placeholders.join(", "),
+            conflict = conflict_cols,
+            update = update_clause,
+            ret = returning,
+        );
+
+        debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort UPSERT");
+
+        let row = execute_query_one(&self.pool, &sql, &bind_values).await?;
+        let uuid: Uuid = row.try_get(returning)
+            .map_err(|e| SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}")))?;
+        Ok(VerbExecutionOutcome::Uuid(uuid))
+    }
+
+    // ── LINK ────────────────────────────────────────────────────
+
+    async fn execute_link(
+        &self,
+        schema: &str,
+        _table: &str,
+        crud: &VerbCrudMapping,
+        arg_defs: &[VerbArgDef],
+        args: &serde_json::Value,
+    ) -> sem_os_core::execution::Result<VerbExecutionOutcome> {
+        let args_map = args.as_object().cloned().unwrap_or_default();
+        let junction = crud.junction.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("Link requires junction table".into())
+        })?;
+        let from_col = crud.from_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("Link requires from_col".into())
+        })?;
+        let to_col = crud.to_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("Link requires to_col".into())
+        })?;
+
+        let mut from_val = None;
+        let mut to_val = None;
+        for arg_def in arg_defs {
+            if let Some(value) = args_map.get(&arg_def.name) {
+                if arg_def.maps_to.as_deref() == Some(from_col) {
+                    from_val = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                } else if arg_def.maps_to.as_deref() == Some(to_col) {
+                    to_val = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                }
+            }
+        }
+
+        let from = from_val.ok_or_else(|| SemOsError::InvalidInput(format!("Missing {from_col}")))?;
+        let to = to_val.ok_or_else(|| SemOsError::InvalidInput(format!("Missing {to_col}")))?;
+
+        let sql = format!(
+            r#"INSERT INTO "{schema}"."{junction}" ("{from_col}", "{to_col}") VALUES ($1, $2) ON CONFLICT DO NOTHING"#,
+        );
+
+        debug!(sql = %sql, "CrudExecutionPort LINK");
+
+        let affected = execute_non_query(&self.pool, &sql, &[from, to]).await?;
+        Ok(VerbExecutionOutcome::Affected(affected))
+    }
+
+    // ── UNLINK ──────────────────────────────────────────────────
+
+    async fn execute_unlink(
+        &self,
+        schema: &str,
+        _table: &str,
+        crud: &VerbCrudMapping,
+        arg_defs: &[VerbArgDef],
+        args: &serde_json::Value,
+    ) -> sem_os_core::execution::Result<VerbExecutionOutcome> {
+        let args_map = args.as_object().cloned().unwrap_or_default();
+        let junction = crud.junction.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("Unlink requires junction table".into())
+        })?;
+        let from_col = crud.from_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("Unlink requires from_col".into())
+        })?;
+        let to_col = crud.to_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("Unlink requires to_col".into())
+        })?;
+
+        let mut from_val = None;
+        let mut to_val = None;
+        for arg_def in arg_defs {
+            if let Some(value) = args_map.get(&arg_def.name) {
+                if arg_def.maps_to.as_deref() == Some(from_col) {
+                    from_val = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                } else if arg_def.maps_to.as_deref() == Some(to_col) {
+                    to_val = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                }
+            }
+        }
+
+        let from = from_val.ok_or_else(|| SemOsError::InvalidInput(format!("Missing {from_col}")))?;
+        let to = to_val.ok_or_else(|| SemOsError::InvalidInput(format!("Missing {to_col}")))?;
+
+        let sql = format!(
+            r#"DELETE FROM "{schema}"."{junction}" WHERE "{from_col}" = $1 AND "{to_col}" = $2"#,
+        );
+
+        debug!(sql = %sql, "CrudExecutionPort UNLINK");
+
+        let affected = execute_non_query(&self.pool, &sql, &[from, to]).await?;
+        Ok(VerbExecutionOutcome::Affected(affected))
     }
 
     // ── LIST_BY_FK ──────────────────────────────────────────────
@@ -267,6 +625,37 @@ fn bind_sql_value<'q>(
     }
 }
 
+async fn execute_query_one(
+    pool: &PgPool,
+    sql: &str,
+    values: &[SqlValue],
+) -> sem_os_core::execution::Result<PgRow> {
+    let mut query = sqlx::query(sql);
+    for val in values {
+        query = bind_sql_value(query, val);
+    }
+    query
+        .fetch_one(pool)
+        .await
+        .map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
+}
+
+async fn execute_non_query(
+    pool: &PgPool,
+    sql: &str,
+    values: &[SqlValue],
+) -> sem_os_core::execution::Result<u64> {
+    let mut query = sqlx::query(sql);
+    for val in values {
+        query = bind_sql_value(query, val);
+    }
+    let result = query
+        .execute(pool)
+        .await
+        .map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))?;
+    Ok(result.rows_affected())
+}
+
 async fn execute_query(
     pool: &PgPool,
     sql: &str,
@@ -280,6 +669,29 @@ async fn execute_query(
         .fetch_all(pool)
         .await
         .map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
+}
+
+/// Infer the primary key column name from the table name.
+/// Convention: singular form + "_id" (e.g., "cbus" → "cbu_id").
+fn infer_pk_column(table: &str) -> &str {
+    // Strip trailing 's' for simple plurals, then append _id
+    // This is a best-effort heuristic; explicit `returning` in YAML overrides it.
+    match table {
+        "cbus" => "cbu_id",
+        "entities" => "entity_id",
+        "cases" => "case_id",
+        "deals" => "deal_id",
+        "documents" => "document_id",
+        "requirements" => "requirement_id",
+        "roles" => "role_id",
+        "mandates" => "mandate_id",
+        "billing_profiles" => "billing_profile_id",
+        _ => {
+            // Fallback: table name singular + _id (handled by returning field in YAML)
+            // For safety, return the table name itself — YAML should always specify `returning`
+            "id"
+        }
+    }
 }
 
 fn soft_delete_predicate(schema: &str, table: &str) -> Option<String> {
