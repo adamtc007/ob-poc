@@ -1,0 +1,134 @@
+# Test fixture: 10-deep chain for depth limit tests
+#
+# deep.0 → deep.1 → ... → deep.9 (terminal: cbu.create)
+# With max_depth=8 this should fail at MaxDepthExceeded
+
+deep.0:
+  kind: macro
+  ui: { label: "Deep 0", description: "Chain", target-label: "Test" }
+  routing: { mode-tags: [], operator-domain: deep }
+  target: { operates-on: client-ref }
+  args: { style: keyworded, required: { x: { type: str, ui-label: "X" } }, optional: {} }
+  prereqs: []
+  expands-to:
+    - invoke-macro: deep.1
+      args: { x: "${arg.x}" }
+  sets-state: []
+  unlocks: []
+
+deep.1:
+  kind: macro
+  ui: { label: "Deep 1", description: "Chain", target-label: "Test" }
+  routing: { mode-tags: [], operator-domain: deep }
+  target: { operates-on: client-ref }
+  args: { style: keyworded, required: { x: { type: str, ui-label: "X" } }, optional: {} }
+  prereqs: []
+  expands-to:
+    - invoke-macro: deep.2
+      args: { x: "${arg.x}" }
+  sets-state: []
+  unlocks: []
+
+deep.2:
+  kind: macro
+  ui: { label: "Deep 2", description: "Chain", target-label: "Test" }
+  routing: { mode-tags: [], operator-domain: deep }
+  target: { operates-on: client-ref }
+  args: { style: keyworded, required: { x: { type: str, ui-label: "X" } }, optional: {} }
+  prereqs: []
+  expands-to:
+    - invoke-macro: deep.3
+      args: { x: "${arg.x}" }
+  sets-state: []
+  unlocks: []
+
+deep.3:
+  kind: macro
+  ui: { label: "Deep 3", description: "Chain", target-label: "Test" }
+  routing: { mode-tags: [], operator-domain: deep }
+  target: { operates-on: client-ref }
+  args: { style: keyworded, required: { x: { type: str, ui-label: "X" } }, optional: {} }
+  prereqs: []
+  expands-to:
+    - invoke-macro: deep.4
+      args: { x: "${arg.x}" }
+  sets-state: []
+  unlocks: []
+
+deep.4:
+  kind: macro
+  ui: { label: "Deep 4", description: "Chain", target-label: "Test" }
+  routing: { mode-tags: [], operator-domain: deep }
+  target: { operates-on: client-ref }
+  args: { style: keyworded, required: { x: { type: str, ui-label: "X" } }, optional: {} }
+  prereqs: []
+  expands-to:
+    - invoke-macro: deep.5
+      args: { x: "${arg.x}" }
+  sets-state: []
+  unlocks: []
+
+deep.5:
+  kind: macro
+  ui: { label: "Deep 5", description: "Chain", target-label: "Test" }
+  routing: { mode-tags: [], operator-domain: deep }
+  target: { operates-on: client-ref }
+  args: { style: keyworded, required: { x: { type: str, ui-label: "X" } }, optional: {} }
+  prereqs: []
+  expands-to:
+    - invoke-macro: deep.6
+      args: { x: "${arg.x}" }
+  sets-state: []
+  unlocks: []
+
+deep.6:
+  kind: macro
+  ui: { label: "Deep 6", description: "Chain", target-label: "Test" }
+  routing: { mode-tags: [], operator-domain: deep }
+  target: { operates-on: client-ref }
+  args: { style: keyworded, required: { x: { type: str, ui-label: "X" } }, optional: {} }
+  prereqs: []
+  expands-to:
+    - invoke-macro: deep.7
+      args: { x: "${arg.x}" }
+  sets-state: []
+  unlocks: []
+
+deep.7:
+  kind: macro
+  ui: { label: "Deep 7", description: "Chain", target-label: "Test" }
+  routing: { mode-tags: [], operator-domain: deep }
+  target: { operates-on: client-ref }
+  args: { style: keyworded, required: { x: { type: str, ui-label: "X" } }, optional: {} }
+  prereqs: []
+  expands-to:
+    - invoke-macro: deep.8
+      args: { x: "${arg.x}" }
+  sets-state: []
+  unlocks: []
+
+deep.8:
+  kind: macro
+  ui: { label: "Deep 8", description: "Chain", target-label: "Test" }
+  routing: { mode-tags: [], operator-domain: deep }
+  target: { operates-on: client-ref }
+  args: { style: keyworded, required: { x: { type: str, ui-label: "X" } }, optional: {} }
+  prereqs: []
+  expands-to:
+    - invoke-macro: deep.9
+      args: { x: "${arg.x}" }
+  sets-state: []
+  unlocks: []
+
+deep.9:
+  kind: macro
+  ui: { label: "Deep 9", description: "Terminal", target-label: "Test" }
+  routing: { mode-tags: [], operator-domain: deep }
+  target: { operates-on: client-ref }
+  args: { style: keyworded, required: { x: { type: str, ui-label: "X" } }, optional: {} }
+  prereqs: []
+  expands-to:
+    - verb: cbu.create
+      args: { name: "${arg.x}" }
+  sets-state: []
+  unlocks: []

@@ -135,6 +135,9 @@ pub fn compile_invocation(
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+mod invariant_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

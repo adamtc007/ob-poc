@@ -2,6 +2,7 @@
 
 **Target executor:** Codex 5.4
 **Date:** 2026-04-16 (revised 2026-04-16)
+**Status:** IMPLEMENTED (2026-04-16). Phases 1-9 applied by Codex. Post-implementation review by Opus identified test boundary violations in `runbook_e2e_test.rs` and `runbook_pipeline_test.rs` (external tests importing `pub(crate)` macro schema types). Corrective action: external tests rewritten to use YAML fixtures + public API only; source-scanning invariant tests extracted to `src/runbook/invariant_tests.rs`. Clippy clean, 2368 tests passing.
 **Prerequisite:** Rust workspace compiles cleanly from `rust/` (`cd rust && env RUSTC_WRAPPER= cargo check --workspace --all-features`).
 **Context:** `docs/reviews/opus_second_pub_api_surface_followup.md` contains the verification evidence backing every phase.
 

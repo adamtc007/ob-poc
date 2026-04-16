@@ -1,0 +1,64 @@
+# Test fixture: nested macros for fixpoint expansion tests
+#
+# party.setup — leaf macro (expands to entity.create)
+# structure.full — composite macro (cbu.create + invokes party.setup)
+
+party.setup:
+  kind: macro
+  ui:
+    label: "Set up Party"
+    description: "Create a party entity"
+    target-label: "Party"
+  routing:
+    mode-tags: []
+    operator-domain: party
+  target:
+    operates-on: client-ref
+    produces: party-ref
+  args:
+    style: keyworded
+    required:
+      party-name:
+        type: str
+        ui-label: "Party Name"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - verb: entity.create
+      args:
+        name: "${arg.party-name}"
+  sets-state: []
+  unlocks: []
+
+structure.full:
+  kind: macro
+  ui:
+    label: "Full Structure Setup"
+    description: "Create structure and party"
+    target-label: "Structure"
+  routing:
+    mode-tags: []
+    operator-domain: structure
+  target:
+    operates-on: client-ref
+    produces: structure-ref
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui-label: "Name"
+      party-name:
+        type: str
+        ui-label: "Party Name"
+    optional: {}
+  prereqs: []
+  expands-to:
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+    - invoke-macro: party.setup
+      args:
+        party-name: "${arg.party-name}"
+  sets-state: []
+  unlocks: []
