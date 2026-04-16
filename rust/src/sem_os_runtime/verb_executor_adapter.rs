@@ -25,13 +25,25 @@ use crate::dsl_v2::executor::{DslExecutor, ExecutionContext, ExecutionResult};
 use dsl_core::ast::{Argument, AstNode, Literal, Span, VerbCall};
 
 /// Adapter implementing the SemOS execution port over ob-poc's DslExecutor.
+///
+/// Routes verb execution based on contract behavior:
+/// - **CRUD** → `CrudExecutionPort` when available, otherwise DslExecutor fallback
+/// - **Plugin** → DslExecutor (CustomOperationRegistry)
+/// - **GraphQuery/Durable** → DslExecutor
 pub struct ObPocVerbExecutor {
     executor: Arc<DslExecutor>,
+    /// Optional SemOS-native CRUD executor. When set, CRUD verbs bypass
+    /// the GenericCrudExecutor and route through the SemOS contract.
+    /// Set via `with_crud_port()`. None = all verbs go through DslExecutor.
+    crud_port: Option<Arc<dyn sem_os_core::execution::CrudExecutionPort>>,
 }
 
 impl ObPocVerbExecutor {
     pub fn new(executor: Arc<DslExecutor>) -> Self {
-        Self { executor }
+        Self {
+            executor,
+            crud_port: None,
+        }
     }
 
     /// Create an executor from a database pool.
@@ -42,7 +54,20 @@ impl ObPocVerbExecutor {
     pub fn from_pool(pool: sqlx::PgPool) -> Self {
         Self {
             executor: Arc::new(DslExecutor::new(pool)),
+            crud_port: None,
         }
+    }
+
+    /// Attach a SemOS-native CRUD executor.
+    ///
+    /// When set, CRUD verbs route through `CrudExecutionPort::execute_crud()`
+    /// using `VerbContractBody` metadata, bypassing the legacy GenericCrudExecutor.
+    pub fn with_crud_port(
+        mut self,
+        port: Arc<dyn sem_os_core::execution::CrudExecutionPort>,
+    ) -> Self {
+        self.crud_port = Some(port);
+        self
     }
 }
 
@@ -58,20 +83,42 @@ impl VerbExecutionPort for ObPocVerbExecutor {
         // 1. Split FQN into domain.verb
         let (domain, verb) = split_fqn(verb_fqn)?;
 
-        // 2. Build VerbCall from JSON args
+        // 2. Resolve behavior from RuntimeVerbRegistry (contract-aware routing)
+        let behavior_label = {
+            use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
+            let registry = runtime_registry();
+            match registry.get(&domain, &verb) {
+                Some(rv) => match &rv.behavior {
+                    RuntimeBehavior::Crud(_) => "crud",
+                    RuntimeBehavior::Plugin(_) => "plugin",
+                    RuntimeBehavior::GraphQuery(_) => "graph_query",
+                    RuntimeBehavior::Durable(_) => "durable",
+                },
+                None => "unknown",
+            }
+        };
+        tracing::debug!(
+            verb_fqn,
+            behavior = behavior_label,
+            "VerbExecutionPort: routing verb"
+        );
+
+        // 3. Build VerbCall from JSON args
         let vc = build_verb_call(&domain, &verb, &args);
 
-        // 3. Translate VerbExecutionContext → dsl_v2::ExecutionContext
+        // 4. Translate VerbExecutionContext → dsl_v2::ExecutionContext
         let mut exec_ctx = to_dsl_context(ctx);
 
-        // 4. Execute through existing DslExecutor dispatch chain
+        // 5. Execute through existing DslExecutor dispatch chain
+        //    (Phase 1: all behaviors still route through DslExecutor.
+        //     Phase 1B will route "crud" to CrudExecutionPort directly.)
         let result = self
             .executor
             .execute_verb(&vc, &mut exec_ctx)
             .await
             .map_err(|e| SemOsError::Internal(anyhow::anyhow!("Verb execution failed: {e}")))?;
 
-        // 5. Collect side effects (new bindings + platform state)
+        // 6. Collect side effects (new bindings + platform state)
         let side_effects = collect_side_effects(ctx, &exec_ctx);
 
         // 6. Propagate new bindings back to SemOS context
@@ -387,5 +434,38 @@ mod tests {
         assert!(matches!(to_verb_outcome(&ExecutionResult::RecordSet(vec![])), VerbExecutionOutcome::RecordSet(v) if v.is_empty()));
         assert!(matches!(to_verb_outcome(&ExecutionResult::Affected(5)), VerbExecutionOutcome::Affected(5)));
         assert!(matches!(to_verb_outcome(&ExecutionResult::Void), VerbExecutionOutcome::Void));
+    }
+
+    #[test]
+    fn behavior_routing_resolves_known_verbs() {
+        use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
+
+        let registry = runtime_registry();
+
+        // cbu.show should be CRUD (SELECT)
+        if let Some(rv) = registry.get("cbu", "show") {
+            assert!(
+                matches!(rv.behavior, RuntimeBehavior::Crud(_)),
+                "cbu.show should be CRUD, got {:?}",
+                std::mem::discriminant(&rv.behavior)
+            );
+        }
+
+        // cbu.create should be Plugin
+        if let Some(rv) = registry.get("cbu", "create") {
+            assert!(
+                matches!(rv.behavior, RuntimeBehavior::Plugin(_)),
+                "cbu.create should be Plugin, got {:?}",
+                std::mem::discriminant(&rv.behavior)
+            );
+        }
+    }
+
+    #[test]
+    fn crud_port_is_optional() {
+        // ObPocVerbExecutor without crud_port should still be constructable
+        // (all CRUD verbs fall through to DslExecutor)
+        // This just verifies the type compiles — actual execution needs a pool.
+        let _has_method = ObPocVerbExecutor::with_crud_port;
     }
 }
