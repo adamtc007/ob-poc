@@ -14,14 +14,10 @@
 //! Generators are deterministic: same input produces same output.
 
 pub mod cbu;
-pub mod deal;
-pub mod matrix;
+mod deal;
+mod matrix;
 
 pub use cbu::CbuGenerator;
-pub use deal::{
-    DealContractInput, DealGenerator, DealInput, DealParticipantInput, DealProductInput,
-    OnboardingRequestInput, RateCardInput, RateCardLineInput,
-};
 pub use matrix::MatrixGenerator;
 
 use crate::model::InspectorProjection;

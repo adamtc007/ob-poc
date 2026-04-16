@@ -13,9 +13,9 @@ use std::str::FromStr;
 /// Holds the test database pool, name, and admin connection for cleanup.
 pub struct IsolatedDb {
     /// Pool connected to the isolated test database.
-    pub pool: PgPool,
+    pub(crate) pool: PgPool,
     /// Name of the temporary database.
-    pub dbname: String,
+    pub(crate) dbname: String,
     /// Admin pool connected to the control database (for CREATE/DROP).
     admin: PgPool,
 }

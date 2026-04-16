@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// Governance tier — mirrors `sem_os_core::types::GovernanceTier`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum GovernanceTier {
+pub(crate) enum GovernanceTier {
     Governed,
     Operational,
 }
@@ -18,7 +18,7 @@ pub enum GovernanceTier {
 /// Trust class — mirrors `sem_os_core::types::TrustClass`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TrustClass {
+pub(crate) enum TrustClass {
     Proof,
     DecisionSupport,
     Convenience,
@@ -27,7 +27,7 @@ pub enum TrustClass {
 /// Snapshot status — mirrors `sem_os_core::types::SnapshotStatus`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SnapshotStatus {
+pub(crate) enum SnapshotStatus {
     Draft,
     Active,
     Deprecated,
@@ -37,7 +37,7 @@ pub enum SnapshotStatus {
 /// Object type — mirrors `sem_os_core::types::ObjectType`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ObjectType {
+pub(crate) enum ObjectType {
     AttributeDef,
     EntityTypeDef,
     RelationshipTypeDef,
@@ -57,7 +57,7 @@ pub enum ObjectType {
 /// Classification level — mirrors `sem_os_core::types::Classification`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Classification {
+pub(crate) enum Classification {
     Public,
     Internal,
     Confidential,
@@ -69,7 +69,7 @@ pub enum Classification {
 /// Flattened from `SnapshotRow` — contains only the fields needed
 /// for the 5 governance checks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CacheEntry {
+pub(crate) struct CacheEntry {
     /// Fully-qualified name (e.g., "cbu.create", "cbu.jurisdiction_code")
     pub fqn: String,
     /// Object type discriminator
@@ -88,7 +88,7 @@ pub struct CacheEntry {
 
 /// The complete governance cache, serialized to bincode.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GovernedCache {
+pub(crate) struct GovernedCache {
     /// Cache format version (for forward compatibility)
     pub version: u32,
     /// When this cache was generated (ISO 8601)
@@ -98,17 +98,17 @@ pub struct GovernedCache {
 }
 
 impl GovernedCache {
-    pub const CURRENT_VERSION: u32 = 1;
+    pub(crate) const CURRENT_VERSION: u32 = 1;
 
     /// Look up a verb contract by FQN.
-    pub fn lookup_verb(&self, fqn: &str) -> Option<&CacheEntry> {
+    pub(crate) fn lookup_verb(&self, fqn: &str) -> Option<&CacheEntry> {
         self.entries
             .get(fqn)
             .filter(|e| matches!(e.object_type, ObjectType::VerbContract))
     }
 
     /// Look up an attribute definition by FQN.
-    pub fn lookup_attribute(&self, fqn: &str) -> Option<&CacheEntry> {
+    pub(crate) fn lookup_attribute(&self, fqn: &str) -> Option<&CacheEntry> {
         self.entries
             .get(fqn)
             .filter(|e| matches!(e.object_type, ObjectType::AttributeDef))

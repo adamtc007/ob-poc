@@ -19,7 +19,7 @@ const DEFAULT_CACHE_FILENAME: &str = "assets/governed_cache.bin";
 /// 1. `GOVERNED_CACHE_PATH` env var (absolute path)
 /// 2. `CARGO_MANIFEST_DIR/../assets/governed_cache.bin` (workspace-relative)
 /// 3. Walk up from CARGO_MANIFEST_DIR looking for `assets/governed_cache.bin`
-pub fn load_cache() -> Result<&'static GovernedCache, String> {
+pub(crate) fn load_cache() -> Result<&'static GovernedCache, String> {
     CACHE
         .get_or_init(load_cache_inner)
         .as_ref()

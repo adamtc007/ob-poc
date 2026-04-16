@@ -46,12 +46,14 @@ use std::sync::atomic::AtomicBool;
 
 // EntityGateway for entity resolution
 use entity_gateway::{
-    config::StartupMode,
-    index::{IndexRegistry, TantivyIndex},
     proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer,
-    refresh::{run_refresh_loop, RefreshPipeline},
-    server::EntityGatewayService,
+    run_refresh_loop,
+    EntityGatewayService,
     GatewayConfig,
+    IndexRegistry,
+    RefreshPipeline,
+    StartupMode,
+    TantivyIndex,
 };
 
 async fn register_bpmn_models(

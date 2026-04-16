@@ -12,7 +12,7 @@ use crate::registry_types::{GovernanceTier, GovernedCache, SnapshotStatus, Trust
 
 /// A governance violation found during compile-time checking.
 #[derive(Debug)]
-pub struct Violation {
+pub(crate) struct Violation {
     pub message: String,
 }
 
@@ -46,7 +46,7 @@ fn is_principal_type(ty: &syn::Type) -> bool {
 }
 
 /// Run all 5 governance checks. Returns a list of violations.
-pub fn run_checks(
+pub(crate) fn run_checks(
     args: &GovernedQueryArgs,
     sig: &syn::Signature,
     cache: &GovernedCache,

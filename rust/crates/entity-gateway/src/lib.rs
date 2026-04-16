@@ -54,13 +54,13 @@
 //! let service = EntityGatewayService::new(registry);
 //! ```
 
-pub mod config;
-pub mod index;
+mod config;
+mod index;
 pub mod proto;
-pub mod refresh;
-pub mod search_engine;
-pub mod search_expr;
-pub mod server;
+mod refresh;
+mod search_engine;
+mod search_expr;
+mod server;
 
 // Re-export main types
 pub use config::{EntityConfig, GatewayConfig, RefreshConfig, StartupMode};

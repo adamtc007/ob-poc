@@ -5,7 +5,7 @@ use syn::{Expr, Lit, Token};
 
 /// Parsed arguments from `#[governed_query(verb = "cbu.create", ...)]`.
 #[derive(Debug)]
-pub struct GovernedQueryArgs {
+pub(crate) struct GovernedQueryArgs {
     /// Required: the verb FQN (e.g., "cbu.create")
     pub verb: String,
     /// Optional: referenced attribute FQNs

@@ -12,9 +12,9 @@
 //!
 //! SC-4 applied: test DB isolation uses CREATE/DROP DATABASE per run.
 
-pub mod db;
-pub mod permissions;
-pub mod projections;
+mod db;
+mod permissions;
+mod projections;
 
 use sem_os_client::SemOsClient;
 use sem_os_core::context_resolution::{EvidenceMode, ResolutionConstraints, SubjectRef};

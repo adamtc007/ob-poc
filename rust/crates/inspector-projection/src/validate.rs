@@ -13,7 +13,7 @@ use crate::node_id::NodeId;
 use std::collections::HashSet;
 
 /// Maximum supported schema version.
-pub const MAX_SCHEMA_VERSION: u32 = 1;
+pub(crate) const MAX_SCHEMA_VERSION: u32 = 1;
 
 /// Result of validating a projection.
 #[derive(Debug, Default)]

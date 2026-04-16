@@ -49,17 +49,17 @@ mod definition;
 mod state;
 
 // Task queue and document modules
-pub mod blob_store;
-pub mod cargo_ref;
-pub mod document;
-pub mod task_queue;
+mod blob_store;
+mod cargo_ref;
+mod document;
+mod task_queue;
 
 #[cfg(feature = "database")]
 mod engine;
 #[cfg(feature = "database")]
 mod guards;
 #[cfg(feature = "database")]
-pub mod listener;
+mod listener;
 #[cfg(feature = "database")]
 mod repository;
 #[cfg(feature = "database")]

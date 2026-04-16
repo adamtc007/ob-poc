@@ -4,7 +4,7 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse_macro_input, Attribute, ItemStruct};
 
-pub fn register_custom_op_impl(input: TokenStream) -> TokenStream {
+pub(crate) fn register_custom_op_impl(input: TokenStream) -> TokenStream {
     let input_struct = parse_macro_input!(input as ItemStruct);
 
     let struct_name = &input_struct.ident;
