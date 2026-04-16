@@ -46,13 +46,15 @@ mod scope;
 mod variable;
 
 pub use expander::{
-    expand_macro, expand_macro_fixpoint, ExpansionLimits, FixpointExpansionOutput,
-    MacroExpansionError, MacroExpansionOutput, EXPANSION_LIMITS,
+    expand_macro, expand_macro_fixpoint, ExpansionLimits, MacroExpansionError,
+    MacroExpansionOutput, EXPANSION_LIMITS,
 };
 pub use registry::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
 #[cfg(test)]
 pub use schema::MacroTier;
+pub use schema::{MacroPrereq, MacroSchema};
+#[cfg(test)]
 pub use schema::{
-    ArgStyle, MacroArg, MacroArgType, MacroArgs, MacroExpansionStep, MacroKind, MacroPrereq,
-    MacroRouting, MacroSchema, MacroTarget, MacroUi, SetState, VerbCallStep,
+    ArgStyle, MacroArg, MacroArgType, MacroArgs, MacroExpansionStep, MacroKind, MacroRouting,
+    MacroTarget, MacroUi, SetState, VerbCallStep,
 };

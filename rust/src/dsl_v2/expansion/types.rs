@@ -143,23 +143,6 @@ pub enum BatchPolicy {
 }
 
 // =============================================================================
-// RUNTIME POLICY (For Verbs)
-// =============================================================================
-
-/// Runtime policy for a verb, loaded from YAML metadata
-///
-/// This extends the VerbMetadata with execution-time policy decisions.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct RuntimePolicy {
-    /// Batch execution policy
-    #[serde(default)]
-    pub batch: BatchPolicy,
-    /// Locking policy (optional)
-    #[serde(default)]
-    pub locking: Option<LockingPolicy>,
-}
-
-// =============================================================================
 // TEMPLATE POLICY
 // =============================================================================
 

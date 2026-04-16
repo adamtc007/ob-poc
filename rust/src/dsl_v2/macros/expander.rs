@@ -307,6 +307,7 @@ pub struct FixpointExpansionOutput {
     pub limits: ExpansionLimits,
 
     /// Total step count across all expansions.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub total_steps: usize,
 }
 

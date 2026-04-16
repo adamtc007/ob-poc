@@ -4,6 +4,7 @@
 //! a verb should be executed directly or dispatched through bpmn-lite.
 
 use anyhow::{Context, Result};
+use dsl_core::config::DurableConfig;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -147,7 +148,7 @@ impl WorkflowConfigIndex {
     pub fn register_from_durable_config(
         &mut self,
         verb_fqn: &str,
-        durable: &dsl_core::DurableConfig,
+        durable: &DurableConfig,
     ) {
         if self.by_verb.contains_key(verb_fqn) {
             tracing::debug!(

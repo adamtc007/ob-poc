@@ -27,9 +27,7 @@
 mod engine;
 mod types;
 
-pub use engine::{expand_templates, expand_templates_simple, ExpansionError, ExpansionOutput};
-pub use types::{
-    BatchPolicy, ExpansionDiagnostic, ExpansionReport, LockAccess, LockKey, LockMode, LockTarget,
-    LockingPolicy, PerItemOrigin, RuntimePolicy, TemplateDigest, TemplateInvocationReport,
-    TemplatePolicy,
-};
+#[allow(unused_imports)]
+pub use engine::{expand_templates, expand_templates_simple};
+#[allow(unused_imports)]
+pub use types::{BatchPolicy, ExpansionReport, LockAccess, LockKey, LockMode};
