@@ -58,7 +58,11 @@ impl CrudExecutionPort for PgCrudExecutor {
             "upsert" => self.execute_upsert(schema, table, crud, &contract.args, &args).await,
             "link" => self.execute_link(schema, table, crud, &contract.args, &args).await,
             "unlink" => self.execute_unlink(schema, table, crud, &contract.args, &args).await,
+            "role_link" => self.execute_role_link(schema, crud, &contract.args, &args).await,
+            "role_unlink" => self.execute_role_unlink(schema, crud, &contract.args, &args).await,
             "list_by_fk" => self.execute_list_by_fk(schema, table, crud, &contract.args, &args).await,
+            "list_parties" => self.execute_list_parties(schema, crud, &contract.args, &args).await,
+            "select_with_join" => self.execute_select_with_join(schema, crud, &contract.args, &args).await,
             op => Err(SemOsError::InvalidInput(format!(
                 "CRUD operation '{}' not yet migrated to CrudExecutionPort (verb: {})",
                 op, contract.fqn
@@ -497,6 +501,240 @@ impl PgCrudExecutor {
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
+    // ── ROLE_LINK ────────────────────────────────────────────────
+
+    async fn execute_role_link(
+        &self,
+        schema: &str,
+        crud: &VerbCrudMapping,
+        arg_defs: &[VerbArgDef],
+        args: &serde_json::Value,
+    ) -> sem_os_core::execution::Result<VerbExecutionOutcome> {
+        let args_map = args.as_object().cloned().unwrap_or_default();
+        let junction = crud.junction.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("role_link requires junction".into())
+        })?;
+        let from_col = crud.from_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("role_link requires from_col".into())
+        })?;
+        let to_col = crud.to_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("role_link requires to_col".into())
+        })?;
+        let role_col = crud.role_col.as_deref().unwrap_or("role_id");
+        let pk_col = infer_pk_column(junction);
+        let new_id = Uuid::new_v4();
+
+        let mut from_val = None;
+        let mut to_val = None;
+        let mut role_val = None;
+        let mut extra_cols = Vec::new();
+        let mut extra_vals = Vec::new();
+
+        for arg_def in arg_defs {
+            if let Some(value) = args_map.get(&arg_def.name) {
+                if arg_def.maps_to.as_deref() == Some(from_col) {
+                    from_val = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                } else if arg_def.maps_to.as_deref() == Some(to_col) {
+                    to_val = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                } else if arg_def.maps_to.as_deref() == Some(role_col) {
+                    role_val = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                } else if let Some(col) = &arg_def.maps_to {
+                    if col != pk_col {
+                        extra_cols.push(format!("\"{}\"", col));
+                        extra_vals.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                    }
+                }
+            }
+        }
+
+        let from = from_val.ok_or_else(|| SemOsError::InvalidInput(format!("Missing {from_col}")))?;
+        let to = to_val.ok_or_else(|| SemOsError::InvalidInput(format!("Missing {to_col}")))?;
+        let role = role_val.ok_or_else(|| SemOsError::InvalidInput(format!("Missing {role_col}")))?;
+
+        let mut columns = vec![
+            format!("\"{pk_col}\""), format!("\"{from_col}\""),
+            format!("\"{to_col}\""), format!("\"{role_col}\""),
+        ];
+        columns.extend(extra_cols);
+
+        let mut bind_values = vec![SqlValue::Uuid(new_id), from, to, role];
+        bind_values.extend(extra_vals);
+
+        let placeholders: Vec<String> = (1..=bind_values.len()).map(|i| format!("${i}")).collect();
+        let returning = crud.returning.as_deref().unwrap_or(pk_col);
+
+        let sql = format!(
+            r#"WITH ins AS (
+                INSERT INTO "{schema}"."{junction}" ({cols}) VALUES ({vals})
+                ON CONFLICT ("{from_col}", "{to_col}", "{role_col}") DO NOTHING
+                RETURNING "{returning}"
+            ) SELECT "{returning}" FROM ins
+              UNION ALL SELECT "{returning}" FROM "{schema}"."{junction}"
+              WHERE "{from_col}" = $2 AND "{to_col}" = $3 AND "{role_col}" = $4
+              AND NOT EXISTS (SELECT 1 FROM ins) LIMIT 1"#,
+            cols = columns.join(", "),
+            vals = placeholders.join(", "),
+        );
+
+        debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort ROLE_LINK");
+
+        let row = execute_query_one(&self.pool, &sql, &bind_values).await?;
+        let uuid: Uuid = row.try_get(returning)
+            .map_err(|e| SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}")))?;
+        Ok(VerbExecutionOutcome::Uuid(uuid))
+    }
+
+    // ── ROLE_UNLINK ─────────────────────────────────────────────
+
+    async fn execute_role_unlink(
+        &self,
+        schema: &str,
+        crud: &VerbCrudMapping,
+        arg_defs: &[VerbArgDef],
+        args: &serde_json::Value,
+    ) -> sem_os_core::execution::Result<VerbExecutionOutcome> {
+        let args_map = args.as_object().cloned().unwrap_or_default();
+        let junction = crud.junction.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("role_unlink requires junction".into())
+        })?;
+        let from_col = crud.from_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("role_unlink requires from_col".into())
+        })?;
+        let to_col = crud.to_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("role_unlink requires to_col".into())
+        })?;
+        let role_col = crud.role_col.as_deref().unwrap_or("role_id");
+
+        let mut from_val = None;
+        let mut to_val = None;
+        let mut role_val = None;
+
+        for arg_def in arg_defs {
+            if let Some(value) = args_map.get(&arg_def.name) {
+                if arg_def.maps_to.as_deref() == Some(from_col) {
+                    from_val = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                } else if arg_def.maps_to.as_deref() == Some(to_col) {
+                    to_val = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                } else if arg_def.maps_to.as_deref() == Some(role_col) {
+                    role_val = Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                }
+            }
+        }
+
+        let from = from_val.ok_or_else(|| SemOsError::InvalidInput(format!("Missing {from_col}")))?;
+        let to = to_val.ok_or_else(|| SemOsError::InvalidInput(format!("Missing {to_col}")))?;
+        let role = role_val.ok_or_else(|| SemOsError::InvalidInput(format!("Missing {role_col}")))?;
+
+        let sql = format!(
+            r#"DELETE FROM "{schema}"."{junction}" WHERE "{from_col}" = $1 AND "{to_col}" = $2 AND "{role_col}" = $3"#,
+        );
+
+        debug!(sql = %sql, "CrudExecutionPort ROLE_UNLINK");
+
+        let affected = execute_non_query(&self.pool, &sql, &[from, to, role]).await?;
+        Ok(VerbExecutionOutcome::Affected(affected))
+    }
+
+    // ── LIST_PARTIES ────────────────────────────────────────────
+
+    async fn execute_list_parties(
+        &self,
+        schema: &str,
+        crud: &VerbCrudMapping,
+        arg_defs: &[VerbArgDef],
+        args: &serde_json::Value,
+    ) -> sem_os_core::execution::Result<VerbExecutionOutcome> {
+        let args_map = args.as_object().cloned().unwrap_or_default();
+        let junction = crud.junction.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("list_parties requires junction".into())
+        })?;
+        let fk_col = crud.fk_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("list_parties requires fk_col".into())
+        })?;
+
+        // Find FK arg value
+        let fk_val = arg_defs.iter()
+            .find(|a| a.required)
+            .and_then(|a| args_map.get(&a.name))
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .ok_or_else(|| SemOsError::InvalidInput("list_parties: missing FK value".into()))?;
+
+        let as_of_date = args_map.get("as-of-date")
+            .and_then(|v| v.as_str())
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+
+        let sql = format!(
+            r#"SELECT
+                cer.*, e.name as entity_name,
+                et.name as entity_type, r.name as role_name
+            FROM "{schema}"."{junction}" cer
+            JOIN "{schema}".entities e ON e.entity_id = cer.entity_id
+            JOIN "{schema}".entity_types et ON et.entity_type_id = e.entity_type_id
+            JOIN "{schema}".roles r ON r.role_id = cer.role_id
+            WHERE cer."{fk_col}" = $1
+            AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
+            AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
+            AND e.deleted_at IS NULL
+            ORDER BY e.name, r.name"#,
+        );
+
+        debug!(sql = %sql, "CrudExecutionPort LIST_PARTIES");
+
+        let bind_values = vec![SqlValue::Uuid(fk_val), SqlValue::Date(as_of_date)];
+        let rows = execute_query(&self.pool, &sql, &bind_values).await?;
+        let records: Result<Vec<serde_json::Value>, _> = rows.iter().map(row_to_json).collect();
+        Ok(VerbExecutionOutcome::RecordSet(records?))
+    }
+
+    // ── SELECT_WITH_JOIN ────────────────────────────────────────
+
+    async fn execute_select_with_join(
+        &self,
+        schema: &str,
+        crud: &VerbCrudMapping,
+        arg_defs: &[VerbArgDef],
+        args: &serde_json::Value,
+    ) -> sem_os_core::execution::Result<VerbExecutionOutcome> {
+        let args_map = args.as_object().cloned().unwrap_or_default();
+        let primary = crud.primary_table.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("select_with_join requires primary_table".into())
+        })?;
+        let join_table = crud.join_table.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("select_with_join requires join_table".into())
+        })?;
+        let join_col = crud.join_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("select_with_join requires join_col".into())
+        })?;
+        let filter_col = crud.filter_col.as_deref().ok_or_else(|| {
+            SemOsError::InvalidInput("select_with_join requires filter_col".into())
+        })?;
+
+        let filter_val = arg_defs.iter()
+            .find(|a| a.required)
+            .and_then(|a| args_map.get(&a.name))
+            .ok_or_else(|| SemOsError::InvalidInput("select_with_join: missing filter arg".into()))?;
+
+        let filter_arg = arg_defs.iter().find(|a| a.required).unwrap();
+        let sql_val = json_to_sql_value(filter_val, &filter_arg.arg_type, &filter_arg.name)?;
+
+        let mut sql = format!(
+            r#"SELECT p.* FROM "{schema}"."{primary}" p
+               JOIN "{schema}"."{join_table}" j ON p."{join_col}" = j."{join_col}"
+               WHERE j."{filter_col}" = $1"#,
+        );
+        if let Some(predicate) = soft_delete_predicate(schema, primary) {
+            sql = format!("{sql} AND p.{predicate}");
+        }
+
+        debug!(sql = %sql, "CrudExecutionPort SELECT_WITH_JOIN");
+
+        let rows = execute_query(&self.pool, &sql, &[sql_val]).await?;
+        let records: Result<Vec<serde_json::Value>, _> = rows.iter().map(row_to_json).collect();
+        Ok(VerbExecutionOutcome::RecordSet(records?))
+    }
+
     // ── LIST_BY_FK ──────────────────────────────────────────────
 
     async fn execute_list_by_fk(
@@ -569,6 +807,7 @@ enum SqlValue {
     Integer(i64),
     Boolean(bool),
     Json(serde_json::Value),
+    Date(chrono::NaiveDate),
 }
 
 fn json_to_sql_value(
@@ -622,6 +861,7 @@ fn bind_sql_value<'q>(
         SqlValue::Integer(n) => query.bind(*n),
         SqlValue::Boolean(b) => query.bind(*b),
         SqlValue::Json(j) => query.bind(j.clone()),
+        SqlValue::Date(d) => query.bind(*d),
     }
 }
 
