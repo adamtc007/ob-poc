@@ -63,7 +63,9 @@ use crate::runbook::envelope::ReplayEnvelope;
 #[cfg(feature = "database")]
 use crate::runbook::executor::PostgresRunbookStore;
 use crate::runbook::executor::{execute_runbook_with_pool, RunbookStoreBackend, StepOutcome};
-use crate::runbook::step_executor_bridge::{DslExecutorV2StepExecutor, DslStepExecutor};
+use crate::runbook::step_executor_bridge::{
+    DslExecutorV2StepExecutor, DslStepExecutor, VerbExecutionPortStepExecutor,
+};
 use crate::runbook::types::{
     CompiledRunbook, CompiledStep, ExecutionMode as CompiledExecutionMode,
 };
@@ -212,6 +214,9 @@ pub struct ReplOrchestratorV2 {
     /// When set, `match_verb_for_input()` resolves a SemOsContextEnvelope and
     /// pre-constrains verb search to Sem OS-allowed verbs.
     sem_os_client: Option<Arc<dyn SemOsClient>>,
+    /// SemOS verb execution port — when set, verb execution routes through
+    /// the SemOS-defined contract instead of directly through DslExecutor.
+    verb_execution_port: Option<Arc<dyn sem_os_core::execution::VerbExecutionPort>>,
     /// Optional lookup service for trace-time entity recovery.
     lookup_service: Option<LookupService>,
     orchestrated_verbs: HashSet<String>,
@@ -241,6 +246,7 @@ impl ReplOrchestratorV2 {
             #[cfg(feature = "database")]
             unified_orch_pool: None,
             sem_os_client: None,
+            verb_execution_port: None,
             lookup_service: None,
             orchestrated_verbs: HashSet::new(),
         }
@@ -331,6 +337,20 @@ impl ReplOrchestratorV2 {
     /// pre-constrains verb search via `MatchContext.allowed_verbs`.
     pub fn with_sem_os_client(mut self, client: Arc<dyn SemOsClient>) -> Self {
         self.sem_os_client = Some(client);
+        self
+    }
+
+    /// Attach a SemOS verb execution port.
+    ///
+    /// When set, verb execution routes through the SemOS-defined contract
+    /// (`VerbExecutionPort::execute_verb()`) instead of directly through
+    /// the DslExecutor. The port adapter translates between SemOS types
+    /// and the existing execution infrastructure.
+    pub fn with_verb_execution_port(
+        mut self,
+        port: Arc<dyn sem_os_core::execution::VerbExecutionPort>,
+    ) -> Self {
+        self.verb_execution_port = Some(port);
         self
     }
 
@@ -5597,6 +5617,19 @@ impl ReplOrchestratorV2 {
                         error: format!("Execution gate error: {}", e),
                     },
                 }
+            }
+        } else if let Some(ref port) = self.verb_execution_port {
+            // SemOS execution port — preferred path when available.
+            let bridge = VerbExecutionPortStepExecutor::new(
+                Arc::clone(port),
+                sem_os_core::principal::Principal::system(),
+                Some(session_id),
+            );
+            match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool()).await {
+                Ok(result) => extract_first_outcome(result),
+                Err(e) => StepOutcome::Failed {
+                    error: format!("Execution gate error: {}", e),
+                },
             }
         } else {
             let bridge = DslStepExecutor::new(Arc::clone(&self.executor));

@@ -1,6 +1,7 @@
 pub mod abac;
 pub mod affinity;
 pub mod authoring;
+pub mod execution;
 pub mod constellation_family_def;
 pub mod constellation_map_def;
 pub mod context_resolution;

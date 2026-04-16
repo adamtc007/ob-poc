@@ -105,6 +105,83 @@ impl super::executor::StepExecutor for DslExecutorV2StepExecutor {
 }
 
 // ---------------------------------------------------------------------------
+// VerbExecutionPortStepExecutor — SemOS execution port bridge
+// ---------------------------------------------------------------------------
+
+/// Bridge from `VerbExecutionPort` (SemOS execution contract) to `StepExecutor`.
+///
+/// This adapter translates each `CompiledStep` into a `VerbExecutionPort::execute_verb()`
+/// call, converting the step's verb FQN and args to JSON, and mapping the
+/// `VerbExecutionOutcome` back to `StepOutcome`.
+pub struct VerbExecutionPortStepExecutor {
+    port: Arc<dyn sem_os_core::execution::VerbExecutionPort>,
+    /// Principal used for all executions in this runbook.
+    principal: sem_os_core::principal::Principal,
+    /// Session ID for correlation.
+    session_id: Option<Uuid>,
+}
+
+impl VerbExecutionPortStepExecutor {
+    pub fn new(
+        port: Arc<dyn sem_os_core::execution::VerbExecutionPort>,
+        principal: sem_os_core::principal::Principal,
+        session_id: Option<Uuid>,
+    ) -> Self {
+        Self {
+            port,
+            principal,
+            session_id,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
+    async fn execute_step(&self, step: &CompiledStep) -> StepOutcome {
+        // Build execution context
+        let mut ctx = sem_os_core::execution::VerbExecutionContext::new(self.principal.clone());
+        if let Some(sid) = self.session_id {
+            ctx.extensions = serde_json::json!({"session_id": sid.to_string()});
+        }
+
+        // Convert step args (BTreeMap<String, String>) to JSON object
+        let args: serde_json::Value = step
+            .args
+            .iter()
+            .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+            .collect::<serde_json::Map<String, serde_json::Value>>()
+            .into();
+
+        // Execute through the SemOS port
+        match self.port.execute_verb(&step.verb, args, &mut ctx).await {
+            Ok(result) => {
+                let json = match &result.outcome {
+                    sem_os_core::execution::VerbExecutionOutcome::Uuid(id) => {
+                        serde_json::json!({"type": "uuid", "value": id.to_string()})
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Record(v) => {
+                        serde_json::json!({"type": "record", "value": v})
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::RecordSet(v) => {
+                        serde_json::json!({"type": "record_set", "value": v})
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Affected(n) => {
+                        serde_json::json!({"type": "affected", "value": n})
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Void => {
+                        serde_json::json!({"type": "void"})
+                    }
+                };
+                StepOutcome::Completed { result: json }
+            }
+            Err(e) => StepOutcome::Failed {
+                error: e.to_string(),
+            },
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

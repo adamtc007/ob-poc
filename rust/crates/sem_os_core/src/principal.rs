@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::authoring::agent_mode::AgentMode;
 use crate::error::SemOsError;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Principal {
     pub actor_id: String,
     pub roles: Vec<String>,
@@ -37,6 +37,16 @@ impl Principal {
             claims: HashMap::new(),
             tenancy: None,
         }
+    }
+
+    /// System principal for internal/automated operations.
+    pub fn system() -> Self {
+        Self::in_process("system", vec!["admin".to_string()])
+    }
+
+    /// Construct with explicit actor_id and roles (shorthand for in_process).
+    pub fn explicit(actor_id: impl Into<String>, roles: Vec<String>) -> Self {
+        Self::in_process(actor_id, roles)
     }
 
     pub fn has_role(&self, role: &str) -> bool {
