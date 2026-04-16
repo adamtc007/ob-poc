@@ -33,10 +33,13 @@ use crate::database::derive_semantic_state;
 use crate::database::generation_log_repository::{
     CompileResult, ExecutionStatus, GenerationAttempt, LintResult, ParseResult,
 };
-use crate::dsl_v2::{
-    compile, expand_templates_simple, parse_program, runtime_registry, AtomicExecutionResult,
-    BatchPolicy, ExecutionContext, ExecutionResult as DslV2Result, SemanticValidator,
+use crate::dsl_v2::execution::{
+    runtime_registry, AtomicExecutionResult, ExecutionContext, ExecutionResult as DslV2Result,
 };
+use crate::dsl_v2::planning::compile;
+use crate::dsl_v2::syntax::parse_program;
+use crate::dsl_v2::tooling::SemanticValidator;
+use crate::dsl_v2::{expand_templates_simple, BatchPolicy};
 use crate::ontology::SemanticStageRegistry;
 use ob_poc_types::{SessionInputRequest, SessionInputResponse};
 
@@ -1682,7 +1685,7 @@ async fn execute_session_dsl_raw(
 
         // Note: UnifiedSession.RunSheetEntry doesn't store pre-compiled plan/ast
         // Always run full pipeline. In the future, we could add optional caching.
-        let plan: Option<crate::dsl_v2::ExecutionPlan> = None;
+        let plan: Option<crate::dsl_v2::planning::ExecutionPlan> = None;
         let ast: Option<Vec<dsl_core::ast::Statement>> = None;
         tracing::debug!("[EXEC] Running full pipeline (UnifiedSession doesn't cache plans)");
 

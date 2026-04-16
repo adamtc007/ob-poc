@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::{ExpansionContext, TemplateExpander, TemplateRegistry};
-use crate::dsl_v2::planning_facade::{analyse_and_plan, PlanningInput};
-use crate::dsl_v2::{compile, parse_program};
+use crate::dsl_v2::planning::{analyse_and_plan, compile, PlanningInput};
+use crate::dsl_v2::syntax::parse_program;
 
 /// Result of testing a single template
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -525,7 +525,7 @@ pub async fn run_harness(
 /// Execute DSL against database and return bindings
 #[cfg(feature = "database")]
 async fn execute_dsl(dsl: &str, pool: &sqlx::PgPool) -> Result<HashMap<String, String>, String> {
-    use crate::dsl_v2::{DslExecutor, ExecutionContext};
+    use crate::dsl_v2::execution::{DslExecutor, ExecutionContext};
 
     let ast = parse_program(dsl).map_err(|e| format!("Parse error: {:?}", e))?;
     let plan = compile(&ast).map_err(|e| format!("Compile error: {:?}", e))?;

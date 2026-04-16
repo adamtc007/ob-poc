@@ -26,8 +26,11 @@ use crate::agent::verb_surface::{
     compute_session_verb_surface, SessionVerbSurface, VerbSurfaceContext, VerbSurfaceFailPolicy,
 };
 use crate::dsl_v2::ast::find_unresolved_ref_locations;
+use crate::dsl_v2::enrich_program;
+use crate::dsl_v2::execution::runtime_registry_arc;
+use crate::dsl_v2::planning::compile;
+use crate::dsl_v2::syntax::parse_program;
 use crate::dsl_v2::verb_registry::registry;
-use crate::dsl_v2::{compile, enrich_program, parse_program, runtime_registry_arc};
 use crate::lookup::LookupService;
 use crate::mcp::intent_pipeline::{
     compute_dsl_hash, IntentPipeline, PipelineOutcome, PipelineResult, StructuredIntent,

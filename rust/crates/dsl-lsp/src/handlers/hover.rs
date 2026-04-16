@@ -5,7 +5,7 @@ use tower_lsp::lsp_types::*;
 use crate::analysis::document::{ExprKind, ParsedArg};
 use crate::analysis::DocumentState;
 
-use ob_poc::dsl_v2::{find_unified_verb, UnifiedVerbDef};
+use ob_poc::dsl_v2::tooling::{find_unified_verb, registry, ArgDef, UnifiedVerbDef};
 
 /// Get hover information at position.
 pub fn get_hover(doc: &DocumentState, position: Position) -> Option<Hover> {
@@ -188,8 +188,6 @@ fn hover_on_keyword(verb_name: &str, args: &[ParsedArg], position: Position) -> 
 // =============================================================================
 // "Did You Mean" Suggestions
 // =============================================================================
-
-use ob_poc::dsl_v2::{registry, ArgDef};
 
 /// Find similar verb name using levenshtein distance.
 fn find_similar_verb(name: &str) -> Option<String> {

@@ -59,8 +59,7 @@ use crate::session::unified::{
     SheetExecutionResult as UnifiedSheetExecutionResult, SheetStatus as UnifiedSheetStatus,
 };
 
-use super::executor::{DslExecutor, ExecutionResult};
-use super::ExecutionContext;
+use super::executor::{DslExecutor, ExecutionContext, ExecutionResult};
 
 /// Phased executor for DSL sheets
 pub struct SheetExecutor<'a> {

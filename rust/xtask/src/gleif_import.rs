@@ -21,7 +21,9 @@ use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-use ob_poc::dsl_v2::{compile, parse_program, DslExecutor, ExecutionContext};
+use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext};
+use ob_poc::dsl_v2::planning::compile;
+use ob_poc::dsl_v2::syntax::parse_program;
 
 const GLEIF_API_BASE: &str = "https://api.gleif.org/api/v1/lei-records";
 const PAGE_SIZE: usize = 100;

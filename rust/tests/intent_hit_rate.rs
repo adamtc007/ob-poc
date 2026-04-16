@@ -1163,7 +1163,7 @@ async fn build_test_searcher(pool: &PgPool) -> ob_poc::mcp::verb_search::HybridV
     use ob_poc::agent::learning::embedder::Embedder;
     use ob_poc::agent::learning::warmup::LearningWarmup;
     use ob_poc::database::verb_service::VerbService;
-    use ob_poc::dsl_v2::macros::load_macro_registry_from_dir;
+    use ob_poc::dsl_v2::load_macro_registry_from_dir;
     use ob_poc::mcp::macro_index::MacroIndex;
     use ob_poc::mcp::scenario_index::ScenarioIndex;
     use ob_poc::mcp::verb_search::HybridVerbSearcher;

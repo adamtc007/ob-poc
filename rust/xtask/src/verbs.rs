@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use dsl_core::config::types::{DurableConfig, SourceOfTruth, VerbBehavior, VerbScope, VerbTier};
 use dsl_core::config::ConfigLoader;
 use ob_poc::domain_ops::CustomOperationRegistry;
-use ob_poc::dsl_v2::RuntimeVerbRegistry;
+use ob_poc::dsl_v2::execution::RuntimeVerbRegistry;
 use ob_poc::session::verb_contract::VerbDiagnostics;
 use ob_poc::session::verb_sync::VerbSyncService;
 use ob_poc::session::verb_tiering_linter;

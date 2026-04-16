@@ -22,11 +22,15 @@ use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
 use crate::database::VisualizationRepository;
-use crate::dsl_v2::macros::MacroRegistry;
-use crate::dsl_v2::{
-    compile, expand_templates_simple, gateway_resolver, parse_program, registry, runtime_registry,
-    AtomicExecutionResult, BatchPolicy, BestEffortExecutionResult, DslExecutor, ExecutionContext,
+use crate::dsl_v2::execution::{
+    runtime_registry, AtomicExecutionResult, BestEffortExecutionResult, DslExecutor,
+    ExecutionContext,
 };
+use crate::dsl_v2::macros::MacroRegistry;
+use crate::dsl_v2::planning::compile;
+use crate::dsl_v2::syntax::parse_program;
+use crate::dsl_v2::tooling::registry;
+use crate::dsl_v2::{expand_templates_simple, gateway_resolver, BatchPolicy};
 use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 

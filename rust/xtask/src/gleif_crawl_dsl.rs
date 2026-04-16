@@ -217,7 +217,7 @@ impl GleifDslCrawler {
 
     /// Execute the generated DSL statements
     async fn execute_dsl(&mut self, pool: &PgPool) -> Result<()> {
-        use ob_poc::dsl_v2::{DslExecutor, ExecutionContext, ExecutionResult};
+        use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext, ExecutionResult};
 
         // Create executor
         let executor = DslExecutor::new(pool.clone());

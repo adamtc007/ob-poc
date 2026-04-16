@@ -11,7 +11,7 @@
 use crate::agent::learning::warmup::LearningWarmup;
 use crate::api::session::SessionStore;
 use crate::database::generation_log_repository::GenerationLogRepository;
-use crate::dsl_v2::DslExecutor;
+use crate::dsl_v2::execution::DslExecutor;
 use crate::entity_linking::{
     EntityLinkingService, EntityLinkingServiceImpl, StubEntityLinkingService,
 };

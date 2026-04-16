@@ -1033,9 +1033,7 @@ fn universe_root_action_descriptors() -> Vec<ActionDescriptor> {
         .collect()
 }
 
-fn universe_graph_scene(
-    label: Option<&str>,
-) -> ob_poc_types::graph_scene::GraphSceneModel {
+fn universe_graph_scene(label: Option<&str>) -> ob_poc_types::graph_scene::GraphSceneModel {
     use crate::repl::types_v2::WorkspaceKind;
     use ob_poc_types::graph_scene::*;
 
@@ -1185,7 +1183,10 @@ mod tests {
         assert_eq!(scene.layout_strategy, LayoutStrategy::DeterministicOrbital);
         assert_eq!(scene.nodes.len(), WorkspaceKind::all().len() + 2);
         assert_eq!(scene.drill_targets.len(), WorkspaceKind::all().len() + 1);
-        assert!(scene.nodes.iter().any(|node| node.id == "workspace:new-session"));
+        assert!(scene
+            .nodes
+            .iter()
+            .any(|node| node.id == "workspace:new-session"));
         assert!(scene
             .drill_targets
             .iter()

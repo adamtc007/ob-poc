@@ -12,10 +12,8 @@
 #[cfg(feature = "database")]
 mod integration {
     use anyhow::Result;
-    use ob_poc::dsl_v2::ExecutionResult;
-    use ob_poc::dsl_v2::{
-        Argument, AstNode, DslExecutor, ExecutionContext, Literal, Span, VerbCall,
-    };
+    use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext, ExecutionResult};
+    use ob_poc::dsl_v2::{Argument, AstNode, Literal, Span, VerbCall};
     use sqlx::PgPool;
 
     fn s(value: &str) -> AstNode {

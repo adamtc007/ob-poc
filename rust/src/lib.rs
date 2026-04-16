@@ -9,7 +9,8 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use ob_poc::dsl_v2::{parse_program, DslExecutor, ExecutionContext};
+//! use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext};
+//! use ob_poc::dsl_v2::syntax::parse_program;
 //!
 //! let dsl = r#"(cbu.create :name "Test Fund" :jurisdiction "LU")"#;
 //! let program = parse_program(dsl).unwrap();
@@ -208,9 +209,11 @@ pub use domains::{DomainHandler, DomainRegistry, DomainResult};
 pub use error::{DSLError, ParseError};
 
 // DSL v2 types - unified S-expression DSL
+pub use dsl_v2::execution::{
+    DslExecutor, ExecutionContext, ExecutionResult as DslV2ExecutionResult, ReturnType,
+};
 pub use dsl_v2::{
-    parse_program, parse_single_verb, Argument, AstNode, DslExecutor, ExecutionContext,
-    ExecutionResult as DslV2ExecutionResult, Literal, Program, ReturnType, Span, Statement,
+    parse_program, parse_single_verb, Argument, AstNode, Literal, Program, Span, Statement,
     VerbCall,
 };
 

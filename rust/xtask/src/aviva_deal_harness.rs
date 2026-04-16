@@ -165,8 +165,7 @@ impl AvivaHarnessResults {
 
 /// Execute a DSL statement and return the result
 async fn execute_dsl(pool: &PgPool, dsl: &str) -> Result<serde_json::Value> {
-    use ob_poc::dsl_v2::executor::{DslExecutor, ExecutionResult};
-    use ob_poc::ExecutionContext;
+    use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext, ExecutionResult};
 
     let executor = DslExecutor::new(pool.clone());
     let mut ctx = ExecutionContext::new();

@@ -15,11 +15,11 @@ use sqlx::PgPool;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
+#[cfg(feature = "database")]
+use crate::dsl_v2::execution::DslExecutor;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[cfg(feature = "database")]
 use crate::dsl_v2::runtime_registry::runtime_registry;
-#[cfg(feature = "database")]
-use crate::dsl_v2::DslExecutor;
 #[cfg(feature = "database")]
 use crate::templates::{ExpansionContext, TemplateExpander};
 

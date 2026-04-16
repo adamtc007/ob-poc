@@ -460,8 +460,8 @@ impl AgentController {
             .await;
 
         // Parse and execute DSL
-        let executor = crate::dsl_v2::DslExecutor::new(self.pool.clone());
-        let mut ctx = crate::dsl_v2::ExecutionContext::new();
+        let executor = crate::dsl_v2::execution::DslExecutor::new(self.pool.clone());
+        let mut ctx = crate::dsl_v2::execution::ExecutionContext::new();
 
         match executor.execute_dsl(dsl, &mut ctx).await {
             Ok(_) => {
@@ -794,8 +794,8 @@ impl AgentControllerHandle {
         .await?;
 
         // Execute GLEIF enrich
-        let executor = crate::dsl_v2::DslExecutor::new(self.pool.clone());
-        let mut ctx = crate::dsl_v2::ExecutionContext::new();
+        let executor = crate::dsl_v2::execution::DslExecutor::new(self.pool.clone());
+        let mut ctx = crate::dsl_v2::execution::ExecutionContext::new();
 
         let dsl = format!(
             r#"(gleif.enrich :lei "{}" :decision-id {})"#,

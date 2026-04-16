@@ -19,7 +19,7 @@ use uuid::Uuid;
 use ob_poc::database::locks::{
     acquire_locks, advisory_xact_lock, lock_key, try_advisory_xact_lock, LockError,
 };
-use ob_poc::dsl_v2::expansion::{LockKey, LockMode};
+use ob_poc::dsl_v2::{LockKey, LockMode};
 
 /// Helper to get test database pool
 async fn get_test_pool() -> PgPool {

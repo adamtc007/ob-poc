@@ -7,10 +7,10 @@ use tower_lsp::lsp_types::*;
 use crate::analysis::{detect_completion_context, CompletionContext, DocumentState, SymbolTable};
 use crate::entity_client::EntityLookupClient;
 
-use ob_poc::dsl_v2::{
-    find_unified_verb, macros::load_macro_registry, parse_program, registry, runtime_registry,
-    suggestions::predict_next_steps, BindingContext, BindingInfo,
-};
+use ob_poc::dsl_v2::suggestions::predict_next_steps;
+use ob_poc::dsl_v2::syntax::{parse_program, BindingContext, BindingInfo};
+use ob_poc::dsl_v2::tooling::{find_unified_verb, registry};
+use ob_poc::dsl_v2::{execution::runtime_registry, load_macro_registry};
 
 /// Generate completions based on cursor position.
 pub async fn get_completions(

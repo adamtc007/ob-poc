@@ -28,22 +28,22 @@
 //! existing orchestrator pipeline. Full macro/pack/constraint integration
 //! is wired in Phases 1-3.
 
-pub mod canonical;
-pub mod compiler;
-pub mod constraint_gate;
-pub mod envelope;
-pub mod errors;
-pub mod executor;
-pub mod narration;
-pub mod plan_compiler;
-pub mod plan_executor;
-pub mod plan_types;
-pub mod response;
-pub mod sem_os_filter;
-pub mod step_executor_bridge;
-pub mod types;
-pub mod verb_classifier;
-pub mod write_set;
+pub(crate) mod canonical;
+pub(crate) mod compiler;
+pub(crate) mod constraint_gate;
+pub(crate) mod envelope;
+pub(crate) mod errors;
+pub(crate) mod executor;
+pub(crate) mod narration;
+pub(crate) mod plan_compiler;
+pub(crate) mod plan_executor;
+pub(crate) mod plan_types;
+pub(crate) mod response;
+pub(crate) mod sem_os_filter;
+pub(crate) mod step_executor_bridge;
+pub(crate) mod types;
+pub(crate) mod verb_classifier;
+pub(crate) mod write_set;
 
 // Re-export key types at module boundary
 pub use canonical::{
@@ -57,8 +57,9 @@ pub use errors::{CompilationError, CompilationErrorKind};
 #[cfg(feature = "database")]
 pub use executor::PostgresRunbookStore;
 pub use executor::{
-    execute_runbook, ExecutionError, LockStats, RunbookEvent, RunbookExecutionResult, RunbookStore,
-    RunbookStoreBackend, StepExecutionResult, StepExecutor, StepOutcome,
+    compute_write_set, execute_runbook, ExecutionError, LockStats, RunbookEvent,
+    RunbookExecutionResult, RunbookStore, RunbookStoreBackend, StepExecutionResult, StepExecutor,
+    StepOutcome,
 };
 pub use response::{
     ClarificationContext, ClarificationRequest, CompiledRunbookSummary, ConstraintViolationDetail,
@@ -70,6 +71,7 @@ pub use types::{
     ParkReason, StepCursor,
 };
 pub use verb_classifier::{classify_verb, VerbClassification};
+pub use write_set::{derive_write_set, derive_write_set_heuristic};
 
 // Re-export compile_invocation (defined below)
 // Callers: `use crate::runbook::compile_invocation;`

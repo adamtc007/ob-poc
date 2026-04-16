@@ -17,7 +17,7 @@ use crate::gleif::client::extract_lei_from_url;
 
 #[cfg(feature = "database")]
 use {
-    crate::dsl_v2::DslExecutor,
+    crate::dsl_v2::execution::DslExecutor,
     crate::gleif::{
         client::TreeFetchOptions, ChainLink, DiscoveredEntity, FundListResult, GleifClient,
         GleifEnrichmentService, LeiRecord, OwnershipChain, SuccessorResult, UboStatus,

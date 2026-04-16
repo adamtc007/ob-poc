@@ -28,10 +28,11 @@ use std::process::ExitCode;
 use tracing_subscriber::EnvFilter;
 
 // Import from library
-use ob_poc::dsl_v2::{
-    compile, parse_program,
-    validation::{ClientType, RustStyleFormatter, Severity, ValidationContext},
-    verb_registry::{registry, VerbBehavior},
+use ob_poc::dsl_v2::planning::compile;
+use ob_poc::dsl_v2::syntax::parse_program;
+use ob_poc::dsl_v2::tooling::{
+    registry, Severity, ValidationClientType as ClientType, ValidationContext,
+    ValidationRustStyleFormatter as RustStyleFormatter, VerbBehavior,
 };
 
 #[derive(Parser)]
@@ -1018,10 +1019,8 @@ async fn cmd_execute(
     jurisdiction: Option<String>,
     format: OutputFormat,
 ) -> Result<(), String> {
-    use ob_poc::dsl_v2::{
-        executor::{DslExecutor, ExecutionContext, ExecutionResult},
-        CsgLinter,
-    };
+    use ob_poc::dsl_v2::csg_linter::CsgLinter;
+    use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext, ExecutionResult};
 
     let source = read_input(file)?;
 
@@ -1308,10 +1307,8 @@ async fn cmd_generate(
     output: Option<PathBuf>,
     format: OutputFormat,
 ) -> Result<(), String> {
-    use ob_poc::dsl_v2::{
-        executor::{DslExecutor, ExecutionContext, ExecutionResult},
-        CsgLinter,
-    };
+    use ob_poc::dsl_v2::csg_linter::CsgLinter;
+    use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext, ExecutionResult};
 
     // Get instruction from arg or stdin
     let prompt = match instruction {
@@ -1957,16 +1954,18 @@ async fn cmd_repl(
     format: OutputFormat,
 ) -> Result<(), String> {
     use ob_poc::database::SessionRepository;
-    use ob_poc::dsl_v2::suggestions::predict_next_steps;
-    use ob_poc::dsl_v2::{
-        config::ConfigLoader,
-        emit_dsl,
-        execution_plan::{compile_with_planning, BindingInfo as PlanInfo, PlanningContext},
-        executor::{DslExecutor, ExecutionContext, ExecutionResult},
-        parse_program, topological_sort,
-        validation::{RustStyleFormatter, ValidationContext},
-        BindingContext, BindingInfo, CsgLinter, RuntimeVerbRegistry,
+    use ob_poc::dsl_v2::config::ConfigLoader;
+    use ob_poc::dsl_v2::csg_linter::CsgLinter;
+    use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext, ExecutionResult};
+    use ob_poc::dsl_v2::planning::{
+        compile_with_planning, PlanningBindingInfo as PlanInfo, PlanningContext,
     };
+    use ob_poc::dsl_v2::suggestions::predict_next_steps;
+    use ob_poc::dsl_v2::syntax::{parse_program, BindingContext, BindingInfo};
+    use ob_poc::dsl_v2::tooling::{
+        RuntimeVerbRegistry, ValidationContext, ValidationRustStyleFormatter as RustStyleFormatter,
+    };
+    use ob_poc::dsl_v2::{emit_dsl, topological_sort};
     use ob_poc::events::{init_events, EventConfig, SharedEmitter};
     use ob_poc::feedback::{FeedbackInspector, ReproGenerator, TodoGenerator};
     use rustyline::completion::{Completer, Pair};

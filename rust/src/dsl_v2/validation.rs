@@ -543,23 +543,6 @@ impl Suggestion {
 }
 
 // =============================================================================
-// VALIDATOR TRAIT
-// =============================================================================
-
-/// The validation service interface
-#[cfg_attr(not(feature = "database"), allow(async_fn_in_trait))]
-pub trait DslValidator: Send + Sync {
-    /// Validate DSL source with context
-    fn validate(
-        &self,
-        request: &ValidationRequest,
-    ) -> impl std::future::Future<Output = ValidationResult> + Send;
-
-    /// Quick syntax-only check (no DB lookups)
-    fn check_syntax(&self, source: &str) -> Vec<Diagnostic>;
-}
-
-// =============================================================================
 // BUILDER FOR DIAGNOSTICS
 // =============================================================================
 
@@ -636,6 +619,7 @@ impl Default for DiagnosticBuilder {
 pub struct DiagnosticEntry(Diagnostic);
 
 impl DiagnosticEntry {
+    #[cfg(test)]
     pub fn suggest(
         &mut self,
         message: impl Into<String>,

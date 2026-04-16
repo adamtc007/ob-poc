@@ -180,5 +180,4 @@ impl PendingDispatchStore {
 
         Ok(result.rows_affected() > 0)
     }
-
 }

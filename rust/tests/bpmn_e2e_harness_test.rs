@@ -31,22 +31,11 @@ use bpmn_lite_server::grpc::proto::bpmn_lite_server::BpmnLiteServer;
 use bpmn_lite_server::grpc::BpmnLiteService;
 
 // ob-poc crates
-use ob_poc::bpmn_integration::signal_relay::SignalRelay;
 use ob_poc::bpmn_integration::{
-    client::BpmnLiteConnection,
-    config::{WorkflowConfig, WorkflowConfigIndex},
-    correlation::CorrelationStore,
-    dispatcher::WorkflowDispatcher,
-    event_bridge::EventBridge,
-    job_frames::JobFrameStore,
-    parked_tokens::ParkedTokenStore,
-    pending_dispatches::PendingDispatchStore,
-    request_state::RequestStateStore,
-    types::{
-        CorrelationStatus, ExecutionRoute, OutcomeEvent, ParkedTokenStatus, RequestStatus,
-        TaskBinding, WorkflowBinding,
-    },
-    worker::JobWorker,
+    BpmnLiteConnection, CompleteJobRequest, CorrelationStatus, CorrelationStore, EventBridge,
+    ExecutionRoute, JobFrameStore, JobWorker, OutcomeEvent, ParkedTokenStatus, ParkedTokenStore,
+    PendingDispatchStore, RequestStateStore, RequestStatus, SignalRelay, TaskBinding,
+    WorkflowBinding, WorkflowConfig, WorkflowConfigIndex, WorkflowDispatcher,
 };
 use ob_poc::journey::router::PackRouter;
 use ob_poc::repl::orchestrator_v2::{
@@ -1515,8 +1504,6 @@ async fn e2e_10_idempotency_dual_dedupe() {
 #[tokio::test]
 #[ignore]
 async fn e2e_11_payload_integrity_corrupt_hash_rejected() {
-    use ob_poc::bpmn_integration::client::CompleteJobRequest;
-
     let rig = BpmnTestRig::setup().await;
     let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
 

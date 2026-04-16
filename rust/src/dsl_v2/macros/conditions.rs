@@ -37,16 +37,6 @@ pub enum ConditionResult {
     Unknown(String),
 }
 
-impl ConditionResult {
-    pub fn is_true(&self) -> bool {
-        matches!(self, ConditionResult::True)
-    }
-
-    pub fn is_false(&self) -> bool {
-        matches!(self, ConditionResult::False)
-    }
-}
-
 /// Evaluate a condition against the given context
 pub fn evaluate_condition(condition: &WhenCondition, ctx: &ConditionContext) -> ConditionResult {
     match condition {

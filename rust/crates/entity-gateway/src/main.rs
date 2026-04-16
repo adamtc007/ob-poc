@@ -8,9 +8,8 @@ use tonic::transport::Server;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use entity_gateway::{
-    proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer,
-    run_refresh_loop, EntityGatewayService, GatewayConfig, IndexRegistry, RefreshPipeline,
-    StartupMode, TantivyIndex,
+    proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer, run_refresh_loop,
+    EntityGatewayService, GatewayConfig, IndexRegistry, RefreshPipeline, StartupMode, TantivyIndex,
 };
 
 /// Default configuration path

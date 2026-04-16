@@ -6,10 +6,10 @@
 - Focus: DSL-based state management, document/data-dictionary-backed attributes, agentic integration with deterministic validation (CSG + verb schema), and RAG hooks.
 
 ## System Components (Spring mental model)
-- **DSL front door**: S-expression programs `(domain.verb :k v ...)` → parsed by `dsl_v2::parser` (Nom). Treat as Spring Web/Message controllers that only accept DSL payloads.
+- **DSL front door**: S-expression programs `(domain.verb :k v ...)` → parsed through the public `dsl_v2::syntax` seam. Treat as Spring Web/Message controllers that only accept DSL payloads.
 - **Config-driven verb registry**: `rust/config/verbs.yaml` (+ split `config/verbs/` support) defines verbs, arg types, CRUD/table mappings; `verb_registry` loads at runtime (analogous to Spring Bean registry + metadata-driven mappers).
 - **Context-Sensitive Guardrails (CSG)**: `rust/config/csg_rules.yaml` + `dsl_v2::csg_linter` enforce business/state rules before execution (state machine + applicability). Think of it as a validation interceptor chain.
-- **Execution layer**: `dsl_v2::execution_plan` compiles nested DSL into ordered steps; `generic_executor` (when DB feature on) performs CRUD per verb mapping; `custom_ops` plug-ins handle non-CRUD behaviors (screening, graph ops, etc.).
+- **Execution layer**: `dsl_v2::planning` compiles nested DSL into ordered steps, while `dsl_v2::execution` owns runtime dispatch and executor wiring; DB-backed CRUD dispatch still flows through the internal generic executor path when the database feature is on.
 - **Data dictionary service**: `rust/src/data_dictionary/*` validates attribute IDs/values; maps semantic IDs to sources/sinks; supports RAG vectors. Database tables `"ob-poc".attribute_dictionary` and `"ob-poc".dictionary` hold canonical attribute definitions.
 - **Agentic pipeline**: `rust/src/agentic/*` orchestrates intent extraction → pattern selection → requirement planning → DSL generation → parse/lint/validate loop, giving deterministic retries instead of free-form execution.
 

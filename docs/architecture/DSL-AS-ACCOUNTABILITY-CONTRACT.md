@@ -18,9 +18,10 @@ The codebase still reflects this argument, but the public-capability boundary is
 
 - `dsl-core` is already a clean compiler kernel
 - `dsl-lsp` has now been narrowed to a deliberate crate-root facade instead of exposing handler and analysis internals
-- the remaining contract problem is the broad `ob_poc::dsl_v2` surface, which still mixes compiler, runtime, planner, and tooling concerns
+- `ob_poc::dsl_v2` now presents stage-oriented public seams for `syntax`, `planning`, `execution`, and `tooling`
+- the remaining contract problem is not the old public module tree, but the still-broad `dsl_v2` root facade, especially around macro/expansion families and cross-stage convenience reexports
 
-So the next architectural step is not a new DSL concept. It is boundary discipline: move internal compiler/runtime tests inward, keep orchestration tests black-box, and define a smaller official surface for parse/validate/plan/execute rather than letting sibling crates reach into `dsl_v2` internals.
+So the next architectural step is not a new DSL concept. It is continued boundary discipline: keep the stage seams dominant, move internal compiler/runtime tests inward, keep orchestration tests black-box, and trim the remaining convenience-driven root exposure where it is not part of the supported DSL contract.
 
 ---
 

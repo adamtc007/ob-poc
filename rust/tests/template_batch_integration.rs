@@ -13,7 +13,7 @@ mod template_batch_tests {
     use sqlx::PgPool;
     use uuid::Uuid;
 
-    use ob_poc::dsl_v2::{DslExecutor, ExecutionContext};
+    use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext};
 
     // =========================================================================
     // TEST INFRASTRUCTURE

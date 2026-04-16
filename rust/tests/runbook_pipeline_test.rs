@@ -20,17 +20,17 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use uuid::Uuid;
 
-use ob_poc::dsl_v2::macros::{
+use ob_poc::dsl_v2::{
     ArgStyle, MacroArg, MacroArgType, MacroArgs, MacroExpansionStep, MacroKind, MacroRegistry,
     MacroRouting, MacroSchema, MacroTarget, MacroUi, VerbCallStep,
 };
 use ob_poc::journey::pack_manager::{ConstraintSource, EffectiveConstraints};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
-use ob_poc::runbook::verb_classifier::{classify_verb, VerbClassification};
 use ob_poc::runbook::{
-    compile_verb, execute_runbook, CompiledRunbook, CompiledRunbookStatus, CompiledStep,
-    ExecutionMode, OrchestratorResponse, ParkReason, ReplayEnvelope, RunbookStore,
-    RunbookStoreBackend, StepCursor, StepExecutor, StepOutcome,
+    classify_verb, compile_verb, compute_write_set, execute_runbook, CompiledRunbook,
+    CompiledRunbookStatus, CompiledStep, ExecutionError, ExecutionMode, OrchestratorResponse,
+    ParkReason, ReplayEnvelope, RunbookExecutionResult, RunbookStore, RunbookStoreBackend,
+    StepCursor, StepExecutor, StepOutcome, VerbClassification,
 };
 use ob_poc::session::unified::{ClientRef, StructureType, UnifiedSession};
 
@@ -327,10 +327,7 @@ async fn compile_and_execute(
     args: BTreeMap<String, String>,
     registry: &MacroRegistry,
     constraints: &EffectiveConstraints,
-) -> (
-    OrchestratorResponse,
-    Option<ob_poc::runbook::executor::RunbookExecutionResult>,
-) {
+) -> (OrchestratorResponse, Option<RunbookExecutionResult>) {
     let session = test_session();
     let verb_index = VerbConfigIndex::empty();
     let classification = classify_verb(macro_name, &verb_index, registry);
@@ -574,7 +571,11 @@ async fn replay_determinism() {
     );
 
     // Both should compile
-    assert!(resp1.is_compiled(), "Expected first compile to succeed, got {:?}", resp1);
+    assert!(
+        resp1.is_compiled(),
+        "Expected first compile to succeed, got {:?}",
+        resp1
+    );
     assert!(
         resp2.is_compiled(),
         "Expected second compile to succeed, got {:?}",
@@ -653,8 +654,8 @@ async fn locking_no_deadlock() {
     step4.write_set = vec![id_a];
 
     // Compute write sets
-    let ws1 = ob_poc::runbook::executor::compute_write_set(&[step1, step2], None);
-    let ws2 = ob_poc::runbook::executor::compute_write_set(&[step3, step4], None);
+    let ws1 = compute_write_set(&[step1, step2], None);
+    let ws2 = compute_write_set(&[step3, step4], None);
 
     // Both should contain all three entity IDs
     assert_eq!(ws1.len(), 3);
@@ -689,10 +690,7 @@ async fn execution_gate_rejects_raw() {
     let fake_id = fake_rb.id;
     let result = execute_runbook(&store, fake_id, None, &SuccessExecutor).await;
     assert!(
-        matches!(
-            result,
-            Err(ob_poc::runbook::executor::ExecutionError::NotFound(_))
-        ),
+        matches!(result, Err(ExecutionError::NotFound(_))),
         "Must reject non-existent runbook"
     );
 
@@ -717,13 +715,7 @@ async fn execution_gate_rejects_raw() {
     // 3. Attempt to re-execute completed runbook → NotExecutable
     let result = execute_runbook(&store, id, None, &SuccessExecutor).await;
     assert!(
-        matches!(
-            result,
-            Err(ob_poc::runbook::executor::ExecutionError::NotExecutable(
-                _,
-                _
-            ))
-        ),
+        matches!(result, Err(ExecutionError::NotExecutable(_, _))),
         "Must reject already-completed runbook"
     );
 
@@ -748,13 +740,7 @@ async fn execution_gate_rejects_raw() {
     // Re-execute failed runbook → NotExecutable
     let result = execute_runbook(&store, id2, None, &SuccessExecutor).await;
     assert!(
-        matches!(
-            result,
-            Err(ob_poc::runbook::executor::ExecutionError::NotExecutable(
-                _,
-                _
-            ))
-        ),
+        matches!(result, Err(ExecutionError::NotExecutable(_, _))),
         "Must reject failed runbook"
     );
 }

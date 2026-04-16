@@ -6,7 +6,7 @@
 //! 3. topological_sort_unified produces correct ordering
 //! 4. The unified system matches behavior of legacy resource_dependencies
 
-use ob_poc::dsl_v2::entity_deps::{
+use ob_poc::dsl_v2::planning::{
     topological_sort_unified, DependencyKind, EntityDep, EntityDependencyRegistry, EntityInstance,
     EntityTypeKey, TopoSortUnifiedError,
 };

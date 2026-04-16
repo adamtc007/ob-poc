@@ -36,7 +36,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::dsl_v2::ExecutionContext;
+use crate::dsl_v2::execution::ExecutionContext;
 use crate::graph::{EntityGraph, GraphFilters, ViewportContext};
 use crate::navigation::{NavCommand, NavExecutor, NavResult};
 

@@ -11,7 +11,6 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
-use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 #[cfg(feature = "database")]
@@ -1080,36 +1079,6 @@ pub fn runtime_registry_arc() -> Arc<RuntimeVerbRegistry> {
             }
         })
         .clone()
-}
-
-// =============================================================================
-// THREAD-SAFE WRAPPER
-// =============================================================================
-
-/// Thread-safe wrapper for hot-reloadable registry
-#[derive(Clone)]
-pub struct SharedVerbRegistry {
-    inner: Arc<RwLock<RuntimeVerbRegistry>>,
-}
-
-impl SharedVerbRegistry {
-    pub fn new(registry: RuntimeVerbRegistry) -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(registry)),
-        }
-    }
-
-    pub async fn read(&self) -> tokio::sync::RwLockReadGuard<'_, RuntimeVerbRegistry> {
-        self.inner.read().await
-    }
-
-    pub async fn write(&self) -> tokio::sync::RwLockWriteGuard<'_, RuntimeVerbRegistry> {
-        self.inner.write().await
-    }
-
-    pub fn clone_inner(&self) -> Arc<RwLock<RuntimeVerbRegistry>> {
-        self.inner.clone()
-    }
 }
 
 // =============================================================================

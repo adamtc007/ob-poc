@@ -20,17 +20,40 @@
 //!     └─► ParkedTokenStore + CorrelationStore + REPL signal
 //! ```
 
-pub mod canonical;
-pub mod client;
-pub mod config;
-pub mod correlation;
-pub mod dispatcher;
-pub mod event_bridge;
-pub mod job_frames;
-pub mod parked_tokens;
-pub mod pending_dispatch_worker;
-pub mod pending_dispatches;
-pub mod request_state;
-pub mod signal_relay;
-pub mod types;
-pub mod worker;
+pub(crate) mod canonical;
+pub(crate) mod client;
+pub(crate) mod config;
+pub(crate) mod correlation;
+pub(crate) mod dispatcher;
+pub(crate) mod event_bridge;
+pub(crate) mod job_frames;
+pub(crate) mod parked_tokens;
+pub(crate) mod pending_dispatch_worker;
+pub(crate) mod pending_dispatches;
+pub(crate) mod request_state;
+pub(crate) mod signal_relay;
+pub(crate) mod types;
+pub(crate) mod worker;
+
+pub use canonical::{canonical_json_with_hash, sha256_bytes, validate_payload_hash};
+pub use client::{
+    BpmnLifecycleEvent, BpmnLiteConnection, CompileDiagnostic, CompileResult, CompleteJobRequest,
+    FiberSnapshot, JobActivation, OrchestratorFlag, ProcessInspection, StartProcessRequest,
+    WaitSnapshot,
+};
+pub use config::{WorkflowConfig, WorkflowConfigIndex};
+pub use correlation::CorrelationStore;
+pub use dispatcher::WorkflowDispatcher;
+pub use event_bridge::EventBridge;
+pub use job_frames::JobFrameStore;
+pub use parked_tokens::ParkedTokenStore;
+pub use pending_dispatch_worker::PendingDispatchWorker;
+pub use pending_dispatches::PendingDispatchStore;
+pub use request_state::RequestStateStore;
+pub use signal_relay::SignalRelay;
+pub use types::{
+    CorrelationRecord, CorrelationStatus, ExecutionRoute, JobFrame, JobFrameStatus, OutcomeEvent,
+    ParkedToken, ParkedTokenStatus, PendingDispatch, PendingDispatchStatus, RequestStateRecord,
+    RequestStatus, TaskBinding, WorkflowBinding,
+};
+pub use worker::JobWorker;

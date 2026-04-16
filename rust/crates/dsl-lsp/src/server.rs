@@ -12,7 +12,7 @@ use tower_lsp::{Client, LanguageServer};
 use crate::analysis::{DocumentState, SymbolTable};
 use crate::entity_client::{gateway_addr, EntityLookupClient};
 use crate::handlers;
-use ob_poc::dsl_v2::planning_facade::PlanningOutput;
+use ob_poc::dsl_v2::tooling::{PlanningOutput, SemanticDiagnostic};
 
 /// File type detection for dispatch
 enum FileType {
@@ -41,7 +41,7 @@ pub struct DslLanguageServer {
     /// Planning output for each document (for code actions)
     planning_outputs: Arc<RwLock<HashMap<Url, PlanningOutput>>>,
     /// Semantic diagnostics for each document (for entity suggestion code actions)
-    semantic_diagnostics: Arc<RwLock<HashMap<Url, Vec<ob_poc::dsl_v2::validation::Diagnostic>>>>,
+    semantic_diagnostics: Arc<RwLock<HashMap<Url, Vec<SemanticDiagnostic>>>>,
     /// Session symbol table (shared across documents)
     symbols: Arc<RwLock<SymbolTable>>,
     /// Entity Gateway client for lookups (replaces direct DB access)
@@ -157,10 +157,7 @@ impl DslLanguageServer {
     }
 
     /// Get semantic diagnostics for a document (for entity suggestion code actions)
-    pub async fn get_semantic_diagnostics(
-        &self,
-        uri: &Url,
-    ) -> Vec<ob_poc::dsl_v2::validation::Diagnostic> {
+    pub async fn get_semantic_diagnostics(&self, uri: &Url) -> Vec<SemanticDiagnostic> {
         self.semantic_diagnostics
             .read()
             .await
@@ -174,9 +171,7 @@ impl DslLanguageServer {
         text: &str,
         documents: &Arc<RwLock<HashMap<Url, DocumentState>>>,
         planning_outputs: &Arc<RwLock<HashMap<Url, PlanningOutput>>>,
-        semantic_diagnostics: &Arc<
-            RwLock<HashMap<Url, Vec<ob_poc::dsl_v2::validation::Diagnostic>>>,
-        >,
+        semantic_diagnostics: &Arc<RwLock<HashMap<Url, Vec<SemanticDiagnostic>>>>,
         client: &Client,
     ) {
         let result = handlers::diagnostics::analyze_document_full(text).await;

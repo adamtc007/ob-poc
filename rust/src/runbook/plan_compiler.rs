@@ -5,7 +5,7 @@
 //! scoped verb surface, orders by workspace grouping + dependency DAG, and
 //! detects cross-workspace forward references.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use anyhow::Result;
 use uuid::Uuid;
@@ -13,7 +13,7 @@ use uuid::Uuid;
 use super::plan_types::{
     BindingTable, EntityBinding, PlanStepStatus, RunbookPlan, RunbookPlanStep,
 };
-use crate::repl::types_v2::{SubjectKind, VerbRef, WorkspaceFrame, WorkspaceKind};
+use crate::repl::types_v2::{SubjectKind, VerbRef, WorkspaceKind};
 use sem_os_core::verb_contract::VerbOutput;
 
 // ---------------------------------------------------------------------------
@@ -140,25 +140,6 @@ fn compute_dependencies(current_seq: usize, prior_steps: &[RunbookPlanStep]) -> 
     }
 }
 
-/// Build workspace inputs from session workspace frames.
-pub fn inputs_from_frames(
-    frames: &[WorkspaceFrame],
-    verb_surfaces: &HashMap<WorkspaceKind, Vec<VerbRef>>,
-    verb_outputs: &BTreeMap<String, Vec<VerbOutput>>,
-) -> Vec<WorkspaceInput> {
-    frames
-        .iter()
-        .map(|f| WorkspaceInput {
-            workspace: f.workspace.clone(),
-            constellation_map: f.constellation_map.clone(),
-            subject_kind: f.subject_kind.clone().unwrap_or(SubjectKind::Cbu),
-            subject_id: f.subject_id,
-            advancing_verbs: verb_surfaces.get(&f.workspace).cloned().unwrap_or_default(),
-            verb_outputs: verb_outputs.clone(),
-        })
-        .collect()
-}
-
 // ---------------------------------------------------------------------------
 // Constellation DAG Discovery
 // ---------------------------------------------------------------------------
@@ -168,18 +149,8 @@ pub fn inputs_from_frames(
 pub struct AdvancingSlot {
     /// Dot-delimited path within the constellation tree.
     pub slot_path: String,
-    /// Slot name.
-    pub slot_name: String,
-    /// Current computed state of the slot.
-    pub computed_state: String,
-    /// Current effective state of the slot.
-    pub effective_state: String,
-    /// Completion progress (0-100).
-    pub progress: u8,
     /// Whether this slot blocks overall progress.
     pub blocking: bool,
-    /// Entity bound to this slot (if any).
-    pub entity_id: Option<Uuid>,
     /// Verbs that can advance this slot.
     pub advancing_verbs: Vec<String>,
 }
@@ -219,12 +190,7 @@ fn collect_advancing_slots_recursive(
     if slot.progress < 100 && !slot.available_verbs.is_empty() {
         results.push(AdvancingSlot {
             slot_path: path.clone(),
-            slot_name: slot.name.clone(),
-            computed_state: slot.computed_state.clone(),
-            effective_state: slot.effective_state.clone(),
-            progress: slot.progress,
             blocking: slot.blocking,
-            entity_id: slot.entity_id,
             advancing_verbs: slot.available_verbs.clone(),
         });
     }
@@ -411,7 +377,7 @@ mod tests {
         let slots = discover_advancing_slots(&hydrated);
         // Only the kyc slot should appear (cbu is at 100% progress)
         assert_eq!(slots.len(), 1);
-        assert_eq!(slots[0].slot_name, "kyc");
+        assert_eq!(slots[0].slot_path, "kyc");
         assert!(slots[0].blocking);
         assert_eq!(slots[0].advancing_verbs, vec!["kyc-case.create"]);
     }

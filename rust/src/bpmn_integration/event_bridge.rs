@@ -314,14 +314,16 @@ impl EventBridge {
                 // Correlation → Cancelled, resolve all parked tokens.
                 self.update_correlation(process_instance_id, CorrelationStatus::Cancelled)
                     .await;
-                self.mark_request_killed(process_instance_id, Some(reason)).await;
+                self.mark_request_killed(process_instance_id, Some(reason))
+                    .await;
                 self.resolve_all_tokens(process_instance_id).await;
             }
             OutcomeEvent::IncidentCreated { error, .. } => {
                 // Correlation → Failed (tokens remain waiting for manual resolution).
                 self.update_correlation(process_instance_id, CorrelationStatus::Failed)
                     .await;
-                self.mark_request_failed(process_instance_id, Some(error)).await;
+                self.mark_request_failed(process_instance_id, Some(error))
+                    .await;
             }
             OutcomeEvent::StepCompleted { .. } | OutcomeEvent::StepFailed { .. } => {
                 // Informational — no store updates needed.
@@ -464,12 +466,10 @@ impl EventBridge {
             .find_by_process_instance(process_instance_id)
             .await
         {
-            Ok(Some(record)) => {
-                Ok(Some(format!(
-                    "{}:{}:{}",
-                    record.runbook_id, record.entry_id, record.correlation_id
-                )))
-            }
+            Ok(Some(record)) => Ok(Some(format!(
+                "{}:{}:{}",
+                record.runbook_id, record.entry_id, record.correlation_id
+            ))),
             Ok(None) => {
                 tracing::warn!(
                     process_instance_id = %process_instance_id,

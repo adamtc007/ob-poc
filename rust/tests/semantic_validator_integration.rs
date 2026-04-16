@@ -10,9 +10,9 @@
 
 #![cfg(feature = "database")]
 
-use ob_poc::dsl_v2::{
-    validation::{RustStyleFormatter, ValidationContext, ValidationRequest, ValidationResult},
-    SemanticValidator,
+use ob_poc::dsl_v2::tooling::{
+    SemanticValidator, ValidationContext, ValidationRequest, ValidationResult,
+    ValidationRustStyleFormatter,
 };
 use sqlx::PgPool;
 
@@ -36,7 +36,9 @@ async fn get_validator(pool: &PgPool) -> SemanticValidator {
 fn format_errors(result: &ValidationResult, source: &str) -> String {
     match result {
         ValidationResult::Ok(_) => String::new(),
-        ValidationResult::Err(diagnostics) => RustStyleFormatter::format(source, diagnostics),
+        ValidationResult::Err(diagnostics) => {
+            ValidationRustStyleFormatter::format(source, diagnostics)
+        }
     }
 }
 
@@ -695,7 +697,7 @@ async fn test_unicode_in_string_values() {
 #[tokio::test]
 #[ignore] // Requires EntityGateway running
 async fn test_validate_dsl_public_api() {
-    use ob_poc::dsl_v2::validate_dsl;
+    use ob_poc::dsl_v2::tooling::validate_dsl;
 
     let pool = get_test_pool().await;
 
@@ -717,7 +719,7 @@ async fn test_validate_dsl_public_api() {
 #[tokio::test]
 #[ignore] // Requires EntityGateway running
 async fn test_validate_dsl_with_csg_public_api() {
-    use ob_poc::dsl_v2::validate_dsl_with_csg;
+    use ob_poc::dsl_v2::tooling::validate_dsl_with_csg;
 
     let pool = get_test_pool().await;
 

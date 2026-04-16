@@ -99,18 +99,21 @@ impl VariableContext {
     }
 
     /// Add an argument value
+    #[cfg(test)]
     pub fn with_arg(mut self, name: impl Into<String>, value: ArgValue) -> Self {
         self.args.insert(name.into(), value);
         self
     }
 
     /// Add a scope field
+    #[cfg(test)]
     pub fn with_scope(mut self, field: impl Into<String>, value: impl Into<String>) -> Self {
         self.scope.insert(field.into(), value.into());
         self
     }
 
     /// Add a session value
+    #[cfg(test)]
     pub fn with_session(mut self, path: impl Into<String>, value: Value) -> Self {
         self.session.insert(path.into(), value);
         self

@@ -14,7 +14,7 @@ use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
 use crate::agent::verb_surface::{
     compute_session_verb_surface, SessionVerbSurface, VerbSurfaceContext, VerbSurfaceFailPolicy,
 };
-use crate::dsl_v2::runtime_registry_arc;
+use crate::dsl_v2::execution::runtime_registry_arc;
 use crate::sem_os_runtime::constellation_runtime::{
     compute_map_revision, load_builtin_constellation_map,
 };

@@ -8,8 +8,9 @@
 use tower_lsp::lsp_types::*;
 
 use ob_poc::dsl_v2::diagnostics::{DiagnosticCode, SuggestedFix};
-use ob_poc::dsl_v2::planning_facade::{PlanningOutput, SyntheticStep};
-use ob_poc::dsl_v2::validation::{Diagnostic as SemanticDiagnostic, Suggestion};
+use ob_poc::dsl_v2::tooling::{
+    PlanningOutput, PlanningSyntheticStep, SemanticDiagnostic, Suggestion,
+};
 
 /// Generate code actions from planning output and semantic diagnostics
 ///
@@ -63,7 +64,7 @@ pub fn get_code_actions(
 
 /// Create a code action for an implicit create suggestion
 fn create_implicit_create_action(
-    step: &SyntheticStep,
+    step: &PlanningSyntheticStep,
     uri: &Url,
     _source: &str,
 ) -> Option<CodeAction> {

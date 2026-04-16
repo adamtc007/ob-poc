@@ -2311,7 +2311,7 @@ impl DslExecutor {
             super::parser::parse_program(source).map_err(|e| anyhow!("Parse error: {}", e))?;
 
         // Enrich: convert string literals to EntityRefs based on YAML verb config
-        let registry = super::runtime_registry();
+        let registry = super::runtime_registry::runtime_registry();
         let enrichment_result = super::enrich_program(raw_program, registry);
         let program = enrichment_result.program;
 

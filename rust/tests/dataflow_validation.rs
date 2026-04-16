@@ -10,13 +10,11 @@
 
 #![cfg(feature = "database")]
 
-use ob_poc::dsl_v2::{
-    binding_context::{BindingContext, BindingInfo},
-    parse_program,
-    runtime_registry::runtime_registry,
-    validation::{DiagnosticCode, ValidationContext},
-    CsgLinter,
-};
+use ob_poc::dsl_v2::binding_context::{BindingContext, BindingInfo};
+use ob_poc::dsl_v2::csg_linter::CsgLinter;
+use ob_poc::dsl_v2::execution::runtime_registry;
+use ob_poc::dsl_v2::syntax::parse_program;
+use ob_poc::dsl_v2::tooling::{ValidationContext, ValidationDiagnosticCode};
 use uuid::Uuid;
 
 /// Get test database pool
@@ -57,9 +55,9 @@ async fn test_valid_dataflow_passes() {
         .filter(|d| {
             matches!(
                 d.code,
-                DiagnosticCode::DataflowUndefinedBinding
-                    | DiagnosticCode::DataflowTypeMismatch
-                    | DiagnosticCode::DataflowDuplicateBinding
+                ValidationDiagnosticCode::DataflowUndefinedBinding
+                    | ValidationDiagnosticCode::DataflowTypeMismatch
+                    | ValidationDiagnosticCode::DataflowDuplicateBinding
             )
         })
         .collect();
@@ -90,11 +88,9 @@ async fn test_undefined_binding_detected() {
     let result = linter.lint(ast, &context, source).await;
 
     assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|d| d.code == DiagnosticCode::DataflowUndefinedBinding
-                && d.message.contains("@fund")),
+        result.diagnostics.iter().any(|d| d.code
+            == ValidationDiagnosticCode::DataflowUndefinedBinding
+            && d.message.contains("@fund")),
         "Should detect undefined @fund binding. Diagnostics: {:?}",
         result.diagnostics
     );
@@ -119,11 +115,9 @@ async fn test_duplicate_binding_detected() {
     let result = linter.lint(ast, &context, source).await;
 
     assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|d| d.code == DiagnosticCode::DataflowDuplicateBinding
-                && d.message.contains("@fund")),
+        result.diagnostics.iter().any(|d| d.code
+            == ValidationDiagnosticCode::DataflowDuplicateBinding
+            && d.message.contains("@fund")),
         "Should detect duplicate @fund binding. Diagnostics: {:?}",
         result.diagnostics
     );
@@ -161,9 +155,9 @@ async fn test_valid_kyc_case_flow() {
         .filter(|d| {
             matches!(
                 d.code,
-                DiagnosticCode::DataflowUndefinedBinding
-                    | DiagnosticCode::DataflowTypeMismatch
-                    | DiagnosticCode::DataflowDuplicateBinding
+                ValidationDiagnosticCode::DataflowUndefinedBinding
+                    | ValidationDiagnosticCode::DataflowTypeMismatch
+                    | ValidationDiagnosticCode::DataflowDuplicateBinding
             )
         })
         .collect();
@@ -194,11 +188,9 @@ async fn test_workstream_requires_case() {
     let result = linter.lint(ast, &context, source).await;
 
     assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|d| d.code == DiagnosticCode::DataflowUndefinedBinding
-                && d.message.contains("@case")),
+        result.diagnostics.iter().any(|d| d.code
+            == ValidationDiagnosticCode::DataflowUndefinedBinding
+            && d.message.contains("@case")),
         "Should detect undefined @case. Diagnostics: {:?}",
         result.diagnostics
     );
@@ -222,9 +214,9 @@ async fn test_screening_requires_workstream() {
     let result = linter.lint(ast, &context, source).await;
 
     assert!(
-        result.diagnostics.iter().any(
-            |d| d.code == DiagnosticCode::DataflowUndefinedBinding && d.message.contains("@ws")
-        ),
+        result.diagnostics.iter().any(|d| d.code
+            == ValidationDiagnosticCode::DataflowUndefinedBinding
+            && d.message.contains("@ws")),
         "Should detect undefined @ws. Diagnostics: {:?}",
         result.diagnostics
     );

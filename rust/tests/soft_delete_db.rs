@@ -4,11 +4,12 @@ mod tests {
 
     use anyhow::Result;
     use ob_poc::database::{CbuService, EntityService};
-    use ob_poc::dsl_v2::execution_plan::compile;
-    use ob_poc::dsl_v2::executor::{DslExecutor, ExecutionContext};
-    use ob_poc::dsl_v2::generic_executor::{GenericCrudExecutor, GenericExecutionResult};
-    use ob_poc::dsl_v2::parser::parse_program;
-    use ob_poc::dsl_v2::runtime_registry::runtime_registry;
+    use ob_poc::dsl_v2::execution::{
+        runtime_registry, DslExecutor, ExecutionContext, GenericCrudExecutor,
+        GenericExecutionResult,
+    };
+    use ob_poc::dsl_v2::planning::compile;
+    use ob_poc::dsl_v2::syntax::parse_program;
     use serde_json::json;
     use sqlx::PgPool;
     use uuid::Uuid;

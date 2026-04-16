@@ -219,7 +219,10 @@ impl RequestStateStore {
     /// ```ignore
     /// let row = store.find_by_request_key(request_key).await?;
     /// ```
-    pub async fn find_by_request_key(&self, request_key: &str) -> Result<Option<RequestStateRecord>> {
+    pub async fn find_by_request_key(
+        &self,
+        request_key: &str,
+    ) -> Result<Option<RequestStateRecord>> {
         let row = sqlx::query(
             r#"
             SELECT request_key, correlation_key, session_id, runbook_id, entry_id,
@@ -249,8 +252,7 @@ impl RequestStateStore {
             entry_id: row.get("entry_id"),
             process_key: row.get("process_key"),
             process_instance_id: row.get("process_instance_id"),
-            status: RequestStatus::parse(&status)
-                .unwrap_or(RequestStatus::Requested),
+            status: RequestStatus::parse(&status).unwrap_or(RequestStatus::Requested),
             requested_at: row.get("requested_at"),
             started_at: row.get("started_at"),
             completed_at: row.get("completed_at"),

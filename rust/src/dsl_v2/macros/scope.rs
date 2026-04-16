@@ -37,47 +37,14 @@ pub enum BoundValue {
     Uuid(Uuid),
     /// String binding
     String(String),
-    /// Integer binding
-    Int(i64),
-    /// JSON value binding (for complex results)
-    Json(serde_json::Value),
 }
 
 impl BoundValue {
-    /// Create a UUID binding
-    pub fn uuid(id: Uuid) -> Self {
-        BoundValue::Uuid(id)
-    }
-
-    /// Create a string binding
-    pub fn string(s: impl Into<String>) -> Self {
-        BoundValue::String(s.into())
-    }
-
     /// Try to get as UUID
     pub fn as_uuid(&self) -> Option<Uuid> {
         match self {
             BoundValue::Uuid(id) => Some(*id),
             BoundValue::String(s) => Uuid::parse_str(s).ok(),
-            _ => None,
-        }
-    }
-
-    /// Try to get as string
-    pub fn as_string(&self) -> Option<&str> {
-        match self {
-            BoundValue::String(s) => Some(s),
-            _ => None,
-        }
-    }
-
-    /// Convert to string representation
-    pub fn to_string_value(&self) -> String {
-        match self {
-            BoundValue::Uuid(id) => id.to_string(),
-            BoundValue::String(s) => s.clone(),
-            BoundValue::Int(i) => i.to_string(),
-            BoundValue::Json(v) => v.to_string(),
         }
     }
 }
@@ -111,9 +78,6 @@ pub struct SymbolScope {
 
     /// Counter for generating unique symbols
     gensym_counter: u64,
-
-    /// Scope name (for debugging/tracing)
-    name: String,
 }
 
 impl Default for SymbolScope {
@@ -129,17 +93,15 @@ impl SymbolScope {
             parent: None,
             bindings: HashMap::new(),
             gensym_counter: 0,
-            name: "root".to_string(),
         }
     }
 
     /// Create a child scope with this scope as parent
-    pub fn child(&self, name: impl Into<String>) -> Self {
+    pub fn child(&self, _name: impl Into<String>) -> Self {
         Self {
             parent: Some(Box::new(self.clone())),
             bindings: HashMap::new(),
             gensym_counter: self.gensym_counter,
-            name: name.into(),
         }
     }
 
@@ -182,31 +144,6 @@ impl SymbolScope {
         self.gensym_counter += 1;
         format!("@{}_{}", prefix, self.gensym_counter)
     }
-
-    /// Get all locally bound symbols
-    pub fn local_symbols(&self) -> impl Iterator<Item = &String> {
-        self.bindings.keys()
-    }
-
-    /// Get all symbols (including inherited)
-    pub fn all_symbols(&self) -> Vec<String> {
-        let mut symbols: HashMap<String, ()> = HashMap::new();
-
-        // Collect from parent first (so local overrides show)
-        if let Some(ref parent) = self.parent {
-            for sym in parent.all_symbols() {
-                symbols.insert(sym, ());
-            }
-        }
-
-        // Add local symbols
-        for sym in self.bindings.keys() {
-            symbols.insert(sym.clone(), ());
-        }
-
-        symbols.into_keys().collect()
-    }
-
     /// Import specific symbols from another scope into this one
     ///
     /// Used for `import-symbols` in nested macro invocation.
@@ -218,21 +155,8 @@ impl SymbolScope {
         }
     }
 
-    /// Export specific symbols to a mutable target scope
-    pub fn export_to(&self, target: &mut SymbolScope, symbols: &[String]) {
-        for sym in symbols {
-            if let Some(value) = self.resolve(sym) {
-                target.bind(sym.clone(), value.clone());
-            }
-        }
-    }
-
-    /// Get scope name
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Get depth in scope chain (0 = root)
+    /// Get depth in scope chain (0 = root).
+    #[cfg(test)]
     pub fn depth(&self) -> usize {
         match &self.parent {
             Some(p) => 1 + p.depth(),
@@ -306,33 +230,6 @@ impl MacroExpansionScope {
         self.scope = self.scope.child(macro_fqn);
         Ok(())
     }
-
-    /// Pop a macro from the expansion stack
-    pub fn pop_macro(&mut self) -> Option<String> {
-        let macro_fqn = self.expansion_stack.pop()?;
-
-        // Restore parent scope
-        if let Some(parent) = self.scope.parent.take() {
-            self.scope = *parent;
-        }
-
-        Some(macro_fqn)
-    }
-
-    /// Get current expansion depth
-    pub fn depth(&self) -> usize {
-        self.expansion_stack.len()
-    }
-
-    /// Check if currently inside a specific macro
-    pub fn is_expanding(&self, macro_fqn: &str) -> bool {
-        self.expansion_stack.contains(&macro_fqn.to_string())
-    }
-
-    /// Get the current macro being expanded
-    pub fn current_macro(&self) -> Option<&str> {
-        self.expansion_stack.last().map(|s| s.as_str())
-    }
 }
 
 /// Errors during macro scoping
@@ -346,9 +243,6 @@ pub enum MacroScopeError {
 
     #[error("Maximum expansion depth {max} exceeded (current: {depth})")]
     MaxDepthExceeded { depth: usize, max: usize },
-
-    #[error("Symbol not found: {0}")]
-    SymbolNotFound(String),
 }
 
 #[cfg(test)]

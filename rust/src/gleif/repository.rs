@@ -3,7 +3,7 @@
 //! Handles persistence of GLEIF Level 1 and Level 2 data to our schema.
 
 use super::types::*;
-use crate::dsl_v2::{DslExecutor, ExecutionContext};
+use crate::dsl_v2::execution::{DslExecutor, ExecutionContext};
 use anyhow::{Context, Result};
 use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::PgPool;

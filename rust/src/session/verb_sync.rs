@@ -52,8 +52,7 @@ use thiserror::Error;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use crate::dsl_v2::runtime_registry::{RuntimeBehavior, RuntimeVerb};
-use crate::dsl_v2::RuntimeVerbRegistry;
+use crate::dsl_v2::execution::{RuntimeBehavior, RuntimeVerb, RuntimeVerbRegistry};
 use dsl_core::config::types::VerbsConfig;
 
 use super::canonical_hash::canonical_json_hash;

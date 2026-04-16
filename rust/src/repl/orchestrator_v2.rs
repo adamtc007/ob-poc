@@ -2511,9 +2511,7 @@ impl ReplOrchestratorV2 {
             .max_by_key(|(_, s)| s.created_at);
 
         if let Some((old_id, old_session)) = resume_candidate {
-            let group_id = old_session
-                .session_scope()
-                .map(|s| s.client_group_id);
+            let group_id = old_session.session_scope().map(|s| s.client_group_id);
             let workspace = old_session
                 .workspace_stack
                 .last()
@@ -2538,8 +2536,7 @@ impl ReplOrchestratorV2 {
                     }
                     if let Some(ws) = workspace {
                         new_session.set_workspace_root(ws);
-                        new_session
-                            .set_state(ReplStateV2::JourneySelection { candidates: None });
+                        new_session.set_state(ReplStateV2::JourneySelection { candidates: None });
                     }
                 }
             }

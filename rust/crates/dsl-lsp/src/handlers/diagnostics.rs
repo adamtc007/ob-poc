@@ -15,10 +15,10 @@ use crate::analysis::parse_with_v2;
 use crate::encoding::{span_to_range as encoding_span_to_range, PositionEncoding};
 
 use ob_poc::dsl_v2::config::ConfigLoader;
-use ob_poc::dsl_v2::planning_facade::{analyse_and_plan, PlanningInput};
-use ob_poc::dsl_v2::runtime_registry::RuntimeVerbRegistry;
-use ob_poc::dsl_v2::validation::{Severity, ValidationContext};
-use ob_poc::dsl_v2::LspValidator;
+use ob_poc::dsl_v2::tooling::{
+    analyse_and_plan, LspValidator, PlanningInput, PlanningOutput, RuntimeVerbRegistry,
+    SemanticDiagnostic, Severity, SourceSpan, ValidationContext,
+};
 
 /// Create a planning registry from config
 /// This is cached after first call via lazy_static pattern
@@ -53,9 +53,9 @@ fn create_planning_registry() -> Option<Arc<RuntimeVerbRegistry>> {
 pub struct AnalysisResult {
     pub state: DocumentState,
     pub diagnostics: Vec<Diagnostic>,
-    pub planning_output: ob_poc::dsl_v2::planning_facade::PlanningOutput,
+    pub planning_output: PlanningOutput,
     /// Semantic diagnostics with entity suggestions (for code actions)
-    pub semantic_diagnostics: Vec<ob_poc::dsl_v2::validation::Diagnostic>,
+    pub semantic_diagnostics: Vec<SemanticDiagnostic>,
 }
 
 /// Analyze a document with full semantic validation via EntityGateway.
@@ -118,11 +118,11 @@ pub async fn analyze_document_full(text: &str) -> AnalysisResult {
             output
         } else {
             // No registry available - skip planning diagnostics
-            ob_poc::dsl_v2::planning_facade::PlanningOutput::default()
+            PlanningOutput::default()
         }
     } else {
         // Return empty planning output for incomplete code
-        ob_poc::dsl_v2::planning_facade::PlanningOutput::default()
+        PlanningOutput::default()
     };
 
     AnalysisResult {
@@ -141,7 +141,7 @@ pub fn analyze_document(text: &str) -> (DocumentState, Vec<Diagnostic>) {
 }
 
 /// Convert internal Diagnostic (from validation module) to LSP Diagnostic format
-fn convert_diagnostic(diag: &ob_poc::dsl_v2::validation::Diagnostic, source: &str) -> Diagnostic {
+fn convert_diagnostic(diag: &SemanticDiagnostic, source: &str) -> Diagnostic {
     // Convert SourceSpan to LSP Range
     let range = span_to_range(&diag.span, source);
 
@@ -239,7 +239,7 @@ fn convert_planning_diagnostic(
 }
 
 /// Convert SourceSpan to LSP Range using proper UTF-16 encoding
-fn span_to_range(span: &ob_poc::dsl_v2::validation::SourceSpan, source: &str) -> Range {
+fn span_to_range(span: &SourceSpan, source: &str) -> Range {
     // Use byte offsets directly with the encoding module for proper UTF-16 handling
     let start_offset = span.offset as usize;
     let end_offset = start_offset + span.length as usize;
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn test_span_to_range_single_line() {
         let source = "(cbu.ensure :name \"Test\")";
-        let span = ob_poc::dsl_v2::validation::SourceSpan {
+        let span = SourceSpan {
             line: 1,
             column: 1,
             offset: 1,

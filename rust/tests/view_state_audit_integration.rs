@@ -22,7 +22,9 @@ mod view_state_audit_tests {
     use uuid::Uuid;
 
     use ob_poc::database::ViewStateAuditRepository;
-    use ob_poc::dsl_v2::{compile, parse_program, DslExecutor, ExecutionContext};
+    use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext};
+    use ob_poc::dsl_v2::planning::compile;
+    use ob_poc::dsl_v2::syntax::parse_program;
     use ob_poc::session::ViewState;
     use ob_poc::taxonomy::{TaxonomyContext, TaxonomyNode};
 

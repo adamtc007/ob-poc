@@ -34,7 +34,7 @@ use ob_poc::api::{
 
 // Import gateway resolver for resolution routes
 use entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient;
-use ob_poc::dsl_v2::{gateway_resolver::gateway_addr, GatewayRefResolver};
+use ob_poc::dsl_v2::execution::{gateway_addr, GatewayRefResolver, RuntimeVerbRegistry};
 
 // Import verb sync and config loader for startup sync
 use ob_poc::dsl_v2::ConfigLoader;
@@ -46,19 +46,13 @@ use std::sync::atomic::AtomicBool;
 
 // EntityGateway for entity resolution
 use entity_gateway::{
-    proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer,
-    run_refresh_loop,
-    EntityGatewayService,
-    GatewayConfig,
-    IndexRegistry,
-    RefreshPipeline,
-    StartupMode,
-    TantivyIndex,
+    proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer, run_refresh_loop,
+    EntityGatewayService, GatewayConfig, IndexRegistry, RefreshPipeline, StartupMode, TantivyIndex,
 };
 
 async fn register_bpmn_models(
-    client: &ob_poc::bpmn_integration::client::BpmnLiteConnection,
-    config_index: &mut ob_poc::bpmn_integration::config::WorkflowConfigIndex,
+    client: &ob_poc::bpmn_integration::BpmnLiteConnection,
+    config_index: &mut ob_poc::bpmn_integration::WorkflowConfigIndex,
     config_dir: &std::path::Path,
 ) {
     let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -240,27 +234,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(verbs_config) => {
             // Use from_config_with_db to expand dynamic verbs from entity_types table
             // This generates entity.create-{type_code} verbs for ALL entity types in DB
-            let registry = match ob_poc::dsl_v2::RuntimeVerbRegistry::from_config_with_db(
-                &verbs_config,
-                &pool,
-            )
-            .await
-            {
-                Ok(r) => {
-                    tracing::info!(
-                        "Verb registry loaded with {} verbs (including dynamic expansion)",
-                        r.len()
-                    );
-                    r
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Dynamic verb expansion failed, falling back to static config: {}",
-                        e
-                    );
-                    ob_poc::dsl_v2::RuntimeVerbRegistry::from_config(&verbs_config)
-                }
-            };
+            let registry =
+                match RuntimeVerbRegistry::from_config_with_db(&verbs_config, &pool).await {
+                    Ok(r) => {
+                        tracing::info!(
+                            "Verb registry loaded with {} verbs (including dynamic expansion)",
+                            r.len()
+                        );
+                        r
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Dynamic verb expansion failed, falling back to static config: {}",
+                            e
+                        );
+                        RuntimeVerbRegistry::from_config(&verbs_config)
+                    }
+                };
 
             // Sync verbs AND invocation_phrases to DB (yaml_intent_patterns column)
             // V1 YAML now has auto-generated phrases from dsl-core ConfigLoader
@@ -571,16 +561,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     type BpmnSetup = (
         Option<Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>>,
-        Option<Arc<ob_poc::bpmn_integration::dispatcher::WorkflowDispatcher>>,
+        Option<Arc<ob_poc::bpmn_integration::WorkflowDispatcher>>,
         std::collections::HashSet<String>,
     );
     let (bpmn_executor_v2, bpmn_dispatcher, orchestrated_verbs): BpmnSetup = {
         use ob_poc::bpmn_integration::{
-            client::BpmnLiteConnection, config::WorkflowConfigIndex, correlation::CorrelationStore,
-            dispatcher::WorkflowDispatcher, job_frames::JobFrameStore,
-            parked_tokens::ParkedTokenStore, pending_dispatch_worker::PendingDispatchWorker,
-            pending_dispatches::PendingDispatchStore, request_state::RequestStateStore,
-            worker::JobWorker,
+            BpmnLiteConnection, CorrelationStore, JobFrameStore, JobWorker, ParkedTokenStore,
+            PendingDispatchStore, PendingDispatchWorker, RequestStateStore, WorkflowConfigIndex,
+            WorkflowDispatcher,
         };
         use ob_poc::repl::executor_bridge::RealDslExecutor;
 
@@ -603,7 +591,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // Auto-register durable verbs from verb YAML
                                 {
                                     use ob_poc::dsl_v2::config::types::DurableConfig;
-                                    use ob_poc::dsl_v2::runtime_registry::{
+                                    use ob_poc::dsl_v2::execution::{
                                         runtime_registry, RuntimeBehavior,
                                     };
                                     let reg = runtime_registry();
@@ -807,8 +795,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             use ob_poc::agent::learning::embedder::CandleEmbedder;
             use ob_poc::agent::learning::warmup::LearningWarmup;
-            use ob_poc::dsl_v2::macros::{load_macro_registry_from_dir, MacroRegistry};
-            use ob_poc::dsl_v2::ConfigLoader;
+            use ob_poc::dsl_v2::{load_macro_registry_from_dir, ConfigLoader, MacroRegistry};
             use ob_poc::entity_linking::{
                 EntityLinkingService, EntityLinkingServiceImpl, StubEntityLinkingService,
             };

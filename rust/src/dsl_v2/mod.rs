@@ -83,16 +83,16 @@ pub mod display_nouns;
 // Macro expansion (operator vocabulary layer)
 pub mod domain_context;
 pub mod enrichment;
-pub mod entity_deps;
+pub(crate) mod entity_deps;
 pub mod errors;
-pub mod execution_plan;
+pub(crate) mod execution_plan;
 pub mod execution_result;
-pub mod executor;
-pub mod expansion;
+pub(crate) mod executor;
+pub(crate) mod expansion;
 #[cfg(feature = "database")]
-pub mod gateway_resolver;
+pub(crate) mod gateway_resolver;
 #[cfg(feature = "database")]
-pub mod generic_executor;
+pub(crate) mod generic_executor;
 #[cfg(feature = "database")]
 pub mod graph_executor;
 #[cfg(feature = "database")]
@@ -100,22 +100,22 @@ pub mod idempotency;
 pub mod intent;
 pub mod intent_tiers;
 #[cfg(feature = "database")]
-pub mod lsp_validator;
-pub mod macros;
+pub(crate) mod lsp_validator;
+pub(crate) mod macros;
 pub mod operator_types;
-pub mod planning_facade;
+pub(crate) mod planning_facade;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
 pub mod repl_session;
-pub mod runtime_registry;
+pub(crate) mod runtime_registry;
 #[cfg(feature = "database")]
-pub mod semantic_validator;
+pub(crate) mod semantic_validator;
 #[cfg(feature = "database")]
 pub mod sheet_executor;
 pub mod submission;
 pub mod suggestions;
 pub mod topo_sort;
-pub mod validation;
+pub(crate) mod validation;
 pub mod verb_registry;
 pub mod verb_taxonomy;
 
@@ -138,45 +138,14 @@ pub use domain_context::{ActiveDomain, DomainContext, IterationContext};
 pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
 #[cfg(feature = "database")]
 pub use entity_deps::init_entity_deps;
-pub use entity_deps::{
-    entity_deps, topological_sort_unified, DependencyKind, EntityDep, EntityDependencyRegistry,
-    EntityInstance, EntityTypeKey, TopoSortUnifiedError, TopoSortUnifiedResult,
-};
-pub use execution_plan::{
-    compile, compile_with_planning, BindingInfo as PlanningBindingInfo, CompileError,
-    ExecutionPlan, ExecutionStep, Injection, PlannerDiagnostic, PlanningContext, PlanningResult,
-    SyntheticStep,
-};
 pub use execution_result::{ExecutionResults, StepResult};
-#[cfg(feature = "database")]
-pub use executor::{
-    AtomicExecutionResult, BatchStatus, BestEffortExecutionResult, IterationResult,
-    SubmissionResult,
-};
-pub use executor::{
-    DagExecutionResult, DslExecutor, ExecutionContext, ExecutionResult, OpExecutionResult,
-    ReturnType,
-};
-#[cfg(feature = "database")]
-pub use gateway_resolver::GatewayRefResolver;
-#[cfg(feature = "database")]
-pub use generic_executor::{GenericCrudExecutor, GenericExecutionResult};
 #[cfg(feature = "database")]
 pub use idempotency::{compute_idempotency_key, IdempotencyManager};
 pub use intent::{ArgIntent, DslIntent, DslIntentBatch, ResolvedArg};
-#[cfg(feature = "database")]
-pub use lsp_validator::LspValidator;
 pub use operator_types::{OperatorRole, OperatorType};
-pub use planning_facade::{
-    analyse_and_plan, quick_validate, ImplicitCreateMode, PlannedExecution, PlanningInput,
-    PlanningOutput, SyntheticStep as FacadeSyntheticStep,
-};
 #[cfg(feature = "database")]
 pub use ref_resolver::RefResolver;
 pub use repl_session::{ExecutedBlock, ReplSession};
-pub use runtime_registry::{runtime_registry, runtime_registry_arc, RuntimeVerbRegistry};
-#[cfg(feature = "database")]
-pub use semantic_validator::{validate_dsl, validate_dsl_with_csg, SemanticValidator};
 #[cfg(feature = "database")]
 pub use sheet_executor::SheetExecutor;
 pub use submission::{
@@ -188,10 +157,6 @@ pub use topo_sort::{
     ExecutionPhase as TopoExecutionPhase, TopoSortError, TopoSortResult,
 };
 
-pub use verb_registry::{
-    find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,
-    VerbBehavior,
-};
 pub use verb_taxonomy::{
     verb_taxonomy, DomainSummary, TaxonomyCategory, TaxonomyDomain, VerbLocation, VerbTaxonomy,
 };
@@ -210,7 +175,87 @@ pub use errors::{
 
 // Re-export macro expansion types
 pub use macros::{
-    expand_macro, load_macro_registry, load_macro_registry_from_dir, MacroArg, MacroArgType,
-    MacroEnumValue, MacroExpansionError, MacroExpansionOutput, MacroExpansionStep, MacroPrereq,
-    MacroRegistry, MacroRouting, MacroSchema, MacroTarget, MacroUi, SetState,
+    expand_macro, expand_macro_fixpoint, load_macro_registry, load_macro_registry_from_dir,
+    ArgStyle, ExpansionLimits, FixpointExpansionOutput, MacroArg, MacroArgType, MacroArgs,
+    MacroExpansionError, MacroExpansionOutput, MacroExpansionStep, MacroKind, MacroPrereq,
+    MacroRegistry, MacroRouting, MacroSchema, MacroTarget, MacroUi, SetState, VerbCallStep,
 };
+
+/// Syntax-facing DSL seam: parse input and inspect AST/bindings.
+pub mod syntax {
+    pub use super::{
+        parse_program, parse_single_verb, Argument, AstNode, BindingContext, BindingInfo,
+        EntityRefStats, Literal, Program, Span, Statement, VerbCall,
+    };
+}
+
+/// Planning-facing DSL seam: compile, analyse, and inspect dependency/planning output.
+pub mod planning {
+    pub use super::entity_deps::{
+        entity_deps, topological_sort_unified, DependencyKind, EntityDep, EntityDependencyRegistry,
+        EntityInstance, EntityTypeKey, TopoSortUnifiedError, TopoSortUnifiedResult,
+    };
+    pub use super::execution_plan::{
+        compile, compile_with_planning, BindingInfo as PlanningBindingInfo, CompileError,
+        ExecutionPlan, ExecutionStep, Injection, PlannerDiagnostic, PlanningContext,
+        PlanningResult, SyntheticStep,
+    };
+    pub use super::planning_facade::{
+        analyse_and_plan, quick_validate, ImplicitCreateMode, PlannedExecution, PlanningInput,
+        PlanningOutput, SyntheticStep as FacadeSyntheticStep,
+    };
+}
+
+/// Execution-facing DSL seam: execute compiled/planned work and access runtime registries.
+pub mod execution {
+    #[cfg(feature = "database")]
+    pub use super::executor::{
+        AtomicExecutionResult, BatchStatus, BestEffortExecutionResult, DslExecutor,
+        ExecutionContext, ExecutionResult, IterationResult, SubmissionResult,
+    };
+    #[cfg(not(feature = "database"))]
+    pub use super::executor::{DslExecutor, ExecutionContext, ExecutionResult};
+
+    pub use super::executor::{DagExecutionResult, OpExecutionResult, ReturnType};
+    #[cfg(feature = "database")]
+    pub use super::gateway_resolver::{gateway_addr, GatewayRefResolver};
+    #[cfg(feature = "database")]
+    pub use super::generic_executor::{GenericCrudExecutor, GenericExecutionResult};
+    pub use super::runtime_registry::{
+        runtime_registry, runtime_registry_arc, RuntimeArg, RuntimeBatchPolicy, RuntimeBehavior,
+        RuntimeCrudConfig, RuntimeDurableConfig, RuntimeGraphQueryConfig, RuntimeLockAccess,
+        RuntimeLockMode, RuntimeLockTarget, RuntimePolicyConfig, RuntimeReturn, RuntimeVerb,
+        RuntimeVerbRegistry,
+    };
+}
+
+/// Tooling-facing DSL seam: diagnostics, validation, planning, and editor support.
+pub mod tooling {
+    pub use super::planning_facade::{
+        analyse_and_plan, PlanningInput, PlanningOutput, SyntheticStep as PlanningSyntheticStep,
+    };
+    pub use super::runtime_registry::{RuntimeBehavior, RuntimeVerb, RuntimeVerbRegistry};
+    pub use super::validation::{
+        ClientType as ValidationClientType, Diagnostic as SemanticDiagnostic,
+        DiagnosticCode as ValidationDiagnosticCode, Intent as ValidationIntent, RefType,
+        ResolvedArg as ValidationResolvedArg, RustStyleFormatter as ValidationRustStyleFormatter,
+        Severity, SourceSpan, Suggestion, ValidatedProgram, ValidatedStatement, ValidationContext,
+        ValidationRequest, ValidationResult,
+    };
+    pub use super::verb_registry::{
+        find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,
+        VerbBehavior,
+    };
+
+    #[cfg(feature = "database")]
+    pub use super::gateway_resolver::{gateway_addr, GatewayRefResolver};
+    #[cfg(feature = "database")]
+    pub use super::lsp_validator::LspValidator;
+    #[cfg(feature = "database")]
+    pub use super::semantic_validator::{validate_dsl, validate_dsl_with_csg, SemanticValidator};
+    #[cfg(feature = "database")]
+    pub use super::validation::{
+        BindingInfo as ValidationBindingInfo, Diagnostic as ValidationDiagnostic,
+        Severity as ValidationSeverity, SourceSpan as ValidationSourceSpan,
+    };
+}

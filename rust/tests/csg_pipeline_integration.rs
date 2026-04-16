@@ -7,11 +7,9 @@
 
 #![cfg(feature = "database")]
 
-use ob_poc::dsl_v2::{
-    parse_program,
-    validation::{ClientType, DiagnosticCode, ValidationContext},
-    CsgLinter,
-};
+use ob_poc::dsl_v2::csg_linter::CsgLinter;
+use ob_poc::dsl_v2::syntax::parse_program;
+use ob_poc::dsl_v2::tooling::{ValidationClientType, ValidationContext, ValidationDiagnosticCode};
 
 /// Get test database pool
 async fn get_test_pool() -> sqlx::PgPool {
@@ -40,7 +38,7 @@ async fn test_passport_for_company_rejected() {
     "#;
 
     let ast = parse_program(source).expect("Failed to parse");
-    let context = ValidationContext::default().with_client_type(ClientType::Corporate);
+    let context = ValidationContext::default().with_client_type(ValidationClientType::Corporate);
 
     let result = linter.lint(ast, &context, source).await;
 
@@ -52,7 +50,7 @@ async fn test_passport_for_company_rejected() {
         result
             .diagnostics
             .iter()
-            .any(|d| d.code == DiagnosticCode::DocumentNotApplicableToEntityType),
+            .any(|d| d.code == ValidationDiagnosticCode::DocumentNotApplicableToEntityType),
         "Expected DocumentNotApplicableToEntityType error"
     );
 }
@@ -75,7 +73,7 @@ async fn test_passport_for_person_accepted() {
     "#;
 
     let ast = parse_program(source).expect("Failed to parse");
-    let context = ValidationContext::default().with_client_type(ClientType::Individual);
+    let context = ValidationContext::default().with_client_type(ValidationClientType::Individual);
 
     let result = linter.lint(ast, &context, source).await;
 
@@ -104,7 +102,7 @@ async fn test_cert_incorporation_for_company_accepted() {
     "#;
 
     let ast = parse_program(source).expect("Failed to parse");
-    let context = ValidationContext::default().with_client_type(ClientType::Corporate);
+    let context = ValidationContext::default().with_client_type(ValidationClientType::Corporate);
 
     let result = linter.lint(ast, &context, source).await;
 
@@ -141,7 +139,7 @@ async fn test_undefined_symbol_detected() {
         result
             .diagnostics
             .iter()
-            .any(|d| d.code == DiagnosticCode::UndefinedSymbol),
+            .any(|d| d.code == ValidationDiagnosticCode::UndefinedSymbol),
         "Expected UndefinedSymbol error"
     );
 }
@@ -176,7 +174,7 @@ async fn test_unused_symbol_warning() {
         result
             .diagnostics
             .iter()
-            .any(|d| d.code == DiagnosticCode::UnusedBinding),
+            .any(|d| d.code == ValidationDiagnosticCode::UnusedBinding),
         "Expected UnusedBinding warning"
     );
 }
@@ -199,7 +197,7 @@ async fn test_financial_statement_for_company_accepted() {
     "#;
 
     let ast = parse_program(source).expect("Failed to parse");
-    let context = ValidationContext::default().with_client_type(ClientType::Corporate);
+    let context = ValidationContext::default().with_client_type(ValidationClientType::Corporate);
 
     let result = linter.lint(ast, &context, source).await;
 
@@ -228,7 +226,7 @@ async fn test_financial_statement_for_person_rejected() {
     "#;
 
     let ast = parse_program(source).expect("Failed to parse");
-    let context = ValidationContext::default().with_client_type(ClientType::Individual);
+    let context = ValidationContext::default().with_client_type(ValidationClientType::Individual);
 
     let result = linter.lint(ast, &context, source).await;
 
@@ -240,7 +238,7 @@ async fn test_financial_statement_for_person_rejected() {
         result
             .diagnostics
             .iter()
-            .any(|d| d.code == DiagnosticCode::DocumentNotApplicableToEntityType),
+            .any(|d| d.code == ValidationDiagnosticCode::DocumentNotApplicableToEntityType),
         "Expected DocumentNotApplicableToEntityType error"
     );
 }

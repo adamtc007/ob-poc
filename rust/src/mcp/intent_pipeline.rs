@@ -44,8 +44,12 @@ use std::sync::Arc;
 use ob_agentic::{create_llm_client, LlmClient};
 
 use crate::dsl_v2::ast::find_unresolved_ref_locations;
+use crate::dsl_v2::enrich_program;
+use crate::dsl_v2::execution::runtime_registry_arc;
+use crate::dsl_v2::planning::compile;
 use crate::dsl_v2::runtime_registry::{RuntimeArg, RuntimeVerb};
-use crate::dsl_v2::{compile, enrich_program, parse_program, registry, runtime_registry_arc};
+use crate::dsl_v2::syntax::parse_program;
+use crate::dsl_v2::tooling::registry;
 use crate::mcp::scope_resolution::{ScopeContext, ScopeResolutionOutcome, ScopeResolver};
 use crate::mcp::verb_search::{
     check_ambiguity, HybridVerbSearcher, VerbSearchOutcome, VerbSearchResult,
@@ -1463,7 +1467,8 @@ mod tests {
     #[test]
     fn test_list_commit_resolves_single_ref() {
         use crate::dsl_v2::ast::find_unresolved_ref_locations;
-        use crate::dsl_v2::{enrich_program, runtime_registry_arc};
+        use crate::dsl_v2::enrich_program;
+        use crate::dsl_v2::execution::runtime_registry_arc;
         use dsl_core::ast::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
         // HashSet used in commented-out TODO assertion for unique ref_ids
         #[allow(unused_imports)]
@@ -1599,7 +1604,8 @@ mod tests {
     #[test]
     fn test_issue_k_commit_resolves_single_list_item() {
         use crate::dsl_v2::ast::{find_unresolved_ref_locations, Statement};
-        use crate::dsl_v2::{enrich_program, runtime_registry_arc};
+        use crate::dsl_v2::enrich_program;
+        use crate::dsl_v2::execution::runtime_registry_arc;
         use dsl_core::ast::{Argument, AstNode, Literal, Program, Span, VerbCall};
         use std::collections::HashSet;
 

@@ -36,8 +36,8 @@ pub mod plan_assembler;
 // Re-export verb_classifier and constraint_gate from runbook module.
 // These remain physically in runbook/ because compiler.rs uses them via
 // `super::` paths. The plan_builder module provides a unified public surface.
-pub use crate::runbook::constraint_gate::{self, check_pack_constraints};
-pub use crate::runbook::verb_classifier::{self, classify_verb, VerbClassification};
+pub use crate::runbook::check_pack_constraints;
+pub use crate::runbook::{classify_verb, VerbClassification};
 
 // Re-export plan_assembler types
 pub use plan_assembler::{

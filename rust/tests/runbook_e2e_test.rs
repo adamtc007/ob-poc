@@ -20,20 +20,19 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use uuid::Uuid;
 
-use ob_poc::dsl_v2::macros::{
-    expand_macro_fixpoint, ArgStyle, ExpansionLimits, InvokeMacroStep, MacroArg, MacroArgType,
-    MacroArgs, MacroExpansionError, MacroExpansionStep, MacroKind, MacroRegistry, MacroRouting,
-    MacroSchema, MacroTarget, MacroUi, VerbCallStep,
+use ob_poc::dsl_v2::{
+    expand_macro_fixpoint, ArgStyle, ExpansionLimits, MacroArg, MacroArgType, MacroArgs,
+    MacroExpansionError, MacroExpansionStep, MacroKind, MacroRegistry, MacroRouting, MacroSchema,
+    MacroTarget, MacroUi, VerbCallStep,
 };
 use ob_poc::journey::pack_manager::{ConstraintSource, EffectiveConstraints};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
-use ob_poc::runbook::canonical::{canonical_bytes_for_steps, content_addressed_id, full_sha256};
-use ob_poc::runbook::errors::CompilationErrorKind;
-use ob_poc::runbook::verb_classifier::{classify_verb, VerbClassification};
 use ob_poc::runbook::{
-    compile_invocation, compile_verb, execute_runbook, CompiledRunbook, CompiledRunbookStatus,
-    CompiledStep, ExecutionMode, OrchestratorResponse, ReplayEnvelope, RunbookStore,
-    RunbookStoreBackend, StepExecutor, StepOutcome,
+    canonical_bytes_for_steps, classify_verb, compile_invocation, compile_verb, compute_write_set,
+    content_addressed_id, derive_write_set_heuristic, execute_runbook, full_sha256,
+    CompilationErrorKind, CompiledRunbook, CompiledRunbookStatus, CompiledStep, ExecutionError,
+    ExecutionMode, OrchestratorResponse, ReplayEnvelope, RunbookStore, RunbookStoreBackend,
+    StepExecutor, StepOutcome, VerbClassification,
 };
 use ob_poc::session::unified::{ClientRef, StructureType, UnifiedSession};
 
@@ -155,6 +154,18 @@ fn make_macro_schema(
         sets_state: vec![],
         unlocks: vec![],
     }
+}
+
+fn make_invoke_macro_step(
+    macro_id: &str,
+    args: HashMap<String, serde_json::Value>,
+) -> MacroExpansionStep {
+    serde_json::from_value(serde_json::json!({
+        "invoke-macro": macro_id,
+        "args": args,
+        "import-symbols": [],
+    }))
+    .expect("invoke-macro test fixture must deserialize")
 }
 
 struct SuccessExecutor;
@@ -453,17 +464,13 @@ async fn test_nested_macro_fixpoint() {
                     },
                     bind_as: None,
                 }),
-                MacroExpansionStep::InvokeMacro(InvokeMacroStep {
-                    macro_id: "party.setup".to_string(),
-                    args: {
-                        let mut m = HashMap::new();
-                        m.insert(
-                            "party-name".to_string(),
-                            serde_json::Value::String("${arg.party-name}".to_string()),
-                        );
-                        m
-                    },
-                    import_symbols: vec![],
+                make_invoke_macro_step("party.setup", {
+                    let mut m = HashMap::new();
+                    m.insert(
+                        "party-name".to_string(),
+                        serde_json::Value::String("${arg.party-name}".to_string()),
+                    );
+                    m
                 }),
             ],
         ),
@@ -535,17 +542,13 @@ fn test_cycle_detection() {
             "Cycle A",
             "Invokes B",
             a_required,
-            vec![MacroExpansionStep::InvokeMacro(InvokeMacroStep {
-                macro_id: "cycle.b".to_string(),
-                args: {
-                    let mut m = HashMap::new();
-                    m.insert(
-                        "x".to_string(),
-                        serde_json::Value::String("${arg.x}".to_string()),
-                    );
-                    m
-                },
-                import_symbols: vec![],
+            vec![make_invoke_macro_step("cycle.b", {
+                let mut m = HashMap::new();
+                m.insert(
+                    "x".to_string(),
+                    serde_json::Value::String("${arg.x}".to_string()),
+                );
+                m
             })],
         ),
     );
@@ -560,17 +563,13 @@ fn test_cycle_detection() {
             "Cycle B",
             "Invokes A",
             b_required,
-            vec![MacroExpansionStep::InvokeMacro(InvokeMacroStep {
-                macro_id: "cycle.a".to_string(),
-                args: {
-                    let mut m = HashMap::new();
-                    m.insert(
-                        "x".to_string(),
-                        serde_json::Value::String("${arg.x}".to_string()),
-                    );
-                    m
-                },
-                import_symbols: vec![],
+            vec![make_invoke_macro_step("cycle.a", {
+                let mut m = HashMap::new();
+                m.insert(
+                    "x".to_string(),
+                    serde_json::Value::String("${arg.x}".to_string()),
+                );
+                m
             })],
         ),
     );
@@ -614,17 +613,13 @@ fn test_depth_limit() {
         required.insert("x".to_string(), make_string_arg("X"));
 
         let expansion = if i < 9 {
-            vec![MacroExpansionStep::InvokeMacro(InvokeMacroStep {
-                macro_id: format!("deep.{}", i + 1),
-                args: {
-                    let mut m = HashMap::new();
-                    m.insert(
-                        "x".to_string(),
-                        serde_json::Value::String("${arg.x}".to_string()),
-                    );
-                    m
-                },
-                import_symbols: vec![],
+            vec![make_invoke_macro_step(&format!("deep.{}", i + 1), {
+                let mut m = HashMap::new();
+                m.insert(
+                    "x".to_string(),
+                    serde_json::Value::String("${arg.x}".to_string()),
+                );
+                m
             })]
         } else {
             // Terminal: deep.9 produces a verb call
@@ -902,7 +897,7 @@ async fn test_write_set_locks_acquired() {
     let step2 = make_step_with_write_set("entity.update", vec![entity_id_2, entity_id_1]);
 
     // Compute combined write_set
-    let ws = ob_poc::runbook::executor::compute_write_set(&[step1.clone(), step2.clone()], None);
+    let ws = compute_write_set(&[step1.clone(), step2.clone()], None);
 
     // Must contain both entity IDs (BTreeSet, deduplicated)
     assert!(
@@ -965,7 +960,7 @@ async fn test_write_set_locks_acquired() {
     let mut heuristic_args = BTreeMap::new();
     heuristic_args.insert("entity-id".to_string(), entity_id_1.to_string());
     heuristic_args.insert("name".to_string(), "Acme Corp".to_string());
-    let heuristic_ws = ob_poc::runbook::write_set::derive_write_set_heuristic(&heuristic_args);
+    let heuristic_ws = derive_write_set_heuristic(&heuristic_args);
     assert!(
         heuristic_ws.contains(&entity_id_1),
         "Heuristic must extract UUID from args"
@@ -994,9 +989,8 @@ async fn test_concurrent_lock_contention() {
     let rb2_step1 = make_step_with_write_set("trading-profile.update", vec![contested_entity]);
 
     // Both produce write_sets containing the contested entity
-    let ws1 =
-        ob_poc::runbook::executor::compute_write_set(&[rb1_step1.clone(), rb1_step2.clone()], None);
-    let ws2 = ob_poc::runbook::executor::compute_write_set(std::slice::from_ref(&rb2_step1), None);
+    let ws1 = compute_write_set(&[rb1_step1.clone(), rb1_step2.clone()], None);
+    let ws2 = compute_write_set(std::slice::from_ref(&rb2_step1), None);
 
     assert!(ws1.contains(&contested_entity));
     assert!(ws2.contains(&contested_entity));
@@ -1065,10 +1059,7 @@ async fn test_no_execution_without_compiled_id() {
     let fake_id = fake_rb.id;
     let result = execute_runbook(&store, fake_id, None, &SuccessExecutor).await;
     assert!(
-        matches!(
-            result,
-            Err(ob_poc::runbook::executor::ExecutionError::NotFound(_))
-        ),
+        matches!(result, Err(ExecutionError::NotFound(_))),
         "INV-1: Non-existent runbook must be rejected"
     );
 
@@ -1088,13 +1079,7 @@ async fn test_no_execution_without_compiled_id() {
 
     let retry = execute_runbook(&store, id, None, &SuccessExecutor).await;
     assert!(
-        matches!(
-            retry,
-            Err(ob_poc::runbook::executor::ExecutionError::NotExecutable(
-                _,
-                _
-            ))
-        ),
+        matches!(retry, Err(ExecutionError::NotExecutable(_, _))),
         "INV-1: Completed runbook must reject re-execution"
     );
 

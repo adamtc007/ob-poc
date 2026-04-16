@@ -24,10 +24,10 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
-use ob_poc::dsl_v2::{
-    compile, parse_program, verb_registry::registry, DslExecutor, ExecutionContext,
-    ExecutionResult as DslResult,
-};
+use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext, ExecutionResult as DslResult};
+use ob_poc::dsl_v2::planning::compile;
+use ob_poc::dsl_v2::syntax::parse_program;
+use ob_poc::dsl_v2::tooling::registry;
 
 // ============================================================================
 // State
@@ -436,7 +436,7 @@ async fn validate_with_fixes(
     State(state): State<AppState>,
     Json(req): Json<ValidateWithFixesRequest>,
 ) -> Json<ValidateWithFixesResponse> {
-    use ob_poc::dsl_v2::runtime_registry::runtime_registry;
+    use ob_poc::dsl_v2::execution::runtime_registry;
 
     // Step 1: Parse
     let program = match parse_program(&req.dsl) {

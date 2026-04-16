@@ -14,7 +14,9 @@ mod rollback_tests {
     use sqlx::PgPool;
     use uuid::Uuid;
 
-    use ob_poc::dsl_v2::{compile, parse_program, DslExecutor, ExecutionContext};
+    use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext};
+    use ob_poc::dsl_v2::planning::compile;
+    use ob_poc::dsl_v2::syntax::parse_program;
 
     // Uuid is still needed for TestDb prefix generation
 

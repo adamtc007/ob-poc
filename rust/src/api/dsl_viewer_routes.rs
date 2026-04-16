@@ -9,7 +9,8 @@
 //! - GET /api/dsl/history/:ref      - Get all versions for business_reference
 
 use crate::database::dsl_repository::{DslInstanceSummary, DslRepository};
-use crate::dsl_v2::{compile, parse_program};
+use crate::dsl_v2::planning::compile;
+use crate::dsl_v2::syntax::parse_program;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,

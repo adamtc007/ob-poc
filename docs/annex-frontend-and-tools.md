@@ -453,10 +453,10 @@ The LSP uses the **same validation code** as the server:
 
 ```rust
 // Both LSP and server use:
-ob_poc::parse_program()           // Parser
-ob_poc::LspValidator              // Semantic validation
-ob_poc::planning_facade           // DAG analysis
-ob_poc::RuntimeVerbRegistry       // Verb metadata
+ob_poc::dsl_v2::syntax::parse_program()     // Parser
+ob_poc::dsl_v2::tooling::LspValidator       // Semantic validation
+ob_poc::dsl_v2::tooling::analyse_and_plan   // DAG analysis
+ob_poc::dsl_v2::tooling::RuntimeVerbRegistry // Verb metadata
 ```
 
 This ensures LSP diagnostics match server behavior 100%.

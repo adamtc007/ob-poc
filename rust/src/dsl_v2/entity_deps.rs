@@ -447,13 +447,6 @@ pub async fn init_entity_deps(pool: &PgPool) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-/// Reset the global registry (for testing)
-#[cfg(test)]
-pub fn reset_entity_deps() {
-    // OnceLock doesn't support reset, but we can work around this in tests
-    // by using a separate test registry
-}
-
 // =============================================================================
 // TESTS
 // =============================================================================

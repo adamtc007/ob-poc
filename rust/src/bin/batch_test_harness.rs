@@ -51,8 +51,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use ob_poc::dsl_v2::config::loader::ConfigLoader;
-use ob_poc::dsl_v2::runtime_registry::RuntimeVerbRegistry;
-use ob_poc::dsl_v2::{DslExecutor, ExecutionContext};
+use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext, RuntimeVerbRegistry};
 use ob_poc::templates::{ExpansionContext, TemplateExpander, TemplateRegistry};
 
 /// Batch Test Harness for Template Execution
@@ -700,7 +699,8 @@ async fn execute_dsl(
     pool: &PgPool,
     _verb_registry: Arc<RuntimeVerbRegistry>,
 ) -> Result<Option<Uuid>, Box<dyn std::error::Error>> {
-    use ob_poc::dsl_v2::{compile, parse_program};
+    use ob_poc::dsl_v2::planning::compile;
+    use ob_poc::dsl_v2::syntax::parse_program;
 
     // Parse
     let ast = parse_program(dsl).map_err(|e| format!("Parse error: {:?}", e))?;

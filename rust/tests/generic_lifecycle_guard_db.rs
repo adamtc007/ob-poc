@@ -3,8 +3,9 @@ mod tests {
     use std::collections::HashMap;
 
     use anyhow::Result;
-    use ob_poc::dsl_v2::generic_executor::{GenericCrudExecutor, GenericExecutionResult};
-    use ob_poc::dsl_v2::runtime_registry::runtime_registry;
+    use ob_poc::dsl_v2::execution::{
+        runtime_registry, GenericCrudExecutor, GenericExecutionResult,
+    };
     use serde_json::json;
     use sqlx::PgPool;
     use uuid::Uuid;

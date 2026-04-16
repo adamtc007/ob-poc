@@ -18,14 +18,11 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use ob_poc::bpmn_integration::{
-    canonical::canonical_json_with_hash,
-    client::{BpmnLiteConnection, CompleteJobRequest, StartProcessRequest},
-    config::WorkflowConfigIndex,
-    correlation::CorrelationStore,
-    job_frames::JobFrameStore,
-    parked_tokens::ParkedTokenStore,
-    pending_dispatches::PendingDispatchStore,
-    types::{CorrelationRecord, CorrelationStatus, ExecutionRoute, ParkedToken, ParkedTokenStatus},
+    canonical_json_with_hash, validate_payload_hash, BpmnLifecycleEvent, BpmnLiteConnection,
+    CompleteJobRequest, CorrelationRecord, CorrelationStatus, CorrelationStore, EventBridge,
+    ExecutionRoute, JobFrame, JobFrameStatus, JobFrameStore, OutcomeEvent, ParkedToken,
+    ParkedTokenStatus, ParkedTokenStore, PendingDispatchStore, RequestStateStore,
+    StartProcessRequest, WorkflowConfigIndex, WorkflowDispatcher,
 };
 use ob_poc_types::session_stack::SessionStackState;
 
@@ -284,12 +281,12 @@ async fn b3_04_job_dedupe() {
     let job_frames = JobFrameStore::new(pool.clone());
 
     // Insert a completed job frame.
-    let frame = ob_poc::bpmn_integration::types::JobFrame {
+    let frame = JobFrame {
         job_key: format!("dedupe-test-{}", Uuid::new_v4()),
         process_instance_id: Uuid::new_v4(),
         task_type: "create_case_record".to_string(),
         worker_id: "test-worker".to_string(),
-        status: ob_poc::bpmn_integration::types::JobFrameStatus::Active,
+        status: JobFrameStatus::Active,
         activated_at: chrono::Utc::now(),
         completed_at: None,
         attempts: 1,
@@ -315,10 +312,7 @@ async fn b3_04_job_dedupe() {
         .await
         .expect("find failed");
     assert!(found.is_some());
-    assert_eq!(
-        found.unwrap().status,
-        ob_poc::bpmn_integration::types::JobFrameStatus::Completed
-    );
+    assert_eq!(found.unwrap().status, JobFrameStatus::Completed);
 
     eprintln!("Dedupe test passed — completed job not re-executed");
 }
@@ -330,8 +324,6 @@ async fn b3_04_job_dedupe() {
 #[tokio::test]
 #[ignore]
 async fn b3_05_payload_hash_integrity() {
-    use ob_poc::bpmn_integration::canonical::validate_payload_hash;
-
     let payload = serde_json::json!({
         "entity_id": "abc-123",
         "case_type": "enhanced"
@@ -547,10 +539,6 @@ async fn b3_08_runtime_switch_equivalence() {
 #[tokio::test]
 #[ignore]
 async fn b3_09_event_bridge_ordering() {
-    use ob_poc::bpmn_integration::client::BpmnLifecycleEvent;
-    use ob_poc::bpmn_integration::event_bridge::EventBridge;
-    use ob_poc::bpmn_integration::types::OutcomeEvent;
-
     // Test translate_event for all expected event types.
     let events = vec![
         ("JobCompleted", true),
@@ -757,7 +745,6 @@ async fn b3_11_early_signal() {
 #[tokio::test]
 #[ignore]
 async fn b3_12_dispatcher_direct_routing() {
-    use ob_poc::bpmn_integration::dispatcher::WorkflowDispatcher;
     use ob_poc::repl::orchestrator_v2::{DslExecutionOutcome, DslExecutorV2, StubExecutor};
 
     let pool = test_pool().await;
@@ -765,7 +752,7 @@ async fn b3_12_dispatcher_direct_routing() {
     let config = load_config();
     let correlation_store = CorrelationStore::new(pool.clone());
     let parked_token_store = ParkedTokenStore::new(pool.clone());
-    let request_state_store = ob_poc::bpmn_integration::request_state::RequestStateStore::new(pool.clone());
+    let request_state_store = RequestStateStore::new(pool.clone());
 
     let inner: Arc<dyn DslExecutorV2> = Arc::new(StubExecutor);
     let dispatcher = WorkflowDispatcher::new(

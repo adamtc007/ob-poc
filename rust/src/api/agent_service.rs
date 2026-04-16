@@ -106,11 +106,13 @@ use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
 
 use crate::api::session::DisambiguationRequest;
 use crate::dsl_v2::ast::AstNode;
+use crate::dsl_v2::execution::runtime_registry;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::macros::{load_macro_registry_from_dir, MacroRegistry};
 use crate::dsl_v2::ref_resolver::ResolveResult;
+use crate::dsl_v2::syntax::parse_program;
 use crate::dsl_v2::validation::RefType;
-use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
+use crate::dsl_v2::{enrich_program, Statement};
 #[cfg(not(feature = "runbook-gate-vnext"))]
 use crate::graph::GraphScope;
 use crate::mcp::macro_index::MacroIndex;
@@ -1146,7 +1148,7 @@ impl AgentService {
         resolved_dsl: String,
         program: crate::dsl_v2::ast::Program,
     ) -> Result<AgentChatResponse, String> {
-        use crate::dsl_v2::{DslExecutor, ExecutionContext};
+        use crate::dsl_v2::execution::{DslExecutor, ExecutionContext};
 
         let executor = DslExecutor::new(self.pool.clone());
         let mut exec_ctx = ExecutionContext::new();
@@ -1154,7 +1156,7 @@ impl AgentService {
             Ok(results) => {
                 // Check if any result is a macro that returned combined_dsl to stage
                 for result in &results {
-                    if let crate::dsl_v2::ExecutionResult::Record(json) = result {
+                    if let crate::dsl_v2::execution::ExecutionResult::Record(json) = result {
                         if let Some(combined_dsl) =
                             json.get("combined_dsl").and_then(|v| v.as_str())
                         {
@@ -1593,7 +1595,7 @@ impl AgentService {
     fn sync_scope_from_exec_ctx(
         &self,
         session: &mut UnifiedSession,
-        exec_ctx: &mut crate::dsl_v2::ExecutionContext,
+        exec_ctx: &mut crate::dsl_v2::execution::ExecutionContext,
     ) {
         if let Some(unified_session) = exec_ctx.take_pending_session() {
             let loaded = unified_session.cbu_ids_vec();

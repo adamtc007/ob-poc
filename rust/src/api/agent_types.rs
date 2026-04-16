@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::dsl_v2::{AtomicExecutionResult, BestEffortExecutionResult};
+use crate::dsl_v2::execution::{AtomicExecutionResult, BestEffortExecutionResult};
 use crate::session::{
     MessageRole, SessionState, SubSessionType, UnifiedSession, UnresolvedRefInfo,
 };

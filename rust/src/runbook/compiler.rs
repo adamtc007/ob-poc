@@ -25,11 +25,13 @@ use std::collections::{BTreeMap, HashMap};
 
 use uuid::Uuid;
 
+use crate::dsl_v2::execution::{runtime_registry_arc, RuntimeVerbRegistry};
 use crate::dsl_v2::macros::{
     expand_macro_fixpoint, MacroExpansionError, MacroRegistry, MacroSchema, EXPANSION_LIMITS,
 };
+use crate::dsl_v2::planning::quick_validate;
 use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
-use crate::dsl_v2::{quick_validate, runtime_registry_arc, Severity};
+use crate::dsl_v2::Severity;
 use crate::journey::pack_manager::EffectiveConstraints;
 use crate::session::unified::UnifiedSession;
 
@@ -571,7 +573,7 @@ fn extract_verb_from_dsl(dsl: &str) -> String {
 
 fn validate_expanded_macro_output(
     statements: &[String],
-    registry: &crate::dsl_v2::RuntimeVerbRegistry,
+    registry: &RuntimeVerbRegistry,
 ) -> Vec<String> {
     let expanded_source = statements.join("\n");
     let mut errors: Vec<String> = quick_validate(&expanded_source, runtime_registry_arc())

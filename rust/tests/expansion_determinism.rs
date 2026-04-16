@@ -5,7 +5,7 @@
 //! - Same input always produces identical digests
 //! - Lock keys are sorted consistently
 
-use ob_poc::dsl_v2::expansion::{expand_templates, BatchPolicy, LockAccess, LockKey};
+use ob_poc::dsl_v2::{expand_templates, BatchPolicy, LockAccess, LockKey};
 use ob_poc::templates::TemplateRegistry;
 use std::collections::HashMap;
 

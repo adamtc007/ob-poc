@@ -127,7 +127,7 @@ impl OntologyService {
     pub fn get_verb_lifecycle(&self, domain: &str, verb: &str) -> Option<VerbLifecycle> {
         // The verb lifecycle is stored in the verb YAML and loaded by RuntimeVerbRegistry.
         // We access it through the runtime registry to avoid duplicating the verb config loading.
-        use crate::dsl_v2::runtime_registry;
+        use crate::dsl_v2::execution::runtime_registry;
 
         runtime_registry()
             .get(domain, verb)
@@ -163,7 +163,7 @@ impl OntologyService {
 
     /// Get entity types that this verb can create.
     pub fn verb_produces_entity_type(&self, domain: &str, verb: &str) -> Option<String> {
-        use crate::dsl_v2::runtime_registry;
+        use crate::dsl_v2::execution::runtime_registry;
 
         runtime_registry()
             .get(domain, verb)

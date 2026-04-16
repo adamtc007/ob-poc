@@ -12,7 +12,9 @@
 #[cfg(feature = "database")]
 mod materialize_tests {
     use anyhow::Result;
-    use ob_poc::dsl_v2::{compile, parse_program, DslExecutor, ExecutionContext};
+    use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext};
+    use ob_poc::dsl_v2::planning::compile;
+    use ob_poc::dsl_v2::syntax::parse_program;
     use serde_json::json;
     use sha2::{Digest, Sha256};
     use sqlx::PgPool;
