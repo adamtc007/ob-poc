@@ -29,6 +29,7 @@ fn verb_contracts() -> Vec<VerbContractBody> {
                 }),
                 valid_values: None,
                 default: None,
+                maps_to: None,
             }],
             returns: None,
             preconditions: vec![],
@@ -64,6 +65,7 @@ fn verb_contracts() -> Vec<VerbContractBody> {
                 lookup: None,
                 valid_values: None,
                 default: None,
+                maps_to: None,
             }],
             returns: None,
             preconditions: vec![],
@@ -84,6 +86,7 @@ fn verb_contracts() -> Vec<VerbContractBody> {
                 table: Some("entities".to_owned()),
                 schema: Some("ob-poc".to_owned()),
                 key_column: Some("entity_id".to_owned()),
+                ..Default::default()
             }),
             reads_from: vec![],
             writes_to: vec!["ob-poc.entities".to_owned()],

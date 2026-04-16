@@ -632,6 +632,7 @@ mod tests {
             }),
             valid_values: None,
             default: None,
+            maps_to: None,
         });
 
         let prompts = generate_disambiguation(&verb, None);

@@ -11,11 +11,13 @@
 pub mod authoring;
 pub mod cleanup;
 pub mod constellation_hydration;
+pub mod crud_executor;
 pub(crate) mod sqlx_types;
 pub mod store;
 
 pub use authoring::{PgAuthoringStore, PgScratchSchemaRunner};
 pub use cleanup::PgCleanupStore;
+pub use crud_executor::PgCrudExecutor;
 pub use store::{
     PgAuditStore, PgBootstrapAuditStore, PgChangesetStore, PgEvidenceStore, PgObjectStore,
     PgOutboxStore, PgProjectionWriter, PgSnapshotStore,

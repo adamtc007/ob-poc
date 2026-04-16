@@ -357,6 +357,7 @@ mod tests {
                 lookup: None,
                 valid_values: None,
                 default: None,
+                maps_to: None,
             }],
             returns: None,
             preconditions: vec![],

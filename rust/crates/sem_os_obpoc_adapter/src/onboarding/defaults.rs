@@ -151,6 +151,7 @@ fn crud_contract(
             lookup: None,
             valid_values: None,
             default: None,
+            maps_to: None,
         });
     }
     if action == "create" || action == "update" {
@@ -168,6 +169,7 @@ fn crud_contract(
                 lookup: None,
                 valid_values: None,
                 default: None,
+                maps_to: None,
             });
         }
     }
