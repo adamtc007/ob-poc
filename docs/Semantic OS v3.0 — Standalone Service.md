@@ -24,6 +24,10 @@
 >
 > **Metadata state after remediation (2026-03-08):** `rust/config/sem_os_seeds/domain_metadata.yaml` now covers `306/306` live `"ob-poc"` tables. The `sem-reg` footprint metadata has been expanded for authoring/publication tables and the orphan `stewardship`/legacy verb footprints have been removed.
 
+> **Capability-boundary state (2026-04-16):** the standalone Sem OS crates now expose a narrower operational surface consistent with the deployable-service model in this document. `sem_os_server` keeps the embedding contract at the crate root (`build_router`, `JwtConfig`, `OutboxDispatcher`) while internal handler/error module trees are no longer part of the intended public boundary. `sem_os_harness` support internals are test-only, so workspace/platform tests do not need production `pub` on harness plumbing. `sem_os_obpoc_adapter` has started moving non-contract plumbing inward (`pipeline_seeds` is now internal), but scanner/seed surfaces that are still consumed by `ob-poc` remain intentionally deferred pending a dedicated adapter-facade pass.
+
+> **Hygiene state (2026-04-16):** the follow-on cleanup removed dormant Sem OS server tool handlers that were no longer routed, keeping the standalone service contract aligned with the live HTTP surface instead of preserving commented-out placeholders.
+
 ---
 
 ## 1) Strategy (state so far)

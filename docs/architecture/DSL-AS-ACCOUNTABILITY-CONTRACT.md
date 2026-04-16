@@ -2,7 +2,7 @@
 
 **Document Type**: Architecture Philosophy  
 **Status**: Working Draft  
-**Last Updated**: 2024-12-30
+**Last Updated**: 2026-04-16
 
 ---
 
@@ -11,6 +11,16 @@
 This document argues that a Domain-Specific Language (DSL) aligned with business entity models serves as an **accountability contract** between Product and Engineering teams. Unlike traditional backlog management approaches (SAFe, Scrum user stories), a well-designed DSL eliminates the ambiguity that enables blame-shifting between teams.
 
 The ob-poc DSL is not merely a technical convenience—it is an organizational mechanism that forces precision from Product and determinism from Engineering.
+
+## Boundary Status Update (2026-04-16)
+
+The codebase still reflects this argument, but the public-capability boundary is uneven:
+
+- `dsl-core` is already a clean compiler kernel
+- `dsl-lsp` has now been narrowed to a deliberate crate-root facade instead of exposing handler and analysis internals
+- the remaining contract problem is the broad `ob_poc::dsl_v2` surface, which still mixes compiler, runtime, planner, and tooling concerns
+
+So the next architectural step is not a new DSL concept. It is boundary discipline: move internal compiler/runtime tests inward, keep orchestration tests black-box, and define a smaller official surface for parse/validate/plan/execute rather than letting sibling crates reach into `dsl_v2` internals.
 
 ---
 

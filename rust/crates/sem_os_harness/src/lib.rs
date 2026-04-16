@@ -12,8 +12,11 @@
 //!
 //! SC-4 applied: test DB isolation uses CREATE/DROP DATABASE per run.
 
+#[cfg(test)]
 mod db;
+#[cfg(test)]
 mod permissions;
+#[cfg(test)]
 mod projections;
 
 use sem_os_client::SemOsClient;
@@ -485,7 +488,10 @@ mod tests {
     use crate::db::{drop_db, isolated_db};
     use sem_os_client::inprocess::InProcessClient;
     use sem_os_core::service::CoreServiceImpl;
-    use sem_os_postgres::store::*;
+    use sem_os_postgres::{
+        PgAuditStore, PgChangesetStore, PgEvidenceStore, PgObjectStore, PgOutboxStore,
+        PgProjectionWriter, PgSnapshotStore,
+    };
     use std::sync::Arc;
 
     /// Build an InProcessClient backed by Postgres port implementations.

@@ -11,8 +11,12 @@
 //!   POST /tools/call                     — invoke an MCP tool (auth required)
 //!   GET  /tools/list                     — list available MCP tools (auth required)
 
-pub mod dispatcher;
-pub mod error;
-pub mod handlers;
-pub mod middleware;
-pub mod router;
+mod dispatcher;
+mod error;
+mod handlers;
+mod middleware;
+mod router;
+
+pub use dispatcher::OutboxDispatcher;
+pub use middleware::jwt::JwtConfig;
+pub use router::build_router;

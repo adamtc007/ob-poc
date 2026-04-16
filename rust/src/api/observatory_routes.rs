@@ -1134,30 +1134,6 @@ fn universe_graph_scene(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::universe_graph_scene;
-    use crate::repl::types_v2::WorkspaceKind;
-    use ob_poc_types::galaxy::ViewLevel;
-    use ob_poc_types::graph_scene::LayoutStrategy;
-
-    #[test]
-    fn universe_graph_scene_includes_all_startup_satellites() {
-        let scene = universe_graph_scene(Some("Universe"));
-
-        assert_eq!(scene.level, ViewLevel::Universe);
-        assert_eq!(scene.layout_strategy, LayoutStrategy::DeterministicOrbital);
-        assert_eq!(scene.nodes.len(), WorkspaceKind::all().len() + 2);
-        assert_eq!(scene.drill_targets.len(), WorkspaceKind::all().len() + 1);
-        assert!(scene.nodes.iter().any(|node| node.id == "workspace:new-session"));
-        assert!(scene
-            .drill_targets
-            .iter()
-            .any(|target| target.node_id == "workspace:new-session"
-                && target.target_level == ViewLevel::System));
-    }
-}
-
 /// Create the Observatory router.
 ///
 /// `repl_sessions` is the REPL V2 session store — the canonical source for hydrated
@@ -1192,4 +1168,28 @@ pub fn create_observatory_router(
         .route("/session/:id/diagrams/:diagram_type", get(get_diagram))
         .route("/health", get(get_health_metrics))
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::universe_graph_scene;
+    use crate::repl::types_v2::WorkspaceKind;
+    use ob_poc_types::galaxy::ViewLevel;
+    use ob_poc_types::graph_scene::LayoutStrategy;
+
+    #[test]
+    fn universe_graph_scene_includes_all_startup_satellites() {
+        let scene = universe_graph_scene(Some("Universe"));
+
+        assert_eq!(scene.level, ViewLevel::Universe);
+        assert_eq!(scene.layout_strategy, LayoutStrategy::DeterministicOrbital);
+        assert_eq!(scene.nodes.len(), WorkspaceKind::all().len() + 2);
+        assert_eq!(scene.drill_targets.len(), WorkspaceKind::all().len() + 1);
+        assert!(scene.nodes.iter().any(|node| node.id == "workspace:new-session"));
+        assert!(scene
+            .drill_targets
+            .iter()
+            .any(|target| target.node_id == "workspace:new-session"
+                && target.target_level == ViewLevel::System));
+    }
 }

@@ -2,7 +2,7 @@
 
 > **Version:** 3.1
 > **Date:** 2026-03-28
-> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, the 2026-03-24 taxonomy/evidence unification pass, the 2026-03-24 attribute DSL + Phase 4 schema cleanup pass, the 2026-03-27 derived attribute canonical persistence (D0-D12), and the 2026-03-28 SemOS-first hub implementation (Phases 1-7)
+> **Status:** Living document — consolidation of 9 prior specs, updated for the 2026-03-08 runtime schema consolidation, the 2026-03-12 document-governance bootstrap, the 2026-03-13 NLCI/CBU surface reconciliation, the 2026-03-15 reducer/constellation runtime cutover, the 2026-03-16 DB harness/runtime verification pass, the 2026-03-16 CODEX data-integrity/parser/serialization remediation, the 2026-03-17 discovery-universe + single-pipeline cutover, the 2026-03-21 SemOS reconciliation remediation verification pass, the 2026-03-24 attribute identity + derivation reconciliation pass, the 2026-03-24 taxonomy/evidence unification pass, the 2026-03-24 attribute DSL + Phase 4 schema cleanup pass, the 2026-03-27 derived attribute canonical persistence (D0-D12), the 2026-03-28 SemOS-first hub implementation (Phases 1-7), and the 2026-04-16 capability-boundary and dead-code cleanup pass
 > **Audience:** Engineering, governance, architecture review
 
 ---
@@ -26,6 +26,17 @@ Semantic OS enforces governance through **three complementary layers**:
 | **GovernedQuery** | What compiles | Proc macro checks against bincode cache at compile time |
 
 The system is deployed as a **standalone service** (6 Rust crates) with port-trait isolation, REST+JWT API, outbox-driven projections, and optional in-process mode for the ob-poc monolith.
+
+### Current Boundary Hygiene State (2026-04-16)
+
+The Sem OS crate split now more closely matches the intended capability boundary:
+
+- `sem_os_client` remains the preferred external contract
+- `sem_os_server` keeps a narrow embedding surface at the crate root instead of exposing its internal handler/error tree as API
+- `sem_os_harness` support plumbing is test-only and should not drive production visibility decisions
+- dormant server tool endpoints have been removed rather than preserved as commented placeholder capability
+
+What remains intentionally unresolved is adapter leakage from `sem_os_obpoc_adapter` into `ob-poc`. That is a bridge-facade problem, not a reason to widen the standalone Sem OS service surface.
 
 ### Current Discovery/Bootstrap State (2026-03-17)
 

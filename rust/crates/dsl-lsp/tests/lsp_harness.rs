@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo test -p dsl-lsp --test lsp_harness
 
-use dsl_lsp::handlers::diagnostics::analyze_document;
+use dsl_lsp::analyze_document;
 use tower_lsp::lsp_types::DiagnosticSeverity;
 
 // =============================================================================

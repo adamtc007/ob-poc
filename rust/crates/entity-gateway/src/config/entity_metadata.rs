@@ -99,40 +99,6 @@ pub struct SearchKeyConfig {
     pub default: bool,
 }
 
-/// Configuration for a composite search key (multi-column for disambiguation)
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct CompositeSearchKeyConfig {
-    /// Name of the composite key (used in API)
-    pub name: String,
-    /// Primary search column (main fuzzy match)
-    pub primary_column: String,
-    /// Columns to combine for composite value
-    pub columns: Vec<String>,
-    /// Separator between columns (default: " ")
-    #[serde(default = "default_separator")]
-    pub separator: String,
-    /// Discriminator fields for disambiguation
-    #[serde(default)]
-    pub discriminators: Vec<DiscriminatorConfig>,
-    /// Whether this is the default search key
-    #[serde(default)]
-    pub default: bool,
-}
-
-fn default_separator() -> String {
-    " ".to_string()
-}
-
-/// Discriminator field for composite search disambiguation
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct DiscriminatorConfig {
-    /// Database column name
-    pub column: String,
-    /// Selectivity score (0.0-1.0, higher = more unique)
-    #[serde(default = "default_selectivity")]
-    pub selectivity: f32,
-}
-
 /// Entity-level discriminator configuration (from entity_index.yaml)
 /// Similar to DiscriminatorConfig but with additional match mode for dates
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -175,13 +141,6 @@ impl std::str::FromStr for DateMatchMode {
 
 fn default_selectivity() -> f32 {
     0.5
-}
-
-/// Unified search key variant (simple or composite)
-#[derive(Debug, Clone)]
-pub enum SearchKeyVariant<'a> {
-    Simple(&'a SearchKeyConfig),
-    Composite(&'a CompositeSearchKeyConfig),
 }
 
 /// Sharding configuration for an entity index

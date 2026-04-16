@@ -41,9 +41,7 @@ use std::time::Duration;
 use sem_os_core::ports::BootstrapAuditStore;
 use sem_os_core::service::CoreServiceImpl;
 use sem_os_postgres::PgStores;
-use sem_os_server::dispatcher::OutboxDispatcher;
-use sem_os_server::middleware::jwt::JwtConfig;
-use sem_os_server::router::build_router;
+use sem_os_server::{build_router, JwtConfig, OutboxDispatcher};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 

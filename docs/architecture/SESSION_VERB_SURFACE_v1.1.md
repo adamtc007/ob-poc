@@ -38,6 +38,9 @@ original paper:
   (`group.ownership + struct.* + kyc.onboarding`)
 - runtime discovery is driven by recovered entity state, not by raw verb
   registry presence
+- Sem OS server and DSL LSP boundary cleanup now reinforce the same rule:
+  harnesses and tooling should consume explicit crate-root facades, not deep
+  handler-module imports that widen the runtime surface by accident
 
 ---
 

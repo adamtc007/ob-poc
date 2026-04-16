@@ -14,6 +14,7 @@
 //! Generators are deterministic: same input produces same output.
 
 pub mod cbu;
+#[cfg(test)]
 mod deal;
 mod matrix;
 

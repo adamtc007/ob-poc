@@ -1,5 +1,7 @@
 # OB-POC Solution Architecture Brief
 
+> **Update (2026-04-16):** the current implementation is tightening around explicit capability boundaries. Sem OS now behaves more like a standalone service surface (`sem_os_client` + narrow server embedding API), and DSL tooling is moving toward crate-root facades rather than deep public module trees. The remaining architectural gap is concentrated in `ob_poc::dsl_v2` and adapter/test-boundary cleanup, not in the Sem OS crate split itself.
+
 ## The Problem Space
 
 ### Why Onboarding needs a new approach

@@ -47,14 +47,11 @@ pub struct ProposeRequest {
 #[derive(Debug, Deserialize)]
 pub struct PublishBatchRequest {
     pub change_set_ids: Vec<Uuid>,
-    pub publisher: String,
 }
 
 /// Request body for `POST /authoring/:id/publish`.
 #[derive(Debug, Deserialize)]
-pub struct PublishRequest {
-    pub publisher: String,
-}
+pub struct PublishRequest {}
 
 /// Request body for `POST /authoring/diff`.
 #[derive(Debug, Deserialize)]

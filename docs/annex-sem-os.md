@@ -36,6 +36,23 @@ Two practical consequences follow.
 
 ---
 
+## Boundary Status Update (2026-04-16)
+
+The Sem OS crate split is now materially aligned with a standalone capability boundary, but two different surfaces need to stay distinct:
+
+- **Official capability surface:** `sem_os_client`, selected `sem_os_core` contracts, and the narrow `sem_os_server` embedding API (`build_router`, `JwtConfig`, `OutboxDispatcher`)
+- **Family integration surface:** `sem_os_core::service`, `sem_os_core::ports`, `sem_os_postgres`, and the `sem_os_obpoc_adapter` bridge used by `ob-poc`
+
+Recent cleanup narrowed the production boundary without changing behavior:
+
+- `sem_os_server` no longer exposes its handler/error module tree as the supported API surface
+- `sem_os_harness` support modules are test-only, so platform harnesses should not treat harness internals as runtime API
+- dormant `/tools/*` server handlers were removed because the routes are intentionally absent from the live standalone surface
+
+The main deferred boundary issue is still `sem_os_obpoc_adapter`: scanner/seed helpers remain public because `ob-poc` still consumes them directly. That is an adapter-facade problem, not a reason to widen the Sem OS service contract itself.
+
+---
+
 ## Semantic Registry (SemReg)
 
 ### Immutable Snapshot Architecture

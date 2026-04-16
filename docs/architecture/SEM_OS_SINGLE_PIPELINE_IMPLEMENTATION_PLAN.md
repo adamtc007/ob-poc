@@ -12,6 +12,17 @@ The acceptance test is:
 
 This plan does not change the intended architecture. It completes and aligns the implementation to the published architecture and intended Sem OS solution shape.
 
+## Status Update (2026-04-16)
+
+The core single-pipeline direction in this document remains correct, but the surrounding capability boundary is now tighter than when this plan was drafted:
+
+- the standalone Sem OS server contract is intentionally the crate-root embedding surface (`build_router`, `JwtConfig`, `OutboxDispatcher`)
+- internal handler/error module trees are no longer treated as public API
+- test/harness support is being moved behind `sem_os_harness` and crate-local tests rather than broad production visibility
+- dormant `/tools/*` server endpoints were removed because they are not part of the live pipeline contract
+
+The main remaining work around this plan is no longer basic plumbing exposure; it is test-boundary cleanup and adapter-facade cleanup where `ob-poc` still reaches too deeply into Sem OS family crates.
+
 ## Principles
 
 - Sem OS owns grounded action truth.
@@ -310,4 +321,3 @@ Given an utterance in Sage research mode:
 Given a rendered DSL statement:
 
 - there must be a Sem OS action-surface record from which it was produced
-

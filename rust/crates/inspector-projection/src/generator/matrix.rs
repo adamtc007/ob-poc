@@ -703,26 +703,6 @@ impl MatrixNodeInput {
     }
 }
 
-// ============================================================================
-// CONVENIENCE FUNCTIONS
-// ============================================================================
-
-/// Generate a projection directly from a `TradingMatrixDocument`.
-pub fn generate_from_trading_matrix(
-    doc: &ob_poc_types::trading_matrix::TradingMatrixDocument,
-    policy: &RenderPolicy,
-) -> InspectorProjection {
-    let children: Vec<MatrixNodeInput> = doc
-        .children
-        .iter()
-        .map(MatrixNodeInput::from_trading_matrix_node)
-        .collect();
-
-    let cbu_id = doc.cbu_id.as_deref().unwrap_or("");
-    let cbu_name = doc.cbu_name.as_deref().unwrap_or("");
-    MatrixGenerator::new().generate(cbu_id, cbu_name, &children, policy)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

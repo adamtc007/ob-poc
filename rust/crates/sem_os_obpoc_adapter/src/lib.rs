@@ -9,7 +9,7 @@
 
 pub mod metadata;
 pub mod onboarding;
-pub mod pipeline_seeds;
+mod pipeline_seeds;
 pub mod scanner;
 pub mod seeds;
 

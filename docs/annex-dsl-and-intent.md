@@ -39,6 +39,18 @@ User Utterance
 
 ---
 
+## Boundary Status Update (2026-04-16)
+
+The DSL capability is still less cleanly standalone than Sem OS, but the tooling boundary has started to tighten around explicit facades rather than deep module exposure.
+
+- `dsl-core` remains the pure parser/compiler kernel
+- `dsl-lsp` now presents a narrower root-level surface (`DslLanguageServer`, encoding helpers, entity lookup types, and a single `analyze_document` seam for tests)
+- `dsl-lsp` handler, analysis, and server module trees are no longer intended public API
+
+The remaining structural issue is not in `dsl-lsp`; it is the broad `ob_poc::dsl_v2` public shape, which still mixes compiler, runtime, planning, and tooling concerns. That needs a later capability-boundary pass rather than another hygiene sweep.
+
+---
+
 ## Orchestrator Stages
 
 **File:** `rust/src/agent/orchestrator.rs`
