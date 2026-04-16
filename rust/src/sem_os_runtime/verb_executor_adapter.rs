@@ -84,41 +84,60 @@ impl VerbExecutionPort for ObPocVerbExecutor {
         let (domain, verb) = split_fqn(verb_fqn)?;
 
         // 2. Resolve behavior from RuntimeVerbRegistry (contract-aware routing)
-        let behavior_label = {
-            use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
-            let registry = runtime_registry();
-            match registry.get(&domain, &verb) {
-                Some(rv) => match &rv.behavior {
-                    RuntimeBehavior::Crud(_) => "crud",
-                    RuntimeBehavior::Plugin(_) => "plugin",
-                    RuntimeBehavior::GraphQuery(_) => "graph_query",
-                    RuntimeBehavior::Durable(_) => "durable",
-                },
-                None => "unknown",
-            }
+        use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
+        let registry = runtime_registry();
+        let runtime_verb = registry.get(&domain, &verb);
+
+        let is_crud = runtime_verb
+            .as_ref()
+            .map(|rv| matches!(rv.behavior, RuntimeBehavior::Crud(_)))
+            .unwrap_or(false);
+
+        let behavior_label = match runtime_verb.as_ref().map(|rv| &rv.behavior) {
+            Some(RuntimeBehavior::Crud(_)) => "crud",
+            Some(RuntimeBehavior::Plugin(_)) => "plugin",
+            Some(RuntimeBehavior::GraphQuery(_)) => "graph_query",
+            Some(RuntimeBehavior::Durable(_)) => "durable",
+            None => "unknown",
         };
         tracing::debug!(
             verb_fqn,
             behavior = behavior_label,
+            has_crud_port = self.crud_port.is_some(),
             "VerbExecutionPort: routing verb"
         );
 
-        // 3. Build VerbCall from JSON args
-        let vc = build_verb_call(&domain, &verb, &args);
+        // 3. CRUD fast path — route through CrudExecutionPort when available
+        if is_crud {
+            if let Some(ref crud_port) = self.crud_port {
+                if let Some(rv) = runtime_verb.as_ref() {
+                    let contract = runtime_verb_to_contract(rv);
+                    match crud_port.execute_crud(&contract, args.clone(), ctx).await {
+                        Ok(outcome) => {
+                            return Ok(VerbExecutionResult::from_outcome(outcome));
+                        }
+                        Err(SemOsError::InvalidInput(msg)) if msg.contains("not yet migrated") => {
+                            // Fall through to DslExecutor for unmigrated operations
+                            tracing::debug!(verb_fqn, "CRUD port: falling through to DslExecutor");
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+            }
+        }
 
-        // 4. Translate VerbExecutionContext → dsl_v2::ExecutionContext
+        // 4. Default path — DslExecutor dispatch chain (plugin, graph_query, durable,
+        //    or CRUD without crud_port / unmigrated operations)
+        let vc = build_verb_call(&domain, &verb, &args);
         let mut exec_ctx = to_dsl_context(ctx);
 
-        // 5. Execute through existing DslExecutor dispatch chain
-        //    (Phase 1: all behaviors still route through DslExecutor.
-        //     Phase 1B will route "crud" to CrudExecutionPort directly.)
         let result = self
             .executor
             .execute_verb(&vc, &mut exec_ctx)
             .await
             .map_err(|e| SemOsError::Internal(anyhow::anyhow!("Verb execution failed: {e}")))?;
 
-        // 6. Collect side effects (new bindings + platform state)
+        // 5. Collect side effects (new bindings + platform state)
         let side_effects = collect_side_effects(ctx, &exec_ctx);
 
         // 6. Propagate new bindings back to SemOS context
@@ -140,6 +159,92 @@ impl VerbExecutionPort for ObPocVerbExecutor {
 }
 
 // ── Conversion helpers ──────────────────────────────────────────
+
+/// Convert a RuntimeVerb to a minimal VerbContractBody for CRUD execution.
+/// Only populates the fields needed by CrudExecutionPort.
+fn runtime_verb_to_contract(
+    rv: &crate::dsl_v2::runtime_registry::RuntimeVerb,
+) -> sem_os_core::verb_contract::VerbContractBody {
+    use crate::dsl_v2::runtime_registry::RuntimeBehavior;
+    use sem_os_core::verb_contract::{VerbArgDef, VerbContractBody, VerbCrudMapping, VerbReturnSpec};
+
+    let crud_mapping = if let RuntimeBehavior::Crud(ref crud) = rv.behavior {
+        Some(VerbCrudMapping {
+            operation: format!("{:?}", crud.operation).to_lowercase(),
+            table: Some(crud.table.clone()),
+            schema: Some(crud.schema.clone()),
+            key_column: crud.key.clone(),
+            returning: crud.returning.clone(),
+            conflict_keys: crud.conflict_keys.clone(),
+            conflict_constraint: crud.conflict_constraint.clone(),
+            junction: crud.junction.clone(),
+            from_col: crud.from_col.clone(),
+            to_col: crud.to_col.clone(),
+            role_table: crud.role_table.clone(),
+            role_col: crud.role_col.clone(),
+            fk_col: crud.fk_col.clone(),
+            filter_col: crud.filter_col.clone(),
+            primary_table: crud.primary_table.clone(),
+            join_table: crud.join_table.clone(),
+            join_col: crud.join_col.clone(),
+        })
+    } else {
+        None
+    };
+
+    let args: Vec<VerbArgDef> = rv
+        .args
+        .iter()
+        .map(|a| VerbArgDef {
+            name: a.name.clone(),
+            arg_type: format!("{:?}", a.arg_type).to_lowercase(),
+            required: a.required,
+            description: a.description.clone(),
+            lookup: None, // Lookups resolved before reaching CrudExecutionPort
+            valid_values: a.valid_values.clone(),
+            default: None,
+            maps_to: a.maps_to.clone(),
+        })
+        .collect();
+
+    let returns = Some(VerbReturnSpec {
+        return_type: format!("{:?}", rv.returns.return_type).to_lowercase(),
+        schema: None,
+    });
+
+    VerbContractBody {
+        fqn: rv.full_name.clone(),
+        domain: rv.domain.clone(),
+        action: rv.verb.clone(),
+        description: rv.description.clone(),
+        behavior: "crud".to_string(),
+        args,
+        returns,
+        crud_mapping,
+        preconditions: vec![],
+        postconditions: vec![],
+        produces: None,
+        consumes: vec![],
+        invocation_phrases: vec![],
+        subject_kinds: rv.subject_kinds.clone(),
+        phase_tags: vec![],
+        harm_class: rv.harm_class.map(|h| match h {
+            dsl_core::config::types::HarmClass::ReadOnly => sem_os_core::verb_contract::HarmClass::ReadOnly,
+            dsl_core::config::types::HarmClass::Reversible => sem_os_core::verb_contract::HarmClass::Reversible,
+            dsl_core::config::types::HarmClass::Irreversible => sem_os_core::verb_contract::HarmClass::Irreversible,
+            dsl_core::config::types::HarmClass::Destructive => sem_os_core::verb_contract::HarmClass::Destructive,
+        }),
+        action_class: None,
+        precondition_states: vec![],
+        requires_subject: true,
+        produces_focus: false,
+        metadata: None,
+        reads_from: vec![],
+        writes_to: vec![],
+        outputs: vec![],
+        produces_shared_facts: vec![],
+    }
+}
 
 fn split_fqn(fqn: &str) -> sem_os_core::execution::Result<(String, String)> {
     let parts: Vec<&str> = fqn.splitn(2, '.').collect();
