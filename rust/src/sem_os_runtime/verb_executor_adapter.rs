@@ -257,6 +257,21 @@ fn split_fqn(fqn: &str) -> sem_os_core::execution::Result<(String, String)> {
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
+/// Public wrapper for use by the compatibility shim in CustomOperation::execute_json.
+pub fn build_verb_call_pub(domain: &str, verb: &str, args: &serde_json::Value) -> VerbCall {
+    build_verb_call(domain, verb, args)
+}
+
+/// Public wrapper for use by the compatibility shim.
+pub fn to_dsl_context_pub(ctx: &VerbExecutionContext) -> ExecutionContext {
+    to_dsl_context(ctx)
+}
+
+/// Public wrapper for use by the compatibility shim.
+pub fn to_verb_outcome_pub(result: &ExecutionResult) -> VerbExecutionOutcome {
+    to_verb_outcome(result)
+}
+
 fn build_verb_call(domain: &str, verb: &str, args: &serde_json::Value) -> VerbCall {
     let arguments = match args.as_object() {
         Some(map) => map

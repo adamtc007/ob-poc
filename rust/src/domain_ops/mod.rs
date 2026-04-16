@@ -359,6 +359,34 @@ pub trait CustomOperation: Send + Sync {
         ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult>;
 
+    /// Execute with JSON args and SemOS context (Phase 2 migration target).
+    ///
+    /// Override this method to migrate an op to the SemOS execution contract.
+    /// The default implementation converts JSON→VerbCall and delegates to `execute()`.
+    ///
+    /// When an op overrides this, the adapter calls it directly without building
+    /// a VerbCall — args arrive as the JSON that the LLM extracted.
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        // Default: convert to legacy types and delegate
+        use crate::sem_os_runtime::verb_executor_adapter;
+        let vc = verb_executor_adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
+    }
+
+    /// Returns true if this op has been migrated to execute_json (overrides the default).
+    /// Used for telemetry — tracks migration progress.
+    fn is_migrated(&self) -> bool {
+        false
+    }
+
     /// Execute within an existing transaction
     ///
     /// Default implementation logs a warning and falls back to pool-based execution
