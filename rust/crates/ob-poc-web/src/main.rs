@@ -772,6 +772,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_runbook_store(runbook_store)
             .with_orchestrated_verbs(orchestrated_verbs);
 
+        // Wire SemOS VerbExecutionPort — CRUD verbs route through PgCrudExecutor,
+        // plugin verbs fall through to DslExecutor via the adapter.
+        {
+            use ob_poc::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
+            use sem_os_postgres::PgCrudExecutor;
+
+            let verb_executor = ObPocVerbExecutor::from_pool(pool.clone())
+                .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())));
+            orchestrator =
+                orchestrator.with_verb_execution_port(Arc::new(verb_executor));
+            tracing::info!("SemOS VerbExecutionPort wired with PgCrudExecutor");
+        }
+
         // Wire the V2 executor that supports parking (WorkflowDispatcher or RealDslExecutor)
         if let Some(ref bpmn_exec) = bpmn_executor_v2 {
             orchestrator = orchestrator.with_executor_v2(bpmn_exec.clone());
