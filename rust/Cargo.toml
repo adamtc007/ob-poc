@@ -226,7 +226,6 @@ members = [
     ".",
     "crates/dsl-core",
     "crates/ob-agentic",
-    "crates/ob-execution-types",
     "crates/ob-templates",
     "crates/ob-workflow",
     "crates/dsl-lsp",
