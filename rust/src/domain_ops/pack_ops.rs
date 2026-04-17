@@ -135,6 +135,37 @@ impl CustomOperation for PackSelectOp {
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt};
+        let pack_id = json_extract_string(args, "pack-id")?;
+        let pack_version =
+            json_extract_string_opt(args, "pack-version").unwrap_or_else(|| "latest".to_string());
+        let manifest_hash = json_extract_string_opt(args, "manifest-hash");
+        let handoff_from = json_extract_string_opt(args, "handoff-from");
+
+        let result = PackSelectResult {
+            pack_id: pack_id.clone(),
+            pack_name: pack_id.clone(),
+            pack_version,
+            manifest_hash,
+            handoff_from,
+        };
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -200,5 +231,33 @@ impl CustomOperation for PackAnswerOp {
         };
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt};
+        let field = json_extract_string(args, "field")?;
+        let value = json_extract_string(args, "value")?;
+        let pack_id = json_extract_string_opt(args, "pack-id");
+
+        let result = PackAnswerResult {
+            field,
+            value,
+            accepted: true,
+            pack_id,
+        };
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

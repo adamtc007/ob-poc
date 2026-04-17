@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO \"ob-poc\".memberships (team_id, user_id, role_key, effective_from)\n            VALUES ($1, $2, $3, CURRENT_DATE)\n            RETURNING membership_id\n            ",
+  "query": "\n        INSERT INTO \"ob-poc\".memberships (team_id, user_id, role_key, effective_from)\n        VALUES ($1, $2, $3, CURRENT_DATE)\n        RETURNING membership_id\n        ",
   "describe": {
     "columns": [
       {
@@ -20,5 +20,5 @@
       false
     ]
   },
-  "hash": "e35b72a68539fc23ce69d6aeab2df4ec7f7cf4fdf9c5924bff79c8e4e957d594"
+  "hash": "c82aada02b97d425a02a2ce9f68346708c10e715cc8473d5f3729e274db3cb20"
 }
