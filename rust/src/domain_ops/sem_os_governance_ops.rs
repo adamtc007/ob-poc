@@ -53,6 +53,21 @@ impl CustomOperation for GovernanceGatePrecheckOp {
             "governance.gate-precheck requires database"
         ))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_gate_precheck")
+            .await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Submit changeset for review.
@@ -90,6 +105,26 @@ impl CustomOperation for GovernanceSubmitForReviewOp {
         Err(anyhow::anyhow!(
             "governance.submit-for-review requires database"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(
+            pool,
+            ctx,
+            args,
+            "stew_submit_for_review",
+        )
+        .await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -129,6 +164,26 @@ impl CustomOperation for GovernanceRecordReviewOp {
             "governance.record-review requires database"
         ))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(
+            pool,
+            ctx,
+            args,
+            "stew_record_review_decision",
+        )
+        .await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── CoreService-Delegated Ops (via direct SQL/tool dispatch) ──────
@@ -167,6 +222,21 @@ impl CustomOperation for GovernanceValidateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("governance.validate requires database"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan")
+            .await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Dry-run a changeset (Stage 2 scratch schema).
@@ -202,6 +272,21 @@ impl CustomOperation for GovernanceDryRunOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("governance.dry-run requires database"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan")
+            .await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -239,6 +324,21 @@ impl CustomOperation for GovernancePlanPublishOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("governance.plan-publish requires database"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_impact_analysis")
+            .await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Publish a validated changeset to the active snapshot set.
@@ -274,6 +374,20 @@ impl CustomOperation for GovernancePublishOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("governance.publish requires database"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_publish").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -312,6 +426,20 @@ impl CustomOperation for GovernancePublishBatchOp {
         Err(anyhow::anyhow!(
             "governance.publish-batch requires database"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_publish").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

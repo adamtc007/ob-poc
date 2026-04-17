@@ -570,6 +570,20 @@ impl CustomOperation for SchemaIntrospectOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("schema.introspect requires database"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── Schema Extraction ─────────────────────────────────────────────
@@ -611,6 +625,20 @@ impl CustomOperation for SchemaExtractAttributesOp {
             "schema.extract-attributes requires database"
         ))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Extract verb contracts from YAML configuration.
@@ -646,6 +674,20 @@ impl CustomOperation for SchemaExtractVerbsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("schema.extract-verbs requires database"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -683,6 +725,20 @@ impl CustomOperation for SchemaExtractEntitiesOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("schema.extract-entities requires database"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Cross-reference schema against registry snapshots for drift detection.
@@ -718,6 +774,20 @@ impl CustomOperation for SchemaCrossReferenceOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("schema.cross-reference requires database"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
