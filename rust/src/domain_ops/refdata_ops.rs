@@ -407,6 +407,18 @@ fn resolve_domain_spec(verb_call: &VerbCall) -> Result<&'static RefdataDomainSpe
         .ok_or_else(|| anyhow!("Unsupported refdata domain: {}", domain))
 }
 
+fn resolve_domain_spec_json(args: &serde_json::Value) -> Result<&'static RefdataDomainSpec> {
+    let domain = args
+        .get("domain")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| anyhow!("refdata.* requires :domain"))?
+        .to_lowercase();
+    REFDATA_DOMAINS
+        .iter()
+        .find(|spec| spec.domain == domain)
+        .ok_or_else(|| anyhow!("Unsupported refdata domain: {}", domain))
+}
+
 fn string_arg_or_default(verb_call: &VerbCall, field: RefdataField) -> Option<String> {
     get_string_arg(verb_call, field.arg)
 }
@@ -423,6 +435,29 @@ fn int_arg_or_default(verb_call: &VerbCall, field: RefdataField) -> Option<i64> 
         Some(RefdataDefaultValue::Int(v)) => Some(v),
         _ => None,
     })
+}
+
+fn string_json_arg_or_default(args: &serde_json::Value, field: RefdataField) -> Option<String> {
+    args.get(field.arg)
+        .and_then(|value| value.as_str().map(ToOwned::to_owned))
+}
+
+fn bool_json_arg_or_default(args: &serde_json::Value, field: RefdataField) -> Option<bool> {
+    args.get(field.arg)
+        .and_then(|value| value.as_bool())
+        .or(match field.default {
+            Some(RefdataDefaultValue::Bool(v)) => Some(v),
+            _ => None,
+        })
+}
+
+fn int_json_arg_or_default(args: &serde_json::Value, field: RefdataField) -> Option<i64> {
+    args.get(field.arg)
+        .and_then(|value| value.as_i64())
+        .or(match field.default {
+            Some(RefdataDefaultValue::Int(v)) => Some(v),
+            _ => None,
+        })
 }
 
 #[cfg(feature = "database")]
@@ -528,6 +563,110 @@ async fn ensure_refdata(
 }
 
 #[cfg(feature = "database")]
+async fn ensure_refdata_json(
+    args: &serde_json::Value,
+    spec: &RefdataDomainSpec,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let mut present_fields = Vec::new();
+    let mut qb =
+        QueryBuilder::<Postgres>::new(format!("INSERT INTO \"{}\".{} (", spec.schema, spec.table));
+    {
+        let mut cols = qb.separated(", ");
+        for field in spec.fields {
+            match field.arg_type {
+                RefdataArgType::String => {
+                    let value = string_json_arg_or_default(args, *field);
+                    if field.required && value.is_none() {
+                        bail!("Missing required argument: {}", field.arg);
+                    }
+                    if value.is_some() {
+                        cols.push(field.column);
+                        present_fields.push((*field, value.map(RefdataBoundValue::String)));
+                    }
+                }
+                RefdataArgType::Bool => {
+                    let value = bool_json_arg_or_default(args, *field);
+                    if field.required && value.is_none() {
+                        bail!("Missing required argument: {}", field.arg);
+                    }
+                    if value.is_some() {
+                        cols.push(field.column);
+                        present_fields.push((*field, value.map(RefdataBoundValue::Bool)));
+                    }
+                }
+                RefdataArgType::Int => {
+                    let value = int_json_arg_or_default(args, *field);
+                    if field.required && value.is_none() {
+                        bail!("Missing required argument: {}", field.arg);
+                    }
+                    if value.is_some() {
+                        cols.push(field.column);
+                        present_fields.push((*field, value.map(RefdataBoundValue::Int)));
+                    }
+                }
+            }
+        }
+    }
+    qb.push(") VALUES (");
+    {
+        let mut vals = qb.separated(", ");
+        for (_, value) in &present_fields {
+            match value {
+                Some(RefdataBoundValue::String(v)) => {
+                    vals.push_bind(v);
+                }
+                Some(RefdataBoundValue::Bool(v)) => {
+                    vals.push_bind(v);
+                }
+                Some(RefdataBoundValue::Int(v)) => {
+                    vals.push_bind(v);
+                }
+                None => {}
+            }
+        }
+    }
+    qb.push(") ON CONFLICT (");
+    qb.push(spec.key_column);
+    qb.push(") DO UPDATE SET ");
+    let mut first = true;
+    for (field, _) in &present_fields {
+        if field.column == spec.key_column {
+            continue;
+        }
+        if !first {
+            qb.push(", ");
+        }
+        first = false;
+        qb.push(field.column);
+        qb.push(" = EXCLUDED.");
+        qb.push(field.column);
+    }
+    if first {
+        qb.push(spec.key_column);
+        qb.push(" = EXCLUDED.");
+        qb.push(spec.key_column);
+    }
+    qb.push(" RETURNING ");
+    qb.push(spec.return_column);
+
+    match spec.return_kind {
+        RefdataReturnKind::Uuid => {
+            let query = qb.build_query_scalar::<uuid::Uuid>();
+            Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+                query.fetch_one(pool).await?,
+            ))
+        }
+        RefdataReturnKind::String => {
+            let query = qb.build_query_scalar::<String>();
+            Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                serde_json::json!({ spec.return_column: query.fetch_one(pool).await? }),
+            ))
+        }
+    }
+}
+
+#[cfg(feature = "database")]
 async fn read_refdata(
     verb_call: &VerbCall,
     spec: &RefdataDomainSpec,
@@ -546,6 +685,29 @@ async fn read_refdata(
     Ok(ExecutionResult::Record(record.ok_or_else(|| {
         anyhow!("No {} record found", spec.domain)
     })?))
+}
+
+#[cfg(feature = "database")]
+async fn read_refdata_json(
+    args: &serde_json::Value,
+    spec: &RefdataDomainSpec,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let key = args
+        .get(spec.key_arg)
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| anyhow!("Missing required argument: {}", spec.key_arg))?;
+    let sql = format!(
+        "SELECT row_to_json(t) FROM (SELECT * FROM \"{}\".{} WHERE {} = $1) t",
+        spec.schema, spec.table, spec.key_column
+    );
+    let record: Option<JsonValue> = sqlx::query_scalar(&sql)
+        .bind(key)
+        .fetch_optional(pool)
+        .await?;
+    Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        record.ok_or_else(|| anyhow!("No {} record found", spec.domain))?,
+    ))
 }
 
 #[cfg(feature = "database")]
@@ -619,6 +781,78 @@ async fn list_refdata(
 }
 
 #[cfg(feature = "database")]
+async fn list_refdata_json(
+    args: &serde_json::Value,
+    spec: &RefdataDomainSpec,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let mut qb = QueryBuilder::<Postgres>::new(format!(
+        "SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (SELECT * FROM \"{}\".{}",
+        spec.schema, spec.table
+    ));
+    let mut first_filter = true;
+    for filter_arg in spec.list_filters {
+        let field = spec
+            .fields
+            .iter()
+            .find(|field| field.arg == *filter_arg)
+            .ok_or_else(|| anyhow!("Missing field metadata for filter {}", filter_arg))?;
+        match field.arg_type {
+            RefdataArgType::String => {
+                if let Some(value) = args.get(filter_arg).and_then(|v| v.as_str()) {
+                    if first_filter {
+                        qb.push(" WHERE ");
+                        first_filter = false;
+                    } else {
+                        qb.push(" AND ");
+                    }
+                    qb.push(field.column);
+                    qb.push(" = ");
+                    qb.push_bind(value);
+                }
+            }
+            RefdataArgType::Bool => {
+                if let Some(value) = args.get(filter_arg).and_then(|v| v.as_bool()) {
+                    if first_filter {
+                        qb.push(" WHERE ");
+                        first_filter = false;
+                    } else {
+                        qb.push(" AND ");
+                    }
+                    qb.push(field.column);
+                    qb.push(" = ");
+                    qb.push_bind(value);
+                }
+            }
+            RefdataArgType::Int => {
+                if let Some(value) = args.get(filter_arg).and_then(|v| v.as_i64()) {
+                    if first_filter {
+                        qb.push(" WHERE ");
+                        first_filter = false;
+                    } else {
+                        qb.push(" AND ");
+                    }
+                    qb.push(field.column);
+                    qb.push(" = ");
+                    qb.push_bind(value);
+                }
+            }
+        }
+    }
+    qb.push(" ORDER BY ");
+    qb.push(spec.order_by);
+    qb.push(") t");
+    let query = qb.build_query_scalar::<JsonValue>();
+    let rows = query.fetch_one(pool).await?;
+    Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        match rows {
+            JsonValue::Array(items) => items,
+            _ => Vec::new(),
+        },
+    ))
+}
+
+#[cfg(feature = "database")]
 async fn deactivate_refdata(
     verb_call: &VerbCall,
     spec: &RefdataDomainSpec,
@@ -639,6 +873,31 @@ async fn deactivate_refdata(
     };
     sqlx::query(&sql).bind(key).execute(pool).await?;
     Ok(ExecutionResult::Void)
+}
+
+#[cfg(feature = "database")]
+async fn deactivate_refdata_json(
+    args: &serde_json::Value,
+    spec: &RefdataDomainSpec,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let key = args
+        .get(spec.key_arg)
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| anyhow!("Missing required argument: {}", spec.key_arg))?;
+    let sql = if let Some(active_column) = spec.active_column {
+        format!(
+            "UPDATE \"{}\".{} SET {} = FALSE WHERE {} = $1",
+            spec.schema, spec.table, active_column, spec.key_column
+        )
+    } else {
+        format!(
+            "DELETE FROM \"{}\".{} WHERE {} = $1",
+            spec.schema, spec.table, spec.key_column
+        )
+    };
+    sqlx::query(&sql).bind(key).execute(pool).await?;
+    Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
 }
 
 enum RefdataBoundValue {
@@ -676,6 +935,17 @@ impl CustomOperation for RefdataEnsureOp {
         ensure_refdata(verb_call, spec, pool).await
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let spec = resolve_domain_spec_json(args)?;
+        ensure_refdata_json(args, spec, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -708,6 +978,17 @@ impl CustomOperation for RefdataReadOp {
     ) -> Result<ExecutionResult> {
         let spec = resolve_domain_spec(verb_call)?;
         read_refdata(verb_call, spec, pool).await
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let spec = resolve_domain_spec_json(args)?;
+        read_refdata_json(args, spec, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -743,6 +1024,17 @@ impl CustomOperation for RefdataListOp {
         list_refdata(verb_call, spec, pool).await
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let spec = resolve_domain_spec_json(args)?;
+        list_refdata_json(args, spec, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -774,6 +1066,17 @@ impl CustomOperation for RefdataDeactivateOp {
     ) -> Result<ExecutionResult> {
         let spec = resolve_domain_spec(verb_call)?;
         deactivate_refdata(verb_call, spec, pool).await
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let spec = resolve_domain_spec_json(args)?;
+        deactivate_refdata_json(args, spec, pool).await
     }
 
     fn is_migrated(&self) -> bool {

@@ -438,13 +438,42 @@ impl CustomOperationRegistry {
             registry.register_internal(op);
         }
 
-        // Log the count for sanity checking
+        // Log the count and migration status for observability
+        let total = registry.operations.len();
+        let migrated = registry
+            .operations
+            .values()
+            .filter(|op| op.is_migrated())
+            .count();
         tracing::info!(
-            "CustomOperationRegistry initialized with {} ops from inventory",
-            registry.operations.len()
+            "CustomOperationRegistry: {} ops from inventory ({} migrated to execute_json, {} legacy)",
+            total,
+            migrated,
+            total - migrated
         );
 
         registry
+    }
+
+    /// Get a snapshot of all registered ops for diagnostics.
+    pub fn manifest(&self) -> Vec<(String, String, bool)> {
+        let mut ops: Vec<_> = self
+            .operations
+            .iter()
+            .map(|((d, v), op)| (d.clone(), v.clone(), op.is_migrated()))
+            .collect();
+        ops.sort();
+        ops
+    }
+
+    /// Count of registered ops.
+    pub fn len(&self) -> usize {
+        self.operations.len()
+    }
+
+    /// Count of ops migrated to execute_json.
+    pub fn migrated_count(&self) -> usize {
+        self.operations.values().filter(|op| op.is_migrated()).count()
     }
 
     /// Internal registration with duplicate detection.
