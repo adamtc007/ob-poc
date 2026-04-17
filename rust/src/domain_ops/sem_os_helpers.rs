@@ -139,6 +139,34 @@ pub async fn delegate_to_tool(
     convert_tool_result(result)
 }
 
+/// JSON-native variant of delegate_to_tool — takes pre-extracted JSON args.
+#[cfg(feature = "database")]
+pub async fn delegate_to_tool_json(
+    pool: &PgPool,
+    ctx: &sem_os_core::execution::VerbExecutionContext,
+    args: &serde_json::Value,
+    tool_name: &str,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let actor = ActorContext {
+        actor_id: ctx.principal.actor_id.clone(),
+        roles: if ctx.principal.is_admin() {
+            vec!["admin".to_string(), "operator".to_string()]
+        } else {
+            vec!["operator".to_string()]
+        },
+        department: None,
+        clearance: Some(crate::sem_reg::types::Classification::Internal),
+        jurisdictions: vec![],
+    };
+    let tool_ctx = SemRegToolContext {
+        pool,
+        actor: &actor,
+        sem_os_service: None,
+    };
+    let result = crate::sem_reg::agent::mcp_tools::dispatch_tool(&tool_ctx, tool_name, args).await;
+    convert_tool_result_json(result)
+}
+
 /// Delegate to stewardship phase 0 tool dispatch.
 #[cfg(feature = "database")]
 pub async fn delegate_to_stew_tool(
@@ -168,4 +196,56 @@ pub async fn delegate_to_stew_tool(
     }
 
     Err(anyhow!("Unknown stewardship tool: {}", tool_name))
+}
+
+/// JSON-native variant of delegate_to_stew_tool — takes pre-extracted JSON args
+/// and SemOS VerbExecutionContext instead of VerbCall + ExecutionContext.
+pub async fn delegate_to_stew_tool_json(
+    pool: &PgPool,
+    ctx: &sem_os_core::execution::VerbExecutionContext,
+    args: &serde_json::Value,
+    tool_name: &str,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let actor = ActorContext {
+        actor_id: ctx.principal.actor_id.clone(),
+        roles: if ctx.principal.is_admin() {
+            vec!["admin".to_string(), "operator".to_string()]
+        } else {
+            vec!["operator".to_string()]
+        },
+        department: None,
+        clearance: Some(crate::sem_reg::types::Classification::Internal),
+        jurisdictions: vec![],
+    };
+    let tool_ctx = SemRegToolContext {
+        pool,
+        actor: &actor,
+        sem_os_service: None,
+    };
+
+    if let Some(result) =
+        crate::sem_reg::stewardship::dispatch_phase0_tool(&tool_ctx, tool_name, args).await
+    {
+        return convert_tool_result_json(result);
+    }
+    if let Some(result) =
+        crate::sem_reg::stewardship::dispatch_phase1_tool(&tool_ctx, tool_name, args).await
+    {
+        return convert_tool_result_json(result);
+    }
+
+    Err(anyhow!("Unknown stewardship tool: {}", tool_name))
+}
+
+fn convert_tool_result_json(
+    result: SemRegToolResult,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    if result.success {
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result.data))
+    } else {
+        Err(anyhow!(
+            "{}",
+            result.error.unwrap_or_else(|| "Unknown tool error".to_string())
+        ))
+    }
 }

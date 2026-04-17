@@ -4,7 +4,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 
-use super::helpers::{extract_string, extract_uuid, extract_uuid_opt};
+use super::helpers::{
+    extract_string, extract_uuid, extract_uuid_opt, json_extract_string, json_extract_uuid,
+    json_extract_uuid_opt,
+};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 use crate::sem_os_runtime::constellation_runtime::{
     handle_constellation_hydrate, handle_constellation_summary,
@@ -50,7 +53,27 @@ impl CustomOperation for ConstellationHydrateOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow!("constellation.hydrate requires database"))
+        Err(anyhow::anyhow!("constellation.hydrate requires database"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let map_name = json_extract_string(args, "map-name")?;
+        let result = handle_constellation_hydrate(pool, cbu_id, case_id, &map_name).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -91,6 +114,26 @@ impl CustomOperation for ConstellationSummaryOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Err(anyhow!("constellation.summary requires database"))
+        Err(anyhow::anyhow!("constellation.summary requires database"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let map_name = json_extract_string(args, "map-name")?;
+        let result = handle_constellation_summary(pool, cbu_id, case_id, &map_name).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

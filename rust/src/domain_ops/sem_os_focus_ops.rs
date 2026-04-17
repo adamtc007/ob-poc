@@ -51,6 +51,20 @@ macro_rules! focus_op {
             ) -> Result<ExecutionResult> {
                 Err(anyhow::anyhow!("focus.{} requires database", $verb))
             }
+
+            #[cfg(feature = "database")]
+            async fn execute_json(
+                &self,
+                args: &serde_json::Value,
+                ctx: &mut sem_os_core::execution::VerbExecutionContext,
+                pool: &PgPool,
+            ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+                super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, $tool).await
+            }
+
+            fn is_migrated(&self) -> bool {
+                true
+            }
         }
     };
 }

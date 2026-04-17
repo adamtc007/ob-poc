@@ -51,6 +51,20 @@ macro_rules! registry_op {
             ) -> Result<ExecutionResult> {
                 Err(anyhow::anyhow!("registry.{} requires database", $verb))
             }
+
+            #[cfg(feature = "database")]
+            async fn execute_json(
+                &self,
+                args: &serde_json::Value,
+                ctx: &mut sem_os_core::execution::VerbExecutionContext,
+                pool: &PgPool,
+            ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+                super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, $tool).await
+            }
+
+            fn is_migrated(&self) -> bool {
+                true
+            }
         }
     };
 }
@@ -107,6 +121,29 @@ impl CustomOperation for RegistryDescribeObjectOp {
             "registry.describe-object requires database"
         ))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let object_type = args.get("object-type").or_else(|| args.get("object_type"))
+            .and_then(|v| v.as_str());
+        let tool_name = match object_type {
+            Some("verb_contract") | Some("verb") => "sem_reg_describe_verb",
+            Some("entity_type_def") | Some("entity_type") => "sem_reg_describe_entity_type",
+            Some("policy_rule") | Some("policy") => "sem_reg_describe_policy",
+            Some("view_def") | Some("view") => "sem_reg_describe_view",
+            _ => "sem_reg_describe_attribute",
+        };
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, tool_name).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── Search & List ──────────────────────────────────────────────────
@@ -162,6 +199,27 @@ impl CustomOperation for RegistryListObjectsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("registry.list-objects requires database"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let object_type = args.get("object-type").or_else(|| args.get("object_type"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("verb_contract");
+        let tool_name = match object_type {
+            "attribute_def" | "attribute" => "sem_reg_list_attributes",
+            _ => "sem_reg_list_verbs",
+        };
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, tool_name).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
