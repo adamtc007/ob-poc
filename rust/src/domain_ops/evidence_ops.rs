@@ -171,6 +171,10 @@ impl CustomOperation for EvidenceRequireOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -248,6 +252,10 @@ impl CustomOperation for EvidenceLinkOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -330,6 +338,10 @@ impl CustomOperation for EvidenceVerifyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -417,6 +429,10 @@ impl CustomOperation for EvidenceRejectOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -490,6 +506,10 @@ impl CustomOperation for EvidenceWaiveOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Compatibility alias for `evidence.create-requirement`.
@@ -525,6 +545,10 @@ impl CustomOperation for EvidenceCreateRequirementOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -562,6 +586,10 @@ impl CustomOperation for EvidenceAttachDocumentOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Compatibility alias for `evidence.mark-verified`.
@@ -597,6 +625,10 @@ impl CustomOperation for EvidenceMarkVerifiedOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -634,6 +666,10 @@ impl CustomOperation for EvidenceMarkRejectedOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Compatibility alias for `evidence.mark-waived`.
@@ -669,5 +705,9 @@ impl CustomOperation for EvidenceMarkWaivedOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

@@ -86,6 +86,10 @@ impl CustomOperation for BatchPauseOp {
             message: "Batch pause requested. Session handler will process.".to_string(),
         }))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -127,6 +131,10 @@ impl CustomOperation for BatchResumeOp {
             status: None,
             message: "Batch resume requested. Session handler will process.".to_string(),
         }))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -179,6 +187,10 @@ impl CustomOperation for BatchContinueOp {
             message: format!("Continue {} more items requested.", count),
         }))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -229,6 +241,10 @@ impl CustomOperation for BatchSkipOp {
             message: reason.unwrap_or_else(|| "Current item skipped.".to_string()),
         }))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -278,6 +294,10 @@ impl CustomOperation for BatchAbortOp {
             status: reason.as_ref().map(|r| serde_json::json!({ "reason": r })),
             message: reason.unwrap_or_else(|| "Batch execution aborted.".to_string()),
         }))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -336,6 +356,10 @@ impl CustomOperation for BatchStatusOp {
             })),
             message: "Batch status requested.".to_string(),
         }))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -520,6 +544,10 @@ impl CustomOperation for BatchAddProductsOp {
                 failure_count
             ),
         }))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

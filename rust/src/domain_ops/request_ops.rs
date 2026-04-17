@@ -283,6 +283,10 @@ impl CustomOperation for RequestCreateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -400,6 +404,10 @@ impl CustomOperation for RequestOverdueOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -508,6 +516,10 @@ impl CustomOperation for RequestFulfillOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -598,6 +610,10 @@ impl CustomOperation for RequestCancelOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -746,6 +762,10 @@ impl CustomOperation for RequestExtendOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -859,6 +879,10 @@ impl CustomOperation for RequestRemindOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -958,6 +982,10 @@ impl CustomOperation for RequestEscalateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1042,6 +1070,10 @@ impl CustomOperation for RequestWaiveOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1227,6 +1259,10 @@ impl CustomOperation for DocumentRequestOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1377,6 +1413,10 @@ impl CustomOperation for DocumentUploadOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1472,6 +1512,10 @@ impl CustomOperation for DocumentWaiveOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

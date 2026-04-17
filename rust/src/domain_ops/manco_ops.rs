@@ -83,6 +83,10 @@ impl CustomOperation for MancoBridgeRolesOp {
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Bridge GLEIF IS_FUND_MANAGED_BY relationships to BOARD_APPOINTMENT special rights
@@ -135,6 +139,10 @@ impl CustomOperation for MancoBridgeGleifFundManagersOp {
             rights_updated: 0,
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -189,6 +197,10 @@ impl CustomOperation for MancoBridgeBodsOwnershipOp {
             entities_linked: 0,
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -245,6 +257,10 @@ impl CustomOperation for MancoGroupDeriveOp {
             memberships_created: 0,
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -322,6 +338,10 @@ impl CustomOperation for MancoGroupCbusOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -403,6 +423,10 @@ impl CustomOperation for MancoGroupForCbuOp {
             message: "Database not available".to_string(),
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -504,6 +528,10 @@ impl CustomOperation for MancoPrimaryControllerOp {
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Trace control chain upward from a governance controller
@@ -598,6 +626,10 @@ impl CustomOperation for MancoControlChainOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -788,6 +820,10 @@ impl CustomOperation for MancoBookSummaryOp {
         });
         Ok(ExecutionResult::Record(result))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -840,6 +876,10 @@ impl CustomOperation for OwnershipComputeControlLinksOp {
     ) -> Result<ExecutionResult> {
         let result = ComputeControlLinksResult { links_created: 0 };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -961,5 +1001,9 @@ impl CustomOperation for OwnershipRefreshOp {
             },
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

@@ -69,6 +69,10 @@ impl CustomOperation for MaintenanceHealthPendingOp {
             "maintenance.health-pending requires database"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Check for stale dry-run results.
@@ -131,6 +135,10 @@ impl CustomOperation for MaintenanceHealthStaleDryrunsOp {
             "maintenance.health-stale-dryruns requires database"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── Cleanup ───────────────────────────────────────────────────────
@@ -187,6 +195,10 @@ impl CustomOperation for MaintenanceCleanupOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("maintenance.cleanup requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── Bootstrap Seeds ───────────────────────────────────────────────
@@ -230,6 +242,10 @@ impl CustomOperation for MaintenanceBootstrapSeedsOp {
         Err(anyhow::anyhow!(
             "maintenance.bootstrap-seeds requires database"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -280,6 +296,10 @@ impl CustomOperation for MaintenanceDrainOutboxOp {
         Err(anyhow::anyhow!(
             "maintenance.drain-outbox requires database"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -356,6 +376,10 @@ impl CustomOperation for MaintenanceReindexEmbeddingsOp {
             "maintenance.reindex-embeddings requires database"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── Schema Sync Validation ────────────────────────────────────────
@@ -412,5 +436,9 @@ impl CustomOperation for MaintenanceValidateSchemaSyncOp {
         Err(anyhow::anyhow!(
             "maintenance.validate-schema-sync requires database"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

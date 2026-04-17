@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::CustomOperation;
+use super::helpers::{json_extract_string, json_extract_string_opt, json_get_required_uuid};
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
@@ -133,6 +134,39 @@ impl CustomOperation for BpmnCompileOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("bpmn.compile requires database feature"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let bpmn_xml = json_extract_string(args, "bpmn-xml")?;
+        let client = get_bpmn_client()?;
+        let result = client.compile(&bpmn_xml).await?;
+
+        let typed = BpmnCompileResult {
+            bytecode_version_hex: hex::encode(&result.bytecode_version),
+            diagnostic_count: result.diagnostics.len(),
+            diagnostics: result
+                .diagnostics
+                .into_iter()
+                .map(|d| BpmnDiagnosticResult {
+                    severity: d.severity,
+                    message: d.message,
+                    element_id: d.element_id,
+                })
+                .collect(),
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(typed)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -195,6 +229,45 @@ impl CustomOperation for BpmnStartOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("bpmn.start requires database feature"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let process_key = json_extract_string(args, "process-key")?;
+        let payload = json_extract_string_opt(args, "payload").unwrap_or_else(|| "{}".to_string());
+
+        let (canonical, hash) = crate::bpmn_integration::canonical::canonical_json_with_hash(
+            &serde_json::from_str(&payload)
+                .unwrap_or(serde_json::Value::Object(Default::default())),
+        );
+
+        let client = get_bpmn_client()?;
+        let instance_id = client
+            .start_process(crate::bpmn_integration::client::StartProcessRequest {
+                process_key,
+                bytecode_version: Vec::new(),
+                domain_payload: canonical,
+                domain_payload_hash: hash,
+                session_stack: SessionStackState::default(),
+                orch_flags: std::collections::HashMap::new(),
+                correlation_id: Uuid::now_v7(),
+                entry_id: Uuid::nil(),
+                runbook_id: Uuid::nil(),
+            })
+            .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            instance_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -247,6 +320,33 @@ impl CustomOperation for BpmnSignalOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("bpmn.signal requires database feature"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let instance_id = json_get_required_uuid(args, "instance-id")?;
+        let message_name = json_extract_string(args, "message-name")?;
+        let payload = json_extract_string_opt(args, "payload");
+
+        let client = get_bpmn_client()?;
+        client
+            .signal(
+                instance_id,
+                &message_name,
+                payload.as_ref().map(|p| p.as_bytes()),
+            )
+            .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -292,6 +392,27 @@ impl CustomOperation for BpmnCancelOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("bpmn.cancel requires database feature"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let instance_id = json_get_required_uuid(args, "instance-id")?;
+        let reason = json_extract_string_opt(args, "reason")
+            .unwrap_or_else(|| "Cancelled by operator".to_string());
+
+        let client = get_bpmn_client()?;
+        client.cancel(instance_id, &reason).await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -343,5 +464,33 @@ impl CustomOperation for BpmnInspectOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("bpmn.inspect requires database feature"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let instance_id = json_get_required_uuid(args, "instance-id")?;
+
+        let client = get_bpmn_client()?;
+        let inspection = client.inspect(instance_id).await?;
+
+        let typed = BpmnInspectResult {
+            state: inspection.state,
+            fiber_count: inspection.fibers.len(),
+            wait_count: inspection.waits.len(),
+            bytecode_version_hex: hex::encode(&inspection.bytecode_version),
+            domain_payload_hash: inspection.domain_payload_hash,
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(typed)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

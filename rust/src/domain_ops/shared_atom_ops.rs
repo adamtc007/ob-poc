@@ -65,6 +65,10 @@ impl CustomOperation for SharedAtomRegisterOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.register requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── activate ─────────────────────────────────────────────────────────
@@ -110,6 +114,10 @@ impl CustomOperation for SharedAtomActivateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.activate requires database"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -158,6 +166,10 @@ impl CustomOperation for SharedAtomDeprecateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.deprecate requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── retire ───────────────────────────────────────────────────────────
@@ -203,6 +215,10 @@ impl CustomOperation for SharedAtomRetireOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.retire requires database"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -258,6 +274,10 @@ impl CustomOperation for SharedAtomListOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.list requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── list-consumers ───────────────────────────────────────────────────
@@ -299,6 +319,10 @@ impl CustomOperation for SharedAtomListConsumersOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.list-consumers requires database"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -416,6 +440,10 @@ impl CustomOperation for SharedAtomReplayConstellationOp {
             "shared-atom.replay-constellation requires database"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── acknowledge-shared-update ────────────────────────────────────────
@@ -514,5 +542,9 @@ impl CustomOperation for SharedAtomAcknowledgeOp {
         Err(anyhow!(
             "shared-atom.acknowledge-shared-update requires database"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

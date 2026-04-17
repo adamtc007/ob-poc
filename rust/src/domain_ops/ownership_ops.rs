@@ -93,6 +93,10 @@ impl CustomOperation for OwnershipComputeOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// List ownership snapshots for an issuer
@@ -239,6 +243,10 @@ impl CustomOperation for OwnershipSnapshotListOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Get control positions for an issuer
@@ -319,6 +327,10 @@ impl CustomOperation for OwnershipControlPositionsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -413,6 +425,10 @@ impl CustomOperation for OwnershipWhoControlsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -644,6 +660,10 @@ impl CustomOperation for OwnershipReconcileOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// List findings from a reconciliation run
@@ -794,6 +814,10 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -868,6 +892,10 @@ impl CustomOperation for OwnershipAnalyzeGapsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -975,5 +1003,9 @@ impl CustomOperation for OwnershipTraceChainOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

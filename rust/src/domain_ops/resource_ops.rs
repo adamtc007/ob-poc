@@ -229,6 +229,10 @@ impl CustomOperation for ResourceCreateOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Set an attribute on a resource instance
@@ -329,6 +333,10 @@ impl CustomOperation for ResourceSetAttrOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -440,6 +448,10 @@ impl CustomOperation for ResourceActivateOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Suspend a resource instance
@@ -500,6 +512,10 @@ impl CustomOperation for ResourceSuspendOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Decommission a resource instance
@@ -559,6 +575,10 @@ impl CustomOperation for ResourceDecommissionOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -668,5 +688,9 @@ impl CustomOperation for ResourceValidateAttrsOp {
             "missing": [],
             "message": "Validation skipped (no database)"
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

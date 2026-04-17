@@ -143,6 +143,10 @@ impl CustomOperation for DilutionGrantOptionsOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -249,6 +253,10 @@ impl CustomOperation for DilutionIssueWarrantOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -346,6 +354,10 @@ impl CustomOperation for DilutionCreateSafeOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -451,6 +463,10 @@ impl CustomOperation for DilutionCreateConvertibleNoteOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -626,6 +642,10 @@ impl CustomOperation for DilutionExerciseOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -969,6 +989,10 @@ impl CustomOperation for DilutionForfeitOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -1118,6 +1142,10 @@ impl CustomOperation for DilutionListOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Get dilution summary for an issuer
@@ -1237,5 +1265,9 @@ impl CustomOperation for DilutionGetSummaryOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

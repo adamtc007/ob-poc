@@ -624,6 +624,10 @@ impl CustomOperation for PhraseObserveMissesOp {
             "phrase.observe-misses requires database feature"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Per-workspace phrase coverage and gap analysis.
@@ -705,6 +709,10 @@ impl CustomOperation for PhraseCoverageReportOp {
             "phrase.coverage-report requires database feature"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -756,6 +764,10 @@ impl CustomOperation for PhraseCheckCollisionsOp {
         Err(anyhow::anyhow!(
             "phrase.check-collisions requires database feature"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -851,6 +863,10 @@ impl CustomOperation for PhraseProposeOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("phrase.propose requires database feature"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1087,6 +1103,10 @@ impl CustomOperation for PhraseBatchProposeOp {
             "phrase.batch-propose requires database feature"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// List pending phrase proposals from SemOS snapshots.
@@ -1191,6 +1211,10 @@ impl CustomOperation for PhraseReviewProposalsOp {
             "phrase.review-proposals requires database feature"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Approve a phrase proposal and publish through SemOS governance.
@@ -1292,6 +1316,10 @@ impl CustomOperation for PhraseApproveOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("phrase.approve requires database feature"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Reject a phrase proposal with reason code.
@@ -1374,6 +1402,10 @@ impl CustomOperation for PhraseRejectOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("phrase.reject requires database feature"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1459,5 +1491,9 @@ impl CustomOperation for PhraseDeferOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("phrase.defer requires database feature"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

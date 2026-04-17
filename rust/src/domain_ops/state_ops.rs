@@ -70,6 +70,10 @@ impl CustomOperation for StateDeriveOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("state.derive requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 #[register_custom_op]
@@ -117,6 +121,10 @@ impl CustomOperation for StateDiagnoseOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("state.diagnose requires database"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -166,6 +174,10 @@ impl CustomOperation for StateDeriveAllOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("state.derive-all requires database"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -223,6 +235,10 @@ impl CustomOperation for StateBlockedWhyOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("state.blocked-why requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 #[register_custom_op]
@@ -271,6 +287,10 @@ impl CustomOperation for StateCheckConsistencyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("state.check-consistency requires database"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -339,6 +359,10 @@ impl CustomOperation for StateOverrideOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("state.override requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 #[register_custom_op]
@@ -385,6 +409,10 @@ impl CustomOperation for StateRevokeOverrideOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("state.revoke-override requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 #[register_custom_op]
@@ -428,5 +456,9 @@ impl CustomOperation for StateListOverridesOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("state.list-overrides requires database"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

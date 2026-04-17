@@ -272,6 +272,10 @@ impl CustomOperation for LifecycleProvisionOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -383,6 +387,10 @@ impl CustomOperation for LifecycleAnalyzeGapsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -502,6 +510,10 @@ impl CustomOperation for LifecycleCheckReadinessOp {
             "blocking_gaps": [],
             "warnings": []
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -623,6 +635,10 @@ impl CustomOperation for LifecycleDiscoverOp {
             "mandatory_lifecycles": [],
             "optional_lifecycles": []
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -792,6 +808,10 @@ impl CustomOperation for LifecycleGeneratePlanOp {
             "ready_to_execute": true
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -896,6 +916,10 @@ impl CustomOperation for LifecycleExecutePlanOp {
             "results": []
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
@@ -979,6 +1003,10 @@ impl CustomOperation for ServiceResourceProvisionLifecycleOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Compatibility alias for `service-resource.analyze-lifecycle-gaps`.
@@ -1014,6 +1042,10 @@ impl CustomOperation for ServiceResourceAnalyzeLifecycleGapsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1053,6 +1085,10 @@ impl CustomOperation for ServiceResourceCheckLifecycleReadinessOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Compatibility alias for `service-resource.discover-lifecycles`.
@@ -1088,6 +1124,10 @@ impl CustomOperation for ServiceResourceDiscoverLifecyclesOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1125,6 +1165,10 @@ impl CustomOperation for ServiceResourceGenerateLifecyclePlanOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Compatibility alias for `service-resource.execute-lifecycle-plan`.
@@ -1160,5 +1204,9 @@ impl CustomOperation for ServiceResourceExecuteLifecyclePlanOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

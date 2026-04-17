@@ -9,7 +9,7 @@
 // These structs deserialize from YAML - fields may not be used in code but are required for serde
 #![allow(dead_code)]
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::json;
@@ -18,6 +18,7 @@ use std::path::Path;
 
 use ob_poc_macros::register_custom_op;
 
+use super::helpers::{json_extract_string, json_extract_string_opt};
 use crate::domain_ops::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -196,6 +197,17 @@ fn default_true() -> bool {
     true
 }
 
+fn result_to_json(result: ExecutionResult) -> serde_json::Value {
+    match result {
+        ExecutionResult::Record(v) => v,
+        ExecutionResult::RecordSet(v) => serde_json::Value::Array(v),
+        ExecutionResult::Uuid(u) => serde_json::Value::String(u.to_string()),
+        ExecutionResult::Affected(n) => serde_json::Value::Number(n.into()),
+        ExecutionResult::Void => serde_json::Value::Null,
+        _ => serde_json::Value::Null,
+    }
+}
+
 // ============================================================================
 // Load Markets Operation
 // ============================================================================
@@ -330,6 +342,107 @@ impl CustomOperation for LoadMarketsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature not enabled"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let file_path = json_extract_string(args, "file-path")?;
+        let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "UPSERT".to_string());
+
+        let yaml_content = std::fs::read_to_string(&file_path)
+            .map_err(|e| anyhow!("Failed to read file {}: {}", file_path, e))?;
+        let data: MarketsYaml = serde_yaml::from_str(&yaml_content)
+            .map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
+
+        let mut inserted = 0;
+        let mut skipped = 0;
+
+        if mode == "REPLACE" {
+            sqlx::query("DELETE FROM \"ob-poc\".markets")
+                .execute(pool)
+                .await?;
+        }
+
+        for market in &data.markets {
+            let result = if mode == "INSERT" {
+                sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".markets
+                    (mic, name, country_code, operating_mic, primary_currency,
+                     supported_currencies, csd_bic, timezone, is_active)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    ON CONFLICT (mic) DO NOTHING
+                    "#,
+                )
+                .bind(&market.mic)
+                .bind(&market.name)
+                .bind(&market.country_code)
+                .bind(&market.operating_mic)
+                .bind(&market.primary_currency)
+                .bind(&market.supported_currencies)
+                .bind(&market.csd_bic)
+                .bind(&market.timezone)
+                .bind(market.is_active)
+                .execute(pool)
+                .await?
+            } else {
+                sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".markets
+                    (mic, name, country_code, operating_mic, primary_currency,
+                     supported_currencies, csd_bic, timezone, is_active)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    ON CONFLICT (mic) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        country_code = EXCLUDED.country_code,
+                        operating_mic = EXCLUDED.operating_mic,
+                        primary_currency = EXCLUDED.primary_currency,
+                        supported_currencies = EXCLUDED.supported_currencies,
+                        csd_bic = EXCLUDED.csd_bic,
+                        timezone = EXCLUDED.timezone,
+                        is_active = EXCLUDED.is_active,
+                        updated_at = now()
+                    "#,
+                )
+                .bind(&market.mic)
+                .bind(&market.name)
+                .bind(&market.country_code)
+                .bind(&market.operating_mic)
+                .bind(&market.primary_currency)
+                .bind(&market.supported_currencies)
+                .bind(&market.csd_bic)
+                .bind(&market.timezone)
+                .bind(market.is_active)
+                .execute(pool)
+                .await?
+            };
+
+            if result.rows_affected() > 0 {
+                inserted += 1;
+            } else {
+                skipped += 1;
+            }
+        }
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "status": "success",
+                "table": "\"ob-poc\".markets",
+                "mode": mode,
+                "total": data.markets.len(),
+                "inserted": inserted,
+                "skipped": skipped
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -504,6 +617,140 @@ impl CustomOperation for LoadInstrumentClassesOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature not enabled"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use uuid::Uuid;
+
+        let file_path = json_extract_string(args, "file-path")?;
+        let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "UPSERT".to_string());
+
+        let yaml_content = std::fs::read_to_string(&file_path)
+            .map_err(|e| anyhow!("Failed to read file {}: {}", file_path, e))?;
+        let data: InstrumentClassesYaml = serde_yaml::from_str(&yaml_content)
+            .map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
+
+        if mode == "REPLACE" {
+            sqlx::query(
+                "DELETE FROM \"ob-poc\".instrument_classes WHERE parent_class_id IS NOT NULL",
+            )
+            .execute(pool)
+            .await?;
+            sqlx::query("DELETE FROM \"ob-poc\".instrument_classes WHERE parent_class_id IS NULL")
+                .execute(pool)
+                .await?;
+        }
+
+        let mut inserted = 0;
+        let mut code_to_id: HashMap<String, Uuid> = HashMap::new();
+
+        for ic in &data.instrument_classes {
+            let settlement_cycle = ic
+                .settlement_cycle
+                .clone()
+                .unwrap_or_else(|| "T+2".to_string());
+            let cfi_cat = ic.cfi_category.as_ref().and_then(|s| s.chars().next());
+
+            let row: (Uuid,) = sqlx::query_as(
+                r#"
+                INSERT INTO "ob-poc".instrument_classes
+                (code, name, default_settlement_cycle, requires_isda, requires_collateral,
+                 cfi_category, smpg_group, isda_asset_class, is_active)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                ON CONFLICT (code) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    default_settlement_cycle = EXCLUDED.default_settlement_cycle,
+                    requires_isda = EXCLUDED.requires_isda,
+                    requires_collateral = EXCLUDED.requires_collateral,
+                    cfi_category = EXCLUDED.cfi_category,
+                    smpg_group = EXCLUDED.smpg_group,
+                    isda_asset_class = EXCLUDED.isda_asset_class,
+                    is_active = EXCLUDED.is_active,
+                    updated_at = now()
+                RETURNING class_id
+                "#,
+            )
+            .bind(&ic.code)
+            .bind(&ic.name)
+            .bind(&settlement_cycle)
+            .bind(ic.requires_isda)
+            .bind(ic.requires_collateral)
+            .bind(cfi_cat.map(|c| c.to_string()))
+            .bind(&ic.smpg_group)
+            .bind(&ic.isda_asset_class)
+            .bind(ic.is_active)
+            .fetch_one(pool)
+            .await?;
+
+            code_to_id.insert(ic.code.clone(), row.0);
+            inserted += 1;
+
+            for child in &ic.children {
+                let child_settlement = child
+                    .settlement_cycle
+                    .clone()
+                    .or_else(|| ic.settlement_cycle.clone())
+                    .unwrap_or_else(|| "T+2".to_string());
+
+                let child_row: (Uuid,) = sqlx::query_as(
+                    r#"
+                    INSERT INTO "ob-poc".instrument_classes
+                    (code, name, default_settlement_cycle, requires_isda, requires_collateral,
+                     smpg_group, isda_asset_class, parent_class_id, is_active)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    ON CONFLICT (code) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        default_settlement_cycle = EXCLUDED.default_settlement_cycle,
+                        requires_isda = EXCLUDED.requires_isda,
+                        requires_collateral = EXCLUDED.requires_collateral,
+                        smpg_group = EXCLUDED.smpg_group,
+                        isda_asset_class = EXCLUDED.isda_asset_class,
+                        parent_class_id = EXCLUDED.parent_class_id,
+                        is_active = EXCLUDED.is_active,
+                        updated_at = now()
+                    RETURNING class_id
+                    "#,
+                )
+                .bind(&child.code)
+                .bind(&child.name)
+                .bind(&child_settlement)
+                .bind(child.requires_isda || ic.requires_isda)
+                .bind(child.requires_collateral || ic.requires_collateral)
+                .bind(child.smpg_code.as_ref().or(ic.smpg_group.as_ref()))
+                .bind(
+                    child
+                        .isda_asset_class
+                        .as_ref()
+                        .or(ic.isda_asset_class.as_ref()),
+                )
+                .bind(row.0)
+                .bind(true)
+                .fetch_one(pool)
+                .await?;
+
+                code_to_id.insert(child.code.clone(), child_row.0);
+                inserted += 1;
+            }
+        }
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "status": "success",
+                "table": "\"ob-poc\".instrument_classes",
+                "mode": mode,
+                "inserted": inserted
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -661,6 +908,124 @@ impl CustomOperation for LoadSubcustodiansOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature not enabled"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use uuid::Uuid;
+
+        let file_path = json_extract_string(args, "file-path")?;
+        let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "UPSERT".to_string());
+
+        let yaml_content = std::fs::read_to_string(&file_path)
+            .map_err(|e| anyhow!("Failed to read file {}: {}", file_path, e))?;
+        let data: SubcustodianNetworkYaml = serde_yaml::from_str(&yaml_content)
+            .map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
+
+        let markets: Vec<(Uuid, String)> =
+            sqlx::query_as("SELECT market_id, mic FROM \"ob-poc\".markets")
+                .fetch_all(pool)
+                .await?;
+        let mic_to_id: HashMap<String, Uuid> =
+            markets.into_iter().map(|(id, mic)| (mic, id)).collect();
+
+        if mode == "REPLACE" {
+            sqlx::query("DELETE FROM \"ob-poc\".subcustodian_network")
+                .execute(pool)
+                .await?;
+        }
+
+        let mut inserted = 0;
+        let mut skipped = 0;
+        let mut errors: Vec<String> = Vec::new();
+
+        for entry in &data.subcustodian_network {
+            let market_id = match mic_to_id.get(&entry.market_mic) {
+                Some(id) => *id,
+                None => {
+                    errors.push(format!("Market MIC not found: {}", entry.market_mic));
+                    skipped += 1;
+                    continue;
+                }
+            };
+
+            let pset_bic = entry
+                .csd_bic
+                .clone()
+                .unwrap_or_else(|| entry.subcustodian_bic.clone());
+
+            let effective_date = entry
+                .effective_date
+                .as_ref()
+                .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+                .unwrap_or_else(|| chrono::Utc::now().date_naive());
+
+            let currencies = if entry.currencies.is_empty() {
+                vec!["USD".to_string()]
+            } else {
+                entry.currencies.clone()
+            };
+
+            for currency in &currencies {
+                let result = sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".subcustodian_network
+                    (market_id, currency, subcustodian_bic, subcustodian_name,
+                     local_agent_bic, local_agent_name, local_agent_account,
+                     csd_participant_id, place_of_settlement_bic, is_primary,
+                     effective_date, is_active)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)
+                    ON CONFLICT (market_id, currency, subcustodian_bic, effective_date)
+                    DO UPDATE SET
+                        subcustodian_name = EXCLUDED.subcustodian_name,
+                        local_agent_bic = EXCLUDED.local_agent_bic,
+                        local_agent_name = EXCLUDED.local_agent_name,
+                        local_agent_account = EXCLUDED.local_agent_account,
+                        csd_participant_id = EXCLUDED.csd_participant_id,
+                        place_of_settlement_bic = EXCLUDED.place_of_settlement_bic,
+                        is_primary = EXCLUDED.is_primary,
+                        updated_at = now()
+                    "#,
+                )
+                .bind(market_id)
+                .bind(currency)
+                .bind(&entry.subcustodian_bic)
+                .bind(&entry.subcustodian_name)
+                .bind(&entry.local_agent_bic)
+                .bind(&entry.local_agent_name)
+                .bind(&entry.local_agent_account)
+                .bind(&entry.csd_participant_id)
+                .bind(&pset_bic)
+                .bind(entry.is_primary)
+                .bind(effective_date)
+                .execute(pool)
+                .await?;
+
+                if result.rows_affected() > 0 {
+                    inserted += 1;
+                }
+            }
+        }
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "status": if errors.is_empty() { "success" } else { "partial" },
+                "table": "\"ob-poc\".subcustodian_network",
+                "mode": mode,
+                "inserted": inserted,
+                "skipped": skipped,
+                "errors": errors
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -808,6 +1173,117 @@ impl CustomOperation for LoadSlaTemplatesOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature not enabled"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use rust_decimal::Decimal;
+        use std::str::FromStr;
+
+        let file_path = json_extract_string(args, "file-path")?;
+        let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "UPSERT".to_string());
+
+        let yaml_content = std::fs::read_to_string(&file_path)
+            .map_err(|e| anyhow!("Failed to read file {}: {}", file_path, e))?;
+        let data: SlaTemplatesYaml = serde_yaml::from_str(&yaml_content)
+            .map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
+
+        let required_metrics: std::collections::HashSet<&str> = data
+            .sla_templates
+            .iter()
+            .map(|t| t.metric_code.as_str())
+            .collect();
+
+        for metric_code in &required_metrics {
+            ensure_metric_type_exists(pool, metric_code).await?;
+        }
+
+        if mode == "REPLACE" {
+            sqlx::query(r#"DELETE FROM "ob-poc".sla_templates"#)
+                .execute(pool)
+                .await?;
+        }
+
+        let mut inserted = 0;
+        let mut errors: Vec<String> = Vec::new();
+
+        for template in &data.sla_templates {
+            let target_value =
+                Decimal::from_str(&template.target_value.to_string()).unwrap_or(Decimal::ZERO);
+            let warning_threshold = template
+                .warning_threshold
+                .map(|v| Decimal::from_str(&v.to_string()).unwrap_or(Decimal::ZERO));
+            let response_time = template
+                .response_time_hours
+                .map(|v| Decimal::from_str(&v.to_string()).unwrap_or(Decimal::ZERO));
+
+            let result = sqlx::query(
+                r#"
+                INSERT INTO "ob-poc".sla_templates
+                (template_code, name, description, applies_to_type, applies_to_code,
+                 metric_code, target_value, warning_threshold, measurement_period,
+                 response_time_hours, escalation_path, regulatory_requirement,
+                 regulatory_reference, is_active)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                ON CONFLICT (template_code) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    applies_to_type = EXCLUDED.applies_to_type,
+                    applies_to_code = EXCLUDED.applies_to_code,
+                    metric_code = EXCLUDED.metric_code,
+                    target_value = EXCLUDED.target_value,
+                    warning_threshold = EXCLUDED.warning_threshold,
+                    measurement_period = EXCLUDED.measurement_period,
+                    response_time_hours = EXCLUDED.response_time_hours,
+                    escalation_path = EXCLUDED.escalation_path,
+                    regulatory_requirement = EXCLUDED.regulatory_requirement,
+                    regulatory_reference = EXCLUDED.regulatory_reference,
+                    is_active = EXCLUDED.is_active
+                "#,
+            )
+            .bind(&template.template_code)
+            .bind(&template.name)
+            .bind(&template.description)
+            .bind(&template.applies_to_type)
+            .bind(&template.applies_to_code)
+            .bind(&template.metric_code)
+            .bind(target_value)
+            .bind(warning_threshold)
+            .bind(template.measurement_period.as_deref().unwrap_or("MONTHLY"))
+            .bind(response_time)
+            .bind(&template.escalation_path)
+            .bind(template.regulatory_requirement)
+            .bind(&template.regulatory_reference)
+            .bind(template.is_active)
+            .execute(pool)
+            .await;
+
+            match result {
+                Ok(r) if r.rows_affected() > 0 => inserted += 1,
+                Ok(_) => {}
+                Err(e) => errors.push(format!("{}: {}", template.template_code, e)),
+            }
+        }
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "status": if errors.is_empty() { "success" } else { "partial" },
+                "table": "ob-poc.sla_templates",
+                "mode": mode,
+                "total": data.sla_templates.len(),
+                "inserted": inserted,
+                "errors": errors
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1048,6 +1524,149 @@ impl CustomOperation for LoadAllRefdataOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature not enabled"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let directory = json_extract_string(args, "directory")?;
+        let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "UPSERT".to_string());
+
+        let dir_path = Path::new(&directory);
+        let mut results = serde_json::Map::new();
+
+        let markets_path = dir_path.join("markets.yaml");
+        if markets_path.exists() {
+            let result = LoadMarketsOp
+                .execute_json(
+                    &json!({"file-path": markets_path.to_string_lossy(), "mode": mode}),
+                    ctx,
+                    pool,
+                )
+                .await?;
+            results.insert(
+                "markets".to_string(),
+                result_to_json(match result {
+                    sem_os_core::execution::VerbExecutionOutcome::Record(v) => {
+                        ExecutionResult::Record(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::RecordSet(v) => {
+                        ExecutionResult::RecordSet(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Uuid(v) => {
+                        ExecutionResult::Uuid(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Affected(v) => {
+                        ExecutionResult::Affected(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Void => ExecutionResult::Void,
+                }),
+            );
+        }
+
+        let ic_path = dir_path.join("instrument_classes.yaml");
+        if ic_path.exists() {
+            let result = LoadInstrumentClassesOp
+                .execute_json(
+                    &json!({"file-path": ic_path.to_string_lossy(), "mode": mode}),
+                    ctx,
+                    pool,
+                )
+                .await?;
+            results.insert(
+                "instrument_classes".to_string(),
+                result_to_json(match result {
+                    sem_os_core::execution::VerbExecutionOutcome::Record(v) => {
+                        ExecutionResult::Record(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::RecordSet(v) => {
+                        ExecutionResult::RecordSet(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Uuid(v) => {
+                        ExecutionResult::Uuid(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Affected(v) => {
+                        ExecutionResult::Affected(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Void => ExecutionResult::Void,
+                }),
+            );
+        }
+
+        let sub_path = dir_path.join("subcustodian_network.yaml");
+        if sub_path.exists() {
+            let result = LoadSubcustodiansOp
+                .execute_json(
+                    &json!({"file-path": sub_path.to_string_lossy(), "mode": mode}),
+                    ctx,
+                    pool,
+                )
+                .await?;
+            results.insert(
+                "subcustodian_network".to_string(),
+                result_to_json(match result {
+                    sem_os_core::execution::VerbExecutionOutcome::Record(v) => {
+                        ExecutionResult::Record(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::RecordSet(v) => {
+                        ExecutionResult::RecordSet(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Uuid(v) => {
+                        ExecutionResult::Uuid(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Affected(v) => {
+                        ExecutionResult::Affected(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Void => ExecutionResult::Void,
+                }),
+            );
+        }
+
+        let sla_path = dir_path.join("sla_templates.yaml");
+        if sla_path.exists() {
+            let result = LoadSlaTemplatesOp
+                .execute_json(
+                    &json!({"file-path": sla_path.to_string_lossy(), "mode": mode}),
+                    ctx,
+                    pool,
+                )
+                .await?;
+            results.insert(
+                "sla_templates".to_string(),
+                result_to_json(match result {
+                    sem_os_core::execution::VerbExecutionOutcome::Record(v) => {
+                        ExecutionResult::Record(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::RecordSet(v) => {
+                        ExecutionResult::RecordSet(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Uuid(v) => {
+                        ExecutionResult::Uuid(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Affected(v) => {
+                        ExecutionResult::Affected(v)
+                    }
+                    sem_os_core::execution::VerbExecutionOutcome::Void => ExecutionResult::Void,
+                }),
+            );
+        }
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "status": "success",
+                "directory": directory,
+                "mode": mode,
+                "results": results
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

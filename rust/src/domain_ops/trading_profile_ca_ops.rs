@@ -130,6 +130,10 @@ impl CustomOperation for TradingProfileCaEnableEventTypesOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"enabled_count": 0})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -203,6 +207,10 @@ impl CustomOperation for TradingProfileCaDisableEventTypesOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -294,6 +302,10 @@ impl CustomOperation for TradingProfileCaSetNotificationOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -384,6 +396,10 @@ impl CustomOperation for TradingProfileCaSetElectionOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -471,6 +487,10 @@ impl CustomOperation for TradingProfileCaSetDefaultOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -536,6 +556,10 @@ impl CustomOperation for TradingProfileCaRemoveDefaultOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -648,6 +672,10 @@ impl CustomOperation for TradingProfileCaAddCutoffOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -721,6 +749,10 @@ impl CustomOperation for TradingProfileCaRemoveCutoffOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -826,6 +858,10 @@ impl CustomOperation for TradingProfileCaLinkSsiOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -912,6 +948,10 @@ impl CustomOperation for TradingProfileCaRemoveSsiOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -966,5 +1006,9 @@ impl CustomOperation for TradingProfileCaGetPolicyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

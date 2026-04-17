@@ -258,6 +258,10 @@ impl CustomOperation for UboMarkDeceasedOp {
             "message": "mark-deceased executed (no-db mode)"
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Supersede an ownership relationship with reason and audit trail (convergence model)
@@ -477,6 +481,10 @@ impl CustomOperation for UboConvergenceSupersedeOp {
             "new_relationship_id": new_id
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Transfer control from one entity to another
@@ -691,6 +699,10 @@ impl CustomOperation for UboTransferControlOp {
             "new_relationship_id": new_id
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Waive verification for a relationship with justification
@@ -881,5 +893,9 @@ impl CustomOperation for UboWaiveVerificationOp {
         Ok(ExecutionResult::Record(serde_json::json!({
             "status": "waived"
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

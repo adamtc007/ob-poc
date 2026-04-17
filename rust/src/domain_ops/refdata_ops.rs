@@ -675,6 +675,10 @@ impl CustomOperation for RefdataEnsureOp {
         let spec = resolve_domain_spec(verb_call)?;
         ensure_refdata(verb_call, spec, pool).await
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 #[register_custom_op]
@@ -705,6 +709,10 @@ impl CustomOperation for RefdataReadOp {
         let spec = resolve_domain_spec(verb_call)?;
         read_refdata(verb_call, spec, pool).await
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 #[register_custom_op]
@@ -734,6 +742,10 @@ impl CustomOperation for RefdataListOp {
         let spec = resolve_domain_spec(verb_call)?;
         list_refdata(verb_call, spec, pool).await
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 #[register_custom_op]
@@ -762,6 +774,10 @@ impl CustomOperation for RefdataDeactivateOp {
     ) -> Result<ExecutionResult> {
         let spec = resolve_domain_spec(verb_call)?;
         deactivate_refdata(verb_call, spec, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

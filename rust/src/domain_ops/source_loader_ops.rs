@@ -88,6 +88,10 @@ impl CustomOperation for SourceListOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Get information about a specific research source
@@ -144,6 +148,10 @@ impl CustomOperation for SourceInfoOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -226,6 +234,10 @@ impl CustomOperation for SourceSearchOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Fetch entity data from a source by key
@@ -306,6 +318,10 @@ impl CustomOperation for SourceFetchOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Find the best source for a jurisdiction and data type
@@ -376,6 +392,10 @@ impl CustomOperation for SourceFindForJurisdictionOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -451,6 +471,10 @@ impl CustomOperation for ChSearchOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Fetch company profile from Companies House
@@ -510,6 +534,10 @@ impl CustomOperation for ChFetchCompanyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -601,6 +629,10 @@ impl CustomOperation for ChFetchPscOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Fetch officers (directors, secretaries) from Companies House
@@ -670,6 +702,10 @@ impl CustomOperation for ChFetchOfficersOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -775,6 +811,10 @@ impl CustomOperation for ChImportCompanyOp {
             "entity_id": uuid::Uuid::new_v4(),
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -844,6 +884,10 @@ impl CustomOperation for SecSearchOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Fetch company from SEC EDGAR
@@ -902,6 +946,10 @@ impl CustomOperation for SecFetchCompanyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -985,6 +1033,10 @@ impl CustomOperation for SecFetchBeneficialOwnersOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Fetch recent SEC filings
@@ -1046,6 +1098,10 @@ impl CustomOperation for SecFetchFilingsOp {
         Ok(ExecutionResult::Record(
             serde_json::json!({ "filings": [] }),
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1128,6 +1184,10 @@ impl CustomOperation for SecImportCompanyOp {
         Ok(ExecutionResult::Record(serde_json::json!({
             "entity_id": uuid::Uuid::new_v4(),
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

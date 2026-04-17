@@ -112,6 +112,10 @@ impl CustomOperation for BodsDiscoverUbosOp {
             "gaps": ["No database connection"],
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Import BODS statements from data dump
@@ -172,6 +176,10 @@ impl CustomOperation for BodsImportOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("BODS import requires database connection"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -351,6 +359,10 @@ impl CustomOperation for BodsGetStatementOp {
             "BODS statement lookup requires database connection"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Find BODS entity statement by LEI
@@ -418,6 +430,10 @@ impl CustomOperation for BodsFindByLeiOp {
         Ok(ExecutionResult::Record(serde_json::json!({
             "found": false,
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -570,6 +586,10 @@ impl CustomOperation for BodsListOwnershipOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Sync BODS data from GLEIF reporting exceptions
@@ -675,5 +695,9 @@ impl CustomOperation for BodsSyncFromGleifOp {
             "synced": 0,
             "errors": 0,
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

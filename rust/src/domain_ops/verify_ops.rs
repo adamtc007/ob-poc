@@ -132,6 +132,10 @@ impl CustomOperation for VerifyDetectPatternsOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -228,6 +232,10 @@ impl CustomOperation for VerifyDetectEvasionOp {
             "severity": "NONE",
             "recommendation": "No analysis performed"
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -454,6 +462,10 @@ impl CustomOperation for VerifyCalculateConfidenceOp {
             "message": "Database not available"
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -610,6 +622,10 @@ impl CustomOperation for VerifyGetStatusOp {
             "message": "Database not available"
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -741,6 +757,10 @@ impl CustomOperation for VerifyAgainstRegistryOp {
             "found": false,
             "message": "Database not available"
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -958,5 +978,9 @@ impl CustomOperation for VerifyAssertOp {
             "passed": false,
             "message": "Database not available"
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

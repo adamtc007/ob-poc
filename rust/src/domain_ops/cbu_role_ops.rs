@@ -220,6 +220,10 @@ impl CustomOperation for CbuRoleAssignOwnershipOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -382,6 +386,10 @@ impl CustomOperation for CbuRoleAssignControlOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -572,6 +580,10 @@ impl CustomOperation for CbuRoleAssignTrustOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -758,6 +770,10 @@ impl CustomOperation for CbuRoleAssignFundOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -887,6 +903,10 @@ impl CustomOperation for CbuRoleAssignServiceOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1035,6 +1055,10 @@ impl CustomOperation for CbuRoleAssignSignatoryOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -1164,5 +1188,9 @@ impl CustomOperation for CbuRoleValidateAllOp {
             "valid": true,
             "issues": []
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

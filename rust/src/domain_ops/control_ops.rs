@@ -440,6 +440,10 @@ impl CustomOperation for ControlAnalyzeOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -649,6 +653,10 @@ impl CustomOperation for ControlBuildGraphOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -926,6 +934,10 @@ impl CustomOperation for ControlIdentifyUbosOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -1111,6 +1123,10 @@ impl CustomOperation for ControlTraceChainOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -1293,6 +1309,10 @@ impl CustomOperation for ControlReconcileOwnershipOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1651,6 +1671,10 @@ impl CustomOperation for ShowBoardControllerOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -1778,6 +1802,10 @@ impl CustomOperation for RecomputeBoardControllerOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -1881,6 +1909,10 @@ impl CustomOperation for SetBoardControllerOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -1956,6 +1988,10 @@ impl CustomOperation for ClearBoardControllerOverrideOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2043,6 +2079,10 @@ impl CustomOperation for ImportPscRegisterOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2150,6 +2190,10 @@ impl CustomOperation for ImportGleifControlOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

@@ -172,6 +172,10 @@ impl CustomOperation for AccessReviewPopulateOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Launch campaign and set to ACTIVE
@@ -234,6 +238,10 @@ impl CustomOperation for AccessReviewLaunchOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -348,6 +356,10 @@ impl CustomOperation for AccessReviewRevokeOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -457,6 +469,10 @@ impl CustomOperation for AccessReviewBulkConfirmOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Confirm all unflagged items for a reviewer
@@ -547,6 +563,10 @@ impl CustomOperation for AccessReviewConfirmCleanOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -657,6 +677,10 @@ impl CustomOperation for AccessReviewAttestOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -791,6 +815,10 @@ impl CustomOperation for AccessReviewProcessDeadlineOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Send reminder notifications
@@ -845,6 +873,10 @@ impl CustomOperation for AccessReviewSendRemindersOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

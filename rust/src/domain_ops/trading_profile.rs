@@ -218,6 +218,10 @@ impl CustomOperation for TradingProfileImportOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -292,6 +296,10 @@ impl CustomOperation for TradingProfileGetActiveOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -389,6 +397,10 @@ impl CustomOperation for TradingProfileActivateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -687,6 +699,10 @@ impl CustomOperation for TradingProfileMaterializeOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1460,6 +1476,10 @@ impl CustomOperation for TradingProfileCreateDraftOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -1601,6 +1621,10 @@ impl CustomOperation for TradingProfileAddComponentOp {
             )),
         }
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 #[register_custom_op]
@@ -1724,6 +1748,10 @@ impl CustomOperation for TradingProfileRemoveComponentOp {
             )),
         }
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Add instrument class to trading profile universe
@@ -1816,6 +1844,10 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Remove instrument class from trading profile universe
@@ -1887,6 +1919,10 @@ impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2012,6 +2048,10 @@ impl CustomOperation for TradingProfileAddMarketOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Remove market from trading profile universe
@@ -2094,6 +2134,10 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2229,6 +2273,10 @@ impl CustomOperation for TradingProfileAddSsiOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Remove standing instruction from trading profile
@@ -2300,6 +2348,10 @@ impl CustomOperation for TradingProfileRemoveSsiOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2439,6 +2491,10 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Remove booking rule from trading profile
@@ -2521,6 +2577,10 @@ impl CustomOperation for TradingProfileRemoveBookingRuleOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2639,6 +2699,10 @@ impl CustomOperation for TradingProfileAddIsdaConfigOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Add product coverage to an ISDA agreement
@@ -2741,6 +2805,10 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2862,6 +2930,10 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3013,6 +3085,10 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Link CSA to collateral SSI
@@ -3109,6 +3185,10 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Remove ISDA configuration from trading profile
@@ -3184,6 +3264,10 @@ impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3269,6 +3353,10 @@ impl CustomOperation for TradingProfileRemoveCsaConfigOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3456,6 +3544,10 @@ impl CustomOperation for TradingProfileAddImMandateOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Update Investment Manager scope
@@ -3564,6 +3656,10 @@ impl CustomOperation for TradingProfileUpdateImScopeOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Remove Investment Manager mandate
@@ -3635,6 +3731,10 @@ impl CustomOperation for TradingProfileRemoveImMandateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3716,6 +3816,10 @@ impl CustomOperation for TradingProfileSetBaseCurrencyOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Add allowed currency to the trading profile.
@@ -3791,6 +3895,10 @@ impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -3851,6 +3959,10 @@ impl CustomOperation for TradingProfileDiffOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 // =============================================================================
 // PHASE 5: VALIDATION OPERATIONS
@@ -3907,6 +4019,10 @@ impl CustomOperation for TradingProfileValidateCoverageOp {
             json!({"is_valid": true, "coverage_percentage": 100.0}),
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Validate that a profile is ready for go-live
@@ -3957,6 +4073,10 @@ impl CustomOperation for TradingProfileValidateGoLiveReadyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"is_ready": true})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -4027,6 +4147,10 @@ impl CustomOperation for TradingProfileSubmitOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "submitted"})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -4151,6 +4275,10 @@ impl CustomOperation for TradingProfileApproveOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "approved"})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Reject a profile pending review
@@ -4219,6 +4347,10 @@ impl CustomOperation for TradingProfileRejectOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "rejected"})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Archive an active or superseded profile
@@ -4284,6 +4416,10 @@ impl CustomOperation for TradingProfileArchiveOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "archived"})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -4387,6 +4523,10 @@ impl CustomOperation for TradingProfileCloneToOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "cloned"})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -4463,5 +4603,9 @@ impl CustomOperation for TradingProfileCreateNewVersionOp {
         Ok(ExecutionResult::Record(
             json!({"status": "new_version_created"}),
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

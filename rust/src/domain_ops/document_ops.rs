@@ -394,6 +394,10 @@ impl CustomOperation for DocumentCatalogOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Document extraction using AI/OCR
@@ -466,6 +470,10 @@ impl CustomOperation for DocumentExtractOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -643,6 +651,10 @@ impl CustomOperation for DocumentSolicitOp {
         };
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -825,6 +837,10 @@ impl CustomOperation for DocumentSolicitSetOp {
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Upload a new version of a document (Layer C - immutable submission)
@@ -1000,6 +1016,10 @@ impl CustomOperation for DocumentUploadVersionOp {
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// QA approves a document version
@@ -1072,6 +1092,10 @@ impl CustomOperation for DocumentVerifyOp {
         }
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1182,6 +1206,10 @@ impl CustomOperation for DocumentRejectOp {
         }
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1300,6 +1328,10 @@ impl CustomOperation for DocumentMissingForEntityOp {
 
         Ok(ExecutionResult::RecordSet(results))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Compute governed document requirements for an entity.
@@ -1354,5 +1386,9 @@ impl CustomOperation for DocumentComputeRequirementsOp {
             })?;
 
         Ok(ExecutionResult::Record(serde_json::to_value(matrix)?))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

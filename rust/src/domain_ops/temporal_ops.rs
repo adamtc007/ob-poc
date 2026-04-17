@@ -144,6 +144,10 @@ impl CustomOperation for TemporalOwnershipAsOfOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -224,6 +228,10 @@ impl CustomOperation for TemporalUboChainAsOfOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -313,6 +321,10 @@ impl CustomOperation for TemporalCbuRelationshipsAsOfOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -388,6 +400,10 @@ impl CustomOperation for TemporalCbuRolesAsOfOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -473,6 +489,10 @@ impl CustomOperation for TemporalCbuStateAtApprovalOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -565,6 +585,10 @@ impl CustomOperation for TemporalRelationshipHistoryOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -668,6 +692,10 @@ impl CustomOperation for TemporalEntityHistoryOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -805,5 +833,9 @@ impl CustomOperation for TemporalCompareOwnershipOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
