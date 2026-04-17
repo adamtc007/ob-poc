@@ -8,7 +8,7 @@
 //! Rationale: Requires semantic state derivation, DSL generation, and multi-step
 //! orchestration that cannot be expressed as simple CRUD operations.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use uuid::Uuid;
@@ -52,6 +52,187 @@ pub struct AutoCompleteResult {
     pub remaining_missing: Vec<String>,
     pub target_reached: bool,
     pub dry_run: bool,
+}
+
+#[cfg(feature = "database")]
+async fn onboarding_auto_complete_impl(
+    cbu_id: Uuid,
+    max_steps: i32,
+    dry_run: bool,
+    target_stage: Option<String>,
+    ctx: &mut ExecutionContext,
+    pool: &PgPool,
+) -> Result<AutoCompleteResult> {
+    use crate::database::derive_semantic_state;
+    use crate::ontology::SemanticStageRegistry;
+
+    tracing::info!(
+        cbu_id = %cbu_id,
+        max_steps = max_steps,
+        dry_run = dry_run,
+        target_stage = ?target_stage,
+        "onboarding.auto-complete: starting"
+    );
+
+    let registry = SemanticStageRegistry::load_default()
+        .map_err(|e| anyhow!("Failed to load semantic stage registry: {}", e))?;
+
+    let mut steps: Vec<AutoCompleteStep> = Vec::new();
+    let mut steps_executed = 0;
+    let mut steps_succeeded = 0;
+    let mut steps_failed = 0;
+
+    let executor = crate::dsl_v2::executor::DslExecutor::new(pool.clone());
+
+    for _ in 0..max_steps {
+        let state = derive_semantic_state(pool, &registry, cbu_id).await?;
+
+        if let Some(ref target) = target_stage {
+            let target_complete = state.required_stages.iter().any(|s| {
+                &s.code == target && s.status == ob_poc_types::semantic_stage::StageStatus::Complete
+            });
+            if target_complete {
+                return Ok(AutoCompleteResult {
+                    steps_executed,
+                    steps_succeeded,
+                    steps_failed,
+                    steps,
+                    remaining_missing: vec![],
+                    target_reached: true,
+                    dry_run,
+                });
+            }
+        }
+
+        if state.missing_entities.is_empty() {
+            break;
+        }
+
+        let next_missing = state
+            .missing_entities
+            .iter()
+            .find(|m| state.next_actionable.contains(&m.stage));
+
+        let missing = match next_missing {
+            Some(m) => m,
+            None => break,
+        };
+
+        let existing: std::collections::HashMap<String, Vec<Uuid>> = state
+            .required_stages
+            .iter()
+            .flat_map(|s| &s.required_entities)
+            .filter(|e| e.exists)
+            .map(|e| (e.entity_type.clone(), e.ids.clone()))
+            .collect();
+
+        let dsl = match OnboardingAutoCompleteOp::generate_entity_dsl(
+            cbu_id,
+            &missing.entity_type,
+            &existing,
+        ) {
+            Some(d) => d,
+            None => {
+                steps.push(AutoCompleteStep {
+                    entity_type: missing.entity_type.clone(),
+                    stage: missing.stage.clone(),
+                    dsl: String::new(),
+                    executed: false,
+                    success: false,
+                    error: Some(format!(
+                        "No DSL template for entity type: {}",
+                        missing.entity_type
+                    )),
+                    created_id: None,
+                });
+                steps_failed += 1;
+                continue;
+            }
+        };
+
+        if dsl.contains("<select-") {
+            steps.push(AutoCompleteStep {
+                entity_type: missing.entity_type.clone(),
+                stage: missing.stage.clone(),
+                dsl: dsl.clone(),
+                executed: false,
+                success: false,
+                error: Some("DSL requires user selection - cannot auto-complete".to_string()),
+                created_id: None,
+            });
+            break;
+        }
+
+        if dry_run {
+            steps.push(AutoCompleteStep {
+                entity_type: missing.entity_type.clone(),
+                stage: missing.stage.clone(),
+                dsl: dsl.clone(),
+                executed: false,
+                success: true,
+                error: None,
+                created_id: None,
+            });
+            steps_executed += 1;
+            steps_succeeded += 1;
+        } else {
+            steps_executed += 1;
+            let result = executor.execute_dsl(&dsl, ctx).await;
+
+            match result {
+                Ok(_) => {
+                    steps_succeeded += 1;
+                    steps.push(AutoCompleteStep {
+                        entity_type: missing.entity_type.clone(),
+                        stage: missing.stage.clone(),
+                        dsl: dsl.clone(),
+                        executed: true,
+                        success: true,
+                        error: None,
+                        created_id: None,
+                    });
+                }
+                Err(e) => {
+                    steps_failed += 1;
+                    steps.push(AutoCompleteStep {
+                        entity_type: missing.entity_type.clone(),
+                        stage: missing.stage.clone(),
+                        dsl: dsl.clone(),
+                        executed: true,
+                        success: false,
+                        error: Some(e.to_string()),
+                        created_id: None,
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    let final_state = derive_semantic_state(pool, &registry, cbu_id).await?;
+    let remaining_missing: Vec<String> = final_state
+        .missing_entities
+        .iter()
+        .map(|m| format!("{} ({})", m.entity_type, m.stage))
+        .collect();
+
+    let target_reached = if let Some(ref target) = target_stage {
+        final_state.required_stages.iter().any(|s| {
+            &s.code == target && s.status == ob_poc_types::semantic_stage::StageStatus::Complete
+        })
+    } else {
+        remaining_missing.is_empty()
+    };
+
+    Ok(AutoCompleteResult {
+        steps_executed,
+        steps_succeeded,
+        steps_failed,
+        steps,
+        remaining_missing,
+        target_reached,
+        dry_run,
+    })
 }
 
 #[cfg(feature = "database")]
@@ -164,222 +345,29 @@ impl CustomOperation for OnboardingAutoCompleteOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::database::derive_semantic_state;
-        use crate::ontology::SemanticStageRegistry;
-
-        // Extract arguments
         let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
-
         let max_steps: i32 = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "max-steps")
             .and_then(|a| a.value.as_integer())
-            .map(|v| v.min(1000) as i32) // Cap at 1000 to prevent runaway
+            .map(|v| v.min(1000) as i32)
             .unwrap_or(20);
-
         let dry_run: bool = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "dry-run")
             .and_then(|a| a.value.as_boolean())
             .unwrap_or(false);
-
         let target_stage: Option<String> = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "target-stage")
             .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        tracing::info!(
-            cbu_id = %cbu_id,
-            max_steps = max_steps,
-            dry_run = dry_run,
-            target_stage = ?target_stage,
-            "onboarding.auto-complete: starting"
-        );
-
-        // Load semantic stage registry
-        let registry = SemanticStageRegistry::load_default()
-            .map_err(|e| anyhow!("Failed to load semantic stage registry: {}", e))?;
-
-        let mut steps: Vec<AutoCompleteStep> = Vec::new();
-        let mut steps_executed = 0;
-        let mut steps_succeeded = 0;
-        let mut steps_failed = 0;
-
-        // Create executor for DSL execution
-        let executor = crate::dsl_v2::executor::DslExecutor::new(pool.clone());
-
-        // Iterative loop: derive state, find missing, generate DSL, execute
-        for _ in 0..max_steps {
-            // Derive current semantic state
-            let state = derive_semantic_state(pool, &registry, cbu_id).await?;
-
-            // Check if target stage is complete
-            if let Some(ref target) = target_stage {
-                let target_complete = state.required_stages.iter().any(|s| {
-                    &s.code == target
-                        && s.status == ob_poc_types::semantic_stage::StageStatus::Complete
-                });
-                if target_complete {
-                    return Ok(ExecutionResult::Record(serde_json::to_value(
-                        AutoCompleteResult {
-                            steps_executed,
-                            steps_succeeded,
-                            steps_failed,
-                            steps,
-                            remaining_missing: vec![],
-                            target_reached: true,
-                            dry_run,
-                        },
-                    )?));
-                }
-            }
-
-            // Find next missing entity to create
-            if state.missing_entities.is_empty() {
-                // No more missing entities - we're done
-                break;
-            }
-
-            // Get the first actionable missing entity
-            // Prioritize by stage order (stages that are unblocked first)
-            let next_missing = state
-                .missing_entities
-                .iter()
-                .find(|m| state.next_actionable.contains(&m.stage));
-
-            let missing = match next_missing {
-                Some(m) => m,
-                None => {
-                    // No actionable missing entities - might be blocked
-                    break;
-                }
-            };
-
-            // Build existing entities map for DSL generation
-            let existing: std::collections::HashMap<String, Vec<Uuid>> = state
-                .required_stages
-                .iter()
-                .flat_map(|s| &s.required_entities)
-                .filter(|e| e.exists)
-                .map(|e| (e.entity_type.clone(), e.ids.clone()))
-                .collect();
-
-            // Generate DSL for this entity
-            let dsl = match Self::generate_entity_dsl(cbu_id, &missing.entity_type, &existing) {
-                Some(d) => d,
-                None => {
-                    // Can't generate DSL for this entity type
-                    steps.push(AutoCompleteStep {
-                        entity_type: missing.entity_type.clone(),
-                        stage: missing.stage.clone(),
-                        dsl: String::new(),
-                        executed: false,
-                        success: false,
-                        error: Some(format!(
-                            "No DSL template for entity type: {}",
-                            missing.entity_type
-                        )),
-                        created_id: None,
-                    });
-                    steps_failed += 1;
-                    continue;
-                }
-            };
-
-            // Check if DSL contains placeholders that need user input
-            if dsl.contains("<select-") {
-                steps.push(AutoCompleteStep {
-                    entity_type: missing.entity_type.clone(),
-                    stage: missing.stage.clone(),
-                    dsl: dsl.clone(),
-                    executed: false,
-                    success: false,
-                    error: Some("DSL requires user selection - cannot auto-complete".to_string()),
-                    created_id: None,
-                });
-                // Don't count as failed - it's expected that some entities need user input
-                break;
-            }
-
-            if dry_run {
-                // In dry-run mode, just collect the DSL without executing
-                steps.push(AutoCompleteStep {
-                    entity_type: missing.entity_type.clone(),
-                    stage: missing.stage.clone(),
-                    dsl: dsl.clone(),
-                    executed: false,
-                    success: true,
-                    error: None,
-                    created_id: None,
-                });
-                steps_executed += 1;
-                steps_succeeded += 1;
-            } else {
-                // Execute the DSL
-                steps_executed += 1;
-                let result = executor.execute_dsl(&dsl, ctx).await;
-
-                match result {
-                    Ok(_) => {
-                        steps_succeeded += 1;
-                        steps.push(AutoCompleteStep {
-                            entity_type: missing.entity_type.clone(),
-                            stage: missing.stage.clone(),
-                            dsl: dsl.clone(),
-                            executed: true,
-                            success: true,
-                            error: None,
-                            created_id: None, // Could extract from ctx bindings
-                        });
-                    }
-                    Err(e) => {
-                        steps_failed += 1;
-                        steps.push(AutoCompleteStep {
-                            entity_type: missing.entity_type.clone(),
-                            stage: missing.stage.clone(),
-                            dsl: dsl.clone(),
-                            executed: true,
-                            success: false,
-                            error: Some(e.to_string()),
-                            created_id: None,
-                        });
-                        // Stop on first error to avoid cascading failures
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Get final state to report remaining missing entities
-        let final_state = derive_semantic_state(pool, &registry, cbu_id).await?;
-        let remaining_missing: Vec<String> = final_state
-            .missing_entities
-            .iter()
-            .map(|m| format!("{} ({})", m.entity_type, m.stage))
-            .collect();
-
-        let target_reached = if let Some(ref target) = target_stage {
-            final_state.required_stages.iter().any(|s| {
-                &s.code == target && s.status == ob_poc_types::semantic_stage::StageStatus::Complete
-            })
-        } else {
-            remaining_missing.is_empty()
-        };
-
-        Ok(ExecutionResult::Record(serde_json::to_value(
-            AutoCompleteResult {
-                steps_executed,
-                steps_succeeded,
-                steps_failed,
-                steps,
-                remaining_missing,
-                target_reached,
-                dry_run,
-            },
-        )?))
+        let result =
+            onboarding_auto_complete_impl(cbu_id, max_steps, dry_run, target_stage, ctx, pool)
+                .await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(not(feature = "database"))]
@@ -391,5 +379,47 @@ impl CustomOperation for OnboardingAutoCompleteOp {
         Err(anyhow!(
             "onboarding.auto-complete requires database feature"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{
+            json_extract_bool_opt, json_extract_int_opt, json_extract_string_opt, json_extract_uuid,
+        };
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let max_steps = json_extract_int_opt(args, "max-steps")
+            .map(|v| v.min(1000) as i32)
+            .unwrap_or(20);
+        let dry_run = json_extract_bool_opt(args, "dry-run").unwrap_or(false);
+        let target_stage = json_extract_string_opt(args, "target-stage");
+
+        let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
+        let result = onboarding_auto_complete_impl(
+            cbu_id,
+            max_steps,
+            dry_run,
+            target_stage,
+            &mut exec_ctx,
+            pool,
+        )
+        .await?;
+
+        for (name, uuid) in &exec_ctx.symbols {
+            ctx.bind(name, *uuid);
+        }
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

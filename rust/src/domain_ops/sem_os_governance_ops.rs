@@ -114,13 +114,8 @@ impl CustomOperation for GovernanceSubmitForReviewOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_stew_tool_json(
-            pool,
-            ctx,
-            args,
-            "stew_submit_for_review",
-        )
-        .await
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_submit_for_review")
+            .await
     }
 
     fn is_migrated(&self) -> bool {
@@ -230,8 +225,7 @@ impl CustomOperation for GovernanceValidateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan")
-            .await
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan").await
     }
 
     fn is_migrated(&self) -> bool {
@@ -281,8 +275,7 @@ impl CustomOperation for GovernanceDryRunOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan")
-            .await
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan").await
     }
 
     fn is_migrated(&self) -> bool {
@@ -447,6 +440,24 @@ impl CustomOperation for GovernancePublishBatchOp {
 #[register_custom_op]
 pub struct GovernanceRollbackOp;
 
+#[cfg(feature = "database")]
+async fn governance_rollback_impl(
+    target: &str,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    sqlx::query("UPDATE sem_reg_pub.active_snapshot_set SET snapshot_set_id = $1")
+        .bind(target)
+        .execute(pool)
+        .await?;
+
+    Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        serde_json::json!({
+            "rolled_back_to": target,
+            "status": "success",
+        }),
+    ))
+}
+
 #[async_trait]
 impl CustomOperation for GovernanceRollbackOp {
     fn domain(&self) -> &'static str {
@@ -472,15 +483,12 @@ impl CustomOperation for GovernanceRollbackOp {
             anyhow::anyhow!("governance.rollback requires target-snapshot-set-id")
         })?;
 
-        sqlx::query("UPDATE sem_reg_pub.active_snapshot_set SET snapshot_set_id = $1")
-            .bind(&target)
-            .execute(pool)
-            .await?;
-
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "rolled_back_to": target,
-            "status": "success",
-        })))
+        match governance_rollback_impl(&target, pool).await? {
+            sem_os_core::execution::VerbExecutionOutcome::Record(value) => {
+                Ok(ExecutionResult::Record(value))
+            }
+            _ => unreachable!(),
+        }
     }
 
     #[cfg(not(feature = "database"))]
@@ -490,5 +498,20 @@ impl CustomOperation for GovernanceRollbackOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("governance.rollback requires database"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let target = super::helpers::json_extract_string(args, "target-snapshot-set-id")?;
+        governance_rollback_impl(&target, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

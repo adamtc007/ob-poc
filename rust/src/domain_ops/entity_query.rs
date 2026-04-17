@@ -48,6 +48,161 @@ impl EntityQueryResult {
 #[register_custom_op]
 pub struct EntityQueryOp;
 
+#[cfg(feature = "database")]
+async fn entity_query_impl(
+    entity_type: Option<String>,
+    name_like: Option<String>,
+    jurisdiction: Option<String>,
+    limit: i64,
+    pool: &PgPool,
+) -> Result<EntityQueryResult> {
+    let entity_type_ref = entity_type.as_deref();
+    let name_like_ref = name_like.as_deref();
+    let jurisdiction_ref = jurisdiction.as_deref();
+
+    let (table, name_col) = match entity_type_ref {
+        Some("fund") | Some("limited_company") => ("entity_limited_companies", "company_name"),
+        Some("proper_person") | Some("person") => {
+            ("entity_proper_persons", "first_name || ' ' || last_name")
+        }
+        Some("partnership") => ("entity_partnerships", "partnership_name"),
+        Some("trust") => ("entity_trusts", "trust_name"),
+        _ => {
+            return execute_unified_entity_query(name_like_ref, jurisdiction_ref, limit, pool)
+                .await;
+        }
+    };
+
+    let mut conditions = Vec::new();
+    let mut bind_idx = 1;
+
+    if name_like_ref.is_some() {
+        conditions.push(format!("{} ILIKE ${}", name_col, bind_idx));
+        bind_idx += 1;
+    }
+
+    if jurisdiction_ref.is_some() {
+        conditions.push(format!("jurisdiction = ${}", bind_idx));
+    }
+
+    let where_clause = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", conditions.join(" AND "))
+    };
+
+    let query = format!(
+        r#"SELECT entity_id, {} as name
+           FROM "ob-poc".{}
+           {}
+           ORDER BY {} ASC
+           LIMIT {}"#,
+        name_col, table, where_clause, name_col, limit
+    );
+
+    let rows: Vec<(Uuid, String)> = match (name_like_ref, jurisdiction_ref) {
+        (Some(name), Some(jur)) => {
+            let pattern = format!("%{}%", name.replace('%', ""));
+            sqlx::query_as(&query)
+                .bind(pattern)
+                .bind(jur)
+                .fetch_all(pool)
+                .await?
+        }
+        (Some(name), None) => {
+            let sql_pattern = if name.contains('%') {
+                name.to_string()
+            } else {
+                format!("%{}%", name)
+            };
+            sqlx::query_as(&query)
+                .bind(sql_pattern)
+                .fetch_all(pool)
+                .await?
+        }
+        (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(pool).await?,
+        (None, None) => sqlx::query_as(&query).fetch_all(pool).await?,
+    };
+
+    Ok(EntityQueryResult {
+        total_count: rows.len(),
+        items: rows,
+        entity_type,
+    })
+}
+
+#[cfg(feature = "database")]
+async fn execute_unified_entity_query(
+    name_like: Option<&str>,
+    jurisdiction: Option<&str>,
+    limit: i64,
+    pool: &PgPool,
+) -> Result<EntityQueryResult> {
+    let base_query = r#"
+        SELECT entity_id, company_name as name, jurisdiction FROM "ob-poc".entity_limited_companies
+        UNION ALL
+        SELECT entity_id, partnership_name as name, jurisdiction FROM "ob-poc".entity_partnerships
+        UNION ALL
+        SELECT entity_id, trust_name as name, jurisdiction FROM "ob-poc".entity_trusts
+        UNION ALL
+        SELECT entity_id, first_name || ' ' || last_name as name, nationality as jurisdiction
+        FROM "ob-poc".entity_proper_persons
+    "#;
+
+    let mut conditions = Vec::new();
+
+    if name_like.is_some() {
+        conditions.push("name ILIKE $1".to_string());
+    }
+
+    if jurisdiction.is_some() {
+        let idx = if name_like.is_some() { 2 } else { 1 };
+        conditions.push(format!("jurisdiction = ${}", idx));
+    }
+
+    let where_clause = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", conditions.join(" AND "))
+    };
+
+    let query = format!(
+        "SELECT entity_id, name FROM ({}) AS unified {} ORDER BY name ASC LIMIT {}",
+        base_query, where_clause, limit
+    );
+
+    let rows: Vec<(Uuid, String)> = match (name_like, jurisdiction) {
+        (Some(name), Some(jur)) => {
+            let pattern = if name.contains('%') {
+                name.to_string()
+            } else {
+                format!("%{}%", name)
+            };
+            sqlx::query_as(&query)
+                .bind(pattern)
+                .bind(jur)
+                .fetch_all(pool)
+                .await?
+        }
+        (Some(name), None) => {
+            let pattern = if name.contains('%') {
+                name.to_string()
+            } else {
+                format!("%{}%", name)
+            };
+            sqlx::query_as(&query).bind(pattern).fetch_all(pool).await?
+        }
+        (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(pool).await?,
+        (None, None) => sqlx::query_as(&query).fetch_all(pool).await?,
+    };
+
+    Ok(EntityQueryResult {
+        total_count: rows.len(),
+        items: rows,
+        entity_type: None,
+    })
+}
+
 #[async_trait]
 impl CustomOperation for EntityQueryOp {
     fn domain(&self) -> &'static str {
@@ -69,24 +224,23 @@ impl CustomOperation for EntityQueryOp {
         _ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        // Extract arguments
         let entity_type = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "type")
-            .and_then(|a| a.value.as_string());
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
 
         let name_like = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "name-like")
-            .and_then(|a| a.value.as_string());
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
 
         let jurisdiction = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "jurisdiction")
-            .and_then(|a| a.value.as_string());
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
 
         let limit: i64 = verb_call
             .arguments
@@ -95,86 +249,7 @@ impl CustomOperation for EntityQueryOp {
             .and_then(|a| a.value.as_integer())
             .unwrap_or(1000);
 
-        // Build query based on entity type
-        // Different entity types have different name columns
-        let (table, name_col) = match entity_type {
-            Some("fund") | Some("limited_company") => ("entity_limited_companies", "company_name"),
-            Some("proper_person") | Some("person") => {
-                ("entity_proper_persons", "first_name || ' ' || last_name")
-            }
-            Some("partnership") => ("entity_partnerships", "partnership_name"),
-            Some("trust") => ("entity_trusts", "trust_name"),
-            _ => {
-                // Default: query base entities table with name from extension tables
-                // Use a UNION view approach
-                return self
-                    .execute_unified_query(name_like, jurisdiction, limit, pool)
-                    .await;
-            }
-        };
-
-        // Build WHERE clauses
-        let mut conditions = Vec::new();
-        let mut bind_idx = 1;
-
-        if name_like.is_some() {
-            conditions.push(format!("{} ILIKE ${}", name_col, bind_idx));
-            bind_idx += 1;
-        }
-
-        if let Some(_jur) = &jurisdiction {
-            conditions.push(format!("jurisdiction = ${}", bind_idx));
-        }
-
-        let where_clause = if conditions.is_empty() {
-            String::new()
-        } else {
-            format!("WHERE {}", conditions.join(" AND "))
-        };
-
-        let query = format!(
-            r#"SELECT entity_id, {} as name
-               FROM "ob-poc".{}
-               {}
-               ORDER BY {} ASC
-               LIMIT {}"#,
-            name_col, table, where_clause, name_col, limit
-        );
-
-        // Execute query with dynamic binding
-        let rows: Vec<(Uuid, String)> = match (&name_like, &jurisdiction) {
-            (Some(name), Some(jur)) => {
-                let pattern = format!("%{}%", name.replace('%', ""));
-                sqlx::query_as(&query)
-                    .bind(pattern)
-                    .bind(jur)
-                    .fetch_all(pool)
-                    .await?
-            }
-            (Some(name), None) => {
-                // Convert user pattern to SQL ILIKE pattern
-                let sql_pattern = if name.contains('%') {
-                    name.to_string()
-                } else {
-                    format!("%{}%", name)
-                };
-                sqlx::query_as(&query)
-                    .bind(sql_pattern)
-                    .fetch_all(pool)
-                    .await?
-            }
-            (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(pool).await?,
-            (None, None) => sqlx::query_as(&query).fetch_all(pool).await?,
-        };
-
-        let result = EntityQueryResult {
-            total_count: rows.len(),
-            items: rows,
-            entity_type: entity_type.map(|s| s.to_string()),
-        };
-
-        // Store the result in context for the binding
-        // The binding name will be set by the executor based on :as argument
+        let result = entity_query_impl(entity_type, name_like, jurisdiction, limit, pool).await?;
         Ok(ExecutionResult::EntityQuery(result))
     }
 
@@ -186,84 +261,32 @@ impl CustomOperation for EntityQueryOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::EntityQuery(EntityQueryResult::default()))
     }
-}
 
-#[cfg(feature = "database")]
-impl EntityQueryOp {
-    /// Execute a unified query across all entity types
-    async fn execute_unified_query(
+    #[cfg(feature = "database")]
+    async fn execute_json(
         &self,
-        name_like: Option<&str>,
-        jurisdiction: Option<&str>,
-        limit: i64,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Use a UNION query to search across all entity extension tables
-        let base_query = r#"
-            SELECT entity_id, company_name as name, jurisdiction FROM "ob-poc".entity_limited_companies
-            UNION ALL
-            SELECT entity_id, partnership_name as name, jurisdiction FROM "ob-poc".entity_partnerships
-            UNION ALL
-            SELECT entity_id, trust_name as name, jurisdiction FROM "ob-poc".entity_trusts
-            UNION ALL
-            SELECT entity_id, first_name || ' ' || last_name as name, nationality as jurisdiction
-            FROM "ob-poc".entity_proper_persons
-        "#;
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_int_opt, json_extract_string_opt};
 
-        let mut conditions = Vec::new();
+        let entity_type = json_extract_string_opt(args, "type");
+        let name_like = json_extract_string_opt(args, "name-like");
+        let jurisdiction = json_extract_string_opt(args, "jurisdiction");
+        let limit = json_extract_int_opt(args, "limit").unwrap_or(1000);
+        let result = entity_query_impl(entity_type, name_like, jurisdiction, limit, pool).await?;
 
-        if name_like.is_some() {
-            conditions.push("name ILIKE $1".to_string());
-        }
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "_type": "entity_query",
+                "_debug": format!("{result:?}")
+            }),
+        ))
+    }
 
-        if jurisdiction.is_some() {
-            let idx = if name_like.is_some() { 2 } else { 1 };
-            conditions.push(format!("jurisdiction = ${}", idx));
-        }
-
-        let where_clause = if conditions.is_empty() {
-            String::new()
-        } else {
-            format!("WHERE {}", conditions.join(" AND "))
-        };
-
-        let query = format!(
-            "SELECT entity_id, name FROM ({}) AS unified {} ORDER BY name ASC LIMIT {}",
-            base_query, where_clause, limit
-        );
-
-        let rows: Vec<(Uuid, String)> = match (name_like, jurisdiction) {
-            (Some(name), Some(jur)) => {
-                let pattern = if name.contains('%') {
-                    name.to_string()
-                } else {
-                    format!("%{}%", name)
-                };
-                sqlx::query_as(&query)
-                    .bind(pattern)
-                    .bind(jur)
-                    .fetch_all(pool)
-                    .await?
-            }
-            (Some(name), None) => {
-                let pattern = if name.contains('%') {
-                    name.to_string()
-                } else {
-                    format!("%{}%", name)
-                };
-                sqlx::query_as(&query).bind(pattern).fetch_all(pool).await?
-            }
-            (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(pool).await?,
-            (None, None) => sqlx::query_as(&query).fetch_all(pool).await?,
-        };
-
-        let result = EntityQueryResult {
-            total_count: rows.len(),
-            items: rows,
-            entity_type: None,
-        };
-
-        Ok(ExecutionResult::EntityQuery(result))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

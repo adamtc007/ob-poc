@@ -241,12 +241,11 @@ async fn document_extract_observations_impl(
 
     let mut allegations_verified = 0;
     if auto_verify && observations_created > 0 {
-        let cbu_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT cbu_id FROM "ob-poc".document_catalog WHERE doc_id = $1"#,
-        )
-        .bind(document_id)
-        .fetch_optional(pool)
-        .await?;
+        let cbu_id: Option<Uuid> =
+            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".document_catalog WHERE doc_id = $1"#)
+                .bind(document_id)
+                .fetch_optional(pool)
+                .await?;
 
         if let Some(cbu_id) = cbu_id {
             let result = sqlx::query(

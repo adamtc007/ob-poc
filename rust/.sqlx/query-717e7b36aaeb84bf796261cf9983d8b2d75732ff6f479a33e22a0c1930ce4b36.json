@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO \"ob-poc\".cbu_ssi_agent_override (\n                    ssi_id, agent_role, agent_bic, agent_account, agent_name, sequence_order, reason\n                ) VALUES ($1, $2, $3, $4, $5, $6, $7)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "717e7b36aaeb84bf796261cf9983d8b2d75732ff6f479a33e22a0c1930ce4b36"
+}

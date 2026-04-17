@@ -11,7 +11,7 @@
 //! - Threshold loading from reference data is dynamic (JSONB)
 //! - Multi-table aggregation across workstreams, ownership graph, and sources
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
@@ -534,6 +534,166 @@ async fn evaluate_review_complete(
 #[register_custom_op]
 pub struct TollgateEvaluateGateOp;
 
+#[cfg(feature = "database")]
+async fn tollgate_evaluate_impl(
+    case_id: Uuid,
+    gate_name: String,
+    pool: &PgPool,
+) -> Result<TollgateEvaluationResult> {
+    let valid_gates = ["SKELETON_READY", "EVIDENCE_COMPLETE", "REVIEW_COMPLETE"];
+    if !valid_gates.contains(&gate_name.as_str()) {
+        return Err(anyhow!(
+            "Invalid gate-name '{}'. Valid values: {}",
+            gate_name,
+            valid_gates.join(", ")
+        ));
+    }
+
+    let case_info: Option<(Uuid, String)> =
+        sqlx::query_as(r#"SELECT case_id, status FROM "ob-poc".cases WHERE case_id = $1"#)
+            .bind(case_id)
+            .fetch_optional(pool)
+            .await?;
+
+    let (_case_id, case_status) =
+        case_info.ok_or_else(|| anyhow!("Case not found: {}", case_id))?;
+
+    #[derive(sqlx::FromRow)]
+    struct GateRow {
+        tollgate_id: String,
+        display_name: String,
+        required_status: Option<String>,
+        default_thresholds: serde_json::Value,
+    }
+
+    let gate_row: GateRow = sqlx::query_as(
+        r#"
+        SELECT tollgate_id, display_name, required_status, default_thresholds
+        FROM "ob-poc".tollgate_definitions
+        WHERE tollgate_id = $1
+        "#,
+    )
+    .bind(&gate_name)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| anyhow!("Gate definition not found: {}", gate_name))?;
+
+    let gate_def = GateDefinition {
+        tollgate_id: gate_row.tollgate_id,
+        display_name: gate_row.display_name,
+        required_status: gate_row.required_status,
+        default_thresholds: gate_row.default_thresholds,
+    };
+
+    if let Some(ref required_status) = gate_def.required_status {
+        if case_status != *required_status {
+            let detail = serde_json::json!({
+                "gate_name": gate_def.tollgate_id,
+                "display_name": gate_def.display_name,
+                "passed": false,
+                "reason": format!(
+                    "Case status '{}' does not match required status '{}'",
+                    case_status, required_status
+                ),
+                "checks": []
+            });
+
+            let eval_row: (Uuid, String) = sqlx::query_as(
+                r#"
+                INSERT INTO "ob-poc".tollgate_evaluations (
+                    case_id, tollgate_id, passed, evaluation_detail, config_version
+                )
+                VALUES ($1, $2, FALSE, $3, 'v1')
+                RETURNING evaluation_id, evaluated_at::text
+                "#,
+            )
+            .bind(case_id)
+            .bind(&gate_def.tollgate_id)
+            .bind(&detail)
+            .fetch_one(pool)
+            .await?;
+
+            return Ok(TollgateEvaluationResult {
+                evaluation_id: eval_row.0,
+                case_id,
+                gate_name: gate_def.tollgate_id,
+                passed: false,
+                evaluation_detail: detail,
+                evaluated_at: eval_row.1,
+            });
+        }
+    }
+
+    let (passed, checks) = match gate_name.as_str() {
+        "SKELETON_READY" => {
+            evaluate_skeleton_ready(pool, case_id, &gate_def.default_thresholds).await?
+        }
+        "EVIDENCE_COMPLETE" => {
+            evaluate_evidence_complete(pool, case_id, &gate_def.default_thresholds).await?
+        }
+        "REVIEW_COMPLETE" => {
+            evaluate_review_complete(pool, case_id, &gate_def.default_thresholds).await?
+        }
+        _ => {
+            return Err(anyhow!("No evaluation logic for gate: {}", gate_name));
+        }
+    };
+
+    let gaps: Vec<serde_json::Value> = checks
+        .iter()
+        .filter(|c| !c.passed)
+        .map(|c| {
+            serde_json::json!({
+                "criterion": c.criterion,
+                "actual": c.actual_value,
+                "threshold": c.threshold_value,
+                "detail": c.detail
+            })
+        })
+        .collect();
+
+    let evaluation_detail = serde_json::json!({
+        "gate_name": gate_def.tollgate_id,
+        "display_name": gate_def.display_name,
+        "passed": passed,
+        "checks": checks,
+        "thresholds_used": gate_def.default_thresholds,
+        "case_status": case_status
+    });
+
+    let gaps_json = if gaps.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::json!(gaps)
+    };
+
+    let eval_row: (Uuid, String) = sqlx::query_as(
+        r#"
+        INSERT INTO "ob-poc".tollgate_evaluations (
+            case_id, tollgate_id, passed, evaluation_detail, gaps, config_version
+        )
+        VALUES ($1, $2, $3, $4, $5, 'v1')
+        RETURNING evaluation_id, evaluated_at::text
+        "#,
+    )
+    .bind(case_id)
+    .bind(&gate_def.tollgate_id)
+    .bind(passed)
+    .bind(&evaluation_detail)
+    .bind(&gaps_json)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(TollgateEvaluationResult {
+        evaluation_id: eval_row.0,
+        case_id,
+        gate_name: gate_def.tollgate_id,
+        passed,
+        evaluation_detail,
+        evaluated_at: eval_row.1,
+    })
+}
+
 #[async_trait]
 impl CustomOperation for TollgateEvaluateGateOp {
     fn domain(&self) -> &'static str {
@@ -557,191 +717,10 @@ impl CustomOperation for TollgateEvaluateGateOp {
     ) -> Result<ExecutionResult> {
         let case_id = extract_uuid(verb_call, ctx, "case-id")?;
         let gate_name = extract_string(verb_call, "gate-name")?;
-
-        // Validate gate name
-        let valid_gates = ["SKELETON_READY", "EVIDENCE_COMPLETE", "REVIEW_COMPLETE"];
-        if !valid_gates.contains(&gate_name.as_str()) {
-            return Err(anyhow!(
-                "Invalid gate-name '{}'. Valid values: {}",
-                gate_name,
-                valid_gates.join(", ")
-            ));
-        }
-
-        // ---------------------------------------------------------------
-        // 1. Validate case exists and get status
-        // ---------------------------------------------------------------
-        let case_info: Option<(Uuid, String)> =
-            sqlx::query_as(r#"SELECT case_id, status FROM "ob-poc".cases WHERE case_id = $1"#)
-                .bind(case_id)
-                .fetch_optional(pool)
-                .await?;
-
-        let (_case_id, case_status) =
-            case_info.ok_or_else(|| anyhow!("Case not found: {}", case_id))?;
-
-        // ---------------------------------------------------------------
-        // 2. Load gate definition from reference data
-        // ---------------------------------------------------------------
-        #[derive(sqlx::FromRow)]
-        struct GateRow {
-            tollgate_id: String,
-            display_name: String,
-            required_status: Option<String>,
-            default_thresholds: serde_json::Value,
-        }
-
-        let gate_row: GateRow = sqlx::query_as(
-            r#"
-            SELECT tollgate_id, display_name, required_status, default_thresholds
-            FROM "ob-poc".tollgate_definitions
-            WHERE tollgate_id = $1
-            "#,
-        )
-        .bind(&gate_name)
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| anyhow!("Gate definition not found: {}", gate_name))?;
-
-        let gate_def = GateDefinition {
-            tollgate_id: gate_row.tollgate_id,
-            display_name: gate_row.display_name,
-            required_status: gate_row.required_status,
-            default_thresholds: gate_row.default_thresholds,
-        };
-
-        // ---------------------------------------------------------------
-        // 3. Check case status prerequisite (if defined)
-        // ---------------------------------------------------------------
-        if let Some(ref required_status) = gate_def.required_status {
-            if case_status != *required_status {
-                let detail = serde_json::json!({
-                    "gate_name": gate_def.tollgate_id,
-                    "display_name": gate_def.display_name,
-                    "passed": false,
-                    "reason": format!(
-                        "Case status '{}' does not match required status '{}'",
-                        case_status, required_status
-                    ),
-                    "checks": []
-                });
-
-                // Record the failed evaluation
-                let eval_row: (Uuid, String) = sqlx::query_as(
-                    r#"
-                    INSERT INTO "ob-poc".tollgate_evaluations (
-                        case_id, tollgate_id, passed, evaluation_detail, config_version
-                    )
-                    VALUES ($1, $2, FALSE, $3, 'v1')
-                    RETURNING evaluation_id, evaluated_at::text
-                    "#,
-                )
-                .bind(case_id)
-                .bind(&gate_def.tollgate_id)
-                .bind(&detail)
-                .fetch_one(pool)
-                .await?;
-
-                let result = TollgateEvaluationResult {
-                    evaluation_id: eval_row.0,
-                    case_id,
-                    gate_name: gate_def.tollgate_id,
-                    passed: false,
-                    evaluation_detail: detail,
-                    evaluated_at: eval_row.1,
-                };
-
-                if let Some(binding) = verb_call.binding.as_deref() {
-                    ctx.bind(binding, eval_row.0);
-                }
-
-                return Ok(ExecutionResult::Record(serde_json::to_value(result)?));
-            }
-        }
-
-        // ---------------------------------------------------------------
-        // 4. Dispatch to gate-specific evaluation
-        // ---------------------------------------------------------------
-        let (passed, checks) = match gate_name.as_str() {
-            "SKELETON_READY" => {
-                evaluate_skeleton_ready(pool, case_id, &gate_def.default_thresholds).await?
-            }
-            "EVIDENCE_COMPLETE" => {
-                evaluate_evidence_complete(pool, case_id, &gate_def.default_thresholds).await?
-            }
-            "REVIEW_COMPLETE" => {
-                evaluate_review_complete(pool, case_id, &gate_def.default_thresholds).await?
-            }
-            _ => {
-                return Err(anyhow!("No evaluation logic for gate: {}", gate_name));
-            }
-        };
-
-        // ---------------------------------------------------------------
-        // 5. Build evaluation detail
-        // ---------------------------------------------------------------
-        let gaps: Vec<serde_json::Value> = checks
-            .iter()
-            .filter(|c| !c.passed)
-            .map(|c| {
-                serde_json::json!({
-                    "criterion": c.criterion,
-                    "actual": c.actual_value,
-                    "threshold": c.threshold_value,
-                    "detail": c.detail
-                })
-            })
-            .collect();
-
-        let evaluation_detail = serde_json::json!({
-            "gate_name": gate_def.tollgate_id,
-            "display_name": gate_def.display_name,
-            "passed": passed,
-            "checks": checks,
-            "thresholds_used": gate_def.default_thresholds,
-            "case_status": case_status
-        });
-
-        let gaps_json = if gaps.is_empty() {
-            serde_json::Value::Null
-        } else {
-            serde_json::json!(gaps)
-        };
-
-        // ---------------------------------------------------------------
-        // 6. Record evaluation
-        // ---------------------------------------------------------------
-        let eval_row: (Uuid, String) = sqlx::query_as(
-            r#"
-            INSERT INTO "ob-poc".tollgate_evaluations (
-                case_id, tollgate_id, passed, evaluation_detail, gaps, config_version
-            )
-            VALUES ($1, $2, $3, $4, $5, 'v1')
-            RETURNING evaluation_id, evaluated_at::text
-            "#,
-        )
-        .bind(case_id)
-        .bind(&gate_def.tollgate_id)
-        .bind(passed)
-        .bind(&evaluation_detail)
-        .bind(&gaps_json)
-        .fetch_one(pool)
-        .await?;
-
-        // ---------------------------------------------------------------
-        // 7. Build result
-        // ---------------------------------------------------------------
-        let result = TollgateEvaluationResult {
-            evaluation_id: eval_row.0,
-            case_id,
-            gate_name: gate_def.tollgate_id,
-            passed,
-            evaluation_detail,
-            evaluated_at: eval_row.1,
-        };
+        let result = tollgate_evaluate_impl(case_id, gate_name, pool).await?;
 
         if let Some(binding) = verb_call.binding.as_deref() {
-            ctx.bind(binding, eval_row.0);
+            ctx.bind(binding, result.evaluation_id);
         }
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
@@ -754,6 +733,27 @@ impl CustomOperation for TollgateEvaluateGateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_uuid};
+
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let gate_name = json_extract_string(args, "gate-name")?;
+        let result = tollgate_evaluate_impl(case_id, gate_name, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

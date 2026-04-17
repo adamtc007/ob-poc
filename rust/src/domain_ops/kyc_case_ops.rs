@@ -181,6 +181,10 @@ impl CustomOperation for KycCaseCreateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -571,6 +575,67 @@ impl CustomOperation for KycCaseUpdateStatusOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
+
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let requested_status = json_extract_string(args, "status")?;
+        let notes = json_extract_string_opt(args, "notes");
+
+        // Reject terminal statuses — callers must use kyc-case.close
+        if is_terminal_status(&requested_status) {
+            return Err(anyhow!(
+                "Use kyc-case.close for terminal status '{}'. The update-status verb handles non-terminal transitions only.",
+                requested_status
+            ));
+        }
+
+        // Load current case status
+        let current_status: String =
+            sqlx::query_scalar(r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#)
+                .bind(case_id)
+                .fetch_optional(pool)
+                .await?
+                .ok_or_else(|| anyhow!("KYC case not found: {}", case_id))?;
+
+        // Validate the transition
+        if !is_valid_transition(&current_status, &requested_status) {
+            return Err(anyhow!(
+                "Invalid transition: {} → {}. Allowed transitions from {}: [{}]",
+                current_status,
+                requested_status,
+                current_status,
+                valid_next_statuses(&current_status)
+            ));
+        }
+
+        // Apply the transition
+        sqlx::query(
+            r#"UPDATE "ob-poc".cases
+               SET status = $2,
+                   notes = COALESCE($3, notes),
+                   updated_at = NOW()
+               WHERE case_id = $1"#,
+        )
+        .bind(case_id)
+        .bind(&requested_status)
+        .bind(&notes)
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -620,80 +685,7 @@ impl CustomOperation for KycCaseCloseOp {
             ));
         }
 
-        // Load current case to validate state and retrieve deal_id
-        let row: Option<(String, Option<Uuid>, Option<String>)> = sqlx::query_as(
-            r#"SELECT status, deal_id, case_ref
-               FROM "ob-poc".cases
-               WHERE case_id = $1"#,
-        )
-        .bind(case_id)
-        .fetch_optional(pool)
-        .await?;
-
-        let (current_status, deal_id, case_ref) =
-            row.ok_or_else(|| anyhow!("KYC case not found: {}", case_id))?;
-
-        // Validate the case is in REVIEW status (closeable state)
-        if current_status != "REVIEW" {
-            return Err(anyhow!(
-                "KYC case {} is in status '{}', but must be in REVIEW to close",
-                case_id,
-                current_status
-            ));
-        }
-
-        // Close the case: set status and closed_at
-        let closed_at: String = sqlx::query_scalar(
-            r#"UPDATE "ob-poc".cases
-               SET status = $2,
-                   closed_at = NOW(),
-                   notes = COALESCE($3, notes),
-                   updated_at = NOW()
-               WHERE case_id = $1
-               RETURNING to_char(closed_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')"#,
-        )
-        .bind(case_id)
-        .bind(&status)
-        .bind(&notes)
-        .fetch_one(pool)
-        .await?;
-
-        // If APPROVED and deal_id is present, emit KYC_GATE_COMPLETED event
-        let mut deal_gate_updated = false;
-
-        if status == "APPROVED" {
-            if let Some(did) = deal_id {
-                let event_id = Uuid::new_v4();
-                let detail = serde_json::json!({
-                    "case_id": case_id,
-                    "case_ref": case_ref,
-                    "approved_at": closed_at,
-                    "gate": "KYC"
-                });
-
-                sqlx::query(
-                    r#"INSERT INTO "ob-poc".deal_events
-                           (event_id, deal_id, event_type, subject_type, subject_id, new_value, description)
-                       VALUES ($1, $2, 'KYC_GATE_COMPLETED', 'KYC_CASE', $3, 'APPROVED', $4)"#,
-                )
-                .bind(event_id)
-                .bind(did)
-                .bind(case_id)
-                .bind(detail.to_string())
-                .execute(pool)
-                .await?;
-
-                deal_gate_updated = true;
-            }
-        }
-
-        let result = KycCaseCloseResult {
-            case_id,
-            status,
-            closed_at,
-            deal_gate_updated,
-        };
-
+        let result = kyc_case_close_impl(case_id, &status, notes.as_deref(), pool).await?;
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
@@ -705,6 +697,121 @@ impl CustomOperation for KycCaseCloseOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
+
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let status = json_extract_string(args, "status")?;
+        let notes = json_extract_string_opt(args, "notes");
+
+        // Validate the requested status is a valid terminal status
+        if !CLOSE_STATUSES.contains(&status.as_str()) {
+            return Err(anyhow!(
+                "Invalid close status '{}'. Must be one of: {}",
+                status,
+                CLOSE_STATUSES.join(", ")
+            ));
+        }
+
+        let result = kyc_case_close_impl(case_id, &status, notes.as_deref(), pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+/// Shared implementation for kyc-case.close.
+#[cfg(feature = "database")]
+async fn kyc_case_close_impl(
+    case_id: Uuid,
+    status: &str,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<KycCaseCloseResult> {
+    // Load current case to validate state and retrieve deal_id
+    let row: Option<(String, Option<Uuid>, Option<String>)> = sqlx::query_as(
+        r#"SELECT status, deal_id, case_ref
+           FROM "ob-poc".cases
+           WHERE case_id = $1"#,
+    )
+    .bind(case_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let (current_status, deal_id, case_ref) =
+        row.ok_or_else(|| anyhow!("KYC case not found: {}", case_id))?;
+
+    // Validate the case is in REVIEW status (closeable state)
+    if current_status != "REVIEW" {
+        return Err(anyhow!(
+            "KYC case {} is in status '{}', but must be in REVIEW to close",
+            case_id,
+            current_status
+        ));
+    }
+
+    // Close the case: set status and closed_at
+    let closed_at: String = sqlx::query_scalar(
+        r#"UPDATE "ob-poc".cases
+           SET status = $2,
+               closed_at = NOW(),
+               notes = COALESCE($3, notes),
+               updated_at = NOW()
+           WHERE case_id = $1
+           RETURNING to_char(closed_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')"#,
+    )
+    .bind(case_id)
+    .bind(status)
+    .bind(notes)
+    .fetch_one(pool)
+    .await?;
+
+    // If APPROVED and deal_id is present, emit KYC_GATE_COMPLETED event
+    let mut deal_gate_updated = false;
+
+    if status == "APPROVED" {
+        if let Some(did) = deal_id {
+            let event_id = Uuid::new_v4();
+            let detail = json!({
+                "case_id": case_id,
+                "case_ref": case_ref,
+                "approved_at": closed_at,
+                "gate": "KYC"
+            });
+
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".deal_events
+                       (event_id, deal_id, event_type, subject_type, subject_id, new_value, description)
+                   VALUES ($1, $2, 'KYC_GATE_COMPLETED', 'KYC_CASE', $3, 'APPROVED', $4)"#,
+            )
+            .bind(event_id)
+            .bind(did)
+            .bind(case_id)
+            .bind(detail.to_string())
+            .execute(pool)
+            .await?;
+
+            deal_gate_updated = true;
+        }
+    }
+
+    Ok(KycCaseCloseResult {
+        case_id,
+        status: status.to_string(),
+        closed_at,
+        deal_gate_updated,
+    })
 }
 
 // ============================================================================
@@ -739,225 +846,7 @@ impl CustomOperation for KycCaseStateOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-
-        // Load case with CBU info
-        let case_row = sqlx::query!(
-            r#"
-            SELECT
-                c.case_id,
-                c.status,
-                c.risk_rating,
-                c.case_type,
-                c.escalation_level,
-                c.opened_at,
-                c.sla_deadline,
-                c.notes,
-                cb.cbu_id,
-                cb.name as cbu_name,
-                cb.client_type
-            FROM "ob-poc".cases c
-            JOIN "ob-poc".cbus cb ON c.cbu_id = cb.cbu_id
-            WHERE c.case_id = $1
-              AND cb.deleted_at IS NULL
-            "#,
-            case_id
-        )
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| anyhow!("Case not found: {}", case_id))?;
-
-        // Load workstreams with entity info
-        let workstreams = sqlx::query!(
-            r#"
-            SELECT
-                w.workstream_id,
-                w.entity_id,
-                w.status,
-                w.discovery_reason,
-                w.is_ubo,
-                w.ownership_percentage,
-                w.risk_rating as ws_risk_rating,
-                w.requires_enhanced_dd,
-                w.blocker_type,
-                w.blocker_message,
-                e.name as entity_name
-            FROM "ob-poc".entity_workstreams w
-            JOIN "ob-poc".entities e ON w.entity_id = e.entity_id
-            WHERE w.case_id = $1
-              AND e.deleted_at IS NULL
-            ORDER BY w.created_at
-            "#,
-            case_id
-        )
-        .fetch_all(pool)
-        .await?;
-
-        // For each workstream, get entity role and awaiting requests
-        let mut workstream_states = Vec::new();
-        let mut total_awaiting = 0;
-        let mut overdue_count = 0;
-
-        for ws in &workstreams {
-            // Get entity role in CBU context
-            let role: Option<String> = sqlx::query_scalar!(
-                r#"
-                SELECT r.name
-                FROM "ob-poc".cbu_entity_roles cer
-                JOIN "ob-poc".roles r ON cer.role_id = r.role_id
-                WHERE cer.entity_id = $1 AND cer.cbu_id = $2
-                LIMIT 1
-                "#,
-                ws.entity_id,
-                case_row.cbu_id
-            )
-            .fetch_optional(pool)
-            .await?;
-
-            // Get awaiting requests for this workstream
-            let awaiting_rows = sqlx::query!(
-                r#"
-                SELECT
-                    request_id,
-                    request_type,
-                    request_subtype,
-                    requested_from_label,
-                    requested_at,
-                    due_date,
-                    reminder_count,
-                    escalation_level,
-                    status,
-                    blocker_message,
-                    CURRENT_DATE - due_date as days_overdue
-                FROM "ob-poc".outstanding_requests
-                WHERE workstream_id = $1 AND status IN ('PENDING', 'ESCALATED')
-                ORDER BY due_date ASC
-                "#,
-                ws.workstream_id
-            )
-            .fetch_all(pool)
-            .await?;
-
-            let awaiting_nodes: Vec<Value> = awaiting_rows
-                .iter()
-                .map(|r| {
-                    let days_over = r.days_overdue.unwrap_or(0).max(0);
-                    let is_overdue = days_over > 0;
-
-                    if is_overdue {
-                        overdue_count += 1;
-                    }
-
-                    let mut actions = vec!["remind", "extend"];
-                    if is_overdue {
-                        actions.push("escalate");
-                    }
-                    actions.push("waive");
-
-                    json!({
-                        "request_id": r.request_id,
-                        "type": r.request_type,
-                        "subtype": r.request_subtype,
-                        "from": r.requested_from_label,
-                        "requested_at": r.requested_at,
-                        "due_date": r.due_date,
-                        "days_overdue": days_over,
-                        "overdue": is_overdue,
-                        "reminder_count": r.reminder_count,
-                        "escalated": r.escalation_level.unwrap_or(0) > 0,
-                        "actions": actions
-                    })
-                })
-                .collect();
-
-            total_awaiting += awaiting_nodes.len();
-
-            workstream_states.push(json!({
-                "workstream_id": ws.workstream_id,
-                "entity": {
-                    "entity_id": ws.entity_id,
-                    "name": ws.entity_name,
-                    "role": role
-                },
-                "status": ws.status,
-                "is_ubo": ws.is_ubo,
-                "ownership_percentage": ws.ownership_percentage,
-                "risk_rating": ws.ws_risk_rating,
-                "requires_enhanced_dd": ws.requires_enhanced_dd,
-                "blocker_type": ws.blocker_type,
-                "blocker_message": ws.blocker_message,
-                "awaiting": awaiting_nodes
-            }));
-        }
-
-        // Build summary
-        let complete_count = workstream_states
-            .iter()
-            .filter(|w| w["status"] == "COMPLETE")
-            .count();
-        let blocked_count = workstream_states
-            .iter()
-            .filter(|w| w["status"] == "BLOCKED")
-            .count();
-        let in_progress_count = workstream_states
-            .iter()
-            .filter(|w| {
-                let s = w["status"].as_str().unwrap_or("");
-                s != "COMPLETE" && s != "BLOCKED" && s != "PENDING"
-            })
-            .count();
-
-        // Build attention items from overdue/blocked workstreams
-        let empty_vec = vec![];
-        let attention: Vec<Value> = workstream_states
-            .iter()
-            .flat_map(|ws| {
-                let awaiting = ws["awaiting"].as_array().unwrap_or(&empty_vec);
-                awaiting
-                    .iter()
-                    .filter(|r| r["overdue"].as_bool().unwrap_or(false))
-                    .map(|r| {
-                        let days = r["days_overdue"].as_i64().unwrap_or(0);
-                        let priority = if days > 7 { "HIGH" } else { "MEDIUM" };
-
-                        json!({
-                            "workstream": ws["workstream_id"],
-                            "entity": ws["entity"]["name"],
-                            "issue": format!("{} overdue {} days",
-                                r["subtype"].as_str().unwrap_or("Request"),
-                                days),
-                            "priority": priority,
-                            "actions": r["actions"]
-                        })
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-
-        let result = json!({
-            "case_id": case_row.case_id,
-            "cbu": {
-                "cbu_id": case_row.cbu_id,
-                "name": case_row.cbu_name,
-                "client_type": case_row.client_type
-            },
-            "status": case_row.status,
-            "risk_rating": case_row.risk_rating,
-            "case_type": case_row.case_type,
-            "escalation_level": case_row.escalation_level,
-            "opened_at": case_row.opened_at,
-            "sla_deadline": case_row.sla_deadline,
-            "workstreams": workstream_states,
-            "summary": {
-                "total_workstreams": workstream_states.len(),
-                "complete": complete_count,
-                "in_progress": in_progress_count,
-                "blocked": blocked_count,
-                "total_awaiting": total_awaiting,
-                "overdue": overdue_count
-            },
-            "attention": attention
-        });
-
+        let result = kyc_case_state_impl(case_id, pool).await?;
         Ok(ExecutionResult::Record(result))
     }
 
@@ -969,6 +858,245 @@ impl CustomOperation for KycCaseStateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let result = kyc_case_state_impl(case_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+/// Shared implementation for kyc-case.summarize.
+#[cfg(feature = "database")]
+async fn kyc_case_state_impl(case_id: Uuid, pool: &PgPool) -> Result<Value> {
+    // Load case with CBU info
+    let case_row = sqlx::query!(
+        r#"
+        SELECT
+            c.case_id,
+            c.status,
+            c.risk_rating,
+            c.case_type,
+            c.escalation_level,
+            c.opened_at,
+            c.sla_deadline,
+            c.notes,
+            cb.cbu_id,
+            cb.name as cbu_name,
+            cb.client_type
+        FROM "ob-poc".cases c
+        JOIN "ob-poc".cbus cb ON c.cbu_id = cb.cbu_id
+        WHERE c.case_id = $1
+          AND cb.deleted_at IS NULL
+        "#,
+        case_id
+    )
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| anyhow!("Case not found: {}", case_id))?;
+
+    // Load workstreams with entity info
+    let workstreams = sqlx::query!(
+        r#"
+        SELECT
+            w.workstream_id,
+            w.entity_id,
+            w.status,
+            w.discovery_reason,
+            w.is_ubo,
+            w.ownership_percentage,
+            w.risk_rating as ws_risk_rating,
+            w.requires_enhanced_dd,
+            w.blocker_type,
+            w.blocker_message,
+            e.name as entity_name
+        FROM "ob-poc".entity_workstreams w
+        JOIN "ob-poc".entities e ON w.entity_id = e.entity_id
+        WHERE w.case_id = $1
+          AND e.deleted_at IS NULL
+        ORDER BY w.created_at
+        "#,
+        case_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    // For each workstream, get entity role and awaiting requests
+    let mut workstream_states = Vec::new();
+    let mut total_awaiting = 0;
+    let mut overdue_count = 0;
+
+    for ws in &workstreams {
+        // Get entity role in CBU context
+        let role: Option<String> = sqlx::query_scalar!(
+            r#"
+            SELECT r.name
+            FROM "ob-poc".cbu_entity_roles cer
+            JOIN "ob-poc".roles r ON cer.role_id = r.role_id
+            WHERE cer.entity_id = $1 AND cer.cbu_id = $2
+            LIMIT 1
+            "#,
+            ws.entity_id,
+            case_row.cbu_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        // Get awaiting requests for this workstream
+        let awaiting_rows = sqlx::query!(
+            r#"
+            SELECT
+                request_id,
+                request_type,
+                request_subtype,
+                requested_from_label,
+                requested_at,
+                due_date,
+                reminder_count,
+                escalation_level,
+                status,
+                blocker_message,
+                CURRENT_DATE - due_date as days_overdue
+            FROM "ob-poc".outstanding_requests
+            WHERE workstream_id = $1 AND status IN ('PENDING', 'ESCALATED')
+            ORDER BY due_date ASC
+            "#,
+            ws.workstream_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let awaiting_nodes: Vec<Value> = awaiting_rows
+            .iter()
+            .map(|r| {
+                let days_over = r.days_overdue.unwrap_or(0).max(0);
+                let is_overdue = days_over > 0;
+
+                if is_overdue {
+                    overdue_count += 1;
+                }
+
+                let mut actions = vec!["remind", "extend"];
+                if is_overdue {
+                    actions.push("escalate");
+                }
+                actions.push("waive");
+
+                json!({
+                    "request_id": r.request_id,
+                    "type": r.request_type,
+                    "subtype": r.request_subtype,
+                    "from": r.requested_from_label,
+                    "requested_at": r.requested_at,
+                    "due_date": r.due_date,
+                    "days_overdue": days_over,
+                    "overdue": is_overdue,
+                    "reminder_count": r.reminder_count,
+                    "escalated": r.escalation_level.unwrap_or(0) > 0,
+                    "actions": actions
+                })
+            })
+            .collect();
+
+        total_awaiting += awaiting_nodes.len();
+
+        workstream_states.push(json!({
+            "workstream_id": ws.workstream_id,
+            "entity": {
+                "entity_id": ws.entity_id,
+                "name": ws.entity_name,
+                "role": role
+            },
+            "status": ws.status,
+            "is_ubo": ws.is_ubo,
+            "ownership_percentage": ws.ownership_percentage,
+            "risk_rating": ws.ws_risk_rating,
+            "requires_enhanced_dd": ws.requires_enhanced_dd,
+            "blocker_type": ws.blocker_type,
+            "blocker_message": ws.blocker_message,
+            "awaiting": awaiting_nodes
+        }));
+    }
+
+    // Build summary
+    let complete_count = workstream_states
+        .iter()
+        .filter(|w| w["status"] == "COMPLETE")
+        .count();
+    let blocked_count = workstream_states
+        .iter()
+        .filter(|w| w["status"] == "BLOCKED")
+        .count();
+    let in_progress_count = workstream_states
+        .iter()
+        .filter(|w| {
+            let s = w["status"].as_str().unwrap_or("");
+            s != "COMPLETE" && s != "BLOCKED" && s != "PENDING"
+        })
+        .count();
+
+    // Build attention items from overdue/blocked workstreams
+    let empty_vec = vec![];
+    let attention: Vec<Value> = workstream_states
+        .iter()
+        .flat_map(|ws| {
+            let awaiting = ws["awaiting"].as_array().unwrap_or(&empty_vec);
+            awaiting
+                .iter()
+                .filter(|r| r["overdue"].as_bool().unwrap_or(false))
+                .map(|r| {
+                    let days = r["days_overdue"].as_i64().unwrap_or(0);
+                    let priority = if days > 7 { "HIGH" } else { "MEDIUM" };
+
+                    json!({
+                        "workstream": ws["workstream_id"],
+                        "entity": ws["entity"]["name"],
+                        "issue": format!("{} overdue {} days",
+                            r["subtype"].as_str().unwrap_or("Request"),
+                            days),
+                        "priority": priority,
+                        "actions": r["actions"]
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    Ok(json!({
+        "case_id": case_row.case_id,
+        "cbu": {
+            "cbu_id": case_row.cbu_id,
+            "name": case_row.cbu_name,
+            "client_type": case_row.client_type
+        },
+        "status": case_row.status,
+        "risk_rating": case_row.risk_rating,
+        "case_type": case_row.case_type,
+        "escalation_level": case_row.escalation_level,
+        "opened_at": case_row.opened_at,
+        "sla_deadline": case_row.sla_deadline,
+        "workstreams": workstream_states,
+        "summary": {
+            "total_workstreams": workstream_states.len(),
+            "complete": complete_count,
+            "in_progress": in_progress_count,
+            "blocked": blocked_count,
+            "total_awaiting": total_awaiting,
+            "overdue": overdue_count
+        },
+        "attention": attention
+    }))
 }
 
 // ============================================================================
@@ -1001,172 +1129,7 @@ impl CustomOperation for WorkstreamStateOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let workstream_id = extract_uuid(verb_call, ctx, "workstream-id")?;
-
-        // Load workstream with entity info
-        let ws = sqlx::query!(
-            r#"
-            SELECT
-                w.workstream_id,
-                w.case_id,
-                w.entity_id,
-                w.status,
-                w.discovery_reason,
-                w.is_ubo,
-                w.ownership_percentage,
-                w.risk_rating,
-                w.requires_enhanced_dd,
-                w.blocker_type,
-                w.blocker_message,
-                w.created_at,
-                w.completed_at,
-                e.name as entity_name,
-                c.cbu_id
-            FROM "ob-poc".entity_workstreams w
-            JOIN "ob-poc".entities e ON w.entity_id = e.entity_id
-            JOIN "ob-poc".cases c ON w.case_id = c.case_id
-            WHERE w.workstream_id = $1
-              AND e.deleted_at IS NULL
-            "#,
-            workstream_id
-        )
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| anyhow!("Workstream not found: {}", workstream_id))?;
-
-        // Get entity role
-        let role: Option<String> = sqlx::query_scalar!(
-            r#"
-            SELECT r.name
-            FROM "ob-poc".cbu_entity_roles cer
-            JOIN "ob-poc".roles r ON cer.role_id = r.role_id
-            WHERE cer.entity_id = $1 AND cer.cbu_id = $2
-            LIMIT 1
-            "#,
-            ws.entity_id,
-            ws.cbu_id
-        )
-        .fetch_optional(pool)
-        .await?;
-
-        // Get awaiting requests
-        let awaiting_rows = sqlx::query!(
-            r#"
-            SELECT
-                request_id,
-                request_type,
-                request_subtype,
-                requested_from_label,
-                requested_at,
-                due_date,
-                reminder_count,
-                escalation_level,
-                status,
-                CURRENT_DATE - due_date as days_overdue
-            FROM "ob-poc".outstanding_requests
-            WHERE workstream_id = $1 AND status IN ('PENDING', 'ESCALATED')
-            ORDER BY due_date ASC
-            "#,
-            workstream_id
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let awaiting: Vec<Value> = awaiting_rows
-            .iter()
-            .map(|r| {
-                let days_over = r.days_overdue.unwrap_or(0).max(0);
-                let is_overdue = days_over > 0;
-                let mut actions = vec!["remind", "extend"];
-                if is_overdue {
-                    actions.push("escalate");
-                }
-                actions.push("waive");
-
-                json!({
-                    "request_id": r.request_id,
-                    "type": r.request_type,
-                    "subtype": r.request_subtype,
-                    "from": r.requested_from_label,
-                    "requested_at": r.requested_at,
-                    "due_date": r.due_date,
-                    "days_overdue": days_over,
-                    "overdue": is_overdue,
-                    "reminder_count": r.reminder_count,
-                    "escalated": r.escalation_level.unwrap_or(0) > 0,
-                    "actions": actions
-                })
-            })
-            .collect();
-
-        // Get completed screenings
-        let screenings = sqlx::query!(
-            r#"
-            SELECT screening_type, status, completed_at
-            FROM "ob-poc".screenings
-            WHERE workstream_id = $1 AND status NOT IN ('PENDING', 'RUNNING')
-            ORDER BY completed_at DESC
-            "#,
-            workstream_id
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let checks_complete: Vec<Value> = screenings
-            .iter()
-            .map(|s| {
-                json!({
-                    "type": s.screening_type,
-                    "result": s.status,
-                    "date": s.completed_at
-                })
-            })
-            .collect();
-
-        // Get received documents
-        let documents = sqlx::query!(
-            r#"
-            SELECT d.document_type_code, d.doc_id, d.created_at
-            FROM "ob-poc".document_catalog d
-            JOIN "ob-poc".outstanding_requests r ON d.doc_id = r.fulfillment_reference_id
-            WHERE r.workstream_id = $1 AND r.status = 'FULFILLED'
-            ORDER BY d.created_at DESC
-            "#,
-            workstream_id
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let documents_received: Vec<Value> = documents
-            .iter()
-            .map(|d| {
-                json!({
-                    "type": d.document_type_code,
-                    "document_id": d.doc_id,
-                    "date": d.created_at
-                })
-            })
-            .collect();
-
-        let result = json!({
-            "workstream_id": ws.workstream_id,
-            "case_id": ws.case_id,
-            "entity": {
-                "entity_id": ws.entity_id,
-                "name": ws.entity_name,
-                "role": role
-            },
-            "status": ws.status,
-            "is_ubo": ws.is_ubo,
-            "ownership_percentage": ws.ownership_percentage,
-            "risk_rating": ws.risk_rating,
-            "requires_enhanced_dd": ws.requires_enhanced_dd,
-            "blocker_type": ws.blocker_type,
-            "blocker_message": ws.blocker_message,
-            "awaiting": awaiting,
-            "checks_complete": checks_complete,
-            "documents_received": documents_received
-        });
-
+        let result = workstream_state_impl(workstream_id, pool).await?;
         Ok(ExecutionResult::Record(result))
     }
 
@@ -1178,4 +1141,190 @@ impl CustomOperation for WorkstreamStateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        let workstream_id = json_extract_uuid(args, ctx, "workstream-id")?;
+        let result = workstream_state_impl(workstream_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+/// Shared implementation for entity-workstream.state.
+#[cfg(feature = "database")]
+async fn workstream_state_impl(workstream_id: Uuid, pool: &PgPool) -> Result<Value> {
+    // Load workstream with entity info
+    let ws = sqlx::query!(
+        r#"
+        SELECT
+            w.workstream_id,
+            w.case_id,
+            w.entity_id,
+            w.status,
+            w.discovery_reason,
+            w.is_ubo,
+            w.ownership_percentage,
+            w.risk_rating,
+            w.requires_enhanced_dd,
+            w.blocker_type,
+            w.blocker_message,
+            w.created_at,
+            w.completed_at,
+            e.name as entity_name,
+            c.cbu_id
+        FROM "ob-poc".entity_workstreams w
+        JOIN "ob-poc".entities e ON w.entity_id = e.entity_id
+        JOIN "ob-poc".cases c ON w.case_id = c.case_id
+        WHERE w.workstream_id = $1
+          AND e.deleted_at IS NULL
+        "#,
+        workstream_id
+    )
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| anyhow!("Workstream not found: {}", workstream_id))?;
+
+    // Get entity role
+    let role: Option<String> = sqlx::query_scalar!(
+        r#"
+        SELECT r.name
+        FROM "ob-poc".cbu_entity_roles cer
+        JOIN "ob-poc".roles r ON cer.role_id = r.role_id
+        WHERE cer.entity_id = $1 AND cer.cbu_id = $2
+        LIMIT 1
+        "#,
+        ws.entity_id,
+        ws.cbu_id
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    // Get awaiting requests
+    let awaiting_rows = sqlx::query!(
+        r#"
+        SELECT
+            request_id,
+            request_type,
+            request_subtype,
+            requested_from_label,
+            requested_at,
+            due_date,
+            reminder_count,
+            escalation_level,
+            status,
+            CURRENT_DATE - due_date as days_overdue
+        FROM "ob-poc".outstanding_requests
+        WHERE workstream_id = $1 AND status IN ('PENDING', 'ESCALATED')
+        ORDER BY due_date ASC
+        "#,
+        workstream_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let awaiting: Vec<Value> = awaiting_rows
+        .iter()
+        .map(|r| {
+            let days_over = r.days_overdue.unwrap_or(0).max(0);
+            let is_overdue = days_over > 0;
+            let mut actions = vec!["remind", "extend"];
+            if is_overdue {
+                actions.push("escalate");
+            }
+            actions.push("waive");
+
+            json!({
+                "request_id": r.request_id,
+                "type": r.request_type,
+                "subtype": r.request_subtype,
+                "from": r.requested_from_label,
+                "requested_at": r.requested_at,
+                "due_date": r.due_date,
+                "days_overdue": days_over,
+                "overdue": is_overdue,
+                "reminder_count": r.reminder_count,
+                "escalated": r.escalation_level.unwrap_or(0) > 0,
+                "actions": actions
+            })
+        })
+        .collect();
+
+    // Get completed screenings
+    let screenings = sqlx::query!(
+        r#"
+        SELECT screening_type, status, completed_at
+        FROM "ob-poc".screenings
+        WHERE workstream_id = $1 AND status NOT IN ('PENDING', 'RUNNING')
+        ORDER BY completed_at DESC
+        "#,
+        workstream_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let checks_complete: Vec<Value> = screenings
+        .iter()
+        .map(|s| {
+            json!({
+                "type": s.screening_type,
+                "result": s.status,
+                "date": s.completed_at
+            })
+        })
+        .collect();
+
+    // Get received documents
+    let documents = sqlx::query!(
+        r#"
+        SELECT d.document_type_code, d.doc_id, d.created_at
+        FROM "ob-poc".document_catalog d
+        JOIN "ob-poc".outstanding_requests r ON d.doc_id = r.fulfillment_reference_id
+        WHERE r.workstream_id = $1 AND r.status = 'FULFILLED'
+        ORDER BY d.created_at DESC
+        "#,
+        workstream_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let documents_received: Vec<Value> = documents
+        .iter()
+        .map(|d| {
+            json!({
+                "type": d.document_type_code,
+                "document_id": d.doc_id,
+                "date": d.created_at
+            })
+        })
+        .collect();
+
+    Ok(json!({
+        "workstream_id": ws.workstream_id,
+        "case_id": ws.case_id,
+        "entity": {
+            "entity_id": ws.entity_id,
+            "name": ws.entity_name,
+            "role": role
+        },
+        "status": ws.status,
+        "is_ubo": ws.is_ubo,
+        "ownership_percentage": ws.ownership_percentage,
+        "risk_rating": ws.risk_rating,
+        "requires_enhanced_dd": ws.requires_enhanced_dd,
+        "blocker_type": ws.blocker_type,
+        "blocker_message": ws.blocker_message,
+        "awaiting": awaiting,
+        "checks_complete": checks_complete,
+        "documents_received": documents_received
+    }))
 }

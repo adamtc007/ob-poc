@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT d.document_type_code, d.doc_id, d.created_at\n        FROM \"ob-poc\".document_catalog d\n        JOIN \"ob-poc\".outstanding_requests r ON d.doc_id = r.fulfillment_reference_id\n        WHERE r.workstream_id = $1 AND r.status = 'FULFILLED'\n        ORDER BY d.created_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "document_type_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "doc_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "d6c9e68836845bb88d6ac29617056b012e732acc2085eb965dae0506327b4a1a"
+}

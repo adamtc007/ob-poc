@@ -241,11 +241,15 @@ fn convert_tool_result_json(
     result: SemRegToolResult,
 ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
     if result.success {
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result.data))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            result.data,
+        ))
     } else {
         Err(anyhow!(
             "{}",
-            result.error.unwrap_or_else(|| "Unknown tool error".to_string())
+            result
+                .error
+                .unwrap_or_else(|| "Unknown tool error".to_string())
         ))
     }
 }

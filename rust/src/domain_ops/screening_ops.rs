@@ -121,6 +121,10 @@ impl CustomOperation for ScreeningPepOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Sanctions screening (Idempotent)
@@ -227,6 +231,10 @@ impl CustomOperation for ScreeningSanctionsOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Adverse media screening (Not Implemented)
@@ -269,6 +277,10 @@ impl CustomOperation for ScreeningAdverseMediaOp {
         Err(anyhow::anyhow!(
             "screening.adverse-media is not yet implemented"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -374,5 +386,72 @@ impl CustomOperation for ScreeningBulkRefreshOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+        use uuid::Uuid;
+
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let screening_type = json_extract_string_opt(args, "screening-type");
+
+        let target_types: Vec<String> = match screening_type.as_deref() {
+            Some(kind) => vec![kind.to_string()],
+            None => vec![
+                "SANCTIONS".to_string(),
+                "PEP".to_string(),
+                "ADVERSE_MEDIA".to_string(),
+            ],
+        };
+
+        let workstream_ids: Vec<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT workstream_id
+            FROM "ob-poc".entity_workstreams
+            WHERE case_id = $1
+            "#,
+        )
+        .bind(case_id)
+        .fetch_all(pool)
+        .await?;
+
+        let mut inserted = 0_u64;
+        for workstream_id in workstream_ids {
+            for st in &target_types {
+                let screening_id = Uuid::new_v4();
+                let result = sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".screenings
+                        (screening_id, workstream_id, screening_type, status)
+                    SELECT $1, $2, $3, 'PENDING'
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM "ob-poc".screenings
+                        WHERE workstream_id = $2 AND screening_type = $3
+                    )
+                    "#,
+                )
+                .bind(screening_id)
+                .bind(workstream_id)
+                .bind(st)
+                .execute(pool)
+                .await?;
+                inserted += result.rows_affected();
+            }
+        }
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            inserted,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE \"ob-poc\".investors\n        SET lifecycle_state = 'OFFBOARDED',\n            offboarded_at = NOW(),\n            offboard_reason = 'Full redemption completed',\n            lifecycle_notes = $2,\n            updated_at = NOW()\n        WHERE investor_id = $1\n        RETURNING investor_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "investor_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7e2f9c7746403144c97e6b77a63b953db08c3c6e1d7e5f0b08d38cd8730eb016"
+}

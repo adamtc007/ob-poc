@@ -9,7 +9,7 @@
 //! - Threshold evaluation involves complex comparison logic
 //! - Override recording requires audit trail management
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde_json::json;
@@ -21,12 +21,182 @@ use crate::database::GovernedDocumentRequirementsService;
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-use super::helpers::get_required_uuid;
+use super::helpers::{get_required_uuid, json_extract_string, json_extract_uuid};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
 /// Evaluate tollgate for a KYC case
 #[register_custom_op]
 pub struct TollgateEvaluateOp;
+
+#[cfg(feature = "database")]
+async fn tollgate_evaluate_impl(
+    case_id: Uuid,
+    evaluation_type: String,
+    evaluated_by: Option<String>,
+    pool: &PgPool,
+) -> Result<ExecutionResult> {
+    let case_info: Option<(Uuid,)> =
+        sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cases WHERE case_id = $1"#)
+            .bind(case_id)
+            .fetch_optional(pool)
+            .await?;
+
+    let (cbu_id,) = case_info.ok_or_else(|| anyhow!("Case not found"))?;
+    let metrics = compute_metrics(pool, cbu_id, case_id).await?;
+
+    #[derive(sqlx::FromRow)]
+    struct ThresholdRow {
+        threshold_name: String,
+        metric_type: String,
+        comparison: String,
+        threshold_value: Option<rust_decimal::Decimal>,
+        is_blocking: bool,
+        weight: Option<rust_decimal::Decimal>,
+    }
+
+    let thresholds: Vec<ThresholdRow> = sqlx::query_as(
+        r#"
+        SELECT threshold_name, metric_type, comparison, threshold_value, is_blocking, weight
+        FROM "ob-poc".tollgate_thresholds
+        WHERE $1 = ANY(applies_to_case_types) OR applies_to_case_types IS NULL
+        ORDER BY is_blocking DESC, threshold_name
+        "#,
+    )
+    .bind(&evaluation_type)
+    .fetch_all(pool)
+    .await?;
+
+    let mut blocking_failures: Vec<serde_json::Value> = Vec::new();
+    let mut warnings: Vec<serde_json::Value> = Vec::new();
+    let mut score = rust_decimal::Decimal::from(100);
+
+    for threshold in &thresholds {
+        let metric_value = match threshold.metric_type.as_str() {
+            "OWNERSHIP_VERIFIED_PCT" => metrics.ownership_verified_pct,
+            "CONTROL_VERIFIED_PCT" => metrics.control_verified_pct,
+            "UBO_COVERAGE_PCT" => metrics.ubo_coverage_pct,
+            "DOC_COMPLETENESS_PCT" => metrics.doc_completeness_pct,
+            "SCREENING_CLEAR_PCT" => metrics.screening_clear_pct,
+            "RED_FLAG_COUNT" => Some(rust_decimal::Decimal::from(metrics.red_flag_count)),
+            "ALLEGATION_UNRESOLVED_COUNT" => Some(rust_decimal::Decimal::from(
+                metrics.allegation_unresolved_count,
+            )),
+            "DAYS_SINCE_REFRESH" => metrics
+                .days_since_last_refresh
+                .map(rust_decimal::Decimal::from),
+            _ => None,
+        };
+
+        if let (Some(value), Some(threshold_val)) = (metric_value, threshold.threshold_value) {
+            let passed = match threshold.comparison.as_str() {
+                "GT" => value > threshold_val,
+                "GTE" => value >= threshold_val,
+                "LT" => value < threshold_val,
+                "LTE" => value <= threshold_val,
+                "EQ" => value == threshold_val,
+                "NEQ" => value != threshold_val,
+                _ => true,
+            };
+
+            if !passed {
+                let failure = json!({
+                    "threshold": threshold.threshold_name,
+                    "metric_type": threshold.metric_type,
+                    "actual_value": value.to_string(),
+                    "comparison": threshold.comparison,
+                    "threshold_value": threshold_val.to_string(),
+                    "is_blocking": threshold.is_blocking
+                });
+
+                let weight = threshold
+                    .weight
+                    .unwrap_or(rust_decimal::Decimal::from(1))
+                    .to_string()
+                    .parse::<f64>()
+                    .unwrap_or(1.0);
+
+                if threshold.is_blocking {
+                    blocking_failures.push(failure);
+                    score -= rust_decimal::Decimal::from((20.0 * weight) as i64);
+                } else {
+                    warnings.push(failure);
+                    score -= rust_decimal::Decimal::from((5.0 * weight) as i64);
+                }
+            }
+        }
+    }
+
+    if score < rust_decimal::Decimal::ZERO {
+        score = rust_decimal::Decimal::ZERO;
+    }
+
+    let overall_result = if !blocking_failures.is_empty() {
+        "FAIL"
+    } else if !warnings.is_empty() {
+        "PASS_WITH_WARNINGS"
+    } else {
+        "PASS"
+    };
+
+    let threshold_results: serde_json::Value = thresholds
+        .iter()
+        .map(|t| {
+            (
+                t.threshold_name.clone(),
+                json!({
+                    "metric_type": t.metric_type,
+                    "comparison": t.comparison,
+                    "threshold_value": t.threshold_value.map(|v| v.to_string()),
+                    "is_blocking": t.is_blocking
+                }),
+            )
+        })
+        .collect::<serde_json::Map<String, serde_json::Value>>()
+        .into();
+
+    let blocking_failure_texts: Vec<String> =
+        blocking_failures.iter().map(|f| f.to_string()).collect();
+    let warning_texts: Vec<String> = warnings.iter().map(|w| w.to_string()).collect();
+
+    let passed = overall_result == "PASS" || overall_result == "PASS_WITH_WARNINGS";
+    let evaluation_detail = json!({
+        "overall_result": overall_result,
+        "score": score.to_string(),
+        "metrics": metrics,
+        "threshold_results": threshold_results,
+        "blocking_failures": blocking_failure_texts,
+        "warnings": warning_texts,
+        "evaluated_by": evaluated_by,
+    });
+
+    let evaluation_id: (Uuid,) = sqlx::query_as(
+        r#"
+        INSERT INTO "ob-poc".tollgate_evaluations (
+            case_id, tollgate_id, passed, evaluation_detail, config_version
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING evaluation_id
+        "#,
+    )
+    .bind(case_id)
+    .bind(&evaluation_type)
+    .bind(passed)
+    .bind(&evaluation_detail)
+    .bind("1.0")
+    .fetch_one(pool)
+    .await?;
+
+    Ok(ExecutionResult::Record(json!({
+        "evaluation_id": evaluation_id.0,
+        "case_id": case_id,
+        "evaluation_type": evaluation_type,
+        "overall_result": overall_result,
+        "score": score.to_string(),
+        "metrics": metrics,
+        "blocking_failures": blocking_failures,
+        "warnings": warnings
+    })))
+}
 
 #[async_trait]
 impl CustomOperation for TollgateEvaluateOp {
@@ -57,180 +227,13 @@ impl CustomOperation for TollgateEvaluateOp {
         let evaluated_by = verb_call
             .get_arg("evaluated-by")
             .and_then(|a| a.value.as_string());
-
-        // Get case info
-        let case_info: Option<(Uuid,)> =
-            sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cases WHERE case_id = $1"#)
-                .bind(case_id)
-                .fetch_optional(pool)
-                .await?;
-
-        let (cbu_id,) = case_info.ok_or_else(|| anyhow!("Case not found"))?;
-
-        // Compute metrics
-        let metrics = compute_metrics(pool, cbu_id, case_id).await?;
-
-        // Get thresholds for this evaluation type
-        // Uses "ob-poc".tollgate_thresholds with comparison-based evaluation
-        #[derive(sqlx::FromRow)]
-        struct ThresholdRow {
-            threshold_name: String,
-            metric_type: String,
-            comparison: String,
-            threshold_value: Option<rust_decimal::Decimal>,
-            is_blocking: bool,
-            weight: Option<rust_decimal::Decimal>,
-        }
-
-        let thresholds: Vec<ThresholdRow> = sqlx::query_as(
-            r#"
-            SELECT threshold_name, metric_type, comparison, threshold_value, is_blocking, weight
-            FROM "ob-poc".tollgate_thresholds
-            WHERE $1 = ANY(applies_to_case_types) OR applies_to_case_types IS NULL
-            ORDER BY is_blocking DESC, threshold_name
-            "#,
+        tollgate_evaluate_impl(
+            case_id,
+            evaluation_type.to_string(),
+            evaluated_by.map(str::to_string),
+            pool,
         )
-        .bind(evaluation_type)
-        .fetch_all(pool)
-        .await?;
-
-        // Evaluate against thresholds using comparison operators
-        let mut blocking_failures: Vec<serde_json::Value> = Vec::new();
-        let mut warnings: Vec<serde_json::Value> = Vec::new();
-        let mut score = rust_decimal::Decimal::from(100);
-
-        for threshold in &thresholds {
-            let metric_value = match threshold.metric_type.as_str() {
-                "OWNERSHIP_VERIFIED_PCT" => metrics.ownership_verified_pct,
-                "CONTROL_VERIFIED_PCT" => metrics.control_verified_pct,
-                "UBO_COVERAGE_PCT" => metrics.ubo_coverage_pct,
-                "DOC_COMPLETENESS_PCT" => metrics.doc_completeness_pct,
-                "SCREENING_CLEAR_PCT" => metrics.screening_clear_pct,
-                "RED_FLAG_COUNT" => Some(rust_decimal::Decimal::from(metrics.red_flag_count)),
-                "ALLEGATION_UNRESOLVED_COUNT" => Some(rust_decimal::Decimal::from(
-                    metrics.allegation_unresolved_count,
-                )),
-                "DAYS_SINCE_REFRESH" => metrics
-                    .days_since_last_refresh
-                    .map(rust_decimal::Decimal::from),
-                _ => None,
-            };
-
-            if let (Some(value), Some(threshold_val)) = (metric_value, threshold.threshold_value) {
-                // Evaluate using comparison operator
-                let passed = match threshold.comparison.as_str() {
-                    "GT" => value > threshold_val,
-                    "GTE" => value >= threshold_val,
-                    "LT" => value < threshold_val,
-                    "LTE" => value <= threshold_val,
-                    "EQ" => value == threshold_val,
-                    "NEQ" => value != threshold_val,
-                    _ => true, // Unknown comparison, assume pass
-                };
-
-                if !passed {
-                    let failure = json!({
-                        "threshold": threshold.threshold_name,
-                        "metric_type": threshold.metric_type,
-                        "actual_value": value.to_string(),
-                        "comparison": threshold.comparison,
-                        "threshold_value": threshold_val.to_string(),
-                        "is_blocking": threshold.is_blocking
-                    });
-
-                    let weight = threshold
-                        .weight
-                        .unwrap_or(rust_decimal::Decimal::from(1))
-                        .to_string()
-                        .parse::<f64>()
-                        .unwrap_or(1.0);
-
-                    if threshold.is_blocking {
-                        blocking_failures.push(failure);
-                        score -= rust_decimal::Decimal::from((20.0 * weight) as i64);
-                    } else {
-                        warnings.push(failure);
-                        score -= rust_decimal::Decimal::from((5.0 * weight) as i64);
-                    }
-                }
-            }
-        }
-
-        // Clamp score
-        if score < rust_decimal::Decimal::ZERO {
-            score = rust_decimal::Decimal::ZERO;
-        }
-
-        let overall_result = if !blocking_failures.is_empty() {
-            "FAIL"
-        } else if !warnings.is_empty() {
-            "PASS_WITH_WARNINGS"
-        } else {
-            "PASS"
-        };
-
-        // Build threshold_results for JSONB column
-        let threshold_results: serde_json::Value = thresholds
-            .iter()
-            .map(|t| {
-                (
-                    t.threshold_name.clone(),
-                    json!({
-                        "metric_type": t.metric_type,
-                        "comparison": t.comparison,
-                        "threshold_value": t.threshold_value.map(|v| v.to_string()),
-                        "is_blocking": t.is_blocking
-                    }),
-                )
-            })
-            .collect::<serde_json::Map<String, serde_json::Value>>()
-            .into();
-
-        // Convert blocking_failures and warnings to TEXT[] for database
-        let blocking_failure_texts: Vec<String> =
-            blocking_failures.iter().map(|f| f.to_string()).collect();
-        let warning_texts: Vec<String> = warnings.iter().map(|w| w.to_string()).collect();
-
-        // Record evaluation — schema: tollgate_evaluations
-        // Maps evaluation_type to tollgate_id (FK to tollgate_definitions)
-        let passed = overall_result == "PASS" || overall_result == "PASS_WITH_WARNINGS";
-        let evaluation_detail = json!({
-            "overall_result": overall_result,
-            "score": score.to_string(),
-            "metrics": metrics,
-            "threshold_results": threshold_results,
-            "blocking_failures": blocking_failure_texts,
-            "warnings": warning_texts,
-            "evaluated_by": evaluated_by,
-        });
-
-        let evaluation_id: (Uuid,) = sqlx::query_as(
-            r#"
-            INSERT INTO "ob-poc".tollgate_evaluations (
-                case_id, tollgate_id, passed, evaluation_detail, config_version
-            )
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING evaluation_id
-            "#,
-        )
-        .bind(case_id)
-        .bind(evaluation_type) // maps to tollgate_id
-        .bind(passed)
-        .bind(&evaluation_detail)
-        .bind("1.0")
-        .fetch_one(pool)
-        .await?;
-
-        Ok(ExecutionResult::Record(json!({
-            "evaluation_id": evaluation_id.0,
-            "case_id": case_id,
-            "evaluation_type": evaluation_type,
-            "overall_result": overall_result,
-            "score": score.to_string(),
-            "metrics": metrics,
-            "blocking_failures": blocking_failures,
-            "warnings": warnings
-        })))
+        .await
     }
 
     #[cfg(not(feature = "database"))]
@@ -241,11 +244,52 @@ impl CustomOperation for TollgateEvaluateOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let case_id = json_extract_uuid(args, _ctx, "case-id")?;
+        let evaluation_type = json_extract_string(args, "evaluation-type")?;
+        let evaluated_by = super::helpers::json_extract_string_opt(args, "evaluated-by");
+        match tollgate_evaluate_impl(case_id, evaluation_type, evaluated_by, pool).await? {
+            ExecutionResult::Record(value) => {
+                Ok(sem_os_core::execution::VerbExecutionOutcome::Record(value))
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Get current metrics for a CBU
 #[register_custom_op]
 pub struct TollgateGetMetricsOp;
+
+#[cfg(feature = "database")]
+async fn tollgate_get_metrics_impl(cbu_id: Uuid, pool: &PgPool) -> Result<serde_json::Value> {
+    let case_id: Option<(Uuid,)> = sqlx::query_as(
+        r#"
+        SELECT case_id FROM "ob-poc".cases
+        WHERE cbu_id = $1 AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN')
+        ORDER BY opened_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let case_id = case_id.map(|c| c.0).unwrap_or(Uuid::nil());
+    let metrics = compute_metrics(pool, cbu_id, case_id).await?;
+    Ok(serde_json::to_value(&metrics)?)
+}
 
 #[async_trait]
 impl CustomOperation for TollgateGetMetricsOp {
@@ -269,25 +313,9 @@ impl CustomOperation for TollgateGetMetricsOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
-
-        // Find active case for this CBU
-        let case_id: Option<(Uuid,)> = sqlx::query_as(
-            r#"
-            SELECT case_id FROM "ob-poc".cases
-            WHERE cbu_id = $1 AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN')
-            ORDER BY opened_at DESC
-            LIMIT 1
-            "#,
-        )
-        .bind(cbu_id)
-        .fetch_optional(pool)
-        .await?;
-
-        let case_id = case_id.map(|c| c.0).unwrap_or(Uuid::nil());
-
-        let metrics = compute_metrics(pool, cbu_id, case_id).await?;
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&metrics)?))
+        Ok(ExecutionResult::Record(
+            tollgate_get_metrics_impl(cbu_id, pool).await?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -298,11 +326,70 @@ impl CustomOperation for TollgateGetMetricsOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            tollgate_get_metrics_impl(cbu_id, pool).await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Record management override of tollgate failure
 #[register_custom_op]
 pub struct TollgateOverrideOp;
+
+#[cfg(feature = "database")]
+async fn tollgate_override_impl(
+    evaluation_id: Uuid,
+    override_reason: String,
+    approved_by: String,
+    approval_authority: String,
+    conditions: Option<String>,
+    expiry_date: Option<String>,
+    pool: &PgPool,
+) -> Result<Uuid> {
+    let eval: Option<(String,)> =
+        sqlx::query_as(r#"SELECT overall_result FROM "ob-poc".tollgate_evaluations WHERE id = $1"#)
+            .bind(evaluation_id)
+            .fetch_optional(pool)
+            .await?;
+
+    let (result,) = eval.ok_or_else(|| anyhow!("Evaluation not found"))?;
+    if result == "PASS" {
+        return Err(anyhow!("Cannot override a passing evaluation"));
+    }
+
+    let override_id: (Uuid,) = sqlx::query_as(
+        r#"
+        INSERT INTO "ob-poc".tollgate_overrides (
+            evaluation_id, override_reason, approved_by, approval_authority, conditions, expiry_date
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::date)
+        RETURNING id
+        "#,
+    )
+    .bind(evaluation_id)
+    .bind(&override_reason)
+    .bind(&approved_by)
+    .bind(&approval_authority)
+    .bind(conditions)
+    .bind(expiry_date)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(override_id.0)
+}
 
 #[async_trait]
 impl CustomOperation for TollgateOverrideOp {
@@ -344,41 +431,18 @@ impl CustomOperation for TollgateOverrideOp {
         let expiry_date = verb_call
             .get_arg("expiry-date")
             .and_then(|a| a.value.as_string());
-
-        // Verify evaluation exists and is a failure
-        let eval: Option<(String,)> = sqlx::query_as(
-            r#"SELECT overall_result FROM "ob-poc".tollgate_evaluations WHERE id = $1"#,
-        )
-        .bind(evaluation_id)
-        .fetch_optional(pool)
-        .await?;
-
-        let (result,) = eval.ok_or_else(|| anyhow!("Evaluation not found"))?;
-
-        if result == "PASS" {
-            return Err(anyhow!("Cannot override a passing evaluation"));
-        }
-
-        // Record override - schema requires approval_authority
-        let override_id: (Uuid,) = sqlx::query_as(
-            r#"
-            INSERT INTO "ob-poc".tollgate_overrides (
-                evaluation_id, override_reason, approved_by, approval_authority, conditions, expiry_date
+        Ok(ExecutionResult::Uuid(
+            tollgate_override_impl(
+                evaluation_id,
+                override_reason.to_string(),
+                approved_by.to_string(),
+                approval_authority.to_string(),
+                conditions.map(str::to_string),
+                expiry_date.map(str::to_string),
+                pool,
             )
-            VALUES ($1, $2, $3, $4, $5, $6::date)
-            RETURNING id
-            "#,
-        )
-        .bind(evaluation_id)
-        .bind(override_reason)
-        .bind(approved_by)
-        .bind(approval_authority)
-        .bind(conditions)
-        .bind(expiry_date)
-        .fetch_one(pool)
-        .await?;
-
-        Ok(ExecutionResult::Uuid(override_id.0))
+            .await?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -389,11 +453,134 @@ impl CustomOperation for TollgateOverrideOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
+        let override_reason = json_extract_string(args, "override-reason")?;
+        let approved_by = json_extract_string(args, "approved-by")?;
+        let approval_authority = json_extract_string(args, "approval-authority")?;
+        let conditions = super::helpers::json_extract_string_opt(args, "conditions");
+        let expiry_date = super::helpers::json_extract_string_opt(args, "expiry-date");
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            tollgate_override_impl(
+                evaluation_id,
+                override_reason,
+                approved_by,
+                approval_authority,
+                conditions,
+                expiry_date,
+                pool,
+            )
+            .await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Get decision readiness summary
 #[register_custom_op]
 pub struct TollgateDecisionReadinessOp;
+
+#[cfg(feature = "database")]
+async fn tollgate_decision_readiness_impl(
+    case_id: Uuid,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    let case_info: Option<(Uuid, String)> =
+        sqlx::query_as(r#"SELECT cbu_id, status FROM "ob-poc".cases WHERE case_id = $1"#)
+            .bind(case_id)
+            .fetch_optional(pool)
+            .await?;
+
+    let (cbu_id, case_status) = case_info.ok_or_else(|| anyhow!("Case not found"))?;
+
+    let evaluations: Vec<(String, String, rust_decimal::Decimal)> = sqlx::query_as(
+        r#"
+        SELECT DISTINCT ON (tollgate_id)
+            tollgate_id, passed::text, COALESCE((evaluation_detail->>'score')::numeric, 0)
+        FROM "ob-poc".tollgate_evaluations
+        WHERE case_id = $1
+        ORDER BY tollgate_id, evaluated_at DESC
+        "#,
+    )
+    .bind(case_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut blocking_issues: Vec<serde_json::Value> = Vec::new();
+    let mut completion_summary: std::collections::HashMap<String, serde_json::Value> =
+        std::collections::HashMap::new();
+
+    for (eval_type, result, score) in &evaluations {
+        completion_summary.insert(
+            eval_type.clone(),
+            json!({
+                "result": result,
+                "score": score.to_string()
+            }),
+        );
+
+        if result == "FAIL" {
+            blocking_issues.push(json!({
+                "evaluation_type": eval_type,
+                "issue": format!("{} failed with score {}", eval_type, score)
+            }));
+        }
+    }
+
+    let required_evaluations = [
+        "DISCOVERY_COMPLETE",
+        "EVIDENCE_COMPLETE",
+        "VERIFICATION_COMPLETE",
+    ];
+    for req in required_evaluations {
+        if !completion_summary.contains_key(req) {
+            blocking_issues.push(json!({
+                "evaluation_type": req,
+                "issue": format!("{} evaluation not yet performed", req)
+            }));
+        }
+    }
+
+    let metrics = compute_metrics(pool, cbu_id, case_id).await?;
+    let mut recommended_actions: Vec<String> = Vec::new();
+
+    if metrics.ownership_verified_pct.unwrap_or_default() < rust_decimal::Decimal::from(100) {
+        recommended_actions.push("Complete ownership verification".to_string());
+    }
+    if metrics.doc_completeness_pct.unwrap_or_default() < rust_decimal::Decimal::from(100) {
+        recommended_actions.push("Collect outstanding documents".to_string());
+    }
+    if metrics.red_flag_count > 0 {
+        recommended_actions.push(format!(
+            "Resolve {} outstanding red flags",
+            metrics.red_flag_count
+        ));
+    }
+    if metrics.screening_clear_pct.unwrap_or_default() < rust_decimal::Decimal::from(100) {
+        recommended_actions.push("Review pending screening results".to_string());
+    }
+
+    let is_decision_ready = blocking_issues.is_empty() && case_status == "REVIEW";
+
+    Ok(json!({
+        "case_id": case_id,
+        "case_status": case_status,
+        "is_decision_ready": is_decision_ready,
+        "blocking_issues": blocking_issues,
+        "completion_summary": completion_summary,
+        "recommended_actions": recommended_actions
+    }))
+}
 
 #[async_trait]
 impl CustomOperation for TollgateDecisionReadinessOp {
@@ -417,97 +604,9 @@ impl CustomOperation for TollgateDecisionReadinessOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let case_id = get_required_uuid(verb_call, "case-id")?;
-
-        // Get case info
-        let case_info: Option<(Uuid, String)> =
-            sqlx::query_as(r#"SELECT cbu_id, status FROM "ob-poc".cases WHERE case_id = $1"#)
-                .bind(case_id)
-                .fetch_optional(pool)
-                .await?;
-
-        let (cbu_id, case_status) = case_info.ok_or_else(|| anyhow!("Case not found"))?;
-
-        // Get latest evaluations for each type
-        let evaluations: Vec<(String, String, rust_decimal::Decimal)> = sqlx::query_as(
-            r#"
-            SELECT DISTINCT ON (tollgate_id)
-                tollgate_id, passed::text, COALESCE((evaluation_detail->>'score')::numeric, 0)
-            FROM "ob-poc".tollgate_evaluations
-            WHERE case_id = $1
-            ORDER BY tollgate_id, evaluated_at DESC
-            "#,
-        )
-        .bind(case_id)
-        .fetch_all(pool)
-        .await?;
-
-        let mut blocking_issues: Vec<serde_json::Value> = Vec::new();
-        let mut completion_summary: std::collections::HashMap<String, serde_json::Value> =
-            std::collections::HashMap::new();
-
-        for (eval_type, result, score) in &evaluations {
-            completion_summary.insert(
-                eval_type.clone(),
-                json!({
-                    "result": result,
-                    "score": score.to_string()
-                }),
-            );
-
-            if result == "FAIL" {
-                blocking_issues.push(json!({
-                    "evaluation_type": eval_type,
-                    "issue": format!("{} failed with score {}", eval_type, score)
-                }));
-            }
-        }
-
-        // Check for missing mandatory evaluations
-        let required_evaluations = [
-            "DISCOVERY_COMPLETE",
-            "EVIDENCE_COMPLETE",
-            "VERIFICATION_COMPLETE",
-        ];
-        for req in required_evaluations {
-            if !completion_summary.contains_key(req) {
-                blocking_issues.push(json!({
-                    "evaluation_type": req,
-                    "issue": format!("{} evaluation not yet performed", req)
-                }));
-            }
-        }
-
-        // Get metrics for recommendations
-        let metrics = compute_metrics(pool, cbu_id, case_id).await?;
-
-        let mut recommended_actions: Vec<String> = Vec::new();
-
-        if metrics.ownership_verified_pct.unwrap_or_default() < rust_decimal::Decimal::from(100) {
-            recommended_actions.push("Complete ownership verification".to_string());
-        }
-        if metrics.doc_completeness_pct.unwrap_or_default() < rust_decimal::Decimal::from(100) {
-            recommended_actions.push("Collect outstanding documents".to_string());
-        }
-        if metrics.red_flag_count > 0 {
-            recommended_actions.push(format!(
-                "Resolve {} outstanding red flags",
-                metrics.red_flag_count
-            ));
-        }
-        if metrics.screening_clear_pct.unwrap_or_default() < rust_decimal::Decimal::from(100) {
-            recommended_actions.push("Review pending screening results".to_string());
-        }
-
-        let is_decision_ready = blocking_issues.is_empty() && case_status == "REVIEW";
-
-        Ok(ExecutionResult::Record(json!({
-            "case_id": case_id,
-            "case_status": case_status,
-            "is_decision_ready": is_decision_ready,
-            "blocking_issues": blocking_issues,
-            "completion_summary": completion_summary,
-            "recommended_actions": recommended_actions
-        })))
+        Ok(ExecutionResult::Record(
+            tollgate_decision_readiness_impl(case_id, pool).await?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -517,6 +616,23 @@ impl CustomOperation for TollgateDecisionReadinessOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            tollgate_decision_readiness_impl(case_id, pool).await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

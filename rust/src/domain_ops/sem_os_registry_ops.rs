@@ -129,7 +129,9 @@ impl CustomOperation for RegistryDescribeObjectOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        let object_type = args.get("object-type").or_else(|| args.get("object_type"))
+        let object_type = args
+            .get("object-type")
+            .or_else(|| args.get("object_type"))
             .and_then(|v| v.as_str());
         let tool_name = match object_type {
             Some("verb_contract") | Some("verb") => "sem_reg_describe_verb",
@@ -208,7 +210,9 @@ impl CustomOperation for RegistryListObjectsOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        let object_type = args.get("object-type").or_else(|| args.get("object_type"))
+        let object_type = args
+            .get("object-type")
+            .or_else(|| args.get("object_type"))
             .and_then(|v| v.as_str())
             .unwrap_or("verb_contract");
         let tool_name = match object_type {
@@ -357,6 +361,33 @@ registry_op!(
 #[register_custom_op]
 pub struct RegistryActiveManifestOp;
 
+#[cfg(feature = "database")]
+async fn registry_active_manifest_impl(
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let row: Option<(String, i64)> = sqlx::query_as(
+        "SELECT snapshot_set_id, object_count FROM sem_reg_pub.active_snapshot_set LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    match row {
+        Some((set_id, count)) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "snapshot_set_id": set_id,
+                "object_count": count,
+            }),
+        )),
+        None => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "snapshot_set_id": null,
+                "object_count": 0,
+                "status": "no active manifest"
+            }),
+        )),
+    }
+}
+
 #[async_trait]
 impl CustomOperation for RegistryActiveManifestOp {
     fn domain(&self) -> &'static str {
@@ -376,22 +407,11 @@ impl CustomOperation for RegistryActiveManifestOp {
         _ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let row: Option<(String, i64)> = sqlx::query_as(
-            "SELECT snapshot_set_id, object_count FROM sem_reg_pub.active_snapshot_set LIMIT 1",
-        )
-        .fetch_optional(pool)
-        .await?;
-
-        match row {
-            Some((set_id, count)) => Ok(ExecutionResult::Record(serde_json::json!({
-                "snapshot_set_id": set_id,
-                "object_count": count,
-            }))),
-            None => Ok(ExecutionResult::Record(serde_json::json!({
-                "snapshot_set_id": null,
-                "object_count": 0,
-                "status": "no active manifest"
-            }))),
+        match registry_active_manifest_impl(pool).await? {
+            sem_os_core::execution::VerbExecutionOutcome::Record(value) => {
+                Ok(ExecutionResult::Record(value))
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -404,5 +424,19 @@ impl CustomOperation for RegistryActiveManifestOp {
         Err(anyhow::anyhow!(
             "registry.active-manifest requires database"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        registry_active_manifest_impl(pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

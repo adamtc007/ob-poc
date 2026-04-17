@@ -880,14 +880,16 @@ impl CustomOperation for ViewLayoutOp {
             _ => Metaphor::Tree,
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
-            "layout_mode": mode,
-            "metaphor": format!("{:?}", metaphor),
-            "primary_axis": primary_axis,
-            "size_by": size_by,
-            "color_by": color_by,
-            "message": "Layout configuration updated"
-        })))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "layout_mode": mode,
+                "metaphor": format!("{:?}", metaphor),
+                "primary_axis": primary_axis,
+                "size_by": size_by,
+                "color_by": color_by,
+                "message": "Layout configuration updated"
+            }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1083,11 +1085,13 @@ impl CustomOperation for ViewZoomInOp {
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let node_id = json_extract_uuid(args, ctx, "node-id")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
-            "action": "zoom-in",
-            "node_id": node_id.to_string(),
-            "message": format!("Zoom into node {}. Use session.zoom_in() to execute.", node_id)
-        })))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "action": "zoom-in",
+                "node_id": node_id.to_string(),
+                "message": format!("Zoom into node {}. Use session.zoom_in() to execute.", node_id)
+            }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1150,10 +1154,12 @@ impl CustomOperation for ViewZoomOutOp {
         _ctx: &mut sem_os_core::execution::VerbExecutionContext,
         _pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
-            "action": "zoom-out",
-            "message": "Zoom out to parent taxonomy. Use session.zoom_out() to execute."
-        })))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "action": "zoom-out",
+                "message": "Zoom out to parent taxonomy. Use session.zoom_out() to execute."
+            }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1231,12 +1237,14 @@ impl CustomOperation for ViewBackToOp {
         use super::helpers::{json_extract_int_opt, json_extract_uuid_opt};
         let depth = json_extract_int_opt(args, "depth").map(|i| i as usize);
         let frame_id = json_extract_uuid_opt(args, ctx, "frame-id");
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
-            "action": "navigate-back-to",
-            "depth": depth,
-            "frame_id": frame_id.map(|id| id.to_string()),
-            "message": "Navigate to breadcrumb level. Use session.back_to() to execute."
-        })))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "action": "navigate-back-to",
+                "depth": depth,
+                "frame_id": frame_id.map(|id| id.to_string()),
+                "message": "Navigate to breadcrumb level. Use session.back_to() to execute."
+            }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1300,10 +1308,12 @@ impl CustomOperation for ViewBreadcrumbsOp {
         _ctx: &mut sem_os_core::execution::VerbExecutionContext,
         _pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
-            "action": "read-breadcrumbs",
-            "message": "Get breadcrumbs from session.breadcrumbs() or session.breadcrumbs_with_ids()"
-        })))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "action": "read-breadcrumbs",
+                "message": "Get breadcrumbs from session.breadcrumbs() or session.breadcrumbs_with_ids()"
+            }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {

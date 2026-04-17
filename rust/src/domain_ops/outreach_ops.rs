@@ -182,14 +182,9 @@ impl CustomOperation for OutreachRecordResponseOp {
             .find(|a| a.key == "notes")
             .and_then(|a| a.value.as_string());
 
-        let result = outreach_record_response_impl(
-            request_id,
-            response_type,
-            document_id,
-            notes,
-            pool,
-        )
-        .await?;
+        let result =
+            outreach_record_response_impl(request_id, response_type, document_id, notes, pool)
+                .await?;
 
         Ok(ExecutionResult::Record(result))
     }
@@ -210,7 +205,9 @@ impl CustomOperation for OutreachRecordResponseOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
+        use super::helpers::{
+            json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+        };
 
         let request_id = json_extract_uuid(args, ctx, "request-id")?;
         let response_type = json_extract_string(args, "response-type")?;
@@ -296,7 +293,9 @@ impl CustomOperation for OutreachListOverdueOp {
 
         let days_overdue = json_extract_int_opt(args, "days-overdue").unwrap_or(0) as i32;
         let results = outreach_list_overdue_impl(days_overdue, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(results))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            results,
+        ))
     }
 
     fn is_migrated(&self) -> bool {

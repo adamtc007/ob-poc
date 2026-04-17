@@ -11,7 +11,7 @@
 //! - Bundling by entity with a cap requires aggregation logic
 //! - Must read from determination run coverage_snapshot and cross-reference workstreams
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
@@ -122,6 +122,166 @@ const MAX_ITEMS_PER_PLAN: usize = 8;
 #[register_custom_op]
 pub struct OutreachPlanGenerateOp;
 
+#[cfg(feature = "database")]
+async fn outreach_plan_generate_impl(
+    case_id: Uuid,
+    determination_run_id: Uuid,
+    doc_preference: Option<String>,
+    pool: &PgPool,
+) -> Result<OutreachPlanResult> {
+    let case_exists: Option<(Uuid,)> =
+        sqlx::query_as(r#"SELECT case_id FROM "ob-poc".cases WHERE case_id = $1"#)
+            .bind(case_id)
+            .fetch_optional(pool)
+            .await?;
+
+    if case_exists.is_none() {
+        return Err(anyhow!("Case not found: {}", case_id));
+    }
+
+    #[derive(sqlx::FromRow)]
+    struct DeterminationRow {
+        coverage_snapshot: Option<serde_json::Value>,
+        subject_entity_id: Uuid,
+    }
+
+    let det_run: DeterminationRow = sqlx::query_as(
+        r#"
+        SELECT coverage_snapshot, subject_entity_id
+        FROM "ob-poc".ubo_determination_runs
+        WHERE run_id = $1 AND case_id = $2
+        "#,
+    )
+    .bind(determination_run_id)
+    .bind(case_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| {
+        anyhow!(
+            "Determination run {} not found for case {}",
+            determination_run_id,
+            case_id
+        )
+    })?;
+
+    let gaps = extract_gaps_from_snapshot(&det_run.coverage_snapshot, det_run.subject_entity_id);
+
+    if gaps.is_empty() {
+        let plan_id: (Uuid,) = sqlx::query_as(
+            r#"
+            INSERT INTO "ob-poc".outreach_plans (case_id, determination_run_id, status, total_items)
+            VALUES ($1, $2, 'DRAFT', 0)
+            RETURNING plan_id
+            "#,
+        )
+        .bind(case_id)
+        .bind(determination_run_id)
+        .fetch_one(pool)
+        .await?;
+
+        return Ok(OutreachPlanResult {
+            plan_id: plan_id.0,
+            case_id,
+            items_count: 0,
+            items: vec![],
+        });
+    }
+
+    let use_primary = doc_preference
+        .as_deref()
+        .map(|p| p != "fallback")
+        .unwrap_or(true);
+
+    let mut planned_items: Vec<PlannedItem> = gaps
+        .iter()
+        .map(|gap| {
+            let (primary, fallback) = gap_prong_to_doc_type(&gap.prong);
+            let doc_type = if use_primary { primary } else { fallback };
+            let request_text = build_request_text(&gap.prong, doc_type, &gap.description);
+            let priority = prong_priority(&gap.prong);
+            let gap_ref = format!(
+                "{}:{}",
+                gap.prong,
+                gap.entity_id
+                    .map(|id| id.to_string())
+                    .unwrap_or_else(|| "subject".to_string())
+            );
+
+            PlannedItem {
+                entity_id: gap.entity_id.unwrap_or(det_run.subject_entity_id),
+                prong: gap.prong.clone(),
+                gap_description: gap.description.clone(),
+                doc_type: doc_type.to_string(),
+                request_text,
+                priority,
+                gap_ref,
+            }
+        })
+        .collect();
+
+    planned_items.sort_by(|a, b| {
+        a.priority
+            .cmp(&b.priority)
+            .then(a.entity_id.cmp(&b.entity_id))
+    });
+    planned_items.truncate(MAX_ITEMS_PER_PLAN);
+
+    let items_count = planned_items.len() as i32;
+
+    let plan_id: (Uuid,) = sqlx::query_as(
+        r#"
+        INSERT INTO "ob-poc".outreach_plans (case_id, determination_run_id, status, total_items)
+        VALUES ($1, $2, 'DRAFT', $3)
+        RETURNING plan_id
+        "#,
+    )
+    .bind(case_id)
+    .bind(determination_run_id)
+    .bind(items_count)
+    .fetch_one(pool)
+    .await?;
+
+    let mut result_items: Vec<OutreachPlanItem> = Vec::with_capacity(planned_items.len());
+
+    for item in &planned_items {
+        let item_row: (Uuid, String) = sqlx::query_as(
+            r#"
+            INSERT INTO "ob-poc".outreach_items (
+                plan_id, prong, target_entity_id, gap_description,
+                request_text, doc_type_requested, priority, closes_gap_ref, status
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
+            RETURNING item_id, status
+            "#,
+        )
+        .bind(plan_id.0)
+        .bind(&item.prong)
+        .bind(item.entity_id)
+        .bind(&item.gap_description)
+        .bind(&item.request_text)
+        .bind(&item.doc_type)
+        .bind(item.priority)
+        .bind(&item.gap_ref)
+        .fetch_one(pool)
+        .await?;
+
+        result_items.push(OutreachPlanItem {
+            item_id: item_row.0,
+            entity_id: item.entity_id,
+            gap_ref: item.gap_ref.clone(),
+            doc_type: item.doc_type.clone(),
+            status: item_row.1,
+        });
+    }
+
+    Ok(OutreachPlanResult {
+        plan_id: plan_id.0,
+        case_id,
+        items_count,
+        items: result_items,
+    })
+}
+
 #[async_trait]
 impl CustomOperation for OutreachPlanGenerateOp {
     fn domain(&self) -> &'static str {
@@ -146,196 +306,12 @@ impl CustomOperation for OutreachPlanGenerateOp {
         let case_id = extract_uuid(verb_call, ctx, "case-id")?;
         let determination_run_id = extract_uuid(verb_call, ctx, "determination-run-id")?;
         let doc_preference = extract_string_opt(verb_call, "doc-preference");
-
-        // ---------------------------------------------------------------
-        // 1. Validate case exists
-        // ---------------------------------------------------------------
-        let case_exists: Option<(Uuid,)> =
-            sqlx::query_as(r#"SELECT case_id FROM "ob-poc".cases WHERE case_id = $1"#)
-                .bind(case_id)
-                .fetch_optional(pool)
+        let result =
+            outreach_plan_generate_impl(case_id, determination_run_id, doc_preference, pool)
                 .await?;
 
-        if case_exists.is_none() {
-            return Err(anyhow!("Case not found: {}", case_id));
-        }
-
-        // ---------------------------------------------------------------
-        // 2. Load determination run and its coverage snapshot
-        // ---------------------------------------------------------------
-        #[derive(sqlx::FromRow)]
-        struct DeterminationRow {
-            coverage_snapshot: Option<serde_json::Value>,
-            subject_entity_id: Uuid,
-        }
-
-        let det_run: DeterminationRow = sqlx::query_as(
-            r#"
-            SELECT coverage_snapshot, subject_entity_id
-            FROM "ob-poc".ubo_determination_runs
-            WHERE run_id = $1 AND case_id = $2
-            "#,
-        )
-        .bind(determination_run_id)
-        .bind(case_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| {
-            anyhow!(
-                "Determination run {} not found for case {}",
-                determination_run_id,
-                case_id
-            )
-        })?;
-
-        // ---------------------------------------------------------------
-        // 3. Extract gaps from coverage snapshot
-        // ---------------------------------------------------------------
-        // coverage_snapshot is JSONB with structure like:
-        // { "gaps": [ { "prong": "OWNERSHIP", "entity_id": "...", "description": "..." }, ... ] }
-        // OR it may be stored as a top-level array.
-        let gaps =
-            extract_gaps_from_snapshot(&det_run.coverage_snapshot, det_run.subject_entity_id);
-
-        if gaps.is_empty() {
-            // No gaps found — create an empty plan
-            let plan_id: (Uuid,) = sqlx::query_as(
-                r#"
-                INSERT INTO "ob-poc".outreach_plans (case_id, determination_run_id, status, total_items)
-                VALUES ($1, $2, 'DRAFT', 0)
-                RETURNING plan_id
-                "#,
-            )
-            .bind(case_id)
-            .bind(determination_run_id)
-            .fetch_one(pool)
-            .await?;
-
-            let result = OutreachPlanResult {
-                plan_id: plan_id.0,
-                case_id,
-                items_count: 0,
-                items: vec![],
-            };
-
-            if let Some(binding) = verb_call.binding.as_deref() {
-                ctx.bind(binding, plan_id.0);
-            }
-
-            return Ok(ExecutionResult::Record(serde_json::to_value(result)?));
-        }
-
-        // ---------------------------------------------------------------
-        // 4. Map gaps to outreach items (cap at MAX_ITEMS_PER_PLAN)
-        // ---------------------------------------------------------------
-        let use_primary = doc_preference
-            .as_deref()
-            .map(|p| p != "fallback")
-            .unwrap_or(true);
-
-        let mut planned_items: Vec<PlannedItem> = gaps
-            .iter()
-            .map(|gap| {
-                let (primary, fallback) = gap_prong_to_doc_type(&gap.prong);
-                let doc_type = if use_primary { primary } else { fallback };
-                let request_text = build_request_text(&gap.prong, doc_type, &gap.description);
-                let priority = prong_priority(&gap.prong);
-                let gap_ref = format!(
-                    "{}:{}",
-                    gap.prong,
-                    gap.entity_id
-                        .map(|id| id.to_string())
-                        .unwrap_or_else(|| "subject".to_string())
-                );
-
-                PlannedItem {
-                    entity_id: gap.entity_id.unwrap_or(det_run.subject_entity_id),
-                    prong: gap.prong.clone(),
-                    gap_description: gap.description.clone(),
-                    doc_type: doc_type.to_string(),
-                    request_text,
-                    priority,
-                    gap_ref,
-                }
-            })
-            .collect();
-
-        // Sort by priority (identity first), then by entity for bundling
-        planned_items.sort_by(|a, b| {
-            a.priority
-                .cmp(&b.priority)
-                .then(a.entity_id.cmp(&b.entity_id))
-        });
-
-        // Cap at MAX_ITEMS_PER_PLAN
-        planned_items.truncate(MAX_ITEMS_PER_PLAN);
-
-        let items_count = planned_items.len() as i32;
-
-        // ---------------------------------------------------------------
-        // 5. Insert plan
-        // ---------------------------------------------------------------
-        let plan_id: (Uuid,) = sqlx::query_as(
-            r#"
-            INSERT INTO "ob-poc".outreach_plans (case_id, determination_run_id, status, total_items)
-            VALUES ($1, $2, 'DRAFT', $3)
-            RETURNING plan_id
-            "#,
-        )
-        .bind(case_id)
-        .bind(determination_run_id)
-        .bind(items_count)
-        .fetch_one(pool)
-        .await?;
-
-        // ---------------------------------------------------------------
-        // 6. Insert items
-        // ---------------------------------------------------------------
-        let mut result_items: Vec<OutreachPlanItem> = Vec::with_capacity(planned_items.len());
-
-        for item in &planned_items {
-            let item_row: (Uuid, String) = sqlx::query_as(
-                r#"
-                INSERT INTO "ob-poc".outreach_items (
-                    plan_id, prong, target_entity_id, gap_description,
-                    request_text, doc_type_requested, priority, closes_gap_ref, status
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
-                RETURNING item_id, status
-                "#,
-            )
-            .bind(plan_id.0)
-            .bind(&item.prong)
-            .bind(item.entity_id)
-            .bind(&item.gap_description)
-            .bind(&item.request_text)
-            .bind(&item.doc_type)
-            .bind(item.priority)
-            .bind(&item.gap_ref)
-            .fetch_one(pool)
-            .await?;
-
-            result_items.push(OutreachPlanItem {
-                item_id: item_row.0,
-                entity_id: item.entity_id,
-                gap_ref: item.gap_ref.clone(),
-                doc_type: item.doc_type.clone(),
-                status: item_row.1,
-            });
-        }
-
-        // ---------------------------------------------------------------
-        // 7. Build result
-        // ---------------------------------------------------------------
-        let result = OutreachPlanResult {
-            plan_id: plan_id.0,
-            case_id,
-            items_count,
-            items: result_items,
-        };
-
         if let Some(binding) = verb_call.binding.as_deref() {
-            ctx.bind(binding, plan_id.0);
+            ctx.bind(binding, result.plan_id);
         }
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
@@ -348,6 +324,31 @@ impl CustomOperation for OutreachPlanGenerateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let determination_run_id = json_extract_uuid(args, ctx, "determination-run-id")?;
+        let doc_preference = json_extract_string_opt(args, "doc-preference");
+        let result =
+            outreach_plan_generate_impl(case_id, determination_run_id, doc_preference, pool)
+                .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

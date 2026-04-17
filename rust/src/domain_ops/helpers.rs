@@ -233,13 +233,14 @@ pub async fn resolve_cbu_id(
 
 /// Extract a required string from JSON args.
 pub fn json_extract_string(args: &serde_json::Value, arg_name: &str) -> Result<String> {
-    json_extract_string_opt(args, arg_name)
-        .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
+    json_extract_string_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
 /// Extract an optional string from JSON args.
 pub fn json_extract_string_opt(args: &serde_json::Value, arg_name: &str) -> Option<String> {
-    args.get(arg_name).and_then(|v| v.as_str()).map(|s| s.to_string())
+    args.get(arg_name)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 /// Extract a required UUID from JSON args + context symbols.
@@ -286,8 +287,7 @@ pub fn json_extract_bool_opt(args: &serde_json::Value, arg_name: &str) -> Option
 
 /// Extract a required boolean from JSON args.
 pub fn json_extract_bool(args: &serde_json::Value, arg_name: &str) -> Result<bool> {
-    json_extract_bool_opt(args, arg_name)
-        .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
+    json_extract_bool_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
 /// Extract an optional integer from JSON args.
@@ -297,15 +297,19 @@ pub fn json_extract_int_opt(args: &serde_json::Value, arg_name: &str) -> Option<
 
 /// Extract a required integer from JSON args.
 pub fn json_extract_int(args: &serde_json::Value, arg_name: &str) -> Result<i64> {
-    json_extract_int_opt(args, arg_name)
-        .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
+    json_extract_int_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
 /// Extract an optional string list from JSON args.
-pub fn json_extract_string_list_opt(args: &serde_json::Value, arg_name: &str) -> Option<Vec<String>> {
-    args.get(arg_name)
-        .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+pub fn json_extract_string_list_opt(
+    args: &serde_json::Value,
+    arg_name: &str,
+) -> Option<Vec<String>> {
+    args.get(arg_name).and_then(|v| v.as_array()).map(|arr| {
+        arr.iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect()
+    })
 }
 
 /// Extract a required string list from JSON args.
@@ -496,7 +500,10 @@ mod tests {
     #[test]
     fn json_extract_string_opt_present() {
         let args = serde_json::json!({"name": "Test"});
-        assert_eq!(json_extract_string_opt(&args, "name"), Some("Test".to_string()));
+        assert_eq!(
+            json_extract_string_opt(&args, "name"),
+            Some("Test".to_string())
+        );
     }
 
     #[test]
@@ -557,7 +564,10 @@ mod tests {
     #[test]
     fn json_extract_string_list_present() {
         let args = serde_json::json!({"tags": ["a", "b", "c"]});
-        assert_eq!(json_extract_string_list(&args, "tags").unwrap(), vec!["a", "b", "c"]);
+        assert_eq!(
+            json_extract_string_list(&args, "tags").unwrap(),
+            vec!["a", "b", "c"]
+        );
     }
 
     #[test]

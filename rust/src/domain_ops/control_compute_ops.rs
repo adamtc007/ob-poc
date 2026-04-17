@@ -17,7 +17,7 @@
 //! - 3: SPECIAL_RIGHTS (veto, golden share)
 //! - 4: OFFICER (bridged from cbu_entity_roles)
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
@@ -103,6 +103,174 @@ fn officer_basis(role_type: &str) -> String {
 #[register_custom_op]
 pub struct ControlComputeOp;
 
+#[cfg(feature = "database")]
+async fn control_compute_impl(
+    case_id: Uuid,
+    entity_id_filter: Option<Uuid>,
+    pool: &PgPool,
+) -> Result<ControlComputeResult> {
+    // ------------------------------------------------------------------
+    // 2. Load CONTROL / MANAGEMENT / BOARD_APPOINTMENT / SPECIAL_RIGHTS
+    //    edges for entities linked to this case.
+    // ------------------------------------------------------------------
+    let control_edges: Vec<(Uuid, Uuid, String, Option<f32>, Option<String>)> =
+        if let Some(eid) = entity_id_filter {
+            sqlx::query_as(
+                r#"SELECT er.from_entity_id, er.to_entity_id, er.relationship_type,
+                          er.confidence, er.evidence_hint
+                   FROM "ob-poc".entity_relationships er
+                   JOIN "ob-poc".entity_workstreams ew ON er.to_entity_id = ew.entity_id
+                   WHERE ew.case_id = $1
+                     AND er.to_entity_id = $2
+                     AND er.relationship_type IN (
+                         'CONTROL', 'MANAGEMENT', 'BOARD_APPOINTMENT', 'SPECIAL_RIGHTS'
+                     )
+                     AND er.effective_to IS NULL
+                   ORDER BY er.relationship_type, er.confidence DESC"#,
+            )
+            .bind(case_id)
+            .bind(eid)
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_as(
+                r#"SELECT er.from_entity_id, er.to_entity_id, er.relationship_type,
+                          er.confidence, er.evidence_hint
+                   FROM "ob-poc".entity_relationships er
+                   JOIN "ob-poc".entity_workstreams ew ON er.to_entity_id = ew.entity_id
+                   WHERE ew.case_id = $1
+                     AND er.relationship_type IN (
+                         'CONTROL', 'MANAGEMENT', 'BOARD_APPOINTMENT', 'SPECIAL_RIGHTS'
+                     )
+                     AND er.effective_to IS NULL
+                   ORDER BY er.relationship_type, er.confidence DESC"#,
+            )
+            .bind(case_id)
+            .fetch_all(pool)
+            .await?
+        };
+
+    // ------------------------------------------------------------------
+    // 3. Convert edges to ControllerRecords with priority classification
+    // ------------------------------------------------------------------
+    let mut controllers: Vec<ControllerRecord> = Vec::new();
+
+    for (from_entity_id, _to_entity_id, relationship_type, confidence, evidence_hint) in
+        &control_edges
+    {
+        let (priority, control_type) = classify_relationship(relationship_type);
+
+        let basis = format!(
+            "{}{}{}",
+            relationship_type,
+            confidence
+                .map(|c| format!(" (confidence: {:.2})", c))
+                .unwrap_or_default(),
+            evidence_hint
+                .as_deref()
+                .map(|h| format!(" -- {}", h))
+                .unwrap_or_default(),
+        );
+
+        controllers.push(ControllerRecord {
+            controller_entity_id: *from_entity_id,
+            control_type: control_type.to_string(),
+            basis,
+            priority,
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // 4. Bridge to cbu_entity_roles for officer roles
+    // ------------------------------------------------------------------
+    let officer_rows: Vec<(Uuid, String, Uuid)> = if let Some(eid) = entity_id_filter {
+        sqlx::query_as(
+            r#"SELECT cer.entity_id, cer.role_type, cer.cbu_id
+               FROM "ob-poc".cbu_entity_roles cer
+               JOIN "ob-poc".entity_workstreams ew ON cer.entity_id = ew.entity_id
+               WHERE ew.case_id = $1
+                 AND cer.entity_id = $2
+                 AND cer.role_type IN (
+                     'DIRECTOR', 'OFFICER', 'SECRETARY', 'COMPLIANCE_OFFICER'
+                 )"#,
+        )
+        .bind(case_id)
+        .bind(eid)
+        .fetch_all(pool)
+        .await?
+    } else {
+        sqlx::query_as(
+            r#"SELECT cer.entity_id, cer.role_type, cer.cbu_id
+               FROM "ob-poc".cbu_entity_roles cer
+               JOIN "ob-poc".entity_workstreams ew ON cer.entity_id = ew.entity_id
+               WHERE ew.case_id = $1
+                 AND cer.role_type IN (
+                     'DIRECTOR', 'OFFICER', 'SECRETARY', 'COMPLIANCE_OFFICER'
+                 )"#,
+        )
+        .bind(case_id)
+        .fetch_all(pool)
+        .await?
+    };
+
+    for (entity_id, role_type, _cbu_id) in &officer_rows {
+        controllers.push(ControllerRecord {
+            controller_entity_id: *entity_id,
+            control_type: "OFFICER".to_string(),
+            basis: officer_basis(role_type),
+            priority: PRIORITY_OFFICER,
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // 5. Sort by priority (ascending = highest priority first),
+    //    then by controller_entity_id for deterministic output.
+    // ------------------------------------------------------------------
+    controllers.sort_by(|a, b| {
+        a.priority
+            .cmp(&b.priority)
+            .then_with(|| a.controller_entity_id.cmp(&b.controller_entity_id))
+    });
+
+    let governance_controller_identified = !controllers.is_empty();
+
+    // ------------------------------------------------------------------
+    // 6. Determine the target entity_id for the result.
+    //    If a filter was provided, use it; otherwise use the first entity
+    //    from the case workstreams.
+    // ------------------------------------------------------------------
+    let result_entity_id = if let Some(eid) = entity_id_filter {
+        eid
+    } else {
+        let first_entity: Option<(Uuid,)> = sqlx::query_as(
+            r#"SELECT entity_id FROM "ob-poc".entity_workstreams
+               WHERE case_id = $1 ORDER BY entity_id LIMIT 1"#,
+        )
+        .bind(case_id)
+        .fetch_optional(pool)
+        .await?;
+
+        first_entity
+            .map(|(eid,)| eid)
+            .ok_or_else(|| anyhow!("No entity workstreams found for case {}", case_id))?
+    };
+
+    tracing::info!(
+        "control.compute-controllers: case={} entity={} controllers_found={} governance={}",
+        case_id,
+        result_entity_id,
+        controllers.len(),
+        governance_controller_identified,
+    );
+
+    Ok(ControlComputeResult {
+        case_id,
+        entity_id: result_entity_id,
+        controllers,
+        governance_controller_identified,
+    })
+}
+
 #[async_trait]
 impl CustomOperation for ControlComputeOp {
     fn domain(&self) -> &'static str {
@@ -127,179 +295,9 @@ impl CustomOperation for ControlComputeOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        // ------------------------------------------------------------------
-        // 1. Extract arguments
-        // ------------------------------------------------------------------
         let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-
-        // Optional entity-id to narrow scope to a single entity within the case.
-        // When omitted, all entities in the case are considered as targets.
         let entity_id_filter = extract_uuid_opt(verb_call, ctx, "entity-id");
-
-        // ------------------------------------------------------------------
-        // 2. Load CONTROL / MANAGEMENT / BOARD_APPOINTMENT / SPECIAL_RIGHTS
-        //    edges for entities linked to this case.
-        // ------------------------------------------------------------------
-        let control_edges: Vec<(Uuid, Uuid, String, Option<f32>, Option<String>)> =
-            if let Some(eid) = entity_id_filter {
-                sqlx::query_as(
-                    r#"SELECT er.from_entity_id, er.to_entity_id, er.relationship_type,
-                              er.confidence, er.evidence_hint
-                       FROM "ob-poc".entity_relationships er
-                       JOIN "ob-poc".entity_workstreams ew ON er.to_entity_id = ew.entity_id
-                       WHERE ew.case_id = $1
-                         AND er.to_entity_id = $2
-                         AND er.relationship_type IN (
-                             'CONTROL', 'MANAGEMENT', 'BOARD_APPOINTMENT', 'SPECIAL_RIGHTS'
-                         )
-                         AND er.effective_to IS NULL
-                       ORDER BY er.relationship_type, er.confidence DESC"#,
-                )
-                .bind(case_id)
-                .bind(eid)
-                .fetch_all(pool)
-                .await?
-            } else {
-                sqlx::query_as(
-                    r#"SELECT er.from_entity_id, er.to_entity_id, er.relationship_type,
-                              er.confidence, er.evidence_hint
-                       FROM "ob-poc".entity_relationships er
-                       JOIN "ob-poc".entity_workstreams ew ON er.to_entity_id = ew.entity_id
-                       WHERE ew.case_id = $1
-                         AND er.relationship_type IN (
-                             'CONTROL', 'MANAGEMENT', 'BOARD_APPOINTMENT', 'SPECIAL_RIGHTS'
-                         )
-                         AND er.effective_to IS NULL
-                       ORDER BY er.relationship_type, er.confidence DESC"#,
-                )
-                .bind(case_id)
-                .fetch_all(pool)
-                .await?
-            };
-
-        // ------------------------------------------------------------------
-        // 3. Convert edges to ControllerRecords with priority classification
-        // ------------------------------------------------------------------
-        let mut controllers: Vec<ControllerRecord> = Vec::new();
-
-        for (from_entity_id, _to_entity_id, relationship_type, confidence, evidence_hint) in
-            &control_edges
-        {
-            let (priority, control_type) = classify_relationship(relationship_type);
-
-            let basis = format!(
-                "{}{}{}",
-                relationship_type,
-                confidence
-                    .map(|c| format!(" (confidence: {:.2})", c))
-                    .unwrap_or_default(),
-                evidence_hint
-                    .as_deref()
-                    .map(|h| format!(" — {}", h))
-                    .unwrap_or_default(),
-            );
-
-            controllers.push(ControllerRecord {
-                controller_entity_id: *from_entity_id,
-                control_type: control_type.to_string(),
-                basis,
-                priority,
-            });
-        }
-
-        // ------------------------------------------------------------------
-        // 4. Bridge to cbu_entity_roles for officer roles
-        // ------------------------------------------------------------------
-        let officer_rows: Vec<(Uuid, String, Uuid)> = if let Some(eid) = entity_id_filter {
-            sqlx::query_as(
-                r#"SELECT cer.entity_id, cer.role_type, cer.cbu_id
-                   FROM "ob-poc".cbu_entity_roles cer
-                   JOIN "ob-poc".entity_workstreams ew ON cer.entity_id = ew.entity_id
-                   WHERE ew.case_id = $1
-                     AND cer.entity_id = $2
-                     AND cer.role_type IN (
-                         'DIRECTOR', 'OFFICER', 'SECRETARY', 'COMPLIANCE_OFFICER'
-                     )"#,
-            )
-            .bind(case_id)
-            .bind(eid)
-            .fetch_all(pool)
-            .await?
-        } else {
-            sqlx::query_as(
-                r#"SELECT cer.entity_id, cer.role_type, cer.cbu_id
-                   FROM "ob-poc".cbu_entity_roles cer
-                   JOIN "ob-poc".entity_workstreams ew ON cer.entity_id = ew.entity_id
-                   WHERE ew.case_id = $1
-                     AND cer.role_type IN (
-                         'DIRECTOR', 'OFFICER', 'SECRETARY', 'COMPLIANCE_OFFICER'
-                     )"#,
-            )
-            .bind(case_id)
-            .fetch_all(pool)
-            .await?
-        };
-
-        for (entity_id, role_type, _cbu_id) in &officer_rows {
-            controllers.push(ControllerRecord {
-                controller_entity_id: *entity_id,
-                control_type: "OFFICER".to_string(),
-                basis: officer_basis(role_type),
-                priority: PRIORITY_OFFICER,
-            });
-        }
-
-        // ------------------------------------------------------------------
-        // 5. Sort by priority (ascending = highest priority first),
-        //    then by controller_entity_id for deterministic output.
-        // ------------------------------------------------------------------
-        controllers.sort_by(|a, b| {
-            a.priority
-                .cmp(&b.priority)
-                .then_with(|| a.controller_entity_id.cmp(&b.controller_entity_id))
-        });
-
-        let governance_controller_identified = !controllers.is_empty();
-
-        // ------------------------------------------------------------------
-        // 6. Determine the target entity_id for the result.
-        //    If a filter was provided, use it; otherwise use the first entity
-        //    from the case workstreams.
-        // ------------------------------------------------------------------
-        let result_entity_id = if let Some(eid) = entity_id_filter {
-            eid
-        } else {
-            let first_entity: Option<(Uuid,)> = sqlx::query_as(
-                r#"SELECT entity_id FROM "ob-poc".entity_workstreams
-                   WHERE case_id = $1 ORDER BY entity_id LIMIT 1"#,
-            )
-            .bind(case_id)
-            .fetch_optional(pool)
-            .await?;
-
-            first_entity
-                .map(|(eid,)| eid)
-                .ok_or_else(|| anyhow!("No entity workstreams found for case {}", case_id))?
-        };
-
-        // ------------------------------------------------------------------
-        // 7. Build and return typed result
-        // ------------------------------------------------------------------
-        tracing::info!(
-            "control.compute-controllers: case={} entity={} controllers_found={} governance={}",
-            case_id,
-            result_entity_id,
-            controllers.len(),
-            governance_controller_identified,
-        );
-
-        let result = ControlComputeResult {
-            case_id,
-            entity_id: result_entity_id,
-            controllers,
-            governance_controller_identified,
-        };
-
+        let result = control_compute_impl(case_id, entity_id_filter, pool).await?;
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
@@ -315,6 +313,27 @@ impl CustomOperation for ControlComputeOp {
             "controllers": [],
             "governance_controller_identified": false
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_uuid, json_extract_uuid_opt};
+
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let entity_id_filter = json_extract_uuid_opt(args, ctx, "entity-id");
+        let result = control_compute_impl(case_id, entity_id_filter, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

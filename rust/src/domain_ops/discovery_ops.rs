@@ -2095,6 +2095,35 @@ impl CustomOperation for DiscoverySearchEntitiesOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{
+            json_extract_bool_opt, json_extract_int_opt, json_extract_string,
+            json_extract_string_list_opt,
+        };
+        let query = json_extract_string(args, "query")?;
+        let entity_types = json_extract_string_list_opt(args, "entity-types").unwrap_or_default();
+        let max_results = json_extract_int_opt(args, "max-results").unwrap_or(10) as i32;
+        let include_inactive = json_extract_bool_opt(args, "include-inactive").unwrap_or(false);
+        let results = search_entities_internal(pool, &query, &entity_types, max_results).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "query": query, "entity_types": entity_types,
+                "include_inactive": include_inactive,
+                "total_matches": results.len(), "results": results,
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2135,6 +2164,25 @@ impl CustomOperation for DiscoveryEntityContextOp {
         Ok(ExecutionResult::Record(
             build_entity_context_record(pool, entity_id, include_completed).await?,
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_bool_opt, json_extract_uuid};
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let include_completed = json_extract_bool_opt(args, "include-completed").unwrap_or(false);
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            build_entity_context_record(pool, entity_id, include_completed).await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -2179,6 +2227,30 @@ impl CustomOperation for DiscoveryEntityRelationshipsOp {
             build_entity_relationships_record(pool, entity_id, &relationship_types, max_depth)
                 .await?,
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{
+            json_extract_int_opt, json_extract_string_list_opt, json_extract_uuid,
+        };
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let relationship_types =
+            json_extract_string_list_opt(args, "relationship-types").unwrap_or_default();
+        let max_depth = json_extract_int_opt(args, "max-depth").unwrap_or(2) as i32;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            build_entity_relationships_record(pool, entity_id, &relationship_types, max_depth)
+                .await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -2269,6 +2341,67 @@ impl CustomOperation for DiscoveryCascadeResearchOp {
             "total_entity_matches": entities.len(),
             "entities": entities,
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_bool_opt, json_extract_int_opt, json_extract_string};
+        let query = json_extract_string(args, "query")?;
+        let top_n = json_extract_int_opt(args, "top-n").unwrap_or(3) as i32;
+        let include_relationships =
+            json_extract_bool_opt(args, "include-relationships").unwrap_or(true);
+        let results = search_entities_internal(pool, &query, &[], top_n).await?;
+        let mut entities = Vec::new();
+        for hit in results {
+            let entity_id = hit
+                .get("entity_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok());
+            let context = match entity_id {
+                Some(id) => Some(build_entity_context_record(pool, id, false).await?),
+                None => None,
+            };
+            let relationships = if include_relationships {
+                match entity_id {
+                    Some(id) => Some(build_entity_relationships_record(pool, id, &[], 1).await?),
+                    None => None,
+                }
+            } else {
+                None
+            };
+            entities.push(json!({
+                "entity_id": hit["entity_id"].clone(),
+                "entity_type": hit["entity_type"].clone(),
+                "name": hit["name"].clone(),
+                "aliases": hit["aliases"].clone(),
+                "match_score": hit["match_score"].clone(),
+                "match_field": hit["match_field"].clone(),
+                "linked_cbu_ids": hit["linked_cbu_ids"].clone(),
+                "is_onboarding_member": hit["is_onboarding_member"].clone(),
+                "candidate_for_cbu": hit["candidate_for_cbu"].clone(),
+                "lifecycle_populated": hit["lifecycle_populated"].clone(),
+                "linked_entity_count": hit["linked_entity_count"].clone(),
+                "has_active_workflow": hit["has_active_workflow"].clone(),
+                "context": context,
+                "relationships": relationships,
+                "signals": context.as_ref().map(|c| c["signals"].clone()).unwrap_or(Value::Null),
+                "likely_intents": [json!({"intent": "inspect-current-state", "confidence": "medium", "reason": "Discovery returned grounded entity context and available relationship state"})],
+            }));
+        }
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "query": query, "total_entity_matches": entities.len(), "entities": entities,
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -2366,6 +2499,68 @@ impl CustomOperation for DiscoveryAvailableActionsOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt};
+        let domain = json_extract_string(args, "domain")?;
+        let entity_type = json_extract_string(args, "entity-type")?;
+        let aspect = json_extract_string_opt(args, "aspect");
+        let polarity =
+            json_extract_string_opt(args, "polarity").unwrap_or_else(|| "all".to_string());
+
+        let verbs = ConfigLoader::from_env().load_verbs()?;
+        let domain_config: &DomainConfig = verbs
+            .domains
+            .get(&domain)
+            .ok_or_else(|| anyhow!("Unknown domain: {}", domain))?;
+        let mut groups: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+        for (verb_name, config) in &domain_config.verbs {
+            let verb_polarity = infer_polarity(config.metadata.as_ref());
+            if polarity != "all" && polarity != verb_polarity {
+                continue;
+            }
+            if !matches_subject_kind(config.metadata.as_ref(), &entity_type) {
+                continue;
+            }
+            if !matches_aspect(config.metadata.as_ref(), aspect.as_deref()) {
+                continue;
+            }
+            let group_key = config
+                .metadata
+                .as_ref()
+                .and_then(|m| m.phase_tags.first().cloned())
+                .or_else(|| aspect.clone())
+                .unwrap_or_else(|| "general".to_string());
+            groups.entry(group_key).or_default().push(json!({
+                "verb_id": format!("{}.{}", domain, verb_name),
+                "name": verb_name, "description": config.description,
+                "polarity": verb_polarity,
+                "parameters": config.args.iter().map(param_summary).collect::<Vec<_>>(),
+                "preconditions": Value::Null, "governance_status": governance_status(config),
+            }));
+        }
+        let groups_json: Vec<Value> = groups
+            .into_iter()
+            .map(|(aspect_name, verbs)| json!({"aspect": aspect_name, "verbs": verbs}))
+            .collect();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "domain": domain, "entity_type": entity_type,
+                "total_verbs": groups_json.iter().map(|g| g["verbs"].as_array().map(|a| a.len()).unwrap_or(0)).sum::<usize>(),
+                "groups": groups_json,
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2441,6 +2636,10 @@ impl CustomOperation for DiscoveryVerbDetailOp {
                 "sem_reg_surface": sem_reg_surface,
             }
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -2574,6 +2773,96 @@ impl CustomOperation for DiscoveryValidTransitionsOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{
+            json_extract_bool_opt, json_extract_string_list_opt, json_extract_uuid,
+        };
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let include_blocked = json_extract_bool_opt(args, "include-blocked").unwrap_or(true);
+        let lanes = json_extract_string_list_opt(args, "lanes").unwrap_or_default();
+        let context = build_entity_context_record(pool, entity_id, true).await?;
+        let entity_type = context["entity_type"]
+            .as_str()
+            .unwrap_or("entity")
+            .to_string();
+        let entity_name = context["name"].as_str().unwrap_or("unknown").to_string();
+        let verbs = ConfigLoader::from_env().load_verbs()?;
+
+        let mut grouped_valid: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+        let mut blocked = Vec::new();
+        for (domain_name, domain) in &verbs.domains {
+            if domain_name == "discovery" {
+                continue;
+            }
+            for (verb_name, config) in &domain.verbs {
+                if !matches_subject_kind(config.metadata.as_ref(), &entity_type) {
+                    continue;
+                }
+                if !matches_lane_filter(config, domain_name, &lanes) {
+                    continue;
+                }
+                let unmet = evaluate_preconditions(config, &context);
+                let lane = lane_for_verb(domain_name, config);
+                let verb_id = format!("{}.{}", domain_name, verb_name);
+                if unmet.is_empty() {
+                    grouped_valid.entry(lane.clone()).or_default().push(json!({
+                        "verb_id": verb_id, "description": config.description,
+                        "polarity": infer_polarity(config.metadata.as_ref()),
+                        "invocation_phrases": config.invocation_phrases,
+                        "enables": Value::Array(vec![]),
+                        "parameters": config.args.iter().map(param_summary).collect::<Vec<_>>(),
+                        "phase_tags": config.metadata.as_ref().map(|m| m.phase_tags.clone()).unwrap_or_default(),
+                        "relevance": compute_relevance(domain_name, config, &context),
+                    }));
+                } else if include_blocked {
+                    blocked.push(json!({
+                        "verb_id": verb_id, "description": config.description,
+                        "unmet_preconditions": unmet,
+                        "unblocking_actions": derive_unblocking_actions(&evaluate_preconditions(config, &context)),
+                    }));
+                }
+            }
+        }
+        let mut lanes_json = grouped_valid.into_iter().map(|(lane, mut valid)| {
+            valid.sort_by(|left, right| right["relevance"].as_f64().partial_cmp(&left["relevance"].as_f64()).unwrap_or(std::cmp::Ordering::Equal));
+            json!({"lane": lane.clone(), "current_phase": current_phase_for_lane(&context, &lane), "valid": valid})
+        }).collect::<Vec<_>>();
+        lanes_json.sort_by(|left, right| left["lane"].as_str().cmp(&right["lane"].as_str()));
+        blocked.sort_by(|left, right| left["verb_id"].as_str().cmp(&right["verb_id"].as_str()));
+        let suggested_next = lanes_json
+            .iter()
+            .flat_map(|lane| lane["valid"].as_array().into_iter().flatten())
+            .max_by(|left, right| {
+                left["relevance"]
+                    .as_f64()
+                    .partial_cmp(&right["relevance"].as_f64())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .and_then(|best| best["verb_id"].as_str().map(str::to_string));
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "entity_id": entity_id, "entity_type": entity_type, "entity_name": entity_name,
+                "lanes": lanes_json, "blocked": blocked,
+                "summary": {
+                    "total_valid": lanes_json.iter().map(|lane| lane["valid"].as_array().map(|items| items.len()).unwrap_or(0)).sum::<usize>(),
+                    "total_blocked": blocked.len(),
+                    "suggested_next": suggested_next,
+                }
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2679,6 +2968,82 @@ impl CustomOperation for DiscoveryGraphWalkOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_bool_opt, json_extract_uuid};
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let include_blocked = json_extract_bool_opt(args, "include-blocked").unwrap_or(true);
+        let context = build_entity_context_record(pool, entity_id, true).await?;
+        let entity_type = context["entity_type"].as_str().unwrap_or("entity");
+
+        let graphs = load_state_graphs()?;
+        validate_graphs(&graphs)?;
+        let applicable = graphs
+            .into_iter()
+            .filter(|graph| {
+                graph.entity_types.is_empty()
+                    || graph
+                        .entity_types
+                        .iter()
+                        .any(|candidate| entity_kind_matches(candidate, entity_type))
+            })
+            .collect::<Vec<_>>();
+
+        let mut valid = BTreeMap::<String, Value>::new();
+        let mut blocked_map = BTreeMap::<String, Value>::new();
+        let mut satisfied_nodes = BTreeSet::new();
+        let mut frontier_nodes = BTreeSet::new();
+        let mut gate_status = Vec::new();
+        let mut graph_ids = Vec::new();
+        for graph in applicable {
+            let result = walk_graph(&graph, &context)?;
+            graph_ids.push(result.graph_id.clone());
+            satisfied_nodes.extend(result.satisfied_nodes);
+            frontier_nodes.extend(result.frontier_nodes);
+            gate_status.extend(
+                result
+                    .gate_status
+                    .into_iter()
+                    .map(|status| serde_json::to_value(status).unwrap_or(Value::Null)),
+            );
+            for verb in result.valid_verbs {
+                valid
+                    .entry(verb.verb_id.clone())
+                    .or_insert_with(|| serde_json::to_value(verb).unwrap_or(Value::Null));
+            }
+            if include_blocked {
+                for verb in result.blocked_verbs {
+                    blocked_map
+                        .entry(verb.verb_id.clone())
+                        .or_insert_with(|| serde_json::to_value(verb).unwrap_or(Value::Null));
+                }
+            }
+        }
+        let valid_verbs = valid.into_values().collect::<Vec<_>>();
+        let blocked_verbs = blocked_map.into_values().collect::<Vec<_>>();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "entity_id": entity_id, "entity_type": entity_type,
+                "entity_name": context["name"].as_str().unwrap_or("unknown"),
+                "graph_ids": graph_ids,
+                "satisfied_nodes": satisfied_nodes.into_iter().collect::<Vec<_>>(),
+                "frontier_nodes": frontier_nodes.into_iter().collect::<Vec<_>>(),
+                "valid_verbs": valid_verbs, "blocked_verbs": blocked_verbs,
+                "gate_status": gate_status,
+                "summary": {"total_valid": valid_verbs.len(), "total_blocked": blocked_verbs.len()}
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2758,6 +3123,53 @@ impl CustomOperation for DiscoveryInspectDataOp {
                 "notable_gaps": [],
             }
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let domain = json_extract_string(args, "domain")?;
+        let aspect = json_extract_string_opt(args, "aspect");
+        let depth = json_extract_string_opt(args, "depth").unwrap_or_else(|| "summary".to_string());
+        let context = build_entity_context_record(pool, entity_id, false).await?;
+        let entity_type = context["entity_type"]
+            .as_str()
+            .unwrap_or("entity")
+            .to_string();
+
+        let verbs = ConfigLoader::from_env().load_verbs()?;
+        let action_count = verbs
+            .domains
+            .get(&domain)
+            .map(|d| {
+                d.verbs
+                    .values()
+                    .filter(|cfg| matches_subject_kind(cfg.metadata.as_ref(), &entity_type))
+                    .filter(|cfg| matches_aspect(cfg.metadata.as_ref(), aspect.as_deref()))
+                    .count()
+            })
+            .unwrap_or(0);
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "entity_id": entity_id, "entity_type": entity_type,
+                "domain": domain, "aspect": aspect,
+                "snapshot_at": chrono::Utc::now(),
+                "data": {"entity_context": context, "available_action_count": action_count, "depth": depth},
+                "summary": {"record_count": 1, "complete_count": if depth == "detail" { 1 } else { 0 },
+                    "incomplete_count": 0, "blocked_count": 0, "last_modified": Value::Null, "notable_gaps": []}
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -2850,6 +3262,10 @@ impl CustomOperation for DiscoverySearchDataOp {
             "total_matches": filtered_results.len(),
             "results": filtered_results,
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]

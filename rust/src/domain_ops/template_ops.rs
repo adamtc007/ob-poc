@@ -4,7 +4,7 @@
 //! - `template.invoke` - Single template invocation within DSL
 //! - `template.batch` - Batch template execution over query results
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use std::collections::HashMap;
@@ -54,6 +54,89 @@ pub struct TemplateInvokeResult {
 #[register_custom_op]
 pub struct TemplateInvokeOp;
 
+#[cfg(feature = "database")]
+async fn template_invoke_impl(
+    template_id: String,
+    explicit_params: HashMap<String, String>,
+    ctx: &mut ExecutionContext,
+    pool: &PgPool,
+) -> Result<TemplateInvokeResult> {
+    let registry = runtime_registry();
+    let template = registry
+        .get_template(&template_id)
+        .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
+
+    let exp_ctx = ExpansionContext {
+        current_cbu: ctx.resolve("cbu"),
+        current_case: ctx.resolve("case"),
+        bindings: ctx.all_bindings_as_strings(),
+        binding_types: ctx.effective_symbol_types(),
+    };
+
+    let expansion = TemplateExpander::expand(template, &explicit_params, &exp_ctx);
+
+    if !expansion.missing_params.is_empty() {
+        let missing_names: Vec<String> = expansion
+            .missing_params
+            .iter()
+            .map(|p| p.name.clone())
+            .collect();
+        return Err(anyhow!(
+            "Template '{}' missing required params: {}",
+            template_id,
+            missing_names.join(", ")
+        ));
+    }
+
+    tracing::debug!(
+        "template.invoke: expanded '{}' to {} bytes DSL",
+        template_id,
+        expansion.dsl.len()
+    );
+
+    let program = crate::dsl_v2::parser::parse_program(&expansion.dsl)
+        .map_err(|e| anyhow!("Template '{}' parse error: {}", template_id, e))?;
+    let plan = crate::dsl_v2::execution_plan::compile(&program)
+        .map_err(|e| anyhow!("Template '{}' compile error: {:?}", template_id, e))?;
+
+    tracing::debug!(
+        "template.invoke: compiled {} statements from '{}'",
+        plan.steps.len(),
+        template_id
+    );
+
+    let executor = DslExecutor::new(pool.clone());
+    let results = executor.execute_plan(&plan, ctx).await?;
+
+    let mut outputs: HashMap<String, Uuid> = HashMap::new();
+    for output_name in &expansion.outputs {
+        if let Some(pk) = ctx.resolve(output_name) {
+            outputs.insert(output_name.clone(), pk);
+        }
+    }
+
+    let primary_entity_id = template
+        .primary_entity_param()
+        .and_then(|param_name| ctx.resolve(param_name))
+        .or_else(|| outputs.values().next().copied());
+
+    let result = TemplateInvokeResult {
+        template_id: template_id.to_string(),
+        statements_executed: results.len(),
+        outputs,
+        primary_entity_id,
+    };
+
+    tracing::info!(
+        "template.invoke: '{}' completed, {} statements, primary={:?}",
+        result.template_id,
+        result.statements_executed,
+        result.primary_entity_id
+    );
+
+    Ok(result)
+}
+
 #[async_trait]
 impl CustomOperation for TemplateInvokeOp {
     fn domain(&self) -> &'static str {
@@ -75,100 +158,15 @@ impl CustomOperation for TemplateInvokeOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        // Extract :id argument (template ID)
         let template_id = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "id")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow!("Missing :id argument for template.invoke"))?;
-
-        // Extract :params map (explicit parameters)
         let explicit_params = extract_params_map(verb_call, ctx)?;
-
-        // Get template from registry
-        let registry = runtime_registry();
-        let template = registry
-            .get_template(template_id)
-            .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
-
-        // Build expansion context from current execution context
-        let exp_ctx = ExpansionContext {
-            current_cbu: ctx.resolve("cbu"),
-            current_case: ctx.resolve("case"),
-            bindings: ctx.all_bindings_as_strings(),
-            binding_types: ctx.effective_symbol_types(),
-        };
-
-        // Expand template
-        let expansion = TemplateExpander::expand(template, &explicit_params, &exp_ctx);
-
-        // Check for missing required params
-        if !expansion.missing_params.is_empty() {
-            let missing_names: Vec<String> = expansion
-                .missing_params
-                .iter()
-                .map(|p| p.name.clone())
-                .collect();
-            return Err(anyhow!(
-                "Template '{}' missing required params: {}",
-                template_id,
-                missing_names.join(", ")
-            ));
-        }
-
-        tracing::debug!(
-            "template.invoke: expanded '{}' to {} bytes DSL",
-            template_id,
-            expansion.dsl.len()
-        );
-
-        // Parse expanded DSL
-        let program = crate::dsl_v2::parser::parse_program(&expansion.dsl)
-            .map_err(|e| anyhow!("Template '{}' parse error: {}", template_id, e))?;
-
-        // Compile to execution plan
-        let plan = crate::dsl_v2::execution_plan::compile(&program)
-            .map_err(|e| anyhow!("Template '{}' compile error: {:?}", template_id, e))?;
-
-        tracing::debug!(
-            "template.invoke: compiled {} statements from '{}'",
-            plan.steps.len(),
-            template_id
-        );
-
-        // Execute plan (nested execution, same context)
-        let executor = DslExecutor::new(pool.clone());
-        let results = executor.execute_plan(&plan, ctx).await?;
-
-        // Collect output bindings from context
-        let mut outputs: HashMap<String, Uuid> = HashMap::new();
-        for output_name in &expansion.outputs {
-            if let Some(pk) = ctx.resolve(output_name) {
-                outputs.insert(output_name.clone(), pk);
-            }
-        }
-
-        // Determine primary entity (from template primary_entity param or first output)
-        let primary_entity_id = template
-            .primary_entity_param()
-            .and_then(|param_name| ctx.resolve(param_name))
-            .or_else(|| outputs.values().next().copied());
-
-        let result = TemplateInvokeResult {
-            template_id: template_id.to_string(),
-            statements_executed: results.len(),
-            outputs,
-            primary_entity_id,
-        };
-
-        tracing::info!(
-            "template.invoke: '{}' completed, {} statements, primary={:?}",
-            result.template_id,
-            result.statements_executed,
-            result.primary_entity_id
-        );
-
+        let result =
+            template_invoke_impl(template_id.to_string(), explicit_params, ctx, pool).await?;
         Ok(ExecutionResult::TemplateInvoked(result))
     }
 
@@ -179,6 +177,34 @@ impl CustomOperation for TemplateInvokeOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("template.invoke requires database feature"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_string;
+
+        let template_id = json_extract_string(args, "id")?;
+        let explicit_params = extract_json_string_map(args, ctx, "params")?;
+        let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
+        let result =
+            template_invoke_impl(template_id, explicit_params, &mut exec_ctx, pool).await?;
+
+        for (name, uuid) in &exec_ctx.symbols {
+            ctx.bind(name, *uuid);
+        }
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({"_type": "template_invoked", "_debug": format!("{result:?}")}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -354,6 +380,107 @@ impl TemplateBatchResult {
 #[register_custom_op]
 pub struct TemplateBatchOp;
 
+#[cfg(feature = "database")]
+async fn template_batch_impl(
+    template_id: String,
+    source_symbol: String,
+    bind_param: String,
+    shared_params: HashMap<String, String>,
+    on_error: OnErrorMode,
+    limit: Option<usize>,
+    ctx: &mut ExecutionContext,
+    pool: &PgPool,
+) -> Result<TemplateBatchResult> {
+    let items = get_entity_query_items(&source_symbol, ctx)?;
+
+    if items.is_empty() {
+        tracing::info!(
+            "template.batch: source @{} is empty, skipping",
+            source_symbol
+        );
+        return Ok(TemplateBatchResult {
+            template_id,
+            total_items: 0,
+            success_count: 0,
+            failure_count: 0,
+            primary_entity_ids: vec![],
+            primary_entity_type: "unknown".to_string(),
+            aborted: false,
+            errors: HashMap::new(),
+        });
+    }
+
+    tracing::info!(
+        "template.batch: starting '{}' with {} items from @{}",
+        template_id,
+        items.len(),
+        source_symbol
+    );
+
+    let registry = runtime_registry();
+    let template = registry
+        .get_template(&template_id)
+        .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
+
+    let parent_ctx = ExecutionContext {
+        symbols: ctx.symbols.clone(),
+        symbol_types: ctx.symbol_types.clone(),
+        parent_symbols: ctx.parent_symbols.clone(),
+        parent_symbol_types: ctx.parent_symbol_types.clone(),
+        batch_index: ctx.batch_index,
+        audit_user: ctx.audit_user.clone(),
+        transaction_id: ctx.transaction_id,
+        execution_id: ctx.execution_id,
+        idempotency_enabled: ctx.idempotency_enabled,
+        json_bindings: ctx.json_bindings.clone(),
+        current_selection: ctx.current_selection.clone(),
+        pending_view_state: None,
+        pending_viewport_state: None,
+        pending_scope_change: None,
+        source_attribution: ctx.source_attribution.clone(),
+        session_id: ctx.session_id,
+        pending_session: None,
+        session_cbu_ids: ctx.session_cbu_ids.clone(),
+        client_group_id: ctx.client_group_id,
+        client_group_name: ctx.client_group_name.clone(),
+        persona: ctx.persona.clone(),
+        pending_session_name: None,
+        pending_dag_flags: Vec::new(),
+        pending_structure_id: None,
+        pending_structure_name: None,
+        pending_case_id: None,
+        pending_mandate_id: None,
+        pending_deal_id: None,
+        pending_deal_name: None,
+        cbu_scope_dirty: false,
+        allow_durable_direct: ctx.allow_durable_direct,
+    };
+
+    let batch_executor =
+        BatchExecutor::new(pool.clone(), template.clone(), shared_params, parent_ctx);
+
+    let batch_result = batch_executor
+        .execute_batch(items.clone(), &bind_param, on_error, limit)
+        .await?;
+
+    let result = TemplateBatchResult::from_accumulator(
+        template_id.to_string(),
+        &batch_result.accumulator,
+        batch_result.total_items,
+        batch_result.aborted,
+    );
+
+    tracing::info!(
+        "template.batch: '{}' completed, {}/{} succeeded, {} primary entities",
+        result.template_id,
+        result.success_count,
+        result.total_items,
+        result.primary_entity_ids.len()
+    );
+
+    Ok(result)
+}
+
 #[async_trait]
 impl CustomOperation for TemplateBatchOp {
     fn domain(&self) -> &'static str {
@@ -375,15 +502,12 @@ impl CustomOperation for TemplateBatchOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        // 1. Extract :id (template ID)
         let template_id = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "id")
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow!("Missing :id argument for template.batch"))?;
-
-        // 2. Extract :source (symbol reference to entity.query result)
         let source_symbol = verb_call
             .arguments
             .iter()
@@ -396,8 +520,6 @@ impl CustomOperation for TemplateBatchOp {
                 }
             })
             .ok_or_else(|| anyhow!("Missing :source symbol for template.batch"))?;
-
-        // 3. Extract :bind-as (parameter name to bind each entity ID to)
         let bind_param = verb_call
             .arguments
             .iter()
@@ -405,11 +527,7 @@ impl CustomOperation for TemplateBatchOp {
             .and_then(|a| a.value.as_string())
             .unwrap_or("entity")
             .to_string();
-
-        // 4. Extract :shared params map
         let shared_params = extract_shared_params(verb_call, ctx)?;
-
-        // 5. Extract :on-error mode
         let on_error_str = verb_call
             .arguments
             .iter()
@@ -417,114 +535,23 @@ impl CustomOperation for TemplateBatchOp {
             .and_then(|a| a.value.as_string())
             .unwrap_or("continue");
         let on_error: OnErrorMode = on_error_str.parse().unwrap_or_default();
-
-        // 6. Extract :limit (optional)
         let limit: Option<usize> = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "limit")
             .and_then(|a| a.value.as_integer())
             .map(|i| i as usize);
-
-        // 7. Get the source entity query result from context
-        // The source should be an EntityQueryResult stored as a special binding
-        let items = get_entity_query_items(source_symbol, ctx)?;
-
-        if items.is_empty() {
-            tracing::info!(
-                "template.batch: source @{} is empty, skipping",
-                source_symbol
-            );
-            let result = TemplateBatchResult {
-                template_id: template_id.to_string(),
-                total_items: 0,
-                success_count: 0,
-                failure_count: 0,
-                primary_entity_ids: vec![],
-                primary_entity_type: "unknown".to_string(),
-                aborted: false,
-                errors: HashMap::new(),
-            };
-            return Ok(ExecutionResult::TemplateBatch(result));
-        }
-
-        tracing::info!(
-            "template.batch: starting '{}' with {} items from @{}",
-            template_id,
-            items.len(),
-            source_symbol
-        );
-
-        // 8. Get template from registry
-        let registry = runtime_registry();
-        let template = registry
-            .get_template(template_id)
-            .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
-
-        // 9. Create parent context snapshot for batch executor
-        // BatchExecutor needs an owned ExecutionContext, so create one from current state
-        let parent_ctx = ExecutionContext {
-            symbols: ctx.symbols.clone(),
-            symbol_types: ctx.symbol_types.clone(),
-            parent_symbols: ctx.parent_symbols.clone(),
-            parent_symbol_types: ctx.parent_symbol_types.clone(),
-            batch_index: ctx.batch_index,
-            audit_user: ctx.audit_user.clone(),
-            transaction_id: ctx.transaction_id,
-            execution_id: ctx.execution_id,
-            idempotency_enabled: ctx.idempotency_enabled,
-            json_bindings: ctx.json_bindings.clone(),
-            current_selection: ctx.current_selection.clone(),
-            pending_view_state: None, // Batch operations don't produce view state
-            pending_viewport_state: None, // Batch operations don't produce viewport state
-            pending_scope_change: None, // Batch operations don't produce scope changes
-            source_attribution: ctx.source_attribution.clone(),
-            session_id: ctx.session_id,
-            pending_session: None, // Batch operations don't modify session
-            session_cbu_ids: ctx.session_cbu_ids.clone(), // Inherit for bulk ops
-            // Inherit client group context for entity resolution
-            client_group_id: ctx.client_group_id,
-            client_group_name: ctx.client_group_name.clone(),
-            // Inherit persona for tag filtering
-            persona: ctx.persona.clone(),
-            // Phase 3 typed fields — fresh per batch
-            pending_session_name: None,
-            pending_dag_flags: Vec::new(),
-            pending_structure_id: None,
-            pending_structure_name: None,
-            pending_case_id: None,
-            pending_mandate_id: None,
-            pending_deal_id: None,
-            pending_deal_name: None,
-            cbu_scope_dirty: false,
-            allow_durable_direct: ctx.allow_durable_direct,
-        };
-
-        // 10. Create and run BatchExecutor
-        let batch_executor =
-            BatchExecutor::new(pool.clone(), template.clone(), shared_params, parent_ctx);
-
-        let batch_result = batch_executor
-            .execute_batch(items.clone(), &bind_param, on_error, limit)
-            .await?;
-
-        // 11. Propagate primary entity IDs to context for post-batch operations
-        // Store the batch result so subsequent verbs can access the created PKs
-        let result = TemplateBatchResult::from_accumulator(
+        let result = template_batch_impl(
             template_id.to_string(),
-            &batch_result.accumulator,
-            batch_result.total_items,
-            batch_result.aborted,
-        );
-
-        tracing::info!(
-            "template.batch: '{}' completed, {}/{} succeeded, {} primary entities",
-            result.template_id,
-            result.success_count,
-            result.total_items,
-            result.primary_entity_ids.len()
-        );
-
+            source_symbol.to_string(),
+            bind_param,
+            shared_params,
+            on_error,
+            limit,
+            ctx,
+            pool,
+        )
+        .await?;
         Ok(ExecutionResult::TemplateBatch(result))
     }
 
@@ -535,6 +562,53 @@ impl CustomOperation for TemplateBatchOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("template.batch requires database feature"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_int_opt, json_extract_string, json_extract_string_opt};
+
+        let template_id = json_extract_string(args, "id")?;
+        let source_symbol = json_extract_string(args, "source")?
+            .trim_start_matches('@')
+            .to_string();
+        let bind_param =
+            json_extract_string_opt(args, "bind-as").unwrap_or_else(|| "entity".to_string());
+        let shared_params = extract_json_string_map(args, ctx, "shared")?;
+        let on_error_str =
+            json_extract_string_opt(args, "on-error").unwrap_or_else(|| "continue".to_string());
+        let on_error: OnErrorMode = on_error_str.parse().unwrap_or_default();
+        let limit = json_extract_int_opt(args, "limit").map(|i| i as usize);
+
+        let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
+        let result = template_batch_impl(
+            template_id,
+            source_symbol,
+            bind_param,
+            shared_params,
+            on_error,
+            limit,
+            &mut exec_ctx,
+            pool,
+        )
+        .await?;
+
+        for (name, uuid) in &exec_ctx.symbols {
+            ctx.bind(name, *uuid);
+        }
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({"_type": "template_batch", "_debug": format!("{result:?}")}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -558,6 +632,33 @@ fn extract_shared_params(
         }
     }
 
+    Ok(params)
+}
+
+#[cfg(feature = "database")]
+fn extract_json_string_map(
+    args: &serde_json::Value,
+    ctx: &sem_os_core::execution::VerbExecutionContext,
+    key: &str,
+) -> Result<HashMap<String, String>> {
+    let mut params = HashMap::new();
+    if let Some(entries) = args.get(key).and_then(|v| v.as_object()) {
+        for (map_key, value) in entries {
+            let resolved = match value {
+                serde_json::Value::String(s) => {
+                    if let Some(sym) = s.strip_prefix('@') {
+                        ctx.resolve(sym)
+                            .map(|u| u.to_string())
+                            .unwrap_or_else(|| s.clone())
+                    } else {
+                        s.clone()
+                    }
+                }
+                other => other.to_string(),
+            };
+            params.insert(map_key.clone(), resolved);
+        }
+    }
     Ok(params)
 }
 

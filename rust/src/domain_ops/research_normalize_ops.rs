@@ -19,8 +19,8 @@ use uuid::Uuid;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
-use super::helpers::{extract_string, extract_string_opt};
 use super::CustomOperation;
+use super::helpers::{extract_string, extract_string_opt};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -87,6 +87,33 @@ fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
 #[register_custom_op]
 pub struct ResearchGenericNormalizeOp;
 
+fn normalize_payload_impl(source_name: String, payload_raw: &str) -> Result<NormalizeResult> {
+    let parsed: serde_json::Value = serde_json::from_str(payload_raw)
+        .map_err(|e| anyhow::anyhow!("Invalid JSON payload: {}", e))?;
+    let canonical = canonicalize_json(&parsed);
+    let canonical_str = serde_json::to_string(&canonical)?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(canonical_str.as_bytes());
+    let hash_bytes = hasher.finalize();
+    let content_hash = hex::encode(hash_bytes);
+
+    let field_count = match &canonical {
+        serde_json::Value::Object(map) => map.len(),
+        _ => 0,
+    };
+
+    let normalized_at = chrono::Utc::now().to_rfc3339();
+
+    Ok(NormalizeResult {
+        source_name,
+        canonical_json: canonical,
+        content_hash,
+        field_count,
+        normalized_at,
+    })
+}
+
 #[async_trait]
 impl CustomOperation for ResearchGenericNormalizeOp {
     fn domain(&self) -> &'static str {
@@ -108,37 +135,11 @@ impl CustomOperation for ResearchGenericNormalizeOp {
         _ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        // 1. Extract required arguments
         let source_name = extract_string(verb_call, "source-name")?;
         let payload_raw = extract_string(verb_call, "payload")?;
         let _schema_name = extract_string_opt(verb_call, "schema-name");
+        let result = normalize_payload_impl(source_name, &payload_raw)?;
 
-        // 2. Parse the raw payload as JSON
-        let parsed: serde_json::Value = serde_json::from_str(&payload_raw)
-            .map_err(|e| anyhow::anyhow!("Invalid JSON payload: {}", e))?;
-
-        // 3. Canonicalize (sort keys, trim strings)
-        let canonical = canonicalize_json(&parsed);
-
-        // 4. Serialize canonical form (compact, no pretty-print)
-        let canonical_str = serde_json::to_string(&canonical)?;
-
-        // 5. SHA-256 hash the canonical string
-        let mut hasher = Sha256::new();
-        hasher.update(canonical_str.as_bytes());
-        let hash_bytes = hasher.finalize();
-        let content_hash = hex::encode(hash_bytes);
-
-        // 6. Count top-level fields
-        let field_count = match &canonical {
-            serde_json::Value::Object(map) => map.len(),
-            _ => 0,
-        };
-
-        // 7. Timestamp
-        let normalized_at = chrono::Utc::now().to_rfc3339();
-
-        // 8. Optionally persist to DB
         let payload_id = Uuid::new_v4();
         sqlx::query(
             r#"INSERT INTO "ob-poc".research_normalized_payloads
@@ -147,20 +148,11 @@ impl CustomOperation for ResearchGenericNormalizeOp {
             ON CONFLICT (content_hash) DO NOTHING"#,
         )
         .bind(payload_id)
-        .bind(&source_name)
-        .bind(&content_hash)
-        .bind(&canonical)
+        .bind(&result.source_name)
+        .bind(&result.content_hash)
+        .bind(&result.canonical_json)
         .execute(pool)
         .await?;
-
-        // 9. Build typed result
-        let result = NormalizeResult {
-            source_name,
-            canonical_json: canonical,
-            content_hash,
-            field_count,
-            normalized_at,
-        };
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
@@ -171,45 +163,48 @@ impl CustomOperation for ResearchGenericNormalizeOp {
         verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        // 1. Extract required arguments
         let source_name = extract_string(verb_call, "source-name")?;
         let payload_raw = extract_string(verb_call, "payload")?;
-
-        // 2. Parse the raw payload as JSON
-        let parsed: serde_json::Value = serde_json::from_str(&payload_raw)
-            .map_err(|e| anyhow::anyhow!("Invalid JSON payload: {}", e))?;
-
-        // 3. Canonicalize (sort keys, trim strings)
-        let canonical = canonicalize_json(&parsed);
-
-        // 4. Serialize canonical form (compact, no pretty-print)
-        let canonical_str = serde_json::to_string(&canonical)?;
-
-        // 5. SHA-256 hash the canonical string
-        let mut hasher = Sha256::new();
-        hasher.update(canonical_str.as_bytes());
-        let hash_bytes = hasher.finalize();
-        let content_hash = hex::encode(hash_bytes);
-
-        // 6. Count top-level fields
-        let field_count = match &canonical {
-            serde_json::Value::Object(map) => map.len(),
-            _ => 0,
-        };
-
-        // 7. Timestamp
-        let normalized_at = chrono::Utc::now().to_rfc3339();
-
-        // 8. Build typed result
-        let result = NormalizeResult {
-            source_name,
-            canonical_json: canonical,
-            content_hash,
-            field_count,
-            normalized_at,
-        };
+        let result = normalize_payload_impl(source_name, &payload_raw)?;
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt};
+
+        let source_name = json_extract_string(args, "source-name")?;
+        let payload_raw = json_extract_string(args, "payload")?;
+        let _schema_name = json_extract_string_opt(args, "schema-name");
+        let result = normalize_payload_impl(source_name, &payload_raw)?;
+
+        let payload_id = Uuid::new_v4();
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".research_normalized_payloads
+                (payload_id, source_name, content_hash, canonical_payload, normalized_at)
+            VALUES ($1, $2, $3, $4, NOW())
+            ON CONFLICT (content_hash) DO NOTHING"#,
+        )
+        .bind(payload_id)
+        .bind(&result.source_name)
+        .bind(&result.content_hash)
+        .bind(&result.canonical_json)
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

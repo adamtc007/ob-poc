@@ -151,6 +151,10 @@ impl CustomOperation for EntityGhostOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Add identifying attributes to a ghost entity, transitioning to IDENTIFIED state
@@ -283,6 +287,10 @@ impl CustomOperation for EntityIdentifyOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -356,6 +364,10 @@ impl CustomOperation for EntityEnsureOrPlaceholderOp {
             "is_placeholder": true
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Resolve a placeholder entity to a real entity.
@@ -422,6 +434,43 @@ impl CustomOperation for EntityResolvePlaceholderOp {
             "roles_transferred": 0
         })))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+
+        let placeholder_id = json_extract_uuid(args, ctx, "placeholder-id")?;
+        let resolved_entity_id = json_extract_uuid(args, ctx, "resolved-entity-id")?;
+        let resolved_by =
+            json_extract_string_opt(args, "resolved-by").unwrap_or_else(|| "system".to_string());
+
+        let resolver = PlaceholderResolver::new(pool.clone());
+        let result = resolver
+            .resolve(ResolvePlaceholderRequest {
+                placeholder_entity_id: placeholder_id,
+                resolved_entity_id,
+                resolved_by,
+            })
+            .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "placeholder_entity_id": result.placeholder_entity_id,
+                "resolved_to_entity_id": result.resolved_to_entity_id,
+                "status": result.status.to_string(),
+                "roles_transferred": result.roles_transferred
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// List pending placeholder entities.
@@ -483,6 +532,50 @@ impl CustomOperation for EntityListPlaceholdersOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid_opt;
+
+        let cbu_id = json_extract_uuid_opt(args, ctx, "cbu-id");
+
+        let resolver = PlaceholderResolver::new(pool.clone());
+
+        let placeholders = if let Some(cbu_id) = cbu_id {
+            resolver.list_pending_for_cbu(cbu_id).await?
+        } else {
+            resolver.list_all_pending().await?
+        };
+
+        let records: Vec<serde_json::Value> = placeholders
+            .into_iter()
+            .map(|p| {
+                serde_json::json!({
+                    "entity_id": p.placeholder.entity_id,
+                    "status": p.placeholder.status.to_string(),
+                    "kind": p.placeholder.kind,
+                    "cbu_id": p.placeholder.created_for_cbu_id,
+                    "entity_name": p.entity_name,
+                    "cbu_name": p.cbu_name,
+                    "kind_label": p.kind_label,
+                    "created_at": p.placeholder.created_at.to_rfc3339()
+                })
+            })
+            .collect();
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            records,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -546,5 +639,43 @@ impl CustomOperation for EntityPlaceholderSummaryOp {
             "pending_count": 0,
             "by_kind": []
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+
+        let resolver = PlaceholderResolver::new(pool.clone());
+        let summary = resolver.get_summary(cbu_id).await?;
+
+        let by_kind: Vec<serde_json::Value> = summary
+            .by_kind
+            .into_iter()
+            .map(|k| {
+                serde_json::json!({
+                    "kind": k.kind,
+                    "count": k.count
+                })
+            })
+            .collect();
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "cbu_id": summary.cbu_id,
+                "pending_count": summary.pending_count,
+                "by_kind": by_kind
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

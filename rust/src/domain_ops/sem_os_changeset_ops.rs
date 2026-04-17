@@ -162,6 +162,37 @@ changeset_op!(
 #[register_custom_op]
 pub struct ChangesetListOp;
 
+#[cfg(feature = "database")]
+async fn changeset_list_impl(status: Option<String>, pool: &PgPool) -> Result<ExecutionResult> {
+    let rows: Vec<(String, String, String)> = if let Some(status) = status {
+        sqlx::query_as(
+            "SELECT changeset_id::text, status, title FROM sem_reg.changesets WHERE status = $1 ORDER BY created_at DESC LIMIT 50",
+        )
+        .bind(status)
+        .fetch_all(pool)
+        .await?
+    } else {
+        sqlx::query_as(
+            "SELECT changeset_id::text, status, title FROM sem_reg.changesets ORDER BY created_at DESC LIMIT 50",
+        )
+        .fetch_all(pool)
+        .await?
+    };
+
+    let list: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|(id, status, title)| {
+            serde_json::json!({
+                "changeset_id": id,
+                "status": status,
+                "title": title,
+            })
+        })
+        .collect();
+
+    Ok(ExecutionResult::RecordSet(list))
+}
+
 #[async_trait]
 impl CustomOperation for ChangesetListOp {
     fn domain(&self) -> &'static str {
@@ -208,25 +239,7 @@ impl CustomOperation for ChangesetListOp {
             return super::sem_os_helpers::convert_tool_result(result);
         }
 
-        // Fallback: direct query for changeset listing
-        let rows: Vec<(String, String, String)> = sqlx::query_as(
-            "SELECT changeset_id::text, status, title FROM sem_reg.changesets ORDER BY created_at DESC LIMIT 50"
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let list: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(|(id, status, title)| {
-                serde_json::json!({
-                    "changeset_id": id,
-                    "status": status,
-                    "title": title,
-                })
-            })
-            .collect();
-
-        Ok(ExecutionResult::RecordSet(list))
+        changeset_list_impl(get_string_arg(verb_call, "status"), pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -236,6 +249,41 @@ impl CustomOperation for ChangesetListOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("changeset.list requires database"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        if let Ok(outcome) = super::sem_os_helpers::delegate_to_stew_tool_json(
+            pool,
+            ctx,
+            args,
+            "stew_describe_object",
+        )
+        .await
+        {
+            return Ok(outcome);
+        }
+
+        match changeset_list_impl(
+            super::helpers::json_extract_string_opt(args, "status"),
+            pool,
+        )
+        .await?
+        {
+            ExecutionResult::RecordSet(rows) => Ok(
+                sem_os_core::execution::VerbExecutionOutcome::RecordSet(rows),
+            ),
+            _ => unreachable!(),
+        }
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

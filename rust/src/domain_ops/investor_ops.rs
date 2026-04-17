@@ -11,6 +11,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 
+use super::helpers::{
+    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -86,6 +89,406 @@ fn get_optional_uuid(
     get_required_uuid(verb_call, key, ctx).ok()
 }
 
+// ── Shared _impl functions (called by both execute and execute_json) ──
+
+#[cfg(feature = "database")]
+async fn investor_request_documents_impl(
+    investor_id: uuid::Uuid,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'PENDING_DOCUMENTS',
+            lifecycle_notes = $2,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_start_kyc_impl(
+    investor_id: uuid::Uuid,
+    case_id: Option<uuid::Uuid>,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'KYC_IN_PROGRESS',
+            kyc_status = 'IN_PROGRESS',
+            kyc_case_id = COALESCE($2, kyc_case_id),
+            lifecycle_notes = $3,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        case_id,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_approve_kyc_impl(
+    investor_id: uuid::Uuid,
+    risk_rating: Option<&str>,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'KYC_APPROVED',
+            kyc_status = 'APPROVED',
+            kyc_approved_at = NOW(),
+            kyc_risk_rating = COALESCE($2, kyc_risk_rating),
+            lifecycle_notes = $3,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        risk_rating,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_reject_kyc_impl(
+    investor_id: uuid::Uuid,
+    reason: &str,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'REJECTED',
+            kyc_status = 'REJECTED',
+            rejection_reason = $2,
+            lifecycle_notes = $3,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        reason,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_mark_eligible_impl(
+    investor_id: uuid::Uuid,
+    investor_type: Option<&str>,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'ELIGIBLE_TO_SUBSCRIBE',
+            investor_type = COALESCE($2, investor_type),
+            lifecycle_notes = $3,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        investor_type,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_record_subscription_impl(
+    investor_id: uuid::Uuid,
+    holding_id: Option<uuid::Uuid>,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'SUBSCRIBED',
+            first_subscription_at = COALESCE(first_subscription_at, NOW()),
+            lifecycle_notes = $2,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
+
+    if let Some(hid) = holding_id {
+        sqlx::query!(
+            r#"UPDATE "ob-poc".holdings SET investor_id = $1 WHERE id = $2"#,
+            investor_id,
+            hid
+        )
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_activate_impl(
+    investor_id: uuid::Uuid,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'ACTIVE_HOLDER',
+            lifecycle_notes = $2,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_start_redemption_impl(
+    investor_id: uuid::Uuid,
+    redemption_type: Option<&str>,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'REDEEMING',
+            redemption_type = $2,
+            lifecycle_notes = $3,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        redemption_type,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_complete_redemption_impl(
+    investor_id: uuid::Uuid,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'OFFBOARDED',
+            offboarded_at = NOW(),
+            offboard_reason = 'Full redemption completed',
+            lifecycle_notes = $2,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
+
+    sqlx::query!(
+        r#"UPDATE "ob-poc".holdings SET status = 'closed', updated_at = NOW() WHERE investor_id = $1 AND status = 'active'"#,
+        investor_id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_offboard_impl(
+    investor_id: uuid::Uuid,
+    reason: &str,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'OFFBOARDED',
+            offboard_reason = $2,
+            offboarded_at = NOW(),
+            lifecycle_notes = $3,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        reason,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
+
+    sqlx::query!(
+        r#"UPDATE "ob-poc".holdings SET status = 'closed', updated_at = NOW() WHERE investor_id = $1 AND status = 'active'"#,
+        investor_id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_suspend_impl(
+    investor_id: uuid::Uuid,
+    reason: &str,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let current = sqlx::query_scalar!(
+        r#"SELECT lifecycle_state FROM "ob-poc".investors WHERE investor_id = $1"#,
+        investor_id
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Investor not found: {}", e))?;
+
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = 'SUSPENDED',
+            suspended_reason = $2,
+            pre_suspension_state = $3,
+            suspended_at = NOW(),
+            lifecycle_notes = $4,
+            updated_at = NOW()
+        WHERE investor_id = $1
+        RETURNING investor_id
+        "#,
+        investor_id,
+        reason,
+        current,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to suspend investor: {}", e))?;
+
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_reinstate_impl(
+    investor_id: uuid::Uuid,
+    notes: Option<&str>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let pre_state = sqlx::query_scalar!(
+        r#"SELECT pre_suspension_state FROM "ob-poc".investors WHERE investor_id = $1"#,
+        investor_id
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Investor not found: {}", e))?
+    .ok_or_else(|| anyhow::anyhow!("No pre-suspension state found for investor"))?;
+
+    let row = sqlx::query!(
+        r#"
+        UPDATE "ob-poc".investors
+        SET lifecycle_state = $2,
+            suspended_reason = NULL,
+            pre_suspension_state = NULL,
+            suspended_at = NULL,
+            lifecycle_notes = $3,
+            updated_at = NOW()
+        WHERE investor_id = $1 AND lifecycle_state = 'SUSPENDED'
+        RETURNING investor_id
+        "#,
+        investor_id,
+        pre_state,
+        notes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to reinstate investor: {}", e))?;
+
+    Ok(row.investor_id)
+}
+
+#[cfg(feature = "database")]
+async fn investor_count_by_state_impl(
+    cbu_id: uuid::Uuid,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT lifecycle_state, COUNT(*) as count
+        FROM "ob-poc".investors
+        WHERE owning_cbu_id = $1
+        GROUP BY lifecycle_state
+        ORDER BY lifecycle_state
+        "#,
+        cbu_id
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to count investors: {}", e))?;
+
+    let counts: std::collections::HashMap<String, i64> = rows
+        .into_iter()
+        .map(|r| (r.lifecycle_state, r.count.unwrap_or(0)))
+        .collect();
+
+    serde_json::to_value(counts).map_err(|e| anyhow::anyhow!("{}", e))
+}
+
 // ============================================================================
 // Lifecycle Transition Operations
 // ============================================================================
@@ -117,25 +520,8 @@ impl CustomOperation for InvestorRequestDocumentsOp {
     ) -> Result<ExecutionResult> {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let notes = get_optional_string(verb_call, "notes");
-
-        // Update lifecycle state (trigger handles validation and history logging)
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'PENDING_DOCUMENTS',
-                lifecycle_notes = $2,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
-            investor_id,
-            notes.as_deref()
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        let id = investor_request_documents_impl(investor_id, notes.as_deref(), pool).await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -147,6 +533,23 @@ impl CustomOperation for InvestorRequestDocumentsOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_request_documents_impl(investor_id, notes.as_deref(), pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -178,27 +581,8 @@ impl CustomOperation for InvestorStartKycOp {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let case_id = get_optional_uuid(verb_call, "case-id", ctx);
         let notes = get_optional_string(verb_call, "notes");
-
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'KYC_IN_PROGRESS',
-                kyc_status = 'IN_PROGRESS',
-                kyc_case_id = COALESCE($2, kyc_case_id),
-                lifecycle_notes = $3,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
-            investor_id,
-            case_id,
-            notes.as_deref()
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        let id = investor_start_kyc_impl(investor_id, case_id, notes.as_deref(), pool).await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -210,6 +594,24 @@ impl CustomOperation for InvestorStartKycOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_start_kyc_impl(investor_id, case_id, notes.as_deref(), pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -241,29 +643,10 @@ impl CustomOperation for InvestorApproveKycOp {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let risk_rating = get_optional_string(verb_call, "risk-rating");
         let notes = get_optional_string(verb_call, "notes");
-
-        // Note: No kyc_approved_by column exists in schema - removed from query
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'KYC_APPROVED',
-                kyc_status = 'APPROVED',
-                kyc_approved_at = NOW(),
-                kyc_risk_rating = COALESCE($2, kyc_risk_rating),
-                lifecycle_notes = $3,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
-            investor_id,
-            risk_rating.as_deref(),
-            notes.as_deref()
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        let id =
+            investor_approve_kyc_impl(investor_id, risk_rating.as_deref(), notes.as_deref(), pool)
+                .await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -275,6 +658,26 @@ impl CustomOperation for InvestorApproveKycOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let risk_rating = json_extract_string_opt(args, "risk-rating");
+        let notes = json_extract_string_opt(args, "notes");
+        let id =
+            investor_approve_kyc_impl(investor_id, risk_rating.as_deref(), notes.as_deref(), pool)
+                .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -306,27 +709,8 @@ impl CustomOperation for InvestorRejectKycOp {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let reason = get_required_string(verb_call, "reason")?;
         let notes = get_optional_string(verb_call, "notes");
-
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'REJECTED',
-                kyc_status = 'REJECTED',
-                rejection_reason = $2,
-                lifecycle_notes = $3,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
-            investor_id,
-            reason,
-            notes.as_deref()
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        let id = investor_reject_kyc_impl(investor_id, &reason, notes.as_deref(), pool).await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -338,6 +722,24 @@ impl CustomOperation for InvestorRejectKycOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let reason = json_extract_string(args, "reason")?;
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_reject_kyc_impl(investor_id, &reason, notes.as_deref(), pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -369,26 +771,14 @@ impl CustomOperation for InvestorMarkEligibleOp {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let investor_type = get_optional_string(verb_call, "investor-type");
         let notes = get_optional_string(verb_call, "notes");
-
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'ELIGIBLE_TO_SUBSCRIBE',
-                investor_type = COALESCE($2, investor_type),
-                lifecycle_notes = $3,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
+        let id = investor_mark_eligible_impl(
             investor_id,
             investor_type.as_deref(),
-            notes.as_deref()
+            notes.as_deref(),
+            pool,
         )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        .await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -400,6 +790,30 @@ impl CustomOperation for InvestorMarkEligibleOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let investor_type = json_extract_string_opt(args, "investor-type");
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_mark_eligible_impl(
+            investor_id,
+            investor_type.as_deref(),
+            notes.as_deref(),
+            pool,
+        )
+        .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -431,40 +845,9 @@ impl CustomOperation for InvestorRecordSubscriptionOp {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let holding_id = get_optional_uuid(verb_call, "holding-id", ctx);
         let notes = get_optional_string(verb_call, "notes");
-
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'SUBSCRIBED',
-                first_subscription_at = COALESCE(first_subscription_at, NOW()),
-                lifecycle_notes = $2,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
-            investor_id,
-            notes.as_deref()
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
-
-        // Link holding if provided
-        if let Some(hid) = holding_id {
-            sqlx::query!(
-                r#"
-                UPDATE "ob-poc".holdings
-                SET investor_id = $1
-                WHERE id = $2
-                "#,
-                investor_id,
-                hid
-            )
-            .execute(pool)
+        let id = investor_record_subscription_impl(investor_id, holding_id, notes.as_deref(), pool)
             .await?;
-        }
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -476,6 +859,25 @@ impl CustomOperation for InvestorRecordSubscriptionOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let holding_id = json_extract_uuid_opt(args, ctx, "holding-id");
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_record_subscription_impl(investor_id, holding_id, notes.as_deref(), pool)
+            .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -506,24 +908,8 @@ impl CustomOperation for InvestorActivateOp {
     ) -> Result<ExecutionResult> {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let notes = get_optional_string(verb_call, "notes");
-
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'ACTIVE_HOLDER',
-                lifecycle_notes = $2,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
-            investor_id,
-            notes.as_deref()
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        let id = investor_activate_impl(investor_id, notes.as_deref(), pool).await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -535,6 +921,23 @@ impl CustomOperation for InvestorActivateOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_activate_impl(investor_id, notes.as_deref(), pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -566,26 +969,14 @@ impl CustomOperation for InvestorStartRedemptionOp {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let redemption_type = get_optional_string(verb_call, "redemption-type");
         let notes = get_optional_string(verb_call, "notes");
-
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'REDEEMING',
-                redemption_type = $2,
-                lifecycle_notes = $3,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
+        let id = investor_start_redemption_impl(
             investor_id,
             redemption_type.as_deref(),
-            notes.as_deref()
+            notes.as_deref(),
+            pool,
         )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        .await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -597,6 +988,30 @@ impl CustomOperation for InvestorStartRedemptionOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let redemption_type = json_extract_string_opt(args, "redemption-type");
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_start_redemption_impl(
+            investor_id,
+            redemption_type.as_deref(),
+            notes.as_deref(),
+            pool,
+        )
+        .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -627,39 +1042,8 @@ impl CustomOperation for InvestorCompleteRedemptionOp {
     ) -> Result<ExecutionResult> {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let notes = get_optional_string(verb_call, "notes");
-
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'OFFBOARDED',
-                offboarded_at = NOW(),
-                offboard_reason = 'Full redemption completed',
-                lifecycle_notes = $2,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
-            investor_id,
-            notes.as_deref()
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
-
-        // Close any associated holdings
-        sqlx::query!(
-            r#"
-            UPDATE "ob-poc".holdings
-            SET status = 'closed',
-                updated_at = NOW()
-            WHERE investor_id = $1 AND status = 'active'
-            "#,
-            investor_id
-        )
-        .execute(pool)
-        .await?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        let id = investor_complete_redemption_impl(investor_id, notes.as_deref(), pool).await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -671,6 +1055,23 @@ impl CustomOperation for InvestorCompleteRedemptionOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_complete_redemption_impl(investor_id, notes.as_deref(), pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -702,40 +1103,8 @@ impl CustomOperation for InvestorOffboardOp {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let reason = get_required_string(verb_call, "reason")?;
         let notes = get_optional_string(verb_call, "notes");
-
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'OFFBOARDED',
-                offboard_reason = $2,
-                offboarded_at = NOW(),
-                lifecycle_notes = $3,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
-            investor_id,
-            reason,
-            notes.as_deref()
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to update investor: {}", e))?;
-
-        // Close any associated holdings
-        sqlx::query!(
-            r#"
-            UPDATE "ob-poc".holdings
-            SET status = 'closed',
-                updated_at = NOW()
-            WHERE investor_id = $1 AND status = 'active'
-            "#,
-            investor_id
-        )
-        .execute(pool)
-        .await?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        let id = investor_offboard_impl(investor_id, &reason, notes.as_deref(), pool).await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -747,6 +1116,24 @@ impl CustomOperation for InvestorOffboardOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let reason = json_extract_string(args, "reason")?;
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_offboard_impl(investor_id, &reason, notes.as_deref(), pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -778,38 +1165,8 @@ impl CustomOperation for InvestorSuspendOp {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let reason = get_required_string(verb_call, "reason")?;
         let notes = get_optional_string(verb_call, "notes");
-
-        // Get current state to store for reinstatement
-        let current = sqlx::query_scalar!(
-            r#"SELECT lifecycle_state FROM "ob-poc".investors WHERE investor_id = $1"#,
-            investor_id
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Investor not found: {}", e))?;
-
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = 'SUSPENDED',
-                suspended_reason = $2,
-                pre_suspension_state = $3,
-                suspended_at = NOW(),
-                lifecycle_notes = $4,
-                updated_at = NOW()
-            WHERE investor_id = $1
-            RETURNING investor_id
-            "#,
-            investor_id,
-            reason,
-            current,
-            notes.as_deref()
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to suspend investor: {}", e))?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        let id = investor_suspend_impl(investor_id, &reason, notes.as_deref(), pool).await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -821,6 +1178,24 @@ impl CustomOperation for InvestorSuspendOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let reason = json_extract_string(args, "reason")?;
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_suspend_impl(investor_id, &reason, notes.as_deref(), pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -851,38 +1226,8 @@ impl CustomOperation for InvestorReinstateOp {
     ) -> Result<ExecutionResult> {
         let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
         let notes = get_optional_string(verb_call, "notes");
-
-        // Get the pre-suspension state
-        let pre_state = sqlx::query_scalar!(
-            r#"SELECT pre_suspension_state FROM "ob-poc".investors WHERE investor_id = $1"#,
-            investor_id
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Investor not found: {}", e))?
-        .ok_or_else(|| anyhow::anyhow!("No pre-suspension state found for investor"))?;
-
-        let row = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".investors
-            SET lifecycle_state = $2,
-                suspended_reason = NULL,
-                pre_suspension_state = NULL,
-                suspended_at = NULL,
-                lifecycle_notes = $3,
-                updated_at = NOW()
-            WHERE investor_id = $1 AND lifecycle_state = 'SUSPENDED'
-            RETURNING investor_id
-            "#,
-            investor_id,
-            pre_state,
-            notes.as_deref()
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to reinstate investor: {}", e))?;
-
-        Ok(ExecutionResult::Uuid(row.investor_id))
+        let id = investor_reinstate_impl(investor_id, notes.as_deref(), pool).await?;
+        Ok(ExecutionResult::Uuid(id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -894,6 +1239,23 @@ impl CustomOperation for InvestorReinstateOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
+        let notes = json_extract_string_opt(args, "notes");
+        let id = investor_reinstate_impl(investor_id, notes.as_deref(), pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -927,27 +1289,8 @@ impl CustomOperation for InvestorCountByStateOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let cbu_id = get_required_uuid(verb_call, "cbu-id", ctx)?;
-
-        let rows = sqlx::query!(
-            r#"
-            SELECT lifecycle_state, COUNT(*) as count
-            FROM "ob-poc".investors
-            WHERE owning_cbu_id = $1
-            GROUP BY lifecycle_state
-            ORDER BY lifecycle_state
-            "#,
-            cbu_id
-        )
-        .fetch_all(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to count investors: {}", e))?;
-
-        let counts: std::collections::HashMap<String, i64> = rows
-            .into_iter()
-            .map(|r| (r.lifecycle_state, r.count.unwrap_or(0)))
-            .collect();
-
-        Ok(ExecutionResult::Record(serde_json::to_value(counts)?))
+        let result = investor_count_by_state_impl(cbu_id, pool).await?;
+        Ok(ExecutionResult::Record(result))
     }
 
     #[cfg(not(feature = "database"))]
@@ -959,5 +1302,21 @@ impl CustomOperation for InvestorCountByStateOp {
         Err(anyhow::anyhow!(
             "Database feature required for investor operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let result = investor_count_by_state_impl(cbu_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

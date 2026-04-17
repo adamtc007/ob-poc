@@ -253,6 +253,45 @@ impl CustomOperation for AffinityVerbsForTableOp {
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_bool_opt, json_extract_string};
+        let schema_name = json_extract_string(args, "schema-name")?;
+        let table_name = json_extract_string(args, "table-name")?;
+        let include_lookups = json_extract_bool_opt(args, "include-lookups").unwrap_or(true);
+
+        let graph = load_affinity_graph_cached(pool).await?;
+        let verb_affinities = graph.verbs_for_table(&schema_name, &table_name);
+        let verbs: Vec<VerbAffinityRow> = verb_affinities
+            .into_iter()
+            .filter(|va| {
+                include_lookups || !matches!(va.affinity_kind, AffinityKind::ArgLookup { .. })
+            })
+            .map(|va| VerbAffinityRow {
+                verb_fqn: va.verb_fqn,
+                affinity_kind: format!("{:?}", va.affinity_kind),
+                provenance: format!("{:?}", va.provenance),
+            })
+            .collect();
+        let result = VerbsForTableResult {
+            schema_name,
+            table_name,
+            verbs,
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -319,6 +358,42 @@ impl CustomOperation for AffinityVerbsForAttributeOp {
         };
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt};
+        let attr_fqn = json_extract_string(args, "attribute-fqn")
+            .or_else(|_| json_extract_string(args, "attr-fqn"))?;
+        let direction = AttributeDirection::from_arg(json_extract_string_opt(args, "direction"))?;
+
+        let graph = load_affinity_graph_cached(pool).await?;
+        let verbs: Vec<VerbAffinityRow> = graph
+            .verbs_for_attribute(&attr_fqn)
+            .into_iter()
+            .filter(|va| direction.include(&va.affinity_kind))
+            .map(|va| VerbAffinityRow {
+                verb_fqn: va.verb_fqn,
+                affinity_kind: format!("{:?}", va.affinity_kind),
+                provenance: format!("{:?}", va.provenance),
+            })
+            .collect();
+        let result = VerbsForAttributeResult {
+            attribute_fqn: attr_fqn,
+            verbs,
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -409,6 +484,65 @@ impl CustomOperation for AffinityDataForVerbOp {
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_int_opt, json_extract_string};
+        let verb_fqn = json_extract_string(args, "verb-fqn")?;
+        let depth = json_extract_int_opt(args, "depth")
+            .map(|d| d as u32)
+            .unwrap_or(1);
+
+        let graph = load_affinity_graph_cached(pool).await?;
+        let data_assets = graph.data_for_verb(&verb_fqn);
+        let asset_rows: Vec<DataAffinityRow> = data_assets
+            .into_iter()
+            .map(|da| {
+                let data_ref_kind = match &da.data_ref {
+                    DataRef::Table(_) => "table",
+                    DataRef::Column(_) => "column",
+                    DataRef::EntityType { .. } => "entity_type",
+                    DataRef::Attribute { .. } => "attribute",
+                }
+                .to_owned();
+                DataAffinityRow {
+                    data_ref_kind,
+                    data_ref_key: da.data_ref.index_key(),
+                    affinity_kind: format!("{:?}", da.affinity_kind),
+                    provenance: format!("{:?}", da.provenance),
+                }
+            })
+            .collect();
+        let footprint = if depth > 1 {
+            let fp = graph.data_footprint(&verb_fqn, depth);
+            Some(DataFootprintSummary {
+                tables: fp.tables.values().map(|t| t.key()).collect(),
+                columns: fp.columns.keys().cloned().collect(),
+                attributes: fp.attributes.into_iter().collect(),
+                entity_types: fp.entity_types.into_iter().collect(),
+            })
+        } else {
+            None
+        };
+        let result = DataForVerbResult {
+            verb_fqn,
+            depth,
+            data_assets: asset_rows,
+            footprint,
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -468,6 +602,42 @@ impl CustomOperation for AffinityAdjacentVerbsOp {
         };
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_int_opt, json_extract_string};
+        let verb_fqn = json_extract_string(args, "verb-fqn")?;
+        let min_overlap = json_extract_int_opt(args, "min-overlap")
+            .unwrap_or(1)
+            .max(1) as usize;
+
+        let graph = load_affinity_graph_cached(pool).await?;
+        let adjacent = graph.adjacent_verbs(&verb_fqn);
+        let entries: Vec<AdjacentVerbEntry> = adjacent
+            .into_iter()
+            .map(|(adj_fqn, shared_refs)| AdjacentVerbEntry {
+                verb_fqn: adj_fqn,
+                shared_data: shared_refs.into_iter().map(|r| r.index_key()).collect(),
+            })
+            .filter(|row| row.shared_data.len() >= min_overlap)
+            .collect();
+        let result = AdjacentVerbsResult {
+            verb_fqn,
+            adjacent: entries,
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -580,6 +750,85 @@ impl CustomOperation for AffinityGovernanceGapsOp {
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_string_opt;
+        let schema_filter = json_extract_string_opt(args, "schema-name");
+        let gap_type = GapType::from_arg(json_extract_string_opt(args, "gap-type"))?;
+
+        let graph = load_affinity_graph_cached(pool).await?;
+        let known_tables = if let Some(ref schema) = schema_filter {
+            sqlx::query_as::<_, (String, String)>(
+                "SELECT table_schema, table_name \
+                 FROM information_schema.tables \
+                 WHERE table_type = 'BASE TABLE' AND table_schema = $1 \
+                 ORDER BY table_schema, table_name",
+            )
+            .bind(schema)
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, (String, String)>(
+                "SELECT table_schema, table_name \
+                 FROM information_schema.tables \
+                 WHERE table_type = 'BASE TABLE' \
+                   AND table_schema NOT IN ('pg_catalog','information_schema','pg_toast') \
+                 ORDER BY table_schema, table_name",
+            )
+            .fetch_all(pool)
+            .await?
+        };
+        let known_table_refs: Vec<TableRef> = known_tables
+            .into_iter()
+            .map(|(s, t)| TableRef::new(s, t))
+            .collect();
+        let orphan_tables_all: Vec<String> = graph
+            .orphan_tables(&known_table_refs)
+            .into_iter()
+            .map(|t| t.key())
+            .collect();
+        let orphan_verbs_all = graph.orphan_verbs();
+        let write_only_all = graph.write_only_attributes();
+        let read_before_write_all = graph.read_before_write_attributes();
+        let result = GovernanceGapsResult {
+            orphan_tables: if matches!(gap_type, GapType::All | GapType::OrphanTables) {
+                orphan_tables_all
+            } else {
+                Vec::new()
+            },
+            orphan_verbs: if matches!(gap_type, GapType::All | GapType::OrphanVerbs) {
+                orphan_verbs_all
+            } else {
+                Vec::new()
+            },
+            write_only_attributes: if matches!(gap_type, GapType::All | GapType::WriteOnly) {
+                write_only_all
+            } else {
+                Vec::new()
+            },
+            read_before_write_attributes: if matches!(
+                gap_type,
+                GapType::All | GapType::ReadBeforeWrite
+            ) {
+                read_before_write_all
+            } else {
+                Vec::new()
+            },
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -688,6 +937,90 @@ impl CustomOperation for AffinityDiscoverDslOp {
             policy_check,
         );
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_int_opt, json_extract_string, json_extract_string_opt};
+        let utterance = json_extract_string(args, "utterance")
+            .or_else(|_| json_extract_string(args, "intent"))?;
+        let subject_id = json_extract_string_opt(args, "subject-id");
+        let max_chain_length = json_extract_int_opt(args, "max-chain-length")
+            .map(|v| v.max(1) as usize)
+            .unwrap_or(5);
+
+        let subject_uuid = subject_id
+            .as_deref()
+            .map(Uuid::parse_str)
+            .transpose()
+            .map_err(|e| anyhow::anyhow!("invalid subject-id: {e}"))?;
+
+        let graph = load_affinity_graph_cached(pool).await?;
+        let verb_contracts = load_active_verb_contracts(pool).await?;
+
+        let mut allowed_verbs: Option<HashSet<String>> = None;
+        let mut policy_check = None;
+
+        if let Some(subject_uuid) = subject_uuid {
+            let actor_id = ctx.principal.actor_id.clone();
+            let actor = ActorContext {
+                actor_id: actor_id.clone(),
+                roles: vec!["analyst".to_owned()],
+                department: Some("registry".to_owned()),
+                clearance: Some(Classification::Internal),
+                jurisdictions: vec![],
+            };
+            let request = ContextResolutionRequest {
+                subject: SubjectRef::EntityId(subject_uuid),
+                intent_summary: None,
+                raw_utterance: Some(utterance.clone()),
+                actor: to_sem_os_actor(&actor),
+                goals: vec!["dsl_discovery".to_owned()],
+                constraints: Default::default(),
+                evidence_mode: EvidenceMode::Normal,
+                point_in_time: None,
+                entity_kind: None,
+                entity_confidence: None,
+                discovery: DiscoveryContext::default(),
+            };
+            match resolve_context_via_sem_os(pool, &actor, request).await {
+                Ok(resp) => {
+                    let allowed: HashSet<String> =
+                        resp.candidate_verbs.into_iter().map(|v| v.fqn).collect();
+                    policy_check = Some(format!(
+                        "ccir_applied:candidates={},confidence={:.2}",
+                        allowed.len(),
+                        resp.confidence
+                    ));
+                    allowed_verbs = Some(allowed);
+                }
+                Err(err) => {
+                    policy_check = Some(format!("ccir_failed:{err}"));
+                }
+            }
+        }
+
+        let result = discover_dsl(
+            &utterance,
+            &graph,
+            &verb_contracts,
+            subject_uuid,
+            max_chain_length,
+            allowed_verbs.as_ref(),
+            policy_check,
+        );
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]

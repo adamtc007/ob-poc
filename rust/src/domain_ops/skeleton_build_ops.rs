@@ -16,8 +16,8 @@ use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 use rust_decimal::prelude::ToPrimitive;
 
-use super::helpers::{extract_string_opt, extract_uuid};
 use super::CustomOperation;
+use super::helpers::{extract_string_opt, extract_uuid};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -51,6 +51,86 @@ pub struct SkeletonBuildResult {
 #[register_custom_op]
 pub struct SkeletonBuildOp;
 
+#[cfg(feature = "database")]
+async fn skeleton_build_impl(
+    case_id: Uuid,
+    source: String,
+    threshold: f64,
+    max_outreach_items: usize,
+    pool: &PgPool,
+) -> Result<SkeletonBuildResult> {
+    let mut tx = pool.begin().await?;
+
+    let mut steps_completed = Vec::new();
+
+    let run_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO "ob-poc".graph_import_runs
+           (run_id, run_kind, source, scope_root_entity_id, status, started_at)
+           SELECT $1, 'SKELETON_BUILD', $2, c.client_group_id, 'ACTIVE', NOW()
+           FROM "ob-poc".cases c WHERE c.case_id = $3"#,
+    )
+    .bind(run_id)
+    .bind(&source)
+    .bind(case_id)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        r#"INSERT INTO "ob-poc".case_import_runs (case_id, run_id)
+           VALUES ($1, $2)
+           ON CONFLICT DO NOTHING"#,
+    )
+    .bind(case_id)
+    .bind(run_id)
+    .execute(&mut *tx)
+    .await?;
+    steps_completed.push("import-run.begin".to_string());
+
+    let anomalies_found = run_graph_validate(&mut tx, case_id).await?;
+    steps_completed.push("graph.validate".to_string());
+
+    let (determination_run_id, ubo_candidates_found) =
+        run_ubo_compute(&mut tx, case_id, threshold).await?;
+    steps_completed.push("ubo.compute-chains".to_string());
+
+    let coverage_pct = run_coverage_compute(&mut tx, case_id, determination_run_id).await?;
+    steps_completed.push("coverage.compute".to_string());
+
+    let (outreach_plan_id, total_gaps_before_cap) =
+        run_outreach_plan(&mut tx, case_id, determination_run_id, max_outreach_items).await?;
+    steps_completed.push("outreach.plan-generate".to_string());
+
+    let skeleton_ready = run_tollgate_evaluate(&mut tx, case_id).await?;
+    steps_completed.push("tollgate.check-gate".to_string());
+
+    sqlx::query(
+        r#"UPDATE "ob-poc".graph_import_runs
+           SET status = 'COMPLETED', completed_at = NOW()
+           WHERE run_id = $1"#,
+    )
+    .bind(run_id)
+    .execute(&mut *tx)
+    .await?;
+    steps_completed.push("import-run.complete".to_string());
+
+    tx.commit().await?;
+
+    Ok(SkeletonBuildResult {
+        case_id,
+        import_run_id: run_id,
+        determination_run_id,
+        anomalies_found,
+        ubo_candidates_found,
+        coverage_pct,
+        outreach_plan_id,
+        skeleton_ready,
+        items_capped: total_gaps_before_cap > max_outreach_items as i32,
+        total_gaps_before_cap,
+        steps_completed,
+    })
+}
+
 #[async_trait]
 impl CustomOperation for SkeletonBuildOp {
     fn domain(&self) -> &'static str {
@@ -80,92 +160,46 @@ impl CustomOperation for SkeletonBuildOp {
             .and_then(|s| s.parse().ok())
             .unwrap_or(8)
             .clamp(1, 50);
-
-        // All 7 steps run within a single transaction.
-        // On any failure, the transaction is rolled back automatically (drop).
-        let mut tx = pool.begin().await?;
-
-        let mut steps_completed = Vec::new();
-
-        // Step 1: Begin import run
-        let run_id = Uuid::new_v4();
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".graph_import_runs
-               (run_id, run_kind, source, scope_root_entity_id, status, started_at)
-               SELECT $1, 'SKELETON_BUILD', $2, c.client_group_id, 'ACTIVE', NOW()
-               FROM "ob-poc".cases c WHERE c.case_id = $3"#,
-        )
-        .bind(run_id)
-        .bind(&source)
-        .bind(case_id)
-        .execute(&mut *tx)
-        .await?;
-
-        // Link import run to case
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".case_import_runs (case_id, run_id)
-               VALUES ($1, $2)
-               ON CONFLICT DO NOTHING"#,
-        )
-        .bind(case_id)
-        .bind(run_id)
-        .execute(&mut *tx)
-        .await?;
-        steps_completed.push("import-run.begin".to_string());
-
-        // Step 2: Graph validate — real cycle detection, supply checks, anomaly persistence
-        let anomalies_found = run_graph_validate(&mut tx, case_id).await?;
-        steps_completed.push("graph.validate".to_string());
-
-        // Step 3: UBO compute chains — real DFS chain traversal with percentage multiplication
-        let (determination_run_id, ubo_candidates_found) =
-            run_ubo_compute(&mut tx, case_id, threshold).await?;
-        steps_completed.push("ubo.compute-chains".to_string());
-
-        // Step 4: Coverage compute — real 4-prong coverage checks
-        let coverage_pct = run_coverage_compute(&mut tx, case_id, determination_run_id).await?;
-        steps_completed.push("coverage.compute".to_string());
-
-        // Step 5: Outreach plan generate — real gap-to-doc mapping
-        let (outreach_plan_id, total_gaps_before_cap) =
-            run_outreach_plan(&mut tx, case_id, determination_run_id, max_outreach_items).await?;
-        steps_completed.push("outreach.plan-generate".to_string());
-
-        // Step 6: Tollgate evaluate (SKELETON_READY) — real gate evaluation
-        let skeleton_ready = run_tollgate_evaluate(&mut tx, case_id).await?;
-        steps_completed.push("tollgate.check-gate".to_string());
-
-        // Step 7: Complete import run
-        sqlx::query(
-            r#"UPDATE "ob-poc".graph_import_runs
-               SET status = 'COMPLETED', completed_at = NOW()
-               WHERE run_id = $1"#,
-        )
-        .bind(run_id)
-        .execute(&mut *tx)
-        .await?;
-        steps_completed.push("import-run.complete".to_string());
-
-        tx.commit().await?;
-
-        let result = SkeletonBuildResult {
-            case_id,
-            import_run_id: run_id,
-            determination_run_id,
-            anomalies_found,
-            ubo_candidates_found,
-            coverage_pct,
-            outreach_plan_id,
-            skeleton_ready,
-            items_capped: total_gaps_before_cap > max_outreach_items as i32,
-            total_gaps_before_cap,
-            steps_completed,
-        };
+        let result =
+            skeleton_build_impl(case_id, source, threshold, max_outreach_items, pool).await?;
 
         // Bind the result UUID so downstream can reference @skeleton
-        ctx.bind("run", run_id);
+        ctx.bind("run", result.import_run_id);
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let source =
+            json_extract_string_opt(args, "source").unwrap_or_else(|| "MANUAL".to_string());
+        let threshold: f64 = json_extract_string_opt(args, "threshold")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(5.0);
+        let max_outreach_items: usize = json_extract_string_opt(args, "max-outreach-items")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(8)
+            .clamp(1, 50);
+
+        let result =
+            skeleton_build_impl(case_id, source, threshold, max_outreach_items, pool).await?;
+        ctx.bind("run", result.import_run_id);
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

@@ -11,7 +11,7 @@
 //! The op queries `entity_relationships` from the database, runs all validation checks,
 //! and persists any anomalies found into `"ob-poc".research_anomalies`.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
@@ -75,6 +75,40 @@ struct Edge {
 #[register_custom_op]
 pub struct GraphValidateOp;
 
+#[cfg(feature = "database")]
+async fn graph_validate_impl(case_id: Option<Uuid>, pool: &PgPool) -> Result<GraphValidateResult> {
+    let edges = load_edges(pool, case_id).await?;
+
+    let mut all_entity_ids: HashSet<Uuid> = HashSet::new();
+    for edge in &edges {
+        all_entity_ids.insert(edge.from_entity_id);
+        all_entity_ids.insert(edge.to_entity_id);
+    }
+
+    let entities_analysed = all_entity_ids.len() as i32;
+    let edges_analysed = edges.len() as i32;
+
+    let mut anomalies: Vec<GraphAnomaly> = Vec::new();
+
+    detect_cycles(&edges, &mut anomalies);
+    check_missing_percentages(&edges, &mut anomalies);
+    check_supply_exceeds_100(&edges, &mut anomalies);
+    check_source_conflicts(&edges, &mut anomalies);
+    check_orphan_entities(&edges, &all_entity_ids, &mut anomalies);
+    check_terminus_integrity(&edges, &all_entity_ids, pool, &mut anomalies).await?;
+
+    let anomalies_found = anomalies.len() as i32;
+    let anomalies_persisted = persist_anomalies(pool, &anomalies, case_id, &all_entity_ids).await?;
+
+    Ok(GraphValidateResult {
+        anomalies_found,
+        anomalies,
+        edges_analysed,
+        entities_analysed,
+        anomalies_persisted,
+    })
+}
+
 #[async_trait]
 impl CustomOperation for GraphValidateOp {
     fn domain(&self) -> &'static str {
@@ -98,47 +132,7 @@ impl CustomOperation for GraphValidateOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
-
-        // Load edges — scoped to case entities if case-id provided, otherwise all active edges.
-        let edges = load_edges(pool, case_id).await?;
-
-        // Collect all entity IDs referenced in edges.
-        let mut all_entity_ids: HashSet<Uuid> = HashSet::new();
-        for edge in &edges {
-            all_entity_ids.insert(edge.from_entity_id);
-            all_entity_ids.insert(edge.to_entity_id);
-        }
-
-        let entities_analysed = all_entity_ids.len() as i32;
-        let edges_analysed = edges.len() as i32;
-
-        // Run all validation checks.
-        let mut anomalies: Vec<GraphAnomaly> = Vec::new();
-
-        // Synchronous checks.
-        detect_cycles(&edges, &mut anomalies);
-        check_missing_percentages(&edges, &mut anomalies);
-        check_supply_exceeds_100(&edges, &mut anomalies);
-        check_source_conflicts(&edges, &mut anomalies);
-        check_orphan_entities(&edges, &all_entity_ids, &mut anomalies);
-
-        // Async check: terminus integrity (requires DB lookups for entity types).
-        check_terminus_integrity(&edges, &all_entity_ids, pool, &mut anomalies).await?;
-
-        let anomalies_found = anomalies.len() as i32;
-
-        // Persist anomalies to "ob-poc".research_anomalies.
-        let anomalies_persisted =
-            persist_anomalies(pool, &anomalies, case_id, &all_entity_ids).await?;
-
-        let result = GraphValidateResult {
-            anomalies_found,
-            anomalies,
-            edges_analysed,
-            entities_analysed,
-            anomalies_persisted,
-        };
-
+        let result = graph_validate_impl(case_id, pool).await?;
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
@@ -149,6 +143,26 @@ impl CustomOperation for GraphValidateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid_opt;
+
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let result = graph_validate_impl(case_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

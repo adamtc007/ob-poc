@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".cbu_ssi (\n                ssi_id, cbu_id, ssi_name, ssi_type, market_id,\n                safekeeping_account, safekeeping_bic, safekeeping_account_name,\n                cash_account, cash_account_bic, cash_currency,\n                collateral_account, collateral_account_bic,\n                pset_bic, receiving_agent_bic, delivering_agent_bic,\n                effective_date, expiry_date, status, source, source_reference\n            ) VALUES (\n                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'PENDING', $19, $20\n            )\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Date",
+        "Date",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bcbcb0652fe7e7f382a4e93226471ea2fe3b86cf44b7cbc30e14c1442c8736cb"
+}

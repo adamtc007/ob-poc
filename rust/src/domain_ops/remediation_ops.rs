@@ -7,7 +7,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 
-use super::helpers::{extract_string, extract_string_opt, extract_uuid, extract_uuid_opt};
+use super::helpers::{
+    extract_string, extract_string_opt, extract_uuid, extract_uuid_opt, json_extract_string,
+    json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
 #[cfg(feature = "database")]
@@ -17,6 +20,18 @@ use sqlx::PgPool;
 
 #[register_custom_op]
 pub struct RemediationListOpenOp;
+
+#[cfg(feature = "database")]
+async fn remediation_list_open_impl(
+    entity_id: Option<uuid::Uuid>,
+    workspace: Option<String>,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    use crate::cross_workspace::remediation;
+
+    let events = remediation::list_open(pool, entity_id, workspace.as_deref()).await?;
+    Ok(serde_json::to_value(events)?)
+}
 
 #[async_trait]
 impl CustomOperation for RemediationListOpenOp {
@@ -39,17 +54,13 @@ impl CustomOperation for RemediationListOpenOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::cross_workspace::remediation;
-
         let entity_id = extract_uuid_opt(verb_call, ctx, "entity-id");
         let workspace = extract_string_opt(verb_call, "workspace");
-
-        let events = remediation::list_open(pool, entity_id, workspace.as_deref()).await?;
-        let records: Vec<serde_json::Value> = events
-            .into_iter()
-            .map(serde_json::to_value)
-            .collect::<Result<_, _>>()?;
-        Ok(ExecutionResult::RecordSet(records))
+        let records = remediation_list_open_impl(entity_id, workspace, pool).await?;
+        match records {
+            serde_json::Value::Array(items) => Ok(ExecutionResult::RecordSet(items)),
+            _ => Ok(ExecutionResult::RecordSet(Vec::new())),
+        }
     }
 
     #[cfg(not(feature = "database"))]
@@ -60,12 +71,60 @@ impl CustomOperation for RemediationListOpenOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("remediation.list-open requires database"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
+        let workspace = json_extract_string_opt(args, "workspace");
+        let records = remediation_list_open_impl(entity_id, workspace, pool).await?;
+        match records {
+            serde_json::Value::Array(items) => Ok(
+                sem_os_core::execution::VerbExecutionOutcome::RecordSet(items),
+            ),
+            _ => Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+                Vec::new(),
+            )),
+        }
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── defer ────────────────────────────────────────────────────────────
 
 #[register_custom_op]
 pub struct RemediationDeferOp;
+
+#[cfg(feature = "database")]
+async fn remediation_defer_impl(
+    remediation_id: uuid::Uuid,
+    reason: String,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    use crate::cross_workspace::remediation;
+
+    remediation::defer(pool, remediation_id, &reason, None).await?;
+
+    #[derive(serde::Serialize)]
+    struct DeferResult {
+        remediation_id: uuid::Uuid,
+        status: &'static str,
+        reason: String,
+    }
+
+    Ok(serde_json::to_value(DeferResult {
+        remediation_id,
+        status: "deferred",
+        reason,
+    })?)
+}
 
 #[async_trait]
 impl CustomOperation for RemediationDeferOp {
@@ -88,27 +147,11 @@ impl CustomOperation for RemediationDeferOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::cross_workspace::remediation;
-
         let remediation_id = extract_uuid(verb_call, ctx, "remediation-id")?;
         let reason = extract_string(verb_call, "reason")?;
-
-        remediation::defer(pool, remediation_id, &reason, None).await?;
-
-        #[derive(serde::Serialize)]
-        struct DeferResult {
-            remediation_id: uuid::Uuid,
-            status: &'static str,
-            reason: String,
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(
-            DeferResult {
-                remediation_id,
-                status: "deferred",
-                reason,
-            },
-        )?))
+        Ok(ExecutionResult::Record(
+            remediation_defer_impl(remediation_id, reason, pool).await?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -119,12 +162,51 @@ impl CustomOperation for RemediationDeferOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("remediation.defer requires database"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
+        let reason = json_extract_string(args, "reason")?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            remediation_defer_impl(remediation_id, reason, pool).await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── revoke-deferral ──────────────────────────────────────────────────
 
 #[register_custom_op]
 pub struct RemediationRevokeDeferralOp;
+
+#[cfg(feature = "database")]
+async fn remediation_revoke_deferral_impl(
+    remediation_id: uuid::Uuid,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    use crate::cross_workspace::remediation;
+
+    remediation::revoke_deferral(pool, remediation_id).await?;
+
+    #[derive(serde::Serialize)]
+    struct RevokeResult {
+        remediation_id: uuid::Uuid,
+        status: &'static str,
+    }
+
+    Ok(serde_json::to_value(RevokeResult {
+        remediation_id,
+        status: "detected",
+    })?)
+}
 
 #[async_trait]
 impl CustomOperation for RemediationRevokeDeferralOp {
@@ -147,24 +229,10 @@ impl CustomOperation for RemediationRevokeDeferralOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::cross_workspace::remediation;
-
         let remediation_id = extract_uuid(verb_call, ctx, "remediation-id")?;
-
-        remediation::revoke_deferral(pool, remediation_id).await?;
-
-        #[derive(serde::Serialize)]
-        struct RevokeResult {
-            remediation_id: uuid::Uuid,
-            status: &'static str,
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(
-            RevokeResult {
-                remediation_id,
-                status: "detected",
-            },
-        )?))
+        Ok(ExecutionResult::Record(
+            remediation_revoke_deferral_impl(remediation_id, pool).await?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -175,12 +243,53 @@ impl CustomOperation for RemediationRevokeDeferralOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("remediation.revoke-deferral requires database"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            remediation_revoke_deferral_impl(remediation_id, pool).await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── confirm-external-correction ──────────────────────────────────────
 
 #[register_custom_op]
 pub struct RemediationConfirmExternalOp;
+
+#[cfg(feature = "database")]
+async fn remediation_confirm_external_impl(
+    remediation_id: uuid::Uuid,
+    provider_ref: String,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    use crate::cross_workspace::remediation;
+
+    remediation::mark_resolved(pool, remediation_id, None).await?;
+
+    #[derive(serde::Serialize)]
+    struct ConfirmResult {
+        remediation_id: uuid::Uuid,
+        provider_ref: String,
+        status: &'static str,
+    }
+
+    Ok(serde_json::to_value(ConfirmResult {
+        remediation_id,
+        provider_ref,
+        status: "resolved",
+    })?)
+}
 
 #[async_trait]
 impl CustomOperation for RemediationConfirmExternalOp {
@@ -203,28 +312,11 @@ impl CustomOperation for RemediationConfirmExternalOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::cross_workspace::remediation;
-
         let remediation_id = extract_uuid(verb_call, ctx, "remediation-id")?;
         let provider_ref = extract_string(verb_call, "provider-ref")?;
-
-        // Resolve the escalated remediation
-        remediation::mark_resolved(pool, remediation_id, None).await?;
-
-        #[derive(serde::Serialize)]
-        struct ConfirmResult {
-            remediation_id: uuid::Uuid,
-            provider_ref: String,
-            status: &'static str,
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(
-            ConfirmResult {
-                remediation_id,
-                provider_ref,
-                status: "resolved",
-            },
-        )?))
+        Ok(ExecutionResult::Record(
+            remediation_confirm_external_impl(remediation_id, provider_ref, pool).await?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -236,5 +328,23 @@ impl CustomOperation for RemediationConfirmExternalOp {
         Err(anyhow!(
             "remediation.confirm-external-correction requires database"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
+        let provider_ref = json_extract_string(args, "provider-ref")?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            remediation_confirm_external_impl(remediation_id, provider_ref, pool).await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

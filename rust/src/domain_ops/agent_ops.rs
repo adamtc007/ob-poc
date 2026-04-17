@@ -209,6 +209,10 @@ impl CustomOperation for AgentStartOp {
         })))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -250,6 +254,10 @@ impl CustomOperation for AgentPauseOp {
         ctx.set_pending_agent_pause();
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -295,6 +303,10 @@ impl CustomOperation for AgentResumeOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -336,6 +348,10 @@ impl CustomOperation for AgentStopOp {
         ctx.set_pending_agent_stop();
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -405,6 +421,10 @@ impl CustomOperation for AgentConfirmOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -466,6 +486,10 @@ impl CustomOperation for AgentRejectOp {
         ctx.set_pending_checkpoint_response(checkpoint_id, "reject", 0);
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -532,6 +556,10 @@ impl CustomOperation for AgentSelectOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -551,6 +579,71 @@ impl CustomOperation for AgentSelectOp {
 /// Get current agent status
 #[register_custom_op]
 pub struct AgentStatusOp;
+
+#[cfg(feature = "database")]
+async fn agent_status_impl(session_id: Uuid, pool: &PgPool) -> Result<serde_json::Value> {
+    let latest = sqlx::query!(
+        r#"
+        SELECT decision_id, search_query, decision_type, created_at
+        FROM "ob-poc".research_decisions
+        WHERE session_id = $1
+          AND search_query LIKE 'agent:%'
+        ORDER BY created_at DESC
+        LIMIT 1
+        "#,
+        session_id
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    match latest {
+        Some(row) => {
+            let stats = sqlx::query!(
+                r#"
+                SELECT
+                    COUNT(*) FILTER (WHERE search_query NOT LIKE 'agent:%') as "decision_count!",
+                    COUNT(*) FILTER (WHERE decision_type = 'USER_CONFIRMED') as "confirmed_count!",
+                    COUNT(*) FILTER (WHERE decision_type = 'REJECTED') as "rejected_count!"
+                FROM "ob-poc".research_decisions
+                WHERE session_id = $1
+                  AND created_at >= $2
+                "#,
+                session_id,
+                row.created_at
+            )
+            .fetch_one(pool)
+            .await?;
+
+            let action_count = sqlx::query_scalar!(
+                r#"
+                SELECT COUNT(*) as "count!"
+                FROM "ob-poc".research_actions
+                WHERE session_id = $1
+                  AND executed_at >= $2
+                "#,
+                session_id,
+                row.created_at
+            )
+            .fetch_one(pool)
+            .await?;
+
+            Ok(json!({
+                "agent_session_id": row.decision_id,
+                "task": row.search_query,
+                "status": row.decision_type,
+                "started_at": row.created_at,
+                "decisions_made": stats.decision_count,
+                "confirmed": stats.confirmed_count,
+                "rejected": stats.rejected_count,
+                "actions_taken": action_count
+            }))
+        }
+        None => Ok(json!({
+            "status": "idle",
+            "message": "No agent session active"
+        })),
+    }
+}
 
 #[async_trait]
 impl CustomOperation for AgentStatusOp {
@@ -574,70 +667,31 @@ impl CustomOperation for AgentStatusOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let session_id = get_session_id(ctx);
+        Ok(ExecutionResult::Record(
+            agent_status_impl(session_id, pool).await?,
+        ))
+    }
 
-        // Get latest agent session for this session
-        let latest = sqlx::query!(
-            r#"
-            SELECT decision_id, search_query, decision_type, created_at
-            FROM "ob-poc".research_decisions
-            WHERE session_id = $1
-              AND search_query LIKE 'agent:%'
-            ORDER BY created_at DESC
-            LIMIT 1
-            "#,
-            session_id
-        )
-        .fetch_optional(pool)
-        .await?;
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let session_id = ctx
+            .extensions
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .unwrap_or_else(Uuid::new_v4);
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            agent_status_impl(session_id, pool).await?,
+        ))
+    }
 
-        match latest {
-            Some(row) => {
-                // Count decisions and actions for this agent session
-                let stats = sqlx::query!(
-                    r#"
-                    SELECT
-                        COUNT(*) FILTER (WHERE search_query NOT LIKE 'agent:%') as "decision_count!",
-                        COUNT(*) FILTER (WHERE decision_type = 'USER_CONFIRMED') as "confirmed_count!",
-                        COUNT(*) FILTER (WHERE decision_type = 'REJECTED') as "rejected_count!"
-                    FROM "ob-poc".research_decisions
-                    WHERE session_id = $1
-                      AND created_at >= $2
-                    "#,
-                    session_id,
-                    row.created_at
-                )
-                .fetch_one(pool)
-                .await?;
-
-                let action_count = sqlx::query_scalar!(
-                    r#"
-                    SELECT COUNT(*) as "count!"
-                    FROM "ob-poc".research_actions
-                    WHERE session_id = $1
-                      AND executed_at >= $2
-                    "#,
-                    session_id,
-                    row.created_at
-                )
-                .fetch_one(pool)
-                .await?;
-
-                Ok(ExecutionResult::Record(json!({
-                    "agent_session_id": row.decision_id,
-                    "task": row.search_query,
-                    "status": row.decision_type,
-                    "started_at": row.created_at,
-                    "decisions_made": stats.decision_count,
-                    "confirmed": stats.confirmed_count,
-                    "rejected": stats.rejected_count,
-                    "actions_taken": action_count
-                })))
-            }
-            None => Ok(ExecutionResult::Record(json!({
-                "status": "idle",
-                "message": "No agent session active"
-            }))),
-        }
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -655,6 +709,79 @@ impl CustomOperation for AgentStatusOp {
 /// Get agent decision and action history for current session
 #[register_custom_op]
 pub struct AgentHistoryOp;
+
+#[cfg(feature = "database")]
+async fn agent_history_impl(
+    session_id: Uuid,
+    limit: i64,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    let decisions = sqlx::query!(
+        r#"
+        SELECT decision_id, source_provider, search_query, decision_type,
+               selection_confidence, selected_key, created_at
+        FROM "ob-poc".research_decisions
+        WHERE session_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+        "#,
+        session_id,
+        limit
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let decision_list: Vec<serde_json::Value> = decisions
+        .into_iter()
+        .map(|d| {
+            json!({
+                "decision_id": d.decision_id,
+                "source_provider": d.source_provider,
+                "query": d.search_query,
+                "decision_type": d.decision_type,
+                "confidence": d.selection_confidence,
+                "selected_key": d.selected_key,
+                "created_at": d.created_at
+            })
+        })
+        .collect();
+
+    let actions = sqlx::query!(
+        r#"
+        SELECT action_id, decision_id, verb_domain, verb_name,
+               success, entities_created, executed_at
+        FROM "ob-poc".research_actions
+        WHERE session_id = $1
+        ORDER BY executed_at DESC
+        LIMIT $2
+        "#,
+        session_id,
+        limit
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let action_list: Vec<serde_json::Value> = actions
+        .into_iter()
+        .map(|a| {
+            json!({
+                "action_id": a.action_id,
+                "decision_id": a.decision_id,
+                "verb": format!("{}:{}", a.verb_domain, a.verb_name),
+                "success": a.success,
+                "entities_created": a.entities_created,
+                "executed_at": a.executed_at
+            })
+        })
+        .collect();
+
+    Ok(json!({
+        "decisions": decision_list,
+        "actions": action_list,
+        "decision_count": decision_list.len(),
+        "action_count": action_list.len()
+    }))
+}
 
 #[async_trait]
 impl CustomOperation for AgentHistoryOp {
@@ -679,74 +806,33 @@ impl CustomOperation for AgentHistoryOp {
     ) -> Result<ExecutionResult> {
         let session_id = get_session_id(ctx);
         let limit = get_optional_integer(verb_call, "limit").unwrap_or(50) as i64;
+        Ok(ExecutionResult::Record(
+            agent_history_impl(session_id, limit, pool).await?,
+        ))
+    }
 
-        // Get decisions
-        let decisions = sqlx::query!(
-            r#"
-            SELECT decision_id, source_provider, search_query, decision_type,
-                   selection_confidence, selected_key, created_at
-            FROM "ob-poc".research_decisions
-            WHERE session_id = $1
-            ORDER BY created_at DESC
-            LIMIT $2
-            "#,
-            session_id,
-            limit
-        )
-        .fetch_all(pool)
-        .await?;
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_int_opt;
+        let session_id = ctx
+            .extensions
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .unwrap_or_else(Uuid::new_v4);
+        let limit = json_extract_int_opt(args, "limit").unwrap_or(50);
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            agent_history_impl(session_id, limit, pool).await?,
+        ))
+    }
 
-        let decision_list: Vec<serde_json::Value> = decisions
-            .into_iter()
-            .map(|d| {
-                json!({
-                    "decision_id": d.decision_id,
-                    "source_provider": d.source_provider,
-                    "query": d.search_query,
-                    "decision_type": d.decision_type,
-                    "confidence": d.selection_confidence,
-                    "selected_key": d.selected_key,
-                    "created_at": d.created_at
-                })
-            })
-            .collect();
-
-        // Get actions
-        let actions = sqlx::query!(
-            r#"
-            SELECT action_id, decision_id, verb_domain, verb_name,
-                   success, entities_created, executed_at
-            FROM "ob-poc".research_actions
-            WHERE session_id = $1
-            ORDER BY executed_at DESC
-            LIMIT $2
-            "#,
-            session_id,
-            limit
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let action_list: Vec<serde_json::Value> = actions
-            .into_iter()
-            .map(|a| {
-                json!({
-                    "action_id": a.action_id,
-                    "decision_id": a.decision_id,
-                    "verb": format!("{}:{}", a.verb_domain, a.verb_name),
-                    "success": a.success,
-                    "entities_created": a.entities_created,
-                    "executed_at": a.executed_at
-                })
-            })
-            .collect();
-
-        Ok(ExecutionResult::Record(json!({
-            "decisions": decision_list,
-            "actions": action_list,
-            "decision_count": decision_list.len(),
-            "action_count": action_list.len()
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -817,6 +903,10 @@ impl CustomOperation for AgentSetThresholdOp {
         })))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -874,6 +964,10 @@ impl CustomOperation for AgentSetModeOp {
             "mode": mode,
             "message": format!("Mode set to {}", mode)
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -959,6 +1053,10 @@ impl CustomOperation for AgentSetAuthoringModeOp {
         })))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1037,6 +1135,45 @@ impl CustomOperation for AgentTeachOp {
         }
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt};
+        let phrase = json_extract_string(args, "phrase")?;
+        let verb = json_extract_string(args, "verb")?;
+        let source =
+            json_extract_string_opt(args, "source").unwrap_or_else(|| "dsl_teaching".to_string());
+
+        let result: (bool,) = sqlx::query_as(r#"SELECT "ob-poc".teach_phrase($1, $2, $3)"#)
+            .bind(&phrase)
+            .bind(&verb)
+            .bind(&source)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to teach phrase: {}", e))?;
+
+        let val = if result.0 {
+            json!({
+                "success": true, "taught": true, "phrase": phrase, "verb": verb, "source": source,
+                "message": format!("Taught: '{}' → {}. Run (agent.activate-teaching) to activate.", phrase, verb)
+            })
+        } else {
+            json!({
+                "success": false, "taught": false, "phrase": phrase, "verb": verb,
+                "error": "Pattern already exists or verb not found"
+            })
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(val))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1102,6 +1239,48 @@ impl CustomOperation for AgentUnteachOp {
                 "No matching patterns found to remove".to_string()
             }
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt};
+        let phrase = json_extract_string(args, "phrase")?;
+        let verb = json_extract_string_opt(args, "verb");
+        let reason =
+            json_extract_string_opt(args, "reason").unwrap_or_else(|| "dsl_unteach".to_string());
+
+        let result: (i32,) = sqlx::query_as(r#"SELECT "ob-poc".unteach_phrase($1, $2, $3)"#)
+            .bind(&phrase)
+            .bind(verb.as_deref())
+            .bind(&reason)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to unteach phrase: {}", e))?;
+
+        let removed_count = result.0;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "success": true,
+                "untaught": removed_count > 0,
+                "phrase": phrase,
+                "verb": verb,
+                "removed_count": removed_count,
+                "message": if removed_count > 0 {
+                    format!("Removed {} pattern(s) for phrase '{}'", removed_count, phrase)
+                } else {
+                    "No matching patterns found to remove".to_string()
+                }
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -1212,6 +1391,77 @@ impl CustomOperation for AgentTeachingStatusOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_bool_opt, json_extract_int_opt};
+        let limit = json_extract_int_opt(args, "limit").unwrap_or(20) as i32;
+        let include_stats = json_extract_bool_opt(args, "include-stats").unwrap_or(true);
+
+        let recent: Vec<(String, String, String, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
+            r#"
+            SELECT phrase, verb, source, taught_at
+            FROM "ob-poc".v_recently_taught
+            ORDER BY taught_at DESC
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to get recently taught: {}", e))?;
+
+        let recent_json: Vec<serde_json::Value> = recent
+            .iter()
+            .map(|(phrase, verb, source, taught_at)| {
+                json!({
+                    "phrase": phrase, "verb": verb, "source": source,
+                    "taught_at": taught_at.to_rfc3339()
+                })
+            })
+            .collect();
+
+        let stats = if include_stats {
+            let row: Option<(i64, i64, i64, Option<chrono::DateTime<chrono::Utc>>)> =
+                sqlx::query_as(
+                    r#"
+                    SELECT total_taught, taught_today, taught_this_week, most_recent
+                    FROM "ob-poc".v_teaching_stats
+                    "#,
+                )
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to get teaching stats: {}", e))?;
+
+            row.map(|(total, today, week, most_recent)| {
+                json!({
+                    "total_taught": total, "taught_today": today,
+                    "taught_this_week": week,
+                    "most_recent": most_recent.map(|t| t.to_rfc3339())
+                })
+            })
+        } else {
+            None
+        };
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "success": true,
+                "recent_count": recent_json.len(),
+                "recent": recent_json,
+                "stats": stats
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1271,6 +1521,10 @@ impl CustomOperation for AgentGetModeOp {
         })))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1328,6 +1582,37 @@ impl CustomOperation for AgentGetPolicyOp {
             "allow_legacy_generate": allow_legacy_generate == "true",
             "message": "Current PolicyGate configuration"
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let strict_pipeline =
+            std::env::var("OBPOC_STRICT_SINGLE_PIPELINE").unwrap_or_else(|_| "true".to_string());
+        let allow_raw_execute =
+            std::env::var("OBPOC_ALLOW_RAW_EXECUTE").unwrap_or_else(|_| "false".to_string());
+        let strict_semreg =
+            std::env::var("OBPOC_STRICT_SEMREG").unwrap_or_else(|_| "true".to_string());
+        let allow_legacy_generate =
+            std::env::var("OBPOC_ALLOW_LEGACY_GENERATE").unwrap_or_else(|_| "false".to_string());
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "strict_single_pipeline": strict_pipeline == "true",
+                "allow_raw_execute": allow_raw_execute == "true",
+                "strict_semreg": strict_semreg == "true",
+                "allow_legacy_generate": allow_legacy_generate == "true",
+                "message": "Current PolicyGate configuration"
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -1398,6 +1683,41 @@ impl CustomOperation for AgentListToolsOp {
                 .map(|v| serde_json::to_value(v).unwrap_or_default())
                 .collect(),
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_string_opt;
+        let category_filter = json_extract_string_opt(args, "category");
+
+        let all_specs = crate::sem_reg::agent::mcp_tools::all_tool_specs();
+        let tools: Vec<serde_json::Value> = all_specs
+            .into_iter()
+            .filter(|spec| {
+                if let Some(ref cat) = category_filter {
+                    spec.name.contains(cat.as_str())
+                } else {
+                    true
+                }
+            })
+            .map(|spec| json!({ "name": spec.name, "description": spec.description }))
+            .collect();
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            tools
+                .into_iter()
+                .map(|v| serde_json::to_value(v).unwrap_or_default())
+                .collect(),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -1568,6 +1888,138 @@ impl CustomOperation for AgentTelemetrySummaryOp {
         Ok(ExecutionResult::Record(result))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_bool_opt, json_extract_int_opt};
+        let days_back = json_extract_int_opt(args, "days-back").unwrap_or(7) as i32;
+        let min_count = json_extract_int_opt(args, "min-count").unwrap_or(2) as i64;
+        let include_ccir = json_extract_bool_opt(args, "include-ccir").unwrap_or(false);
+
+        let clarify_rows: Vec<(String, i64)> = sqlx::query_as(
+            r#"
+            SELECT chosen_verb_fqn, count(*) AS clarify_count
+            FROM "ob-poc".intent_events
+            WHERE outcome = 'needs_clarification'
+              AND chosen_verb_fqn IS NOT NULL
+              AND ts > now() - make_interval(days => $1)
+            GROUP BY chosen_verb_fqn
+            HAVING count(*) >= $2
+            ORDER BY clarify_count DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(days_back)
+        .bind(min_count)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let failure_rows: Vec<(String, Option<String>, i64)> = sqlx::query_as(
+            r#"
+            SELECT outcome, error_code, count(*) AS event_count
+            FROM "ob-poc".intent_events
+            WHERE outcome NOT IN ('ready', 'scope_resolved', 'macro_expanded')
+              AND ts > now() - make_interval(days => $1)
+            GROUP BY outcome, error_code
+            HAVING count(*) >= $2
+            ORDER BY event_count DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(days_back)
+        .bind(min_count)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let deny_rows: Vec<(String, i64)> = sqlx::query_as(
+            r#"
+            SELECT denied_verb, count(*) AS deny_count
+            FROM (
+                SELECT jsonb_array_elements_text(semreg_denied_verbs) AS denied_verb
+                FROM "ob-poc".intent_events
+                WHERE semreg_denied_verbs IS NOT NULL
+                  AND jsonb_array_length(semreg_denied_verbs) > 0
+                  AND ts > now() - make_interval(days => $1)
+            ) sub
+            GROUP BY denied_verb
+            HAVING count(*) >= $2
+            ORDER BY deny_count DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(days_back)
+        .bind(min_count)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let total: (i64,) = sqlx::query_as(
+            r#"
+            SELECT count(*) FROM "ob-poc".intent_events
+            WHERE ts > now() - make_interval(days => $1)
+            "#,
+        )
+        .bind(days_back)
+        .fetch_one(pool)
+        .await
+        .unwrap_or((0,));
+
+        let mut result = json!({
+            "period_days": days_back,
+            "min_count_threshold": min_count,
+            "total_events": total.0,
+            "clarify_hotspots": clarify_rows.iter().map(|(verb, count)| {
+                json!({"verb": verb, "count": count})
+            }).collect::<Vec<_>>(),
+            "failure_modes": failure_rows.iter().map(|(outcome, code, count)| {
+                json!({"outcome": outcome, "error_code": code, "count": count})
+            }).collect::<Vec<_>>(),
+            "semreg_denies": deny_rows.iter().map(|(verb, count)| {
+                json!({"verb": verb, "deny_count": count})
+            }).collect::<Vec<_>>(),
+        });
+
+        if include_ccir {
+            let ccir_row: (i64, i64, i64) = sqlx::query_as(
+                r#"
+                SELECT
+                    count(*) FILTER (WHERE allowed_verbs_fingerprint IS NOT NULL) AS fingerprinted,
+                    coalesce(avg(pruned_verbs_count) FILTER (WHERE pruned_verbs_count IS NOT NULL), 0)::bigint AS avg_pruned,
+                    count(*) FILTER (WHERE toctou_recheck_performed = true) AS toctou_rechecks
+                FROM "ob-poc".intent_events
+                WHERE ts > now() - make_interval(days => $1)
+                "#,
+            )
+            .bind(days_back)
+            .fetch_one(pool)
+            .await
+            .unwrap_or((0, 0, 0));
+
+            if let serde_json::Value::Object(ref mut map) = result {
+                map.insert(
+                    "ccir".to_string(),
+                    json!({
+                        "events_with_fingerprint": ccir_row.0,
+                        "avg_pruned_verbs": ccir_row.1,
+                        "toctou_rechecks": ccir_row.2,
+                    }),
+                );
+            }
+        }
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1681,6 +2133,94 @@ impl CustomOperation for AgentLearnOp {
             "pending_before": pending_before.0,
             "pending_after": pending_after.0
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let pending_before: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM "ob-poc".v_recently_taught rt
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
+                WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb
+            )
+            "#,
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to count pending patterns: {}", e))?;
+
+        if pending_before.0 == 0 {
+            return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                json!({
+                    "success": true,
+                    "message": "No pending patterns to embed",
+                    "embedded_count": 0
+                }),
+            ));
+        }
+
+        tracing::info!(
+            "Running populate_embeddings for {} pending patterns...",
+            pending_before.0
+        );
+
+        let output = tokio::process::Command::new("cargo")
+            .args([
+                "run",
+                "--release",
+                "-p",
+                "ob-semantic-matcher",
+                "--bin",
+                "populate_embeddings",
+            ])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to run populate_embeddings: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                json!({
+                    "success": false,
+                    "error": format!("populate_embeddings failed: {}", stderr)
+                }),
+            ));
+        }
+
+        let pending_after: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM "ob-poc".v_recently_taught rt
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
+                WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb
+            )
+            "#,
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to count remaining patterns: {}", e))?;
+
+        let embedded_count = pending_before.0 - pending_after.0;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "success": true,
+                "message": format!("Activated {} new patterns for semantic search", embedded_count),
+                "embedded_count": embedded_count,
+                "pending_before": pending_before.0,
+                "pending_after": pending_after.0
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 
     #[cfg(not(feature = "database"))]

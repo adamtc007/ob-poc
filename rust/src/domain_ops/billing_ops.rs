@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use super::helpers::{
     extract_bool_opt, extract_string, extract_string_opt, extract_uuid, extract_uuid_opt,
+    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -139,6 +140,87 @@ impl CustomOperation for BillingCreateProfileOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
+        let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
+        let rate_card_id = json_extract_uuid(args, ctx, "rate-card-id")?;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let product_id = json_extract_uuid(args, ctx, "product-id")?;
+        let invoice_entity_id = json_extract_uuid(args, ctx, "invoice-entity-id")?;
+        let profile_name = json_extract_string_opt(args, "profile-name");
+        let billing_frequency = json_extract_string_opt(args, "billing-frequency")
+            .unwrap_or_else(|| "MONTHLY".to_string());
+        let invoice_currency =
+            json_extract_string_opt(args, "invoice-currency").unwrap_or_else(|| "USD".to_string());
+        let payment_method = json_extract_string_opt(args, "payment-method");
+        let payment_account_ref = json_extract_string_opt(args, "payment-account-ref");
+        let effective_from = json_extract_string(args, "effective-from")?;
+
+        let rate_card_status: String = sqlx::query_scalar(
+            r#"SELECT status FROM "ob-poc".deal_rate_cards WHERE rate_card_id = $1"#,
+        )
+        .bind(rate_card_id)
+        .fetch_one(pool)
+        .await?;
+
+        if rate_card_status != "AGREED" {
+            return Err(anyhow!(
+                "Rate card must be in AGREED status to create billing profile"
+            ));
+        }
+
+        let profile_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".fee_billing_profiles (
+                deal_id, contract_id, rate_card_id, cbu_id, product_id,
+                profile_name, billing_frequency, invoice_entity_id,
+                invoice_currency, payment_method, payment_account_ref, effective_from
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::date)
+            RETURNING profile_id
+            "#,
+        )
+        .bind(deal_id)
+        .bind(contract_id)
+        .bind(rate_card_id)
+        .bind(cbu_id)
+        .bind(product_id)
+        .bind(&profile_name)
+        .bind(&billing_frequency)
+        .bind(invoice_entity_id)
+        .bind(&invoice_currency)
+        .bind(&payment_method)
+        .bind(&payment_account_ref)
+        .bind(&effective_from)
+        .fetch_one(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, new_value)
+            VALUES ($1, 'BILLING_PROFILE_CREATED', 'BILLING_PROFILE', $2, 'PENDING')
+            "#,
+        )
+        .bind(deal_id)
+        .bind(profile_id)
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            profile_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Activate a billing profile
@@ -219,6 +301,60 @@ impl CustomOperation for BillingActivateProfileOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
+
+        let target_count: i64 = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".fee_billing_account_targets WHERE profile_id = $1 AND is_active = true"#,
+        )
+        .bind(profile_id)
+        .fetch_one(pool)
+        .await?;
+
+        if target_count == 0 {
+            return Err(anyhow!(
+                "Cannot activate billing profile without account targets"
+            ));
+        }
+
+        let deal_id: Uuid = sqlx::query_scalar(
+            r#"SELECT deal_id FROM "ob-poc".fee_billing_profiles WHERE profile_id = $1"#,
+        )
+        .bind(profile_id)
+        .fetch_one(pool)
+        .await?;
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".fee_billing_profiles SET status = 'ACTIVE', updated_at = NOW() WHERE profile_id = $1"#,
+        )
+        .bind(profile_id)
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, new_value)
+            VALUES ($1, 'BILLING_ACTIVATED', 'BILLING_PROFILE', $2, 'ACTIVE')
+            "#,
+        )
+        .bind(deal_id)
+        .bind(profile_id)
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Suspend a billing profile
@@ -287,6 +423,49 @@ impl CustomOperation for BillingSuspendProfileOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
+        let reason = json_extract_string(args, "reason")?;
+
+        let deal_id: Uuid = sqlx::query_scalar(
+            r#"SELECT deal_id FROM "ob-poc".fee_billing_profiles WHERE profile_id = $1"#,
+        )
+        .bind(profile_id)
+        .fetch_one(pool)
+        .await?;
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".fee_billing_profiles SET status = 'SUSPENDED', updated_at = NOW() WHERE profile_id = $1"#,
+        )
+        .bind(profile_id)
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, new_value, description)
+            VALUES ($1, 'BILLING_SUSPENDED', 'BILLING_PROFILE', $2, 'SUSPENDED', $3)
+            "#,
+        )
+        .bind(deal_id)
+        .bind(profile_id)
+        .bind(&reason)
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Close a billing profile
@@ -337,6 +516,37 @@ impl CustomOperation for BillingCloseProfileOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
+        let effective_to = json_extract_string(args, "effective-to")?;
+
+        let result = sqlx::query(
+            r#"
+            UPDATE "ob-poc".fee_billing_profiles
+            SET status = 'CLOSED', effective_to = $2::date, updated_at = NOW()
+            WHERE profile_id = $1
+            "#,
+        )
+        .bind(profile_id)
+        .bind(&effective_to)
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -436,6 +646,78 @@ impl CustomOperation for BillingAddAccountTargetOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_bool_opt;
+
+        let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
+        let cbu_resource_instance_id = json_extract_uuid(args, ctx, "cbu-resource-instance-id")?;
+        let rate_card_line_id = json_extract_uuid_opt(args, ctx, "rate-card-line-id");
+        let resource_type = json_extract_string_opt(args, "resource-type");
+        let resource_ref = json_extract_string_opt(args, "resource-ref");
+        let activity_type = json_extract_string_opt(args, "activity-type");
+        let has_override = json_extract_bool_opt(args, "has-override").unwrap_or(false);
+        let override_rate: Option<f64> =
+            json_extract_string_opt(args, "override-rate").and_then(|s| s.parse().ok());
+        let override_model = json_extract_string_opt(args, "override-model");
+
+        let profile_cbu_id: Uuid = sqlx::query_scalar(
+            r#"SELECT cbu_id FROM "ob-poc".fee_billing_profiles WHERE profile_id = $1"#,
+        )
+        .bind(profile_id)
+        .fetch_one(pool)
+        .await?;
+
+        let instance_cbu_id: Uuid = sqlx::query_scalar(
+            r#"SELECT cbu_id FROM "ob-poc".cbu_resource_instances WHERE instance_id = $1"#,
+        )
+        .bind(cbu_resource_instance_id)
+        .fetch_one(pool)
+        .await?;
+
+        if profile_cbu_id != instance_cbu_id {
+            return Err(anyhow!(
+                "Resource instance does not belong to the profile's CBU"
+            ));
+        }
+
+        let target_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".fee_billing_account_targets (
+                profile_id, cbu_resource_instance_id, rate_card_line_id,
+                resource_type, resource_ref, activity_type,
+                has_override, override_rate, override_model
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING target_id
+            "#,
+        )
+        .bind(profile_id)
+        .bind(cbu_resource_instance_id)
+        .bind(rate_card_line_id)
+        .bind(&resource_type)
+        .bind(&resource_ref)
+        .bind(&activity_type)
+        .bind(has_override)
+        .bind(override_rate)
+        .bind(&override_model)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            target_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Remove an account target (soft delete)
@@ -480,6 +762,31 @@ impl CustomOperation for BillingRemoveAccountTargetOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let target_id = json_extract_uuid(args, ctx, "target-id")?;
+
+        let result = sqlx::query(
+            r#"UPDATE "ob-poc".fee_billing_account_targets SET is_active = false, updated_at = NOW() WHERE target_id = $1"#,
+        )
+        .bind(target_id)
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -577,6 +884,75 @@ impl CustomOperation for BillingCreatePeriodOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
+        let period_start = json_extract_string(args, "period-start")?;
+        let period_end = json_extract_string(args, "period-end")?;
+
+        let profile_status: String = sqlx::query_scalar(
+            r#"SELECT status FROM "ob-poc".fee_billing_profiles WHERE profile_id = $1"#,
+        )
+        .bind(profile_id)
+        .fetch_one(pool)
+        .await?;
+
+        if profile_status != "ACTIVE" {
+            return Err(anyhow!("Billing profile must be ACTIVE to create periods"));
+        }
+
+        let overlap_count: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM "ob-poc".fee_billing_periods
+            WHERE profile_id = $1
+            AND (period_start, period_end) OVERLAPS ($2::date, $3::date)
+            "#,
+        )
+        .bind(profile_id)
+        .bind(&period_start)
+        .bind(&period_end)
+        .fetch_one(pool)
+        .await?;
+
+        if overlap_count > 0 {
+            return Err(anyhow!("Billing period overlaps with existing period"));
+        }
+
+        let currency_code: String = sqlx::query_scalar(
+            r#"SELECT invoice_currency FROM "ob-poc".fee_billing_profiles WHERE profile_id = $1"#,
+        )
+        .bind(profile_id)
+        .fetch_one(pool)
+        .await?;
+
+        let period_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".fee_billing_periods (profile_id, period_start, period_end, currency_code)
+            VALUES ($1, $2::date, $3::date, $4)
+            RETURNING period_id
+            "#,
+        )
+        .bind(profile_id)
+        .bind(&period_start)
+        .bind(&period_end)
+        .bind(&currency_code)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            period_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -729,6 +1105,121 @@ impl CustomOperation for BillingCalculatePeriodOp {
             "status": "CALCULATED"
         })))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let period_id = json_extract_uuid(args, ctx, "period-id")?;
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".fee_billing_periods SET calc_status = 'CALCULATING' WHERE period_id = $1"#,
+        )
+        .bind(period_id)
+        .execute(pool)
+        .await?;
+
+        let period_row: (Uuid, String, String) = sqlx::query_as(
+            r#"SELECT profile_id, period_start::text, period_end::text FROM "ob-poc".fee_billing_periods WHERE period_id = $1"#,
+        )
+        .bind(period_id)
+        .fetch_one(pool)
+        .await?;
+
+        let (profile_id, _period_start, _period_end) = period_row;
+
+        let targets: Vec<(
+            Uuid,
+            Option<Uuid>,
+            Option<String>,
+            Option<f64>,
+            Option<String>,
+        )> = sqlx::query_as(
+            r#"
+            SELECT t.target_id, t.rate_card_line_id,
+                   COALESCE(t.activity_type, l.fee_basis) as activity_type,
+                   CASE WHEN t.has_override THEN t.override_rate ELSE l.rate_value END as rate,
+                   COALESCE(t.override_model, l.pricing_model) as pricing_model
+            FROM "ob-poc".fee_billing_account_targets t
+            LEFT JOIN "ob-poc".deal_rate_card_lines l ON t.rate_card_line_id = l.line_id
+            WHERE t.profile_id = $1 AND t.is_active = true
+            "#,
+        )
+        .bind(profile_id)
+        .fetch_all(pool)
+        .await?;
+
+        let mut line_count = 0;
+        let mut gross_amount = 0.0f64;
+
+        for (target_id, rate_card_line_id, _activity_type, rate, pricing_model) in targets {
+            let activity_volume = 1000000.0f64;
+            let activity_unit = "USD_AUM".to_string();
+
+            let calculated_fee = match pricing_model.as_deref() {
+                Some("BPS") => {
+                    let rate_decimal = rate.unwrap_or(0.0) / 10000.0;
+                    activity_volume * rate_decimal
+                }
+                Some("FLAT") => rate.unwrap_or(0.0),
+                Some("PER_TRANSACTION") => rate.unwrap_or(0.0) * 100.0,
+                _ => 0.0,
+            };
+
+            sqlx::query(
+                r#"
+                INSERT INTO "ob-poc".fee_billing_period_lines (
+                    period_id, target_id, rate_card_line_id,
+                    activity_volume, activity_unit, applied_rate,
+                    calculated_fee, adjustment, net_fee
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $7)
+                "#,
+            )
+            .bind(period_id)
+            .bind(target_id)
+            .bind(rate_card_line_id)
+            .bind(activity_volume)
+            .bind(&activity_unit)
+            .bind(rate)
+            .bind(calculated_fee)
+            .execute(pool)
+            .await?;
+
+            line_count += 1;
+            gross_amount += calculated_fee;
+        }
+
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".fee_billing_periods
+            SET gross_amount = $2, net_amount = $2, calc_status = 'CALCULATED', calculated_at = NOW(), updated_at = NOW()
+            WHERE period_id = $1
+            "#,
+        )
+        .bind(period_id)
+        .bind(gross_amount)
+        .execute(pool)
+        .await?;
+
+        let result = BillingCalculationResult {
+            period_id,
+            line_count,
+            gross_amount,
+            status: "CALCULATED".to_string(),
+        };
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Review a billing period
@@ -782,6 +1273,35 @@ impl CustomOperation for BillingReviewPeriodOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let period_id = json_extract_uuid(args, ctx, "period-id")?;
+        let reviewed_by = json_extract_string(args, "reviewed-by")?;
+
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".fee_billing_periods
+            SET calc_status = 'REVIEWED', reviewed_by = $2, updated_at = NOW()
+            WHERE period_id = $1
+            "#,
+        )
+        .bind(period_id)
+        .bind(&reviewed_by)
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Approve a billing period
@@ -832,6 +1352,35 @@ impl CustomOperation for BillingApprovePeriodOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let period_id = json_extract_uuid(args, ctx, "period-id")?;
+        let approved_by = json_extract_string(args, "approved-by")?;
+
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".fee_billing_periods
+            SET calc_status = 'APPROVED', approved_by = $2, approved_at = NOW(), updated_at = NOW()
+            WHERE period_id = $1
+            "#,
+        )
+        .bind(period_id)
+        .bind(&approved_by)
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -925,6 +1474,73 @@ impl CustomOperation for BillingGenerateInvoiceOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let period_id = json_extract_uuid(args, ctx, "period-id")?;
+
+        let status: String = sqlx::query_scalar(
+            r#"SELECT calc_status FROM "ob-poc".fee_billing_periods WHERE period_id = $1"#,
+        )
+        .bind(period_id)
+        .fetch_one(pool)
+        .await?;
+
+        if status != "APPROVED" {
+            return Err(anyhow!("Period must be APPROVED to generate invoice"));
+        }
+
+        let invoice_id = Uuid::new_v4();
+
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".fee_billing_periods
+            SET calc_status = 'INVOICED', invoice_id = $2, invoiced_at = NOW(), updated_at = NOW()
+            WHERE period_id = $1
+            "#,
+        )
+        .bind(period_id)
+        .bind(invoice_id)
+        .execute(pool)
+        .await?;
+
+        let deal_id: Uuid = sqlx::query_scalar(
+            r#"
+            SELECT p.deal_id
+            FROM "ob-poc".fee_billing_profiles p
+            JOIN "ob-poc".fee_billing_periods bp ON p.profile_id = bp.profile_id
+            WHERE bp.period_id = $1
+            "#,
+        )
+        .bind(period_id)
+        .fetch_one(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
+            VALUES ($1, 'INVOICE_GENERATED', 'BILLING_PERIOD', $2, $3)
+            "#,
+        )
+        .bind(deal_id)
+        .bind(period_id)
+        .bind(invoice_id.to_string())
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            invoice_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Dispute a billing period
@@ -997,6 +1613,54 @@ impl CustomOperation for BillingDisputePeriodOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let period_id = json_extract_uuid(args, ctx, "period-id")?;
+        let dispute_reason = json_extract_string(args, "dispute-reason")?;
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".fee_billing_periods SET calc_status = 'DISPUTED', updated_at = NOW() WHERE period_id = $1"#,
+        )
+        .bind(period_id)
+        .execute(pool)
+        .await?;
+
+        let deal_id: Uuid = sqlx::query_scalar(
+            r#"
+            SELECT p.deal_id
+            FROM "ob-poc".fee_billing_profiles p
+            JOIN "ob-poc".fee_billing_periods bp ON p.profile_id = bp.profile_id
+            WHERE bp.period_id = $1
+            "#,
+        )
+        .bind(period_id)
+        .fetch_one(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
+            VALUES ($1, 'BILLING_DISPUTED', 'BILLING_PERIOD', $2, $3)
+            "#,
+        )
+        .bind(deal_id)
+        .bind(period_id)
+        .bind(&dispute_reason)
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1079,6 +1743,64 @@ impl CustomOperation for BillingPeriodSummaryOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let period_id = json_extract_uuid(args, ctx, "period-id")?;
+
+        let period: (Uuid, String, String, String, Option<f64>, Option<f64>) = sqlx::query_as(
+            r#"
+            SELECT period_id, period_start::text, period_end::text, calc_status, gross_amount::float8, net_amount::float8
+            FROM "ob-poc".fee_billing_periods WHERE period_id = $1
+            "#,
+        )
+        .bind(period_id)
+        .fetch_one(pool)
+        .await?;
+
+        let lines: Vec<(Uuid, Option<f64>, Option<f64>, Option<f64>)> = sqlx::query_as(
+            r#"
+            SELECT period_line_id, activity_volume::float8, calculated_fee::float8, net_fee::float8
+            FROM "ob-poc".fee_billing_period_lines WHERE period_id = $1
+            "#,
+        )
+        .bind(period_id)
+        .fetch_all(pool)
+        .await?;
+
+        let line_values: Vec<serde_json::Value> = lines
+            .into_iter()
+            .map(|(line_id, volume, calc_fee, net_fee)| {
+                serde_json::json!({
+                    "period_line_id": line_id,
+                    "activity_volume": volume,
+                    "calculated_fee": calc_fee,
+                    "net_fee": net_fee
+                })
+            })
+            .collect();
+
+        let result = serde_json::json!({
+            "period_id": period.0,
+            "period_start": period.1,
+            "period_end": period.2,
+            "calc_status": period.3,
+            "gross_amount": period.4,
+            "net_amount": period.5,
+            "lines": line_values
+        });
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1194,5 +1916,91 @@ impl CustomOperation for BillingRevenueSummaryOp {
             "deal_count": 0,
             "cbu_count": 0
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let deal_id = json_extract_uuid_opt(args, ctx, "deal-id");
+        let cbu_id = json_extract_uuid_opt(args, ctx, "cbu-id");
+        let from_date = json_extract_string_opt(args, "from-date");
+        let to_date = json_extract_string_opt(args, "to-date");
+
+        let mut conditions = Vec::new();
+        let mut bind_idx = 1;
+
+        if deal_id.is_some() {
+            conditions.push(format!("p.deal_id = ${}", bind_idx));
+            bind_idx += 1;
+        }
+        if cbu_id.is_some() {
+            conditions.push(format!("p.cbu_id = ${}", bind_idx));
+            bind_idx += 1;
+        }
+        if from_date.is_some() {
+            conditions.push(format!("bp.period_start >= ${}::date", bind_idx));
+            bind_idx += 1;
+        }
+        if to_date.is_some() {
+            conditions.push(format!("bp.period_end <= ${}::date", bind_idx));
+        }
+
+        let where_clause = if conditions.is_empty() {
+            "WHERE bp.calc_status = 'INVOICED'".to_string()
+        } else {
+            format!(
+                "WHERE bp.calc_status = 'INVOICED' AND {}",
+                conditions.join(" AND ")
+            )
+        };
+
+        let query = format!(
+            r#"
+            SELECT
+                COUNT(DISTINCT bp.period_id)::int8 as period_count,
+                COALESCE(SUM(bp.net_amount), 0)::float8 as total_revenue,
+                COUNT(DISTINCT p.deal_id)::int8 as deal_count,
+                COUNT(DISTINCT p.cbu_id)::int8 as cbu_count
+            FROM "ob-poc".fee_billing_profiles p
+            JOIN "ob-poc".fee_billing_periods bp ON p.profile_id = bp.profile_id
+            {}
+            "#,
+            where_clause
+        );
+
+        let mut query_builder = sqlx::query_as::<_, (i64, f64, i64, i64)>(&query);
+
+        if let Some(d) = deal_id {
+            query_builder = query_builder.bind(d);
+        }
+        if let Some(c) = cbu_id {
+            query_builder = query_builder.bind(c);
+        }
+        if let Some(ref f) = from_date {
+            query_builder = query_builder.bind(f);
+        }
+        if let Some(ref t) = to_date {
+            query_builder = query_builder.bind(t);
+        }
+
+        let (period_count, total_revenue, deal_count, cbu_count) =
+            query_builder.fetch_one(pool).await?;
+
+        let result = serde_json::json!({
+            "period_count": period_count,
+            "total_revenue": total_revenue,
+            "deal_count": deal_count,
+            "cbu_count": cbu_count
+        });
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

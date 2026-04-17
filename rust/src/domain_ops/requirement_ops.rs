@@ -146,8 +146,8 @@ impl CustomOperation for RequirementCreateSetOp {
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         use super::helpers::{
-            json_extract_string_list, json_extract_string_opt,
-            json_extract_uuid, json_extract_uuid_opt,
+            json_extract_string_list, json_extract_string_opt, json_extract_uuid,
+            json_extract_uuid_opt,
         };
         use sqlx::Row;
 
@@ -160,7 +160,8 @@ impl CustomOperation for RequirementCreateSetOp {
             return Err(anyhow::anyhow!("doc-types cannot be empty"));
         }
 
-        let workflow_instance_id: Option<Uuid> = json_extract_uuid_opt(args, ctx, "workflow-instance-id");
+        let workflow_instance_id: Option<Uuid> =
+            json_extract_uuid_opt(args, ctx, "workflow-instance-id");
 
         let due_date: Option<NaiveDate> = json_extract_string_opt(args, "due-date")
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
@@ -333,7 +334,9 @@ impl CustomOperation for RequirementUnsatisfiedOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(results))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            results,
+        ))
     }
 
     fn is_migrated(&self) -> bool {

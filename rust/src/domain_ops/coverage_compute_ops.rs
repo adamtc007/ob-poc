@@ -29,7 +29,7 @@
 //! - KYC/UBO Architecture v0.5, section 6.3 (coverage computation)
 //! - KYC/UBO Architecture v0.5, section 2A.3 (prong model)
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
@@ -114,6 +114,195 @@ const ALL_PRONGS: &[&str] = &[
 #[register_custom_op]
 pub struct CoverageComputeOp;
 
+#[cfg(feature = "database")]
+async fn coverage_compute_impl(
+    case_id: Uuid,
+    determination_run_id: Uuid,
+    pool: &PgPool,
+) -> Result<CoverageComputeResult> {
+    // ------------------------------------------------------------------
+    // 1. Load the determination run
+    // ------------------------------------------------------------------
+    let run_row: Option<(Uuid, serde_json::Value, Option<serde_json::Value>)> = sqlx::query_as(
+        r#"
+            SELECT subject_entity_id, output_snapshot, chains_snapshot
+            FROM "ob-poc".ubo_determination_runs
+            WHERE run_id = $1
+              AND case_id = $2
+            "#,
+    )
+    .bind(determination_run_id)
+    .bind(case_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let (subject_entity_id, output_snapshot, chains_snapshot) = run_row.ok_or_else(|| {
+        anyhow!(
+            "Determination run {} not found for case {}",
+            determination_run_id,
+            case_id
+        )
+    })?;
+
+    // ------------------------------------------------------------------
+    // 2. Extract UBO candidates from output_snapshot
+    // ------------------------------------------------------------------
+    let candidates = extract_candidates(&output_snapshot)?;
+
+    if candidates.is_empty() {
+        let result = CoverageComputeResult {
+            run_id: determination_run_id,
+            case_id,
+            overall_coverage_pct: 100.0,
+            prong_coverage: ALL_PRONGS
+                .iter()
+                .map(|p| ProngCoverage {
+                    prong: p.to_string(),
+                    covered: 0,
+                    total: 0,
+                    coverage_pct: 100.0,
+                })
+                .collect(),
+            gaps: vec![],
+            gaps_blocking_skeleton: 0,
+        };
+
+        persist_coverage_snapshot(pool, determination_run_id, &result).await?;
+        return Ok(result);
+    }
+
+    // ------------------------------------------------------------------
+    // 3. Check coverage across prongs for each candidate
+    // ------------------------------------------------------------------
+    let mut all_gaps: Vec<CoverageGap> = Vec::new();
+    let mut prong_totals: std::collections::HashMap<&str, (i32, i32)> =
+        std::collections::HashMap::new();
+
+    for prong in ALL_PRONGS {
+        prong_totals.insert(prong, (0, 0));
+    }
+
+    for candidate in &candidates {
+        let entity_id = candidate.entity_id;
+
+        let ownership_covered =
+            check_ownership_prong(pool, subject_entity_id, entity_id, &chains_snapshot).await?;
+        update_prong_count(&mut prong_totals, PRONG_OWNERSHIP, ownership_covered);
+        if !ownership_covered {
+            all_gaps.push(CoverageGap {
+                gap_id: format!("{}:{}", entity_id, PRONG_OWNERSHIP),
+                prong: PRONG_OWNERSHIP.to_string(),
+                entity_id,
+                description: format!(
+                    "Missing ownership edges with percentages for {}",
+                    candidate.entity_name.as_deref().unwrap_or("unknown entity")
+                ),
+                blocking_at_gate: Some("SKELETON_READY".to_string()),
+            });
+        }
+
+        let identity_covered = check_identity_prong(pool, entity_id, case_id).await?;
+        update_prong_count(&mut prong_totals, PRONG_IDENTITY, identity_covered);
+        if !identity_covered {
+            all_gaps.push(CoverageGap {
+                gap_id: format!("{}:{}", entity_id, PRONG_IDENTITY),
+                prong: PRONG_IDENTITY.to_string(),
+                entity_id,
+                description: format!(
+                    "Missing verified identity document for {}",
+                    candidate.entity_name.as_deref().unwrap_or("unknown entity")
+                ),
+                blocking_at_gate: Some("EVIDENCE_COMPLETE".to_string()),
+            });
+        }
+
+        let control_covered = check_control_prong(pool, subject_entity_id, entity_id).await?;
+        update_prong_count(&mut prong_totals, PRONG_CONTROL, control_covered);
+        if !control_covered {
+            let edge_gaps = find_edge_gaps_for_control(pool, subject_entity_id, entity_id).await?;
+            if edge_gaps.is_empty() {
+                all_gaps.push(CoverageGap {
+                    gap_id: format!("{}:{}", entity_id, PRONG_CONTROL),
+                    prong: PRONG_CONTROL.to_string(),
+                    entity_id,
+                    description: format!(
+                        "No control relationship documented for {}",
+                        candidate.entity_name.as_deref().unwrap_or("unknown entity")
+                    ),
+                    blocking_at_gate: Some("EVIDENCE_COMPLETE".to_string()),
+                });
+            } else {
+                for (relationship_id, desc) in edge_gaps {
+                    all_gaps.push(CoverageGap {
+                        gap_id: format!("{}:{}", relationship_id, PRONG_CONTROL),
+                        prong: PRONG_CONTROL.to_string(),
+                        entity_id,
+                        description: desc,
+                        blocking_at_gate: Some("EVIDENCE_COMPLETE".to_string()),
+                    });
+                }
+            }
+        }
+
+        let sow_covered = check_source_of_wealth_prong(pool, entity_id, case_id).await?;
+        update_prong_count(&mut prong_totals, PRONG_SOURCE_OF_WEALTH, sow_covered);
+        if !sow_covered {
+            all_gaps.push(CoverageGap {
+                gap_id: format!("{}:{}", entity_id, PRONG_SOURCE_OF_WEALTH),
+                prong: PRONG_SOURCE_OF_WEALTH.to_string(),
+                entity_id,
+                description: format!(
+                    "Missing source of wealth evidence for {}",
+                    candidate.entity_name.as_deref().unwrap_or("unknown entity")
+                ),
+                blocking_at_gate: Some("EVIDENCE_COMPLETE".to_string()),
+            });
+        }
+    }
+
+    let prong_coverage: Vec<ProngCoverage> = ALL_PRONGS
+        .iter()
+        .map(|prong| {
+            let (covered, total) = prong_totals.get(prong).copied().unwrap_or((0, 0));
+            let coverage_pct = if total > 0 {
+                (covered as f64 / total as f64) * 100.0
+            } else {
+                100.0
+            };
+            ProngCoverage {
+                prong: prong.to_string(),
+                covered,
+                total,
+                coverage_pct,
+            }
+        })
+        .collect();
+
+    let overall_coverage_pct = if prong_coverage.is_empty() {
+        100.0
+    } else {
+        let sum: f64 = prong_coverage.iter().map(|p| p.coverage_pct).sum();
+        sum / prong_coverage.len() as f64
+    };
+
+    let gaps_blocking_skeleton = all_gaps
+        .iter()
+        .filter(|g| g.blocking_at_gate.as_deref() == Some("SKELETON_READY"))
+        .count() as i32;
+
+    let result = CoverageComputeResult {
+        run_id: determination_run_id,
+        case_id,
+        overall_coverage_pct,
+        prong_coverage,
+        gaps: all_gaps,
+        gaps_blocking_skeleton,
+    };
+
+    persist_coverage_snapshot(pool, determination_run_id, &result).await?;
+    Ok(result)
+}
+
 #[async_trait]
 impl CustomOperation for CoverageComputeOp {
     fn domain(&self) -> &'static str {
@@ -139,208 +328,7 @@ impl CustomOperation for CoverageComputeOp {
     ) -> Result<ExecutionResult> {
         let case_id = extract_uuid(verb_call, ctx, "case-id")?;
         let determination_run_id = extract_uuid(verb_call, ctx, "determination-run-id")?;
-
-        // ------------------------------------------------------------------
-        // 1. Load the determination run
-        // ------------------------------------------------------------------
-        let run_row: Option<(Uuid, serde_json::Value, Option<serde_json::Value>)> = sqlx::query_as(
-            r#"
-                SELECT subject_entity_id, output_snapshot, chains_snapshot
-                FROM "ob-poc".ubo_determination_runs
-                WHERE run_id = $1
-                  AND case_id = $2
-                "#,
-        )
-        .bind(determination_run_id)
-        .bind(case_id)
-        .fetch_optional(pool)
-        .await?;
-
-        let (subject_entity_id, output_snapshot, chains_snapshot) = run_row.ok_or_else(|| {
-            anyhow!(
-                "Determination run {} not found for case {}",
-                determination_run_id,
-                case_id
-            )
-        })?;
-
-        // ------------------------------------------------------------------
-        // 2. Extract UBO candidates from output_snapshot
-        // ------------------------------------------------------------------
-        let candidates = extract_candidates(&output_snapshot)?;
-
-        if candidates.is_empty() {
-            // No candidates means 100% coverage (nothing to cover)
-            let result = CoverageComputeResult {
-                run_id: determination_run_id,
-                case_id,
-                overall_coverage_pct: 100.0,
-                prong_coverage: ALL_PRONGS
-                    .iter()
-                    .map(|p| ProngCoverage {
-                        prong: p.to_string(),
-                        covered: 0,
-                        total: 0,
-                        coverage_pct: 100.0,
-                    })
-                    .collect(),
-                gaps: vec![],
-                gaps_blocking_skeleton: 0,
-            };
-
-            persist_coverage_snapshot(pool, determination_run_id, &result).await?;
-
-            return Ok(ExecutionResult::Record(serde_json::to_value(result)?));
-        }
-
-        // ------------------------------------------------------------------
-        // 3. Check coverage across prongs for each candidate
-        // ------------------------------------------------------------------
-        let mut all_gaps: Vec<CoverageGap> = Vec::new();
-        let mut prong_totals: std::collections::HashMap<&str, (i32, i32)> =
-            std::collections::HashMap::new();
-
-        for prong in ALL_PRONGS {
-            prong_totals.insert(prong, (0, 0)); // (covered, total)
-        }
-
-        for candidate in &candidates {
-            let entity_id = candidate.entity_id;
-
-            // --- OWNERSHIP prong ---
-            // Check if there are ownership edges with percentages for this entity
-            let ownership_covered =
-                check_ownership_prong(pool, subject_entity_id, entity_id, &chains_snapshot).await?;
-            update_prong_count(&mut prong_totals, PRONG_OWNERSHIP, ownership_covered);
-            if !ownership_covered {
-                all_gaps.push(CoverageGap {
-                    gap_id: format!("{}:{}", entity_id, PRONG_OWNERSHIP),
-                    prong: PRONG_OWNERSHIP.to_string(),
-                    entity_id,
-                    description: format!(
-                        "Missing ownership edges with percentages for {}",
-                        candidate.entity_name.as_deref().unwrap_or("unknown entity")
-                    ),
-                    blocking_at_gate: Some("SKELETON_READY".to_string()),
-                });
-            }
-
-            // --- IDENTITY prong ---
-            // Check if identity documents are verified for this UBO person
-            let identity_covered = check_identity_prong(pool, entity_id, case_id).await?;
-            update_prong_count(&mut prong_totals, PRONG_IDENTITY, identity_covered);
-            if !identity_covered {
-                all_gaps.push(CoverageGap {
-                    gap_id: format!("{}:{}", entity_id, PRONG_IDENTITY),
-                    prong: PRONG_IDENTITY.to_string(),
-                    entity_id,
-                    description: format!(
-                        "Missing verified identity document for {}",
-                        candidate.entity_name.as_deref().unwrap_or("unknown entity")
-                    ),
-                    blocking_at_gate: Some("EVIDENCE_COMPLETE".to_string()),
-                });
-            }
-
-            // --- CONTROL prong ---
-            // Check if control edges are documented for this entity
-            let control_covered = check_control_prong(pool, subject_entity_id, entity_id).await?;
-            update_prong_count(&mut prong_totals, PRONG_CONTROL, control_covered);
-            if !control_covered {
-                // Control gaps also check edge-level gaps
-                let edge_gaps =
-                    find_edge_gaps_for_control(pool, subject_entity_id, entity_id).await?;
-                if edge_gaps.is_empty() {
-                    all_gaps.push(CoverageGap {
-                        gap_id: format!("{}:{}", entity_id, PRONG_CONTROL),
-                        prong: PRONG_CONTROL.to_string(),
-                        entity_id,
-                        description: format!(
-                            "No control relationship documented for {}",
-                            candidate.entity_name.as_deref().unwrap_or("unknown entity")
-                        ),
-                        blocking_at_gate: Some("EVIDENCE_COMPLETE".to_string()),
-                    });
-                } else {
-                    for (relationship_id, desc) in edge_gaps {
-                        all_gaps.push(CoverageGap {
-                            gap_id: format!("{}:{}", relationship_id, PRONG_CONTROL),
-                            prong: PRONG_CONTROL.to_string(),
-                            entity_id,
-                            description: desc,
-                            blocking_at_gate: Some("EVIDENCE_COMPLETE".to_string()),
-                        });
-                    }
-                }
-            }
-
-            // --- SOURCE_OF_WEALTH prong ---
-            // Check if source of wealth evidence exists for this UBO
-            let sow_covered = check_source_of_wealth_prong(pool, entity_id, case_id).await?;
-            update_prong_count(&mut prong_totals, PRONG_SOURCE_OF_WEALTH, sow_covered);
-            if !sow_covered {
-                all_gaps.push(CoverageGap {
-                    gap_id: format!("{}:{}", entity_id, PRONG_SOURCE_OF_WEALTH),
-                    prong: PRONG_SOURCE_OF_WEALTH.to_string(),
-                    entity_id,
-                    description: format!(
-                        "Missing source of wealth evidence for {}",
-                        candidate.entity_name.as_deref().unwrap_or("unknown entity")
-                    ),
-                    blocking_at_gate: Some("EVIDENCE_COMPLETE".to_string()),
-                });
-            }
-        }
-
-        // ------------------------------------------------------------------
-        // 4. Build prong coverage summaries
-        // ------------------------------------------------------------------
-        let prong_coverage: Vec<ProngCoverage> = ALL_PRONGS
-            .iter()
-            .map(|prong| {
-                let (covered, total) = prong_totals.get(prong).copied().unwrap_or((0, 0));
-                let coverage_pct = if total > 0 {
-                    (covered as f64 / total as f64) * 100.0
-                } else {
-                    100.0
-                };
-                ProngCoverage {
-                    prong: prong.to_string(),
-                    covered,
-                    total,
-                    coverage_pct,
-                }
-            })
-            .collect();
-
-        // Overall coverage: average across prongs (weighted equally)
-        let overall_coverage_pct = if prong_coverage.is_empty() {
-            100.0
-        } else {
-            let sum: f64 = prong_coverage.iter().map(|p| p.coverage_pct).sum();
-            sum / prong_coverage.len() as f64
-        };
-
-        // Count gaps blocking SKELETON_READY
-        let gaps_blocking_skeleton = all_gaps
-            .iter()
-            .filter(|g| g.blocking_at_gate.as_deref() == Some("SKELETON_READY"))
-            .count() as i32;
-
-        // ------------------------------------------------------------------
-        // 5. Build result and persist
-        // ------------------------------------------------------------------
-        let result = CoverageComputeResult {
-            run_id: determination_run_id,
-            case_id,
-            overall_coverage_pct,
-            prong_coverage,
-            gaps: all_gaps,
-            gaps_blocking_skeleton,
-        };
-
-        persist_coverage_snapshot(pool, determination_run_id, &result).await?;
-
+        let result = coverage_compute_impl(case_id, determination_run_id, pool).await?;
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
@@ -351,6 +339,27 @@ impl CustomOperation for CoverageComputeOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let determination_run_id = json_extract_uuid(args, ctx, "determination-run-id")?;
+        let result = coverage_compute_impl(case_id, determination_run_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

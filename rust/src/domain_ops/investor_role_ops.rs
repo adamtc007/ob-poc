@@ -9,6 +9,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 
+use super::helpers::{
+    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -194,6 +197,65 @@ impl CustomOperation for InvestorRoleSetOp {
             "investor-role.set requires database feature"
         ))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_bool_opt, json_extract_string_opt as jso};
+
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer")?;
+        let holder_entity_id = json_extract_uuid(args, ctx, "holder")?;
+        let role_type = json_extract_string(args, "role-type")?;
+
+        let lookthrough_policy =
+            jso(args, "lookthrough-policy").unwrap_or_else(|| "NONE".to_string());
+        let holder_affiliation =
+            jso(args, "holder-affiliation").unwrap_or_else(|| "UNKNOWN".to_string());
+        let bo_data_available = json_extract_bool_opt(args, "bo-data-available").unwrap_or(false);
+        let is_ubo_eligible = json_extract_bool_opt(args, "is-ubo-eligible").unwrap_or(true);
+        let share_class_id = json_extract_uuid_opt(args, ctx, "share-class");
+        let group_container_entity_id = json_extract_uuid_opt(args, ctx, "group-container");
+        let group_label = jso(args, "group-label");
+        let effective_from: Option<chrono::NaiveDate> = jso(args, "effective-from")
+            .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
+        let source = jso(args, "source").unwrap_or_else(|| "MANUAL".to_string());
+        let source_reference = jso(args, "source-reference");
+        let notes = jso(args, "notes");
+
+        let result: (uuid::Uuid,) = sqlx::query_as(
+            r#"
+            SELECT "ob-poc".upsert_role_profile(
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL
+            )
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(holder_entity_id)
+        .bind(&role_type)
+        .bind(&lookthrough_policy)
+        .bind(&holder_affiliation)
+        .bind(bo_data_available)
+        .bind(is_ubo_eligible)
+        .bind(share_class_id)
+        .bind(group_container_entity_id)
+        .bind(group_label.as_deref())
+        .bind(effective_from)
+        .bind(&source)
+        .bind(source_reference.as_deref())
+        .bind(notes.as_deref())
+        .fetch_one(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(result.0))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -270,6 +332,56 @@ impl CustomOperation for InvestorRoleReadAsOfOp {
         Err(anyhow::anyhow!(
             "investor-role.read-as-of requires database feature"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer")?;
+        let holder_entity_id = json_extract_uuid(args, ctx, "holder")?;
+        let as_of_str = json_extract_string(args, "as-of-date")?;
+        let as_of_date = chrono::NaiveDate::parse_from_str(&as_of_str, "%Y-%m-%d")
+            .map_err(|e| anyhow::anyhow!("Invalid as-of-date: {}", e))?;
+
+        let row = sqlx::query_as::<_, RoleProfileRow>(
+            r#"
+            SELECT
+                id, issuer_entity_id, holder_entity_id, share_class_id,
+                role_type, lookthrough_policy, holder_affiliation,
+                beneficial_owner_data_available, is_ubo_eligible,
+                group_container_entity_id, group_label,
+                effective_from, effective_to,
+                source, source_reference, notes,
+                created_at, updated_at
+            FROM "ob-poc".investor_role_profiles
+            WHERE issuer_entity_id = $1
+              AND holder_entity_id = $2
+              AND effective_from <= $3
+              AND (effective_to IS NULL OR effective_to > $3)
+            ORDER BY effective_from DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(holder_entity_id)
+        .bind(as_of_date)
+        .fetch_optional(pool)
+        .await?;
+
+        match row {
+            Some(profile) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                profile.into(),
+            )),
+            None => Ok(sem_os_core::execution::VerbExecutionOutcome::Void),
+        }
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -398,6 +510,35 @@ impl CustomOperation for InvestorRoleMarkAsNomineeOp {
             "investor-role.mark-as-nominee requires database feature"
         ))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer")?;
+        let holder_entity_id = json_extract_uuid(args, ctx, "holder")?;
+        let notes = json_extract_string_opt(args, "notes");
+
+        let result: (uuid::Uuid,) = sqlx::query_as(
+            r#"SELECT "ob-poc".upsert_role_profile($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL)"#,
+        )
+        .bind(issuer_entity_id).bind(holder_entity_id)
+        .bind("NOMINEE").bind("NONE").bind("UNKNOWN")
+        .bind(false).bind(false)
+        .bind(None::<uuid::Uuid>).bind(None::<uuid::Uuid>).bind(None::<String>)
+        .bind(None::<chrono::NaiveDate>).bind("MANUAL").bind(None::<String>)
+        .bind(notes.as_deref())
+        .fetch_one(pool).await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(result.0))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Mark a holder as a fund-of-funds intermediary.
@@ -468,6 +609,37 @@ impl CustomOperation for InvestorRoleMarkAsFofOp {
         Err(anyhow::anyhow!(
             "investor-role.mark-as-fof requires database feature"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_bool_opt;
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer")?;
+        let holder_entity_id = json_extract_uuid(args, ctx, "holder")?;
+        let bo_data_available = json_extract_bool_opt(args, "bo-data-available").unwrap_or(false);
+        let notes = json_extract_string_opt(args, "notes");
+
+        let result: (uuid::Uuid,) = sqlx::query_as(
+            r#"SELECT "ob-poc".upsert_role_profile($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL)"#,
+        )
+        .bind(issuer_entity_id).bind(holder_entity_id)
+        .bind("INTERMEDIARY_FOF").bind("ON_DEMAND").bind("UNKNOWN")
+        .bind(bo_data_available).bind(false)
+        .bind(None::<uuid::Uuid>).bind(None::<uuid::Uuid>).bind(None::<String>)
+        .bind(None::<chrono::NaiveDate>).bind("MANUAL").bind(None::<String>)
+        .bind(notes.as_deref())
+        .fetch_one(pool).await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(result.0))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -541,6 +713,37 @@ impl CustomOperation for InvestorRoleMarkAsMasterPoolOp {
             "investor-role.mark-as-master-pool requires database feature"
         ))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer")?;
+        let holder_entity_id = json_extract_uuid(args, ctx, "holder")?;
+        let holder_affiliation = json_extract_string_opt(args, "holder-affiliation")
+            .unwrap_or_else(|| "INTRA_GROUP".to_string());
+        let notes = json_extract_string_opt(args, "notes");
+
+        let result: (uuid::Uuid,) = sqlx::query_as(
+            r#"SELECT "ob-poc".upsert_role_profile($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL)"#,
+        )
+        .bind(issuer_entity_id).bind(holder_entity_id)
+        .bind("MASTER_POOL").bind("AUTO_IF_DATA").bind(&holder_affiliation)
+        .bind(false).bind(false)
+        .bind(None::<uuid::Uuid>).bind(None::<uuid::Uuid>).bind(None::<String>)
+        .bind(None::<chrono::NaiveDate>).bind("MANUAL").bind(None::<String>)
+        .bind(notes.as_deref())
+        .fetch_one(pool).await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(result.0))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Mark a holder as an end investor (terminal beneficial owner).
@@ -612,5 +815,36 @@ impl CustomOperation for InvestorRoleMarkAsEndInvestorOp {
         Err(anyhow::anyhow!(
             "investor-role.mark-as-end-investor requires database feature"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer")?;
+        let holder_entity_id = json_extract_uuid(args, ctx, "holder")?;
+        let holder_affiliation = json_extract_string_opt(args, "holder-affiliation")
+            .unwrap_or_else(|| "EXTERNAL".to_string());
+        let notes = json_extract_string_opt(args, "notes");
+
+        let result: (uuid::Uuid,) = sqlx::query_as(
+            r#"SELECT "ob-poc".upsert_role_profile($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL)"#,
+        )
+        .bind(issuer_entity_id).bind(holder_entity_id)
+        .bind("END_INVESTOR").bind("NONE").bind(&holder_affiliation)
+        .bind(false).bind(true)
+        .bind(None::<uuid::Uuid>).bind(None::<uuid::Uuid>).bind(None::<String>)
+        .bind(None::<chrono::NaiveDate>).bind("MANUAL").bind(None::<String>)
+        .bind(notes.as_deref())
+        .fetch_one(pool).await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(result.0))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

@@ -1350,21 +1350,27 @@ async fn cbu_inspect_impl(
            AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
            AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
            ORDER BY cer.entity_id, r.name"#,
-        cbu_id, as_of_date
+        cbu_id,
+        as_of_date
     )
     .fetch_all(pool)
     .await?;
 
-    let entity_list: Vec<serde_json::Value> = entities.iter().map(|e| {
-        let entity_roles: Vec<String> = roles.iter()
-            .filter(|r| r.entity_id == e.entity_id)
-            .map(|r| r.role_name.clone()).collect();
-        serde_json::json!({
-            "entity_id": e.entity_id, "name": e.name,
-            "entity_type": e.entity_type, "jurisdiction": e.jurisdiction,
-            "roles": entity_roles
+    let entity_list: Vec<serde_json::Value> = entities
+        .iter()
+        .map(|e| {
+            let entity_roles: Vec<String> = roles
+                .iter()
+                .filter(|r| r.entity_id == e.entity_id)
+                .map(|r| r.role_name.clone())
+                .collect();
+            serde_json::json!({
+                "entity_id": e.entity_id, "name": e.name,
+                "entity_type": e.entity_type, "jurisdiction": e.jurisdiction,
+                "roles": entity_roles
+            })
         })
-    }).collect();
+        .collect();
 
     let documents = sqlx::query!(
         r#"SELECT dc.doc_id, dc.document_name, dt.type_code, dt.display_name, dc.status
@@ -1372,12 +1378,17 @@ async fn cbu_inspect_impl(
            LEFT JOIN "ob-poc".document_types dt ON dc.document_type_id = dt.type_id
            WHERE dc.cbu_id = $1 ORDER BY dt.type_code"#,
         cbu_id
-    ).fetch_all(pool).await?;
+    )
+    .fetch_all(pool)
+    .await?;
 
-    let doc_list: Vec<serde_json::Value> = documents.iter().map(|d| {
-        serde_json::json!({"doc_id": d.doc_id, "name": d.document_name,
+    let doc_list: Vec<serde_json::Value> = documents
+        .iter()
+        .map(|d| {
+            serde_json::json!({"doc_id": d.doc_id, "name": d.document_name,
             "type_code": d.type_code, "type_name": d.display_name, "status": d.status})
-    }).collect();
+        })
+        .collect();
 
     let screenings = sqlx::query!(
         r#"SELECT s.screening_id, w.entity_id, e.name as entity_name,
@@ -1389,13 +1400,18 @@ async fn cbu_inspect_impl(
            WHERE c.cbu_id = $1 AND e.deleted_at IS NULL
            ORDER BY s.screening_type, e.name"#,
         cbu_id
-    ).fetch_all(pool).await?;
+    )
+    .fetch_all(pool)
+    .await?;
 
-    let screening_list: Vec<serde_json::Value> = screenings.iter().map(|s| {
-        serde_json::json!({"screening_id": s.screening_id, "entity_id": s.entity_id,
+    let screening_list: Vec<serde_json::Value> = screenings
+        .iter()
+        .map(|s| {
+            serde_json::json!({"screening_id": s.screening_id, "entity_id": s.entity_id,
             "entity_name": s.entity_name, "screening_type": s.screening_type,
             "status": s.status, "result": s.result_summary})
-    }).collect();
+        })
+        .collect();
 
     let services = sqlx::query!(
         r#"SELECT sdm.delivery_id, p.name as product_name, p.product_code,
@@ -1405,27 +1421,37 @@ async fn cbu_inspect_impl(
            JOIN "ob-poc".services s ON s.service_id = sdm.service_id
            WHERE sdm.cbu_id = $1 ORDER BY p.name, s.name"#,
         cbu_id
-    ).fetch_all(pool).await?;
+    )
+    .fetch_all(pool)
+    .await?;
 
-    let service_list: Vec<serde_json::Value> = services.iter().map(|s| {
-        serde_json::json!({"delivery_id": s.delivery_id, "product": s.product_name,
+    let service_list: Vec<serde_json::Value> = services
+        .iter()
+        .map(|s| {
+            serde_json::json!({"delivery_id": s.delivery_id, "product": s.product_name,
             "product_code": s.product_code, "service": s.service_name, "status": s.delivery_status})
-    }).collect();
+        })
+        .collect();
 
     let cases = sqlx::query!(
         r#"SELECT case_id, status, case_type, risk_rating, escalation_level,
                   opened_at, closed_at
            FROM "ob-poc".cases WHERE cbu_id = $1 ORDER BY opened_at DESC"#,
         cbu_id
-    ).fetch_all(pool).await?;
+    )
+    .fetch_all(pool)
+    .await?;
 
-    let case_list: Vec<serde_json::Value> = cases.iter().map(|c| {
-        serde_json::json!({"case_id": c.case_id, "status": c.status,
+    let case_list: Vec<serde_json::Value> = cases
+        .iter()
+        .map(|c| {
+            serde_json::json!({"case_id": c.case_id, "status": c.status,
             "case_type": c.case_type, "risk_rating": c.risk_rating,
             "escalation_level": c.escalation_level,
             "opened_at": c.opened_at.to_rfc3339(),
             "closed_at": c.closed_at.map(|t| t.to_rfc3339())})
-    }).collect();
+        })
+        .collect();
 
     Ok(serde_json::json!({
         "cbu_id": cbu.cbu_id, "name": cbu.name,

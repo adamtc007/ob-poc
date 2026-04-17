@@ -3,7 +3,7 @@
 //! Plugin handlers for partnership.yaml verbs that require custom logic.
 //! Uses "ob-poc".partnership_capital table for partner capital tracking.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde_json::json;
@@ -12,8 +12,10 @@ use uuid::Uuid;
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-use super::helpers::get_required_uuid;
 use super::CustomOperation;
+use super::helpers::{
+    get_required_uuid, json_extract_string, json_extract_string_opt, json_extract_uuid,
+};
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
@@ -34,6 +36,81 @@ struct PartnerRecord {
     capital_commitment: Option<rust_decimal::Decimal>,
     capital_contributed: Option<rust_decimal::Decimal>,
     capital_returned: Option<rust_decimal::Decimal>,
+}
+
+#[cfg(feature = "database")]
+async fn partnership_contribution_impl(
+    partnership_id: Uuid,
+    partner_id: Uuid,
+    amount: rust_decimal::Decimal,
+    contribution_date: String,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    let mut tx = pool.begin().await?;
+
+    let partner_record: Option<PartnerRecord> = sqlx::query_as(
+        r#"
+        SELECT id, partner_type, capital_commitment, capital_contributed, capital_returned
+        FROM "ob-poc".partnership_capital
+        WHERE partnership_entity_id = $1 AND partner_entity_id = $2 AND is_active = true
+        "#,
+    )
+    .bind(partnership_id)
+    .bind(partner_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let partner_record =
+        partner_record.ok_or_else(|| anyhow!("Partner not found in partnership"))?;
+
+    let old_contributed = partner_record
+        .capital_contributed
+        .unwrap_or(rust_decimal::Decimal::ZERO);
+    let commitment = partner_record
+        .capital_commitment
+        .unwrap_or(rust_decimal::Decimal::ZERO);
+    let new_contributed = old_contributed + amount;
+
+    if commitment > rust_decimal::Decimal::ZERO && new_contributed > commitment {
+        return Err(anyhow!(
+            "Contribution of {} would exceed capital commitment of {} (current contributed: {})",
+            amount,
+            commitment,
+            old_contributed
+        ));
+    }
+
+    sqlx::query(
+        r#"
+        UPDATE "ob-poc".partnership_capital
+        SET capital_contributed = $1, updated_at = NOW()
+        WHERE id = $2
+        "#,
+    )
+    .bind(new_contributed)
+    .bind(partner_record.id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    let unfunded = commitment - new_contributed
+        + partner_record
+            .capital_returned
+            .unwrap_or(rust_decimal::Decimal::ZERO);
+
+    Ok(json!({
+        "partnership_capital_id": partner_record.id.to_string(),
+        "partnership_entity_id": partnership_id.to_string(),
+        "partner_entity_id": partner_id.to_string(),
+        "partner_type": partner_record.partner_type,
+        "contribution_amount": amount.to_string(),
+        "previous_contributed": old_contributed.to_string(),
+        "new_contributed": new_contributed.to_string(),
+        "capital_commitment": commitment.to_string(),
+        "unfunded_commitment": unfunded.to_string(),
+        "contribution_date": contribution_date
+    }))
 }
 
 #[async_trait]
@@ -71,78 +148,14 @@ impl CustomOperation for PartnershipContributionOp {
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
             .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
-
-        let mut tx = pool.begin().await?;
-
-        // Verify partner exists in partnership (use runtime query for kyc schema)
-        let partner_record: Option<PartnerRecord> = sqlx::query_as(
-            r#"
-            SELECT id, partner_type, capital_commitment, capital_contributed, capital_returned
-            FROM "ob-poc".partnership_capital
-            WHERE partnership_entity_id = $1 AND partner_entity_id = $2 AND is_active = true
-            "#,
+        let result = partnership_contribution_impl(
+            partnership_id,
+            partner_id,
+            amount,
+            contribution_date,
+            pool,
         )
-        .bind(partnership_id)
-        .bind(partner_id)
-        .fetch_optional(&mut *tx)
         .await?;
-
-        let partner_record =
-            partner_record.ok_or_else(|| anyhow!("Partner not found in partnership"))?;
-
-        let old_contributed = partner_record
-            .capital_contributed
-            .unwrap_or(rust_decimal::Decimal::ZERO);
-        let commitment = partner_record
-            .capital_commitment
-            .unwrap_or(rust_decimal::Decimal::ZERO);
-        let new_contributed = old_contributed + amount;
-
-        // Check if contribution would exceed commitment (if commitment is set)
-        if commitment > rust_decimal::Decimal::ZERO && new_contributed > commitment {
-            return Err(anyhow!(
-                "Contribution of {} would exceed capital commitment of {} (current contributed: {})",
-                amount,
-                commitment,
-                old_contributed
-            ));
-        }
-
-        // Update capital_contributed
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".partnership_capital
-            SET capital_contributed = $1, updated_at = NOW()
-            WHERE id = $2
-            "#,
-        )
-        .bind(new_contributed)
-        .bind(partner_record.id)
-        .execute(&mut *tx)
-        .await?;
-
-        // Log the contribution event (to case_events if we have a case context, otherwise just return)
-        // For now we just return the result without logging to a separate transactions table
-
-        tx.commit().await?;
-
-        let unfunded = commitment - new_contributed
-            + partner_record
-                .capital_returned
-                .unwrap_or(rust_decimal::Decimal::ZERO);
-
-        let result = json!({
-            "partnership_capital_id": partner_record.id.to_string(),
-            "partnership_entity_id": partnership_id.to_string(),
-            "partner_entity_id": partner_id.to_string(),
-            "partner_type": partner_record.partner_type,
-            "contribution_amount": amount.to_string(),
-            "previous_contributed": old_contributed.to_string(),
-            "new_contributed": new_contributed.to_string(),
-            "capital_commitment": commitment.to_string(),
-            "unfunded_commitment": unfunded.to_string(),
-            "contribution_date": contribution_date
-        });
 
         Ok(ExecutionResult::Record(result))
     }
@@ -157,6 +170,36 @@ impl CustomOperation for PartnershipContributionOp {
             "Database feature required for partnership.record-contribution"
         ))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
+        let partner_id = json_extract_uuid(args, ctx, "partner-entity-id")?;
+        let amount: rust_decimal::Decimal = json_extract_string(args, "amount")?
+            .parse()
+            .map_err(|_| anyhow!("amount is required"))?;
+        let contribution_date = json_extract_string_opt(args, "contribution-date")
+            .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
+        let result = partnership_contribution_impl(
+            partnership_id,
+            partner_id,
+            amount,
+            contribution_date,
+            pool,
+        )
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -167,6 +210,82 @@ impl CustomOperation for PartnershipContributionOp {
 /// Updates the capital_returned column in "ob-poc".partnership_capital.
 #[register_custom_op]
 pub struct PartnershipDistributionOp;
+
+#[cfg(feature = "database")]
+async fn partnership_distribution_impl(
+    partnership_id: Uuid,
+    partner_id: Uuid,
+    amount: rust_decimal::Decimal,
+    distribution_type: String,
+    distribution_date: String,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    let mut tx = pool.begin().await?;
+
+    let partner_record: Option<PartnerRecord> = sqlx::query_as(
+        r#"
+        SELECT id, partner_type, capital_commitment, capital_contributed, capital_returned
+        FROM "ob-poc".partnership_capital
+        WHERE partnership_entity_id = $1 AND partner_entity_id = $2 AND is_active = true
+        "#,
+    )
+    .bind(partnership_id)
+    .bind(partner_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let partner_record =
+        partner_record.ok_or_else(|| anyhow!("Partner not found in partnership"))?;
+
+    let contributed = partner_record
+        .capital_contributed
+        .unwrap_or(rust_decimal::Decimal::ZERO);
+    let old_returned = partner_record
+        .capital_returned
+        .unwrap_or(rust_decimal::Decimal::ZERO);
+
+    if distribution_type == "capital_return" {
+        let max_returnable = contributed - old_returned;
+        if amount > max_returnable {
+            return Err(anyhow!(
+                "Cannot return {} - only {} is available (contributed {} minus already returned {})",
+                amount,
+                max_returnable,
+                contributed,
+                old_returned
+            ));
+        }
+    }
+
+    let new_returned = old_returned + amount;
+
+    sqlx::query(
+        r#"
+        UPDATE "ob-poc".partnership_capital
+        SET capital_returned = $1, updated_at = NOW()
+        WHERE id = $2
+        "#,
+    )
+    .bind(new_returned)
+    .bind(partner_record.id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(json!({
+        "partnership_capital_id": partner_record.id.to_string(),
+        "partnership_entity_id": partnership_id.to_string(),
+        "partner_entity_id": partner_id.to_string(),
+        "partner_type": partner_record.partner_type,
+        "distribution_type": distribution_type,
+        "distribution_amount": amount.to_string(),
+        "previous_returned": old_returned.to_string(),
+        "new_returned": new_returned.to_string(),
+        "capital_contributed": contributed.to_string(),
+        "distribution_date": distribution_date
+    }))
+}
 
 #[async_trait]
 impl CustomOperation for PartnershipDistributionOp {
@@ -208,75 +327,15 @@ impl CustomOperation for PartnershipDistributionOp {
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
             .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
-
-        let mut tx = pool.begin().await?;
-
-        // Get current capital state
-        let partner_record: Option<PartnerRecord> = sqlx::query_as(
-            r#"
-            SELECT id, partner_type, capital_commitment, capital_contributed, capital_returned
-            FROM "ob-poc".partnership_capital
-            WHERE partnership_entity_id = $1 AND partner_entity_id = $2 AND is_active = true
-            "#,
+        let result = partnership_distribution_impl(
+            partnership_id,
+            partner_id,
+            amount,
+            distribution_type.to_string(),
+            distribution_date,
+            pool,
         )
-        .bind(partnership_id)
-        .bind(partner_id)
-        .fetch_optional(&mut *tx)
         .await?;
-
-        let partner_record =
-            partner_record.ok_or_else(|| anyhow!("Partner not found in partnership"))?;
-
-        let contributed = partner_record
-            .capital_contributed
-            .unwrap_or(rust_decimal::Decimal::ZERO);
-        let old_returned = partner_record
-            .capital_returned
-            .unwrap_or(rust_decimal::Decimal::ZERO);
-
-        // For capital returns, validate against contributed amount
-        if distribution_type == "capital_return" {
-            let max_returnable = contributed - old_returned;
-            if amount > max_returnable {
-                return Err(anyhow!(
-                    "Cannot return {} - only {} is available (contributed {} minus already returned {})",
-                    amount,
-                    max_returnable,
-                    contributed,
-                    old_returned
-                ));
-            }
-        }
-
-        let new_returned = old_returned + amount;
-
-        // Update capital_returned
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".partnership_capital
-            SET capital_returned = $1, updated_at = NOW()
-            WHERE id = $2
-            "#,
-        )
-        .bind(new_returned)
-        .bind(partner_record.id)
-        .execute(&mut *tx)
-        .await?;
-
-        tx.commit().await?;
-
-        let result = json!({
-            "partnership_capital_id": partner_record.id.to_string(),
-            "partnership_entity_id": partnership_id.to_string(),
-            "partner_entity_id": partner_id.to_string(),
-            "partner_type": partner_record.partner_type,
-            "distribution_type": distribution_type,
-            "distribution_amount": amount.to_string(),
-            "previous_returned": old_returned.to_string(),
-            "new_returned": new_returned.to_string(),
-            "capital_contributed": contributed.to_string(),
-            "distribution_date": distribution_date
-        });
 
         Ok(ExecutionResult::Record(result))
     }
@@ -290,6 +349,39 @@ impl CustomOperation for PartnershipDistributionOp {
         Err(anyhow!(
             "Database feature required for partnership.record-distribution"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
+        let partner_id = json_extract_uuid(args, ctx, "partner-entity-id")?;
+        let amount: rust_decimal::Decimal = json_extract_string(args, "amount")?
+            .parse()
+            .map_err(|_| anyhow!("amount is required"))?;
+        let distribution_type = json_extract_string_opt(args, "distribution-type")
+            .unwrap_or_else(|| "capital_return".to_string());
+        let distribution_date = json_extract_string_opt(args, "distribution-date")
+            .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
+        let result = partnership_distribution_impl(
+            partnership_id,
+            partner_id,
+            amount,
+            distribution_type,
+            distribution_date,
+            pool,
+        )
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -311,6 +403,116 @@ struct PartnerSummary {
     voting_pct: Option<rust_decimal::Decimal>,
     capital_commitment: Option<rust_decimal::Decimal>,
     capital_contributed: Option<rust_decimal::Decimal>,
+}
+
+#[cfg(feature = "database")]
+async fn partnership_reconcile_impl(
+    partnership_id: Uuid,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    let partners: Vec<PartnerSummary> = sqlx::query_as(
+        r#"
+        SELECT
+            pc.partner_entity_id,
+            e.name as partner_name,
+            pc.partner_type,
+            pc.profit_share_pct,
+            pc.voting_pct,
+            pc.capital_commitment,
+            pc.capital_contributed
+        FROM "ob-poc".partnership_capital pc
+        JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
+        WHERE pc.partnership_entity_id = $1 AND pc.is_active = true AND e.deleted_at IS NULL
+        ORDER BY pc.partner_type, pc.profit_share_pct DESC NULLS LAST
+        "#,
+    )
+    .bind(partnership_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut total_profit_share: f64 = 0.0;
+    let mut total_voting: f64 = 0.0;
+    let mut total_commitment: rust_decimal::Decimal = rust_decimal::Decimal::ZERO;
+    let mut total_contributed: rust_decimal::Decimal = rust_decimal::Decimal::ZERO;
+    let mut gp_count = 0;
+    let mut lp_count = 0;
+    let mut partner_details: Vec<serde_json::Value> = Vec::new();
+
+    for p in &partners {
+        let profit_pct: f64 = p
+            .profit_share_pct
+            .map(|d| d.to_string().parse().unwrap_or(0.0))
+            .unwrap_or(0.0);
+        total_profit_share += profit_pct;
+
+        let voting: f64 = p
+            .voting_pct
+            .map(|d| d.to_string().parse().unwrap_or(0.0))
+            .unwrap_or(0.0);
+        total_voting += voting;
+
+        let commitment = p.capital_commitment.unwrap_or(rust_decimal::Decimal::ZERO);
+        total_commitment += commitment;
+
+        let contributed = p.capital_contributed.unwrap_or(rust_decimal::Decimal::ZERO);
+        total_contributed += contributed;
+
+        match p.partner_type.as_str() {
+            "GP" | "FOUNDING_PARTNER" => gp_count += 1,
+            "LP" | "SPECIAL_LP" => lp_count += 1,
+            "MEMBER" => {}
+            _ => {}
+        }
+
+        partner_details.push(json!({
+            "partner_id": p.partner_entity_id.to_string(),
+            "partner_name": p.partner_name,
+            "partner_type": p.partner_type,
+            "profit_share_pct": profit_pct,
+            "voting_pct": voting,
+            "capital_commitment": commitment.to_string(),
+            "capital_contributed": contributed.to_string()
+        }));
+    }
+
+    let tolerance = 0.01;
+    let is_profit_balanced = (total_profit_share - 100.0).abs() <= tolerance;
+    let is_voting_balanced = (total_voting - 100.0).abs() <= tolerance || total_voting == 0.0;
+
+    let mut issues: Vec<String> = Vec::new();
+    if !is_profit_balanced {
+        issues.push(format!(
+            "Profit shares sum to {:.2}%, expected 100%",
+            total_profit_share
+        ));
+    }
+    if !is_voting_balanced {
+        issues.push(format!(
+            "Voting percentages sum to {:.2}%, expected 100%",
+            total_voting
+        ));
+    }
+    if gp_count == 0 && lp_count > 0 {
+        issues.push("No General Partner (GP) found in limited partnership".to_string());
+    }
+
+    Ok(json!({
+        "partnership_entity_id": partnership_id.to_string(),
+        "partner_count": partners.len(),
+        "gp_count": gp_count,
+        "lp_count": lp_count,
+        "total_profit_share_pct": total_profit_share,
+        "total_voting_pct": total_voting,
+        "total_capital_commitment": total_commitment.to_string(),
+        "total_capital_contributed": total_contributed.to_string(),
+        "is_profit_balanced": is_profit_balanced,
+        "is_voting_balanced": is_voting_balanced,
+        "tolerance_pct": tolerance,
+        "issues": issues,
+        "status": if issues.is_empty() { "reconciled" } else { "discrepancies_found" },
+        "partners": partner_details,
+        "reconciled_at": chrono::Utc::now().to_rfc3339()
+    }))
 }
 
 #[async_trait]
@@ -335,114 +537,9 @@ impl CustomOperation for PartnershipReconcileOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let partnership_id = get_required_uuid(verb_call, "partnership-entity-id")?;
-
-        // Get all active partners with their profit shares
-        let partners: Vec<PartnerSummary> = sqlx::query_as(
-            r#"
-            SELECT
-                pc.partner_entity_id,
-                e.name as partner_name,
-                pc.partner_type,
-                pc.profit_share_pct,
-                pc.voting_pct,
-                pc.capital_commitment,
-                pc.capital_contributed
-            FROM "ob-poc".partnership_capital pc
-            JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
-            WHERE pc.partnership_entity_id = $1 AND pc.is_active = true AND e.deleted_at IS NULL
-            ORDER BY pc.partner_type, pc.profit_share_pct DESC NULLS LAST
-            "#,
-        )
-        .bind(partnership_id)
-        .fetch_all(pool)
-        .await?;
-
-        let mut total_profit_share: f64 = 0.0;
-        let mut total_voting: f64 = 0.0;
-        let mut total_commitment: rust_decimal::Decimal = rust_decimal::Decimal::ZERO;
-        let mut total_contributed: rust_decimal::Decimal = rust_decimal::Decimal::ZERO;
-        let mut gp_count = 0;
-        let mut lp_count = 0;
-
-        let mut partner_details: Vec<serde_json::Value> = Vec::new();
-
-        for p in &partners {
-            let profit_pct: f64 = p
-                .profit_share_pct
-                .map(|d| d.to_string().parse().unwrap_or(0.0))
-                .unwrap_or(0.0);
-            total_profit_share += profit_pct;
-
-            let voting: f64 = p
-                .voting_pct
-                .map(|d| d.to_string().parse().unwrap_or(0.0))
-                .unwrap_or(0.0);
-            total_voting += voting;
-
-            let commitment = p.capital_commitment.unwrap_or(rust_decimal::Decimal::ZERO);
-            total_commitment += commitment;
-
-            let contributed = p.capital_contributed.unwrap_or(rust_decimal::Decimal::ZERO);
-            total_contributed += contributed;
-
-            match p.partner_type.as_str() {
-                "GP" | "FOUNDING_PARTNER" => gp_count += 1,
-                "LP" | "SPECIAL_LP" => lp_count += 1,
-                "MEMBER" => {} // LLC member, count separately if needed
-                _ => {}
-            }
-
-            partner_details.push(json!({
-                "partner_id": p.partner_entity_id.to_string(),
-                "partner_name": p.partner_name,
-                "partner_type": p.partner_type,
-                "profit_share_pct": profit_pct,
-                "voting_pct": voting,
-                "capital_commitment": commitment.to_string(),
-                "capital_contributed": contributed.to_string()
-            }));
-        }
-
-        let tolerance = 0.01; // 0.01% tolerance for rounding
-        let is_profit_balanced = (total_profit_share - 100.0).abs() <= tolerance;
-        let is_voting_balanced = (total_voting - 100.0).abs() <= tolerance || total_voting == 0.0;
-
-        let mut issues: Vec<String> = Vec::new();
-        if !is_profit_balanced {
-            issues.push(format!(
-                "Profit shares sum to {:.2}%, expected 100%",
-                total_profit_share
-            ));
-        }
-        if !is_voting_balanced {
-            issues.push(format!(
-                "Voting percentages sum to {:.2}%, expected 100%",
-                total_voting
-            ));
-        }
-        if gp_count == 0 && lp_count > 0 {
-            issues.push("No General Partner (GP) found in limited partnership".to_string());
-        }
-
-        let result = json!({
-            "partnership_entity_id": partnership_id.to_string(),
-            "partner_count": partners.len(),
-            "gp_count": gp_count,
-            "lp_count": lp_count,
-            "total_profit_share_pct": total_profit_share,
-            "total_voting_pct": total_voting,
-            "total_capital_commitment": total_commitment.to_string(),
-            "total_capital_contributed": total_contributed.to_string(),
-            "is_profit_balanced": is_profit_balanced,
-            "is_voting_balanced": is_voting_balanced,
-            "tolerance_pct": tolerance,
-            "issues": issues,
-            "status": if issues.is_empty() { "reconciled" } else { "discrepancies_found" },
-            "partners": partner_details,
-            "reconciled_at": chrono::Utc::now().to_rfc3339()
-        });
-
-        Ok(ExecutionResult::Record(result))
+        Ok(ExecutionResult::Record(
+            partnership_reconcile_impl(partnership_id, pool).await?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -454,6 +551,23 @@ impl CustomOperation for PartnershipReconcileOp {
         Err(anyhow!(
             "Database feature required for partnership.reconcile"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            partnership_reconcile_impl(partnership_id, pool).await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -475,6 +589,137 @@ struct PartnerControlInfo {
     voting_pct: Option<rust_decimal::Decimal>,
     management_rights: Option<bool>,
     is_natural_person: Option<bool>,
+}
+
+#[cfg(feature = "database")]
+async fn partnership_analyze_control_impl(
+    partnership_id: Uuid,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    let partners: Vec<PartnerControlInfo> = sqlx::query_as(
+        r#"
+        SELECT
+            pc.partner_entity_id,
+            e.name as partner_name,
+            pc.partner_type,
+            pc.profit_share_pct,
+            pc.voting_pct,
+            pc.management_rights,
+            EXISTS(
+                SELECT 1 FROM "ob-poc".entity_proper_persons pp
+                WHERE pp.entity_id = pc.partner_entity_id
+            ) as is_natural_person
+        FROM "ob-poc".partnership_capital pc
+        JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
+        WHERE pc.partnership_entity_id = $1 AND pc.is_active = true AND e.deleted_at IS NULL
+        ORDER BY pc.partner_type, pc.profit_share_pct DESC NULLS LAST
+        "#,
+    )
+    .bind(partnership_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut controllers: Vec<serde_json::Value> = Vec::new();
+    let mut gps: Vec<serde_json::Value> = Vec::new();
+    let mut lps: Vec<serde_json::Value> = Vec::new();
+
+    for p in &partners {
+        let profit_pct: f64 = p
+            .profit_share_pct
+            .map(|d| d.to_string().parse().unwrap_or(0.0))
+            .unwrap_or(0.0);
+        let voting_pct: f64 = p
+            .voting_pct
+            .map(|d| d.to_string().parse().unwrap_or(0.0))
+            .unwrap_or(0.0);
+
+        let partner_info = json!({
+            "partner_id": p.partner_entity_id.to_string(),
+            "partner_name": p.partner_name,
+            "partner_type": p.partner_type,
+            "profit_share_pct": profit_pct,
+            "voting_pct": voting_pct,
+            "management_rights": p.management_rights.unwrap_or(false),
+            "is_natural_person": p.is_natural_person.unwrap_or(false)
+        });
+
+        match p.partner_type.as_str() {
+            "GP" | "FOUNDING_PARTNER" => {
+                gps.push(partner_info.clone());
+                controllers.push(json!({
+                    "controller_id": p.partner_entity_id.to_string(),
+                    "controller_name": p.partner_name,
+                    "control_type": "general_partner",
+                    "control_strength": 0.95,
+                    "is_natural_person": p.is_natural_person.unwrap_or(false),
+                    "needs_further_tracing": !p.is_natural_person.unwrap_or(false)
+                }));
+            }
+            "LP" | "SPECIAL_LP" => {
+                lps.push(partner_info.clone());
+                if p.management_rights.unwrap_or(false) || voting_pct > 50.0 {
+                    controllers.push(json!({
+                        "controller_id": p.partner_entity_id.to_string(),
+                        "controller_name": p.partner_name,
+                        "control_type": if p.management_rights.unwrap_or(false) {
+                            "lp_with_management_rights"
+                        } else {
+                            "lp_majority_voting"
+                        },
+                        "control_strength": if voting_pct > 50.0 { 0.85 } else { 0.70 },
+                        "voting_pct": voting_pct,
+                        "is_natural_person": p.is_natural_person.unwrap_or(false),
+                        "needs_further_tracing": !p.is_natural_person.unwrap_or(false)
+                    }));
+                }
+            }
+            "MEMBER" => {
+                if p.management_rights.unwrap_or(false) || voting_pct > 50.0 {
+                    controllers.push(json!({
+                        "controller_id": p.partner_entity_id.to_string(),
+                        "controller_name": p.partner_name,
+                        "control_type": "managing_member",
+                        "control_strength": 0.80,
+                        "voting_pct": voting_pct,
+                        "is_natural_person": p.is_natural_person.unwrap_or(false),
+                        "needs_further_tracing": !p.is_natural_person.unwrap_or(false)
+                    }));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let control_type = match gps.len() {
+        0 => {
+            if partners.iter().any(|p| p.partner_type == "MEMBER") {
+                "llc_member_managed"
+            } else {
+                "no_gp"
+            }
+        }
+        1 => "single_gp",
+        _ => "multiple_gps",
+    };
+
+    Ok(json!({
+        "partnership_entity_id": partnership_id.to_string(),
+        "control_type": control_type,
+        "general_partners": gps,
+        "limited_partners": lps,
+        "controllers": controllers,
+        "gp_count": gps.len(),
+        "lp_count": lps.len(),
+        "total_partners": partners.len(),
+        "analysis_notes": match control_type {
+            "no_gp" => "WARNING: No General Partner found - unusual partnership structure",
+            "llc_member_managed" => "LLC structure - members with management rights have control",
+            "single_gp" => "Single GP has presumptive control per partnership law",
+            "multiple_gps" => "Multiple GPs share control - further analysis may be needed",
+            _ => "Unknown control structure"
+        },
+        "analysis_timestamp": chrono::Utc::now().to_rfc3339()
+    }))
 }
 
 #[async_trait]
@@ -499,137 +744,9 @@ impl CustomOperation for PartnershipAnalyzeControlOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let partnership_id = get_required_uuid(verb_call, "partnership-entity-id")?;
-
-        // Get all partners with control-relevant info
-        let partners: Vec<PartnerControlInfo> = sqlx::query_as(
-            r#"
-            SELECT
-                pc.partner_entity_id,
-                e.name as partner_name,
-                pc.partner_type,
-                pc.profit_share_pct,
-                pc.voting_pct,
-                pc.management_rights,
-                EXISTS(
-                    SELECT 1 FROM "ob-poc".entity_proper_persons pp
-                    WHERE pp.entity_id = pc.partner_entity_id
-                ) as is_natural_person
-            FROM "ob-poc".partnership_capital pc
-            JOIN "ob-poc".entities e ON pc.partner_entity_id = e.entity_id
-            WHERE pc.partnership_entity_id = $1 AND pc.is_active = true AND e.deleted_at IS NULL
-            ORDER BY pc.partner_type, pc.profit_share_pct DESC NULLS LAST
-            "#,
-        )
-        .bind(partnership_id)
-        .fetch_all(pool)
-        .await?;
-
-        let mut controllers: Vec<serde_json::Value> = Vec::new();
-        let mut gps: Vec<serde_json::Value> = Vec::new();
-        let mut lps: Vec<serde_json::Value> = Vec::new();
-
-        for p in &partners {
-            let profit_pct: f64 = p
-                .profit_share_pct
-                .map(|d| d.to_string().parse().unwrap_or(0.0))
-                .unwrap_or(0.0);
-            let voting_pct: f64 = p
-                .voting_pct
-                .map(|d| d.to_string().parse().unwrap_or(0.0))
-                .unwrap_or(0.0);
-
-            let partner_info = json!({
-                "partner_id": p.partner_entity_id.to_string(),
-                "partner_name": p.partner_name,
-                "partner_type": p.partner_type,
-                "profit_share_pct": profit_pct,
-                "voting_pct": voting_pct,
-                "management_rights": p.management_rights.unwrap_or(false),
-                "is_natural_person": p.is_natural_person.unwrap_or(false)
-            });
-
-            match p.partner_type.as_str() {
-                "GP" | "FOUNDING_PARTNER" => {
-                    gps.push(partner_info.clone());
-                    // GPs have presumptive control
-                    controllers.push(json!({
-                        "controller_id": p.partner_entity_id.to_string(),
-                        "controller_name": p.partner_name,
-                        "control_type": "general_partner",
-                        "control_strength": 0.95,
-                        "is_natural_person": p.is_natural_person.unwrap_or(false),
-                        "needs_further_tracing": !p.is_natural_person.unwrap_or(false)
-                    }));
-                }
-                "LP" | "SPECIAL_LP" => {
-                    lps.push(partner_info.clone());
-                    // LPs with management rights or >50% voting also have control
-                    if p.management_rights.unwrap_or(false) || voting_pct > 50.0 {
-                        controllers.push(json!({
-                            "controller_id": p.partner_entity_id.to_string(),
-                            "controller_name": p.partner_name,
-                            "control_type": if p.management_rights.unwrap_or(false) {
-                                "lp_with_management_rights"
-                            } else {
-                                "lp_majority_voting"
-                            },
-                            "control_strength": if voting_pct > 50.0 { 0.85 } else { 0.70 },
-                            "voting_pct": voting_pct,
-                            "is_natural_person": p.is_natural_person.unwrap_or(false),
-                            "needs_further_tracing": !p.is_natural_person.unwrap_or(false)
-                        }));
-                    }
-                }
-                "MEMBER" => {
-                    // LLC members - check if they have management rights or majority voting
-                    if p.management_rights.unwrap_or(false) || voting_pct > 50.0 {
-                        controllers.push(json!({
-                            "controller_id": p.partner_entity_id.to_string(),
-                            "controller_name": p.partner_name,
-                            "control_type": "managing_member",
-                            "control_strength": 0.80,
-                            "voting_pct": voting_pct,
-                            "is_natural_person": p.is_natural_person.unwrap_or(false),
-                            "needs_further_tracing": !p.is_natural_person.unwrap_or(false)
-                        }));
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        let control_type = match gps.len() {
-            0 => {
-                if partners.iter().any(|p| p.partner_type == "MEMBER") {
-                    "llc_member_managed"
-                } else {
-                    "no_gp"
-                }
-            }
-            1 => "single_gp",
-            _ => "multiple_gps",
-        };
-
-        let result = json!({
-            "partnership_entity_id": partnership_id.to_string(),
-            "control_type": control_type,
-            "general_partners": gps,
-            "limited_partners": lps,
-            "controllers": controllers,
-            "gp_count": gps.len(),
-            "lp_count": lps.len(),
-            "total_partners": partners.len(),
-            "analysis_notes": match control_type {
-                "no_gp" => "WARNING: No General Partner found - unusual partnership structure",
-                "llc_member_managed" => "LLC structure - members with management rights have control",
-                "single_gp" => "Single GP has presumptive control per partnership law",
-                "multiple_gps" => "Multiple GPs share control - further analysis may be needed",
-                _ => "Unknown control structure"
-            },
-            "analysis_timestamp": chrono::Utc::now().to_rfc3339()
-        });
-
-        Ok(ExecutionResult::Record(result))
+        Ok(ExecutionResult::Record(
+            partnership_analyze_control_impl(partnership_id, pool).await?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -641,6 +758,23 @@ impl CustomOperation for PartnershipAnalyzeControlOp {
         Err(anyhow!(
             "Database feature required for partnership.analyze-control"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            partnership_analyze_control_impl(partnership_id, pool).await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

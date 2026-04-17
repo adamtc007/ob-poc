@@ -20,8 +20,8 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 
 use super::helpers::{
-    extract_string, extract_string_opt, extract_uuid, extract_uuid_opt,
-    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+    extract_string, extract_string_opt, extract_uuid, extract_uuid_opt, json_extract_string,
+    json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 

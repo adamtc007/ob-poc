@@ -25,6 +25,58 @@ use sqlx::PgPool;
 #[register_custom_op]
 pub struct MatrixEffectiveOp;
 
+#[cfg(feature = "database")]
+async fn matrix_effective_impl(
+    cbu_id: uuid::Uuid,
+    instrument_class: Option<String>,
+    market: Option<String>,
+    pool: &PgPool,
+) -> Result<Vec<serde_json::Value>> {
+    let rows: Vec<(
+        uuid::Uuid,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        serde_json::Value,
+        i64,
+    )> = sqlx::query_as(
+        r#"SELECT
+            universe_id,
+            cbu_name,
+            instrument_class,
+            market,
+            counterparty_name,
+            product_overlays,
+            overlay_count
+           FROM "ob-poc".v_cbu_matrix_effective
+           WHERE cbu_id = $1
+             AND ($2::text IS NULL OR instrument_class = $2)
+             AND ($3::text IS NULL OR market = $3)
+           ORDER BY instrument_class, market, counterparty_name"#,
+    )
+    .bind(cbu_id)
+    .bind(&instrument_class)
+    .bind(&market)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| {
+            serde_json::json!({
+                "universe_id": r.0,
+                "cbu_name": r.1,
+                "instrument_class": r.2,
+                "market": r.3,
+                "counterparty_name": r.4,
+                "product_overlays": r.5,
+                "overlay_count": r.6
+            })
+        })
+        .collect())
+}
+
 #[async_trait]
 impl CustomOperation for MatrixEffectiveOp {
     fn domain(&self) -> &'static str {
@@ -44,9 +96,7 @@ impl CustomOperation for MatrixEffectiveOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let cbu_id: Uuid = verb_call
+        let cbu_id: uuid::Uuid = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "cbu-id")
@@ -73,52 +123,7 @@ impl CustomOperation for MatrixEffectiveOp {
             .find(|a| a.key == "market")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
-
-        // Query the effective matrix view
-        let rows: Vec<(
-            Uuid,              // universe_id
-            String,            // cbu_name
-            String,            // instrument_class
-            Option<String>,    // market
-            Option<String>,    // counterparty_name
-            serde_json::Value, // product_overlays (jsonb)
-            i64,               // overlay_count
-        )> = sqlx::query_as(
-            r#"SELECT
-                universe_id,
-                cbu_name,
-                instrument_class,
-                market,
-                counterparty_name,
-                product_overlays,
-                overlay_count
-               FROM "ob-poc".v_cbu_matrix_effective
-               WHERE cbu_id = $1
-                 AND ($2::text IS NULL OR instrument_class = $2)
-                 AND ($3::text IS NULL OR market = $3)
-               ORDER BY instrument_class, market, counterparty_name"#,
-        )
-        .bind(cbu_id)
-        .bind(&instrument_class)
-        .bind(&market)
-        .fetch_all(pool)
-        .await?;
-
-        let result: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(|r| {
-                serde_json::json!({
-                    "universe_id": r.0,
-                    "cbu_name": r.1,
-                    "instrument_class": r.2,
-                    "market": r.3,
-                    "counterparty_name": r.4,
-                    "product_overlays": r.5,
-                    "overlay_count": r.6
-                })
-            })
-            .collect();
-
+        let result = matrix_effective_impl(cbu_id, instrument_class, market, pool).await?;
         Ok(ExecutionResult::RecordSet(result))
     }
 
@@ -129,6 +134,28 @@ impl CustomOperation for MatrixEffectiveOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let instrument_class = json_extract_string_opt(args, "instrument-class");
+        let market = json_extract_string_opt(args, "market");
+        let result = matrix_effective_impl(cbu_id, instrument_class, market, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            result,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -142,6 +169,78 @@ impl CustomOperation for MatrixEffectiveOp {
 /// from both the trading matrix (lifecycle) and product (service) domains.
 #[register_custom_op]
 pub struct MatrixUnifiedGapsOp;
+
+#[cfg(feature = "database")]
+async fn matrix_unified_gaps_impl(
+    cbu_id: uuid::Uuid,
+    domain_filter: Option<String>,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    let rows: Vec<(
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+        bool,
+    )> = sqlx::query_as(
+        r#"SELECT
+            gap_source,
+            instrument_class,
+            market,
+            counterparty_name,
+            product_code,
+            operation_code,
+            operation_name,
+            missing_resource_code,
+            missing_resource_name,
+            provisioning_verb,
+            is_required
+           FROM "ob-poc".v_cbu_unified_gaps
+           WHERE cbu_id = $1
+             AND ($2::text IS NULL OR $2 = 'ALL' OR gap_source = $2)
+           ORDER BY gap_source, operation_code, missing_resource_code"#,
+    )
+    .bind(cbu_id)
+    .bind(&domain_filter)
+    .fetch_all(pool)
+    .await?;
+
+    let result: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|r| {
+            serde_json::json!({
+                "source": r.0,
+                "instrument_class": r.1,
+                "market": r.2,
+                "counterparty_name": r.3,
+                "product_code": r.4,
+                "operation_code": r.5,
+                "operation_name": r.6,
+                "missing_resource_code": r.7,
+                "missing_resource_name": r.8,
+                "provisioning_verb": r.9,
+                "is_required": r.10
+            })
+        })
+        .collect();
+
+    let lifecycle_count = result.iter().filter(|r| r["source"] == "LIFECYCLE").count();
+    let service_count = result.iter().filter(|r| r["source"] == "SERVICE").count();
+
+    Ok(serde_json::json!({
+        "cbu_id": cbu_id,
+        "total_gaps": result.len(),
+        "lifecycle_gaps": lifecycle_count,
+        "service_gaps": service_count,
+        "gaps": result
+    }))
+}
 
 #[async_trait]
 impl CustomOperation for MatrixUnifiedGapsOp {
@@ -162,9 +261,7 @@ impl CustomOperation for MatrixUnifiedGapsOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let cbu_id: Uuid = verb_call
+        let cbu_id: uuid::Uuid = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "cbu-id")
@@ -183,73 +280,8 @@ impl CustomOperation for MatrixUnifiedGapsOp {
             .find(|a| a.key == "domain")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
-
-        // Query the unified gaps view
-        let rows: Vec<(
-            String,         // gap_source (LIFECYCLE or SERVICE)
-            Option<String>, // instrument_class
-            Option<String>, // market
-            Option<String>, // counterparty_name
-            Option<String>, // product_code
-            String,         // operation_code
-            String,         // operation_name
-            String,         // missing_resource_code
-            String,         // missing_resource_name
-            Option<String>, // provisioning_verb
-            bool,           // is_required
-        )> = sqlx::query_as(
-            r#"SELECT
-                gap_source,
-                instrument_class,
-                market,
-                counterparty_name,
-                product_code,
-                operation_code,
-                operation_name,
-                missing_resource_code,
-                missing_resource_name,
-                provisioning_verb,
-                is_required
-               FROM "ob-poc".v_cbu_unified_gaps
-               WHERE cbu_id = $1
-                 AND ($2::text IS NULL OR $2 = 'ALL' OR gap_source = $2)
-               ORDER BY gap_source, operation_code, missing_resource_code"#,
-        )
-        .bind(cbu_id)
-        .bind(&domain_filter)
-        .fetch_all(pool)
-        .await?;
-
-        let result: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(|r| {
-                serde_json::json!({
-                    "source": r.0,
-                    "instrument_class": r.1,
-                    "market": r.2,
-                    "counterparty_name": r.3,
-                    "product_code": r.4,
-                    "operation_code": r.5,
-                    "operation_name": r.6,
-                    "missing_resource_code": r.7,
-                    "missing_resource_name": r.8,
-                    "provisioning_verb": r.9,
-                    "is_required": r.10
-                })
-            })
-            .collect();
-
-        // Summary counts
-        let lifecycle_count = result.iter().filter(|r| r["source"] == "LIFECYCLE").count();
-        let service_count = result.iter().filter(|r| r["source"] == "SERVICE").count();
-
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "cbu_id": cbu_id,
-            "total_gaps": result.len(),
-            "lifecycle_gaps": lifecycle_count,
-            "service_gaps": service_count,
-            "gaps": result
-        })))
+        let result = matrix_unified_gaps_impl(cbu_id, domain_filter, pool).await?;
+        Ok(ExecutionResult::Record(result))
     }
 
     #[cfg(not(feature = "database"))]
@@ -265,6 +297,25 @@ impl CustomOperation for MatrixUnifiedGapsOp {
             "gaps": []
         })))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let domain_filter = json_extract_string_opt(args, "domain");
+        let result = matrix_unified_gaps_impl(cbu_id, domain_filter, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -277,6 +328,85 @@ impl CustomOperation for MatrixUnifiedGapsOp {
 /// what overlaps, helping with product selection.
 #[register_custom_op]
 pub struct MatrixCompareProductsOp;
+
+#[cfg(feature = "database")]
+async fn matrix_compare_products_impl(
+    _cbu_id: uuid::Uuid,
+    instrument_class: String,
+    products: Vec<String>,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    use std::collections::{HashMap, HashSet};
+
+    let base_lifecycles: Vec<(String, String)> = sqlx::query_as(
+        r#"SELECT l.code, l.name
+           FROM "ob-poc".lifecycles l
+           JOIN "ob-poc".instrument_lifecycles il ON il.lifecycle_id = l.lifecycle_id
+           JOIN "ob-poc".instrument_classes ic ON ic.class_id = il.instrument_class_id
+           WHERE ic.code = $1 AND il.is_mandatory = true AND l.is_active = true"#,
+    )
+    .bind(&instrument_class)
+    .fetch_all(pool)
+    .await?;
+
+    let mut by_product: HashMap<String, Vec<String>> = HashMap::new();
+    let mut all_services: HashSet<String> = HashSet::new();
+
+    for product_code in &products {
+        let services: Vec<(String,)> = sqlx::query_as(
+            r#"SELECT s.service_code
+               FROM "ob-poc".services s
+               JOIN "ob-poc".product_services ps ON ps.service_id = s.service_id
+               JOIN "ob-poc".products p ON p.product_id = ps.product_id
+               WHERE p.product_code = $1 AND s.is_active = true"#,
+        )
+        .bind(product_code)
+        .fetch_all(pool)
+        .await?;
+
+        let service_codes: Vec<String> = services.iter().map(|s| s.0.clone()).collect();
+        for s in &service_codes {
+            all_services.insert(s.clone());
+        }
+        by_product.insert(product_code.clone(), service_codes);
+    }
+
+    let overlap: Vec<String> = all_services
+        .iter()
+        .filter(|s| {
+            products
+                .iter()
+                .all(|p| by_product.get(p).is_some_and(|v| v.contains(s)))
+        })
+        .cloned()
+        .collect();
+
+    let mut unique_to_each: HashMap<String, Vec<String>> = HashMap::new();
+    for product_code in &products {
+        let services = by_product.get(product_code).cloned().unwrap_or_default();
+        let unique: Vec<String> = services
+            .iter()
+            .filter(|s| {
+                products
+                    .iter()
+                    .filter(|p| *p != product_code)
+                    .all(|p| by_product.get(p).is_none_or(|v| !v.contains(s)))
+            })
+            .cloned()
+            .collect();
+        unique_to_each.insert(product_code.clone(), unique);
+    }
+
+    Ok(serde_json::json!({
+        "instrument_class": instrument_class,
+        "base_lifecycles": base_lifecycles.iter().map(|(c, n)| {
+            serde_json::json!({"code": c, "name": n})
+        }).collect::<Vec<_>>(),
+        "by_product": by_product,
+        "overlap": overlap,
+        "unique_to_each": unique_to_each
+    }))
+}
 
 #[async_trait]
 impl CustomOperation for MatrixCompareProductsOp {
@@ -297,11 +427,7 @@ impl CustomOperation for MatrixCompareProductsOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use std::collections::{HashMap, HashSet};
-        use uuid::Uuid;
-
-        // cbu_id extracted for future CBU-specific comparison (e.g., overlays)
-        let _cbu_id: Uuid = verb_call
+        let cbu_id: uuid::Uuid = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "cbu-id")
@@ -333,79 +459,10 @@ impl CustomOperation for MatrixCompareProductsOp {
                 })
             })
             .ok_or_else(|| anyhow::anyhow!("Missing products argument (must be a list)"))?;
-
-        // Get base lifecycles for this instrument class
-        let base_lifecycles: Vec<(String, String)> = sqlx::query_as(
-            r#"SELECT l.code, l.name
-               FROM "ob-poc".lifecycles l
-               JOIN "ob-poc".instrument_lifecycles il ON il.lifecycle_id = l.lifecycle_id
-               JOIN "ob-poc".instrument_classes ic ON ic.class_id = il.instrument_class_id
-               WHERE ic.code = $1 AND il.is_mandatory = true AND l.is_active = true"#,
-        )
-        .bind(instrument_class)
-        .fetch_all(pool)
-        .await?;
-
-        // Get services for each product
-        let mut by_product: HashMap<String, Vec<String>> = HashMap::new();
-        let mut all_services: HashSet<String> = HashSet::new();
-
-        for product_code in &products {
-            let services: Vec<(String,)> = sqlx::query_as(
-                r#"SELECT s.service_code
-                   FROM "ob-poc".services s
-                   JOIN "ob-poc".product_services ps ON ps.service_id = s.service_id
-                   JOIN "ob-poc".products p ON p.product_id = ps.product_id
-                   WHERE p.product_code = $1 AND s.is_active = true"#,
-            )
-            .bind(product_code)
-            .fetch_all(pool)
-            .await?;
-
-            let service_codes: Vec<String> = services.iter().map(|s| s.0.clone()).collect();
-            for s in &service_codes {
-                all_services.insert(s.clone());
-            }
-            by_product.insert(product_code.clone(), service_codes);
-        }
-
-        // Find overlap (services in ALL products)
-        let overlap: Vec<String> = all_services
-            .iter()
-            .filter(|s| {
-                products
-                    .iter()
-                    .all(|p| by_product.get(p).is_some_and(|v| v.contains(s)))
-            })
-            .cloned()
-            .collect();
-
-        // Find unique to each product
-        let mut unique_to_each: HashMap<String, Vec<String>> = HashMap::new();
-        for product_code in &products {
-            let services = by_product.get(product_code).cloned().unwrap_or_default();
-            let unique: Vec<String> = services
-                .iter()
-                .filter(|s| {
-                    products
-                        .iter()
-                        .filter(|p| *p != product_code)
-                        .all(|p| by_product.get(p).is_none_or(|v| !v.contains(s)))
-                })
-                .cloned()
-                .collect();
-            unique_to_each.insert(product_code.clone(), unique);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "instrument_class": instrument_class,
-            "base_lifecycles": base_lifecycles.iter().map(|(c, n)| {
-                serde_json::json!({"code": c, "name": n})
-            }).collect::<Vec<_>>(),
-            "by_product": by_product,
-            "overlap": overlap,
-            "unique_to_each": unique_to_each
-        })))
+        let result =
+            matrix_compare_products_impl(cbu_id, instrument_class.to_string(), products, pool)
+                .await?;
+        Ok(ExecutionResult::Record(result))
     }
 
     #[cfg(not(feature = "database"))]
@@ -421,6 +478,26 @@ impl CustomOperation for MatrixCompareProductsOp {
             "overlap": [],
             "unique_to_each": {}
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_list, json_extract_uuid};
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let instrument_class = json_extract_string(args, "instrument-class")?;
+        let products = json_extract_string_list(args, "products")?;
+        let result = matrix_compare_products_impl(cbu_id, instrument_class, products, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

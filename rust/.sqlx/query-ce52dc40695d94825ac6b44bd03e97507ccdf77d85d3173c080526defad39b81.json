@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT dc.extracted_data, dt.type_code\n        FROM \"ob-poc\".document_catalog dc\n        JOIN \"ob-poc\".document_types dt ON dt.type_id = dc.document_type_id\n        WHERE dc.doc_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "extracted_data",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 1,
+        "name": "type_code",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "ce52dc40695d94825ac6b44bd03e97507ccdf77d85d3173c080526defad39b81"
+}
