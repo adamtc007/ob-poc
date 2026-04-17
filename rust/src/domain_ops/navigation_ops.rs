@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 
+use super::helpers::json_extract_string_opt;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
@@ -77,6 +78,31 @@ impl crate::domain_ops::CustomOperation for NavDrillOp {
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let target_id = json_extract_string_opt(args, "target_id");
+        let result = NavResult {
+            success: true,
+            message: format!("Drilled to {}", target_id.as_deref().unwrap_or("target")),
+            target_level: None,
+            target_slot: target_id,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Extract a string argument from a VerbCall by key.
@@ -127,6 +153,30 @@ impl crate::domain_ops::CustomOperation for NavZoomOutOp {
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let result = NavResult {
+            success: true,
+            message: "Zoomed out one level".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// nav.select — set semantic focus to a specific entity.
@@ -162,6 +212,31 @@ impl crate::domain_ops::CustomOperation for NavSelectOp {
             history_direction: None,
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let target_id = json_extract_string_opt(args, "target_id");
+        let result = NavResult {
+            success: true,
+            message: format!("Focus set to {}", target_id.as_deref().unwrap_or("target")),
+            target_level: None,
+            target_slot: target_id,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -199,6 +274,30 @@ impl crate::domain_ops::CustomOperation for NavSetClusterTypeOp {
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let result = NavResult {
+            success: true,
+            message: "Cluster mode updated".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// nav.set-lens — change observation lens.
@@ -235,6 +334,30 @@ impl crate::domain_ops::CustomOperation for NavSetLensOp {
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let result = NavResult {
+            success: true,
+            message: "Lens updated".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// nav.history-back — navigate back in viewport history.
@@ -270,6 +393,30 @@ impl crate::domain_ops::CustomOperation for NavHistoryBackOp {
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let result = NavResult {
+            success: true,
+            message: "Navigated back".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: Some("back".into()),
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// nav.history-forward — navigate forward in viewport history.
@@ -304,5 +451,29 @@ impl crate::domain_ops::CustomOperation for NavHistoryForwardOp {
             history_direction: Some("forward".into()),
         };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let result = NavResult {
+            success: true,
+            message: "Navigated forward".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: Some("forward".into()),
+        };
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

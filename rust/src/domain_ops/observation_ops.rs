@@ -7,6 +7,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 
+use super::helpers::{
+    json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
+    json_extract_uuid_opt,
+};
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -14,6 +18,268 @@ use crate::services::attribute_identity_service::AttributeIdentityService;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
+
+// ============================================================================
+// Shared _impl functions (called by both execute and execute_json)
+// ============================================================================
+
+/// Shared impl for observation.reconcile — creates discrepancy records via sqlx::query!
+#[cfg(feature = "database")]
+async fn observation_reconcile_impl(
+    entity_id: uuid::Uuid,
+    attribute_id: uuid::Uuid,
+    case_id: Option<uuid::Uuid>,
+    auto_create: bool,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    use uuid::Uuid;
+
+    let observations: Vec<(
+        Uuid,
+        Option<String>,
+        String,
+        Option<rust_decimal::Decimal>,
+        bool,
+    )> = sqlx::query_as(
+        r#"SELECT observation_id, value_text, source_type, confidence, is_authoritative
+               FROM "ob-poc".attribute_observations
+               WHERE entity_id = $1 AND attribute_id = $2 AND status = 'ACTIVE'
+               ORDER BY is_authoritative DESC, confidence DESC NULLS LAST, observed_at DESC"#,
+    )
+    .bind(entity_id)
+    .bind(attribute_id)
+    .fetch_all(pool)
+    .await?;
+
+    if observations.len() < 2 {
+        return Ok(serde_json::json!({
+            "status": "no_conflict",
+            "observation_count": observations.len(),
+            "discrepancies_created": 0
+        }));
+    }
+
+    let mut discrepancies_created = 0;
+    let first = &observations[0];
+
+    for other in observations.iter().skip(1) {
+        if first.1 != other.1 && auto_create {
+            let discrepancy_id = Uuid::new_v4();
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".observation_discrepancies
+                   (discrepancy_id, entity_id, attribute_id, observation_1_id, observation_2_id,
+                    discrepancy_type, severity, description, case_id, resolution_status)
+                   VALUES ($1, $2, $3, $4, $5, 'VALUE_MISMATCH', 'MEDIUM',
+                           'Different values observed for same attribute', $6, 'OPEN')"#,
+            )
+            .bind(discrepancy_id)
+            .bind(entity_id)
+            .bind(attribute_id)
+            .bind(first.0)
+            .bind(other.0)
+            .bind(case_id)
+            .execute(pool)
+            .await?;
+            discrepancies_created += 1;
+        }
+    }
+
+    Ok(serde_json::json!({
+        "status": if discrepancies_created > 0 { "conflicts_found" } else { "no_conflict" },
+        "observation_count": observations.len(),
+        "discrepancies_created": discrepancies_created
+    }))
+}
+
+/// Shared impl for observation.verify-allegations — updates allegations via sqlx::query!
+#[cfg(feature = "database")]
+async fn observation_verify_allegations_impl(
+    cbu_id: uuid::Uuid,
+    entity_id: uuid::Uuid,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    use uuid::Uuid;
+
+    let allegations: Vec<(Uuid, Uuid, serde_json::Value, Option<String>)> = sqlx::query_as(
+        r#"SELECT allegation_id, attribute_id, alleged_value, alleged_value_display
+           FROM "ob-poc".client_allegations
+           WHERE cbu_id = $1 AND entity_id = $2 AND verification_status = 'PENDING'"#,
+    )
+    .bind(cbu_id)
+    .bind(entity_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut verified = 0;
+    let mut contradicted = 0;
+    let mut no_observation = 0;
+
+    for (allegation_id, attribute_id, alleged_value, alleged_display) in allegations {
+        let current: Option<(Uuid, Option<String>)> = sqlx::query_as(
+            r#"SELECT observation_id, value_text
+               FROM "ob-poc".v_attribute_current
+               WHERE entity_id = $1 AND attribute_id = $2"#,
+        )
+        .bind(entity_id)
+        .bind(attribute_id)
+        .fetch_optional(pool)
+        .await?;
+
+        match current {
+            Some((observation_id, obs_value_text)) => {
+                let alleged_str = alleged_display
+                    .or_else(|| alleged_value.as_str().map(String::from))
+                    .unwrap_or_default();
+
+                let matches = obs_value_text
+                    .as_ref()
+                    .map(|v| v.to_lowercase() == alleged_str.to_lowercase())
+                    .unwrap_or(false);
+
+                if matches {
+                    sqlx::query(
+                        r#"UPDATE "ob-poc".client_allegations
+                           SET verification_status = 'VERIFIED',
+                               verified_by_observation_id = $2,
+                               verified_at = NOW()
+                           WHERE allegation_id = $1"#,
+                    )
+                    .bind(allegation_id)
+                    .bind(observation_id)
+                    .execute(pool)
+                    .await?;
+                    verified += 1;
+                } else {
+                    sqlx::query(
+                        r#"UPDATE "ob-poc".client_allegations
+                           SET verification_status = 'CONTRADICTED',
+                               verified_by_observation_id = $2,
+                               verified_at = NOW(),
+                               verification_notes = 'Value does not match observation'
+                           WHERE allegation_id = $1"#,
+                    )
+                    .bind(allegation_id)
+                    .bind(observation_id)
+                    .execute(pool)
+                    .await?;
+                    contradicted += 1;
+                }
+            }
+            None => {
+                no_observation += 1;
+            }
+        }
+    }
+
+    Ok(serde_json::json!({
+        "verified": verified,
+        "contradicted": contradicted,
+        "no_observation": no_observation,
+        "total_processed": verified + contradicted + no_observation
+    }))
+}
+
+/// Shared impl for document.extract-to-observations — creates observations + auto-verifies via sqlx::query!
+#[cfg(feature = "database")]
+async fn document_extract_observations_impl(
+    document_id: uuid::Uuid,
+    entity_id: uuid::Uuid,
+    auto_verify: bool,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    use uuid::Uuid;
+
+    let doc_type: Option<Uuid> = sqlx::query_scalar(
+        r#"SELECT document_type_id FROM "ob-poc".document_catalog WHERE doc_id = $1"#,
+    )
+    .bind(document_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let doc_type_id =
+        doc_type.ok_or_else(|| anyhow::anyhow!("Document not found: {}", document_id))?;
+
+    let extractable: Vec<(Uuid, String, Option<String>, Option<sqlx::types::BigDecimal>, bool)> =
+        sqlx::query_as(
+            r#"SELECT dal.attribute_id, ar.id, dal.extraction_method,
+                      dal.extraction_confidence_default, dal.is_authoritative
+               FROM "ob-poc".document_attribute_links dal
+               JOIN "ob-poc".attribute_registry ar ON ar.uuid = dal.attribute_id
+               WHERE dal.document_type_id = $1 AND dal.direction = 'SOURCE' AND dal.is_active = TRUE"#,
+        )
+        .bind(doc_type_id)
+        .fetch_all(pool)
+        .await?;
+
+    let mut observations_created = 0;
+
+    for (attribute_id, attr_name, extraction_method, confidence, is_authoritative) in &extractable {
+        let observation_id = Uuid::new_v4();
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".attribute_observations
+               (observation_id, entity_id, attribute_id, value_text, source_type,
+                source_document_id, extraction_method, confidence, is_authoritative, status)
+               VALUES ($1, $2, $3, $4, 'DOCUMENT', $5, $6, $7, $8, 'ACTIVE')
+               ON CONFLICT (entity_id, attribute_id, source_type, source_document_id)
+               WHERE status = 'ACTIVE'
+               DO NOTHING"#,
+        )
+        .bind(observation_id)
+        .bind(entity_id)
+        .bind(attribute_id)
+        .bind(format!("[Extracted from document - {}]", attr_name))
+        .bind(document_id)
+        .bind(extraction_method.as_deref().unwrap_or("MANUAL"))
+        .bind(confidence.clone())
+        .bind(is_authoritative)
+        .execute(pool)
+        .await?;
+
+        observations_created += 1;
+    }
+
+    let mut allegations_verified = 0;
+    if auto_verify && observations_created > 0 {
+        let cbu_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT cbu_id FROM "ob-poc".document_catalog WHERE doc_id = $1"#,
+        )
+        .bind(document_id)
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(cbu_id) = cbu_id {
+            let result = sqlx::query(
+                r#"UPDATE "ob-poc".client_allegations ca
+                   SET verification_status = 'VERIFIED',
+                       verified_at = NOW(),
+                       verification_notes = 'Auto-verified by document extraction'
+                   WHERE ca.cbu_id = $1 AND ca.entity_id = $2
+                     AND ca.verification_status = 'PENDING'
+                     AND EXISTS (
+                       SELECT 1 FROM "ob-poc".attribute_observations ao
+                       WHERE ao.entity_id = ca.entity_id
+                         AND ao.attribute_id = ca.attribute_id
+                         AND ao.source_document_id = $3
+                         AND ao.status = 'ACTIVE'
+                     )"#,
+            )
+            .bind(cbu_id)
+            .bind(entity_id)
+            .bind(document_id)
+            .execute(pool)
+            .await?;
+
+            allegations_verified = result.rows_affected() as i32;
+        }
+    }
+
+    Ok(serde_json::json!({
+        "observations_created": observations_created,
+        "attributes_extractable": extractable.len(),
+        "allegations_verified": allegations_verified
+    }))
+}
 
 // ============================================================================
 // Observation Operations
@@ -44,7 +310,6 @@ impl CustomOperation for ObservationFromDocumentOp {
     ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        // Get entity-id (required)
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
@@ -58,7 +323,6 @@ impl CustomOperation for ObservationFromDocumentOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
 
-        // Get document-id (required)
         let document_id: Uuid = verb_call
             .arguments
             .iter()
@@ -72,7 +336,6 @@ impl CustomOperation for ObservationFromDocumentOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing document-id argument"))?;
 
-        // Get attribute name (required) and look up ID
         let attr_name = verb_call
             .arguments
             .iter()
@@ -87,7 +350,6 @@ impl CustomOperation for ObservationFromDocumentOp {
         let attribute_id =
             attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
 
-        // Get value (required)
         let value = verb_call
             .arguments
             .iter()
@@ -95,14 +357,12 @@ impl CustomOperation for ObservationFromDocumentOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing value argument"))?;
 
-        // Get optional extraction method
         let extraction_method = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "extraction-method")
             .and_then(|a| a.value.as_string());
 
-        // Get optional confidence (default 0.80 for document extractions)
         let confidence: f64 = verb_call
             .arguments
             .iter()
@@ -111,7 +371,6 @@ impl CustomOperation for ObservationFromDocumentOp {
             .and_then(|s| s.parse().ok())
             .unwrap_or(0.80);
 
-        // Look up if this document type is authoritative for this attribute
         let is_authoritative: bool = sqlx::query_scalar(
             r#"SELECT COALESCE(dal.is_authoritative, FALSE)
                FROM "ob-poc".document_catalog dc
@@ -128,7 +387,6 @@ impl CustomOperation for ObservationFromDocumentOp {
         .await?
         .unwrap_or(false);
 
-        // Insert observation
         let observation_id = Uuid::new_v4();
 
         sqlx::query(
@@ -161,6 +419,79 @@ impl CustomOperation for ObservationFromDocumentOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use uuid::Uuid;
+
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let document_id = json_extract_uuid(args, ctx, "document-id")?;
+
+        let attr_name = json_extract_string(args, "attribute")?;
+        let attribute_id = AttributeIdentityService::new(pool.clone())
+            .resolve_runtime_uuid(&attr_name)
+            .await?;
+        let attribute_id =
+            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+        let value = json_extract_string(args, "value")?;
+        let extraction_method = json_extract_string_opt(args, "extraction-method");
+
+        let confidence_str = json_extract_string_opt(args, "confidence");
+        let confidence: f64 = confidence_str
+            .as_deref()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0.80);
+
+        let is_authoritative: bool = sqlx::query_scalar(
+            r#"SELECT COALESCE(dal.is_authoritative, FALSE)
+               FROM "ob-poc".document_catalog dc
+               LEFT JOIN "ob-poc".document_attribute_links dal
+                 ON dal.document_type_id = dc.document_type_id
+                 AND dal.attribute_id = $2
+                 AND dal.direction IN ('SOURCE', 'BOTH')
+               WHERE dc.doc_id = $1
+               LIMIT 1"#,
+        )
+        .bind(document_id)
+        .bind(attribute_id)
+        .fetch_optional(pool)
+        .await?
+        .unwrap_or(false);
+
+        let observation_id = Uuid::new_v4();
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".attribute_observations
+               (observation_id, entity_id, attribute_id, value_text, source_type,
+                source_document_id, confidence, is_authoritative, extraction_method,
+                observed_at, status)
+               VALUES ($1, $2, $3, $4, 'DOCUMENT', $5, $6, $7, $8, NOW(), 'ACTIVE')"#,
+        )
+        .bind(observation_id)
+        .bind(entity_id)
+        .bind(attribute_id)
+        .bind(&value)
+        .bind(document_id)
+        .bind(confidence)
+        .bind(is_authoritative)
+        .bind(extraction_method.as_deref())
+        .execute(pool)
+        .await?;
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            observation_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Get current best observation for an attribute
@@ -188,7 +519,6 @@ impl CustomOperation for ObservationGetCurrentOp {
     ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        // Get entity-id (required)
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
@@ -202,7 +532,6 @@ impl CustomOperation for ObservationGetCurrentOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
 
-        // Get attribute name (required) and look up ID
         let attr_name = verb_call
             .arguments
             .iter()
@@ -217,7 +546,6 @@ impl CustomOperation for ObservationGetCurrentOp {
         let attribute_id =
             attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
 
-        // Get current best observation from view
         let result: Option<(
             Uuid,
             Option<String>,
@@ -276,6 +604,79 @@ impl CustomOperation for ObservationGetCurrentOp {
             "message": "No database available"
         })))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use uuid::Uuid;
+
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+
+        let attr_name = json_extract_string(args, "attribute")?;
+        let attribute_id = AttributeIdentityService::new(pool.clone())
+            .resolve_runtime_uuid(&attr_name)
+            .await?;
+        let attribute_id =
+            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+        let result: Option<(
+            Uuid,
+            Option<String>,
+            Option<rust_decimal::Decimal>,
+            Option<bool>,
+            Option<chrono::NaiveDate>,
+            String,
+            Option<rust_decimal::Decimal>,
+            bool,
+        )> = sqlx::query_as(
+            r#"SELECT observation_id, value_text, value_number, value_boolean, value_date,
+                      source_type, confidence, is_authoritative
+               FROM "ob-poc".v_attribute_current
+               WHERE entity_id = $1 AND attribute_id = $2"#,
+        )
+        .bind(entity_id)
+        .bind(attribute_id)
+        .fetch_optional(pool)
+        .await?;
+
+        match result {
+            Some((
+                obs_id,
+                value_text,
+                value_number,
+                value_boolean,
+                value_date,
+                source_type,
+                confidence,
+                is_authoritative,
+            )) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                serde_json::json!({
+                    "observation_id": obs_id,
+                    "value_text": value_text,
+                    "value_number": value_number,
+                    "value_boolean": value_boolean,
+                    "value_date": value_date,
+                    "source_type": source_type,
+                    "confidence": confidence,
+                    "is_authoritative": is_authoritative
+                }),
+            )),
+            None => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                serde_json::json!({
+                    "found": false,
+                    "message": "No active observation found for this attribute"
+                }),
+            )),
+        }
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Reconcile observations for an attribute and auto-create discrepancies
@@ -306,7 +707,6 @@ impl CustomOperation for ObservationReconcileOp {
     ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        // Get entity-id (required)
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
@@ -320,7 +720,6 @@ impl CustomOperation for ObservationReconcileOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
 
-        // Get attribute name
         let attr_name = verb_call
             .arguments
             .iter()
@@ -328,15 +727,12 @@ impl CustomOperation for ObservationReconcileOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
-        // Lookup attribute ID
         let attribute_id = AttributeIdentityService::new(pool.clone())
             .resolve_runtime_uuid(attr_name)
             .await?;
-
         let attribute_id =
             attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
 
-        // Optional case-id
         let case_id: Option<Uuid> = verb_call
             .arguments
             .iter()
@@ -349,7 +745,6 @@ impl CustomOperation for ObservationReconcileOp {
                 }
             });
 
-        // Auto-create discrepancies (default true)
         let auto_create = verb_call
             .arguments
             .iter()
@@ -357,65 +752,9 @@ impl CustomOperation for ObservationReconcileOp {
             .and_then(|a| a.value.as_boolean())
             .unwrap_or(true);
 
-        // Get all active observations for this entity+attribute
-        let observations: Vec<(
-            Uuid,
-            Option<String>,
-            String,
-            Option<rust_decimal::Decimal>,
-            bool,
-        )> = sqlx::query_as(
-            r#"SELECT observation_id, value_text, source_type, confidence, is_authoritative
-                   FROM "ob-poc".attribute_observations
-                   WHERE entity_id = $1 AND attribute_id = $2 AND status = 'ACTIVE'
-                   ORDER BY is_authoritative DESC, confidence DESC NULLS LAST, observed_at DESC"#,
-        )
-        .bind(entity_id)
-        .bind(attribute_id)
-        .fetch_all(pool)
-        .await?;
-
-        if observations.len() < 2 {
-            return Ok(ExecutionResult::Record(serde_json::json!({
-                "status": "no_conflict",
-                "observation_count": observations.len(),
-                "discrepancies_created": 0
-            })));
-        }
-
-        // Compare values to find discrepancies
-        let mut discrepancies_created = 0;
-        let first = &observations[0];
-
-        for other in observations.iter().skip(1) {
-            // Compare values (simplified - just text comparison for now)
-            if first.1 != other.1 && auto_create {
-                // Create discrepancy record
-                let discrepancy_id = Uuid::new_v4();
-                sqlx::query!(
-                    r#"INSERT INTO "ob-poc".observation_discrepancies
-                       (discrepancy_id, entity_id, attribute_id, observation_1_id, observation_2_id,
-                        discrepancy_type, severity, description, case_id, resolution_status)
-                       VALUES ($1, $2, $3, $4, $5, 'VALUE_MISMATCH', 'MEDIUM',
-                               'Different values observed for same attribute', $6, 'OPEN')"#,
-                    discrepancy_id,
-                    entity_id,
-                    attribute_id,
-                    first.0,
-                    other.0,
-                    case_id
-                )
-                .execute(pool)
-                .await?;
-                discrepancies_created += 1;
-            }
-        }
-
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "status": if discrepancies_created > 0 { "conflicts_found" } else { "no_conflict" },
-            "observation_count": observations.len(),
-            "discrepancies_created": discrepancies_created
-        })))
+        let result =
+            observation_reconcile_impl(entity_id, attribute_id, case_id, auto_create, pool).await?;
+        Ok(ExecutionResult::Record(result))
     }
 
     #[cfg(not(feature = "database"))]
@@ -428,6 +767,34 @@ impl CustomOperation for ObservationReconcileOp {
             "status": "no_database",
             "discrepancies_created": 0
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+
+        let attr_name = json_extract_string(args, "attribute")?;
+        let attribute_id = AttributeIdentityService::new(pool.clone())
+            .resolve_runtime_uuid(&attr_name)
+            .await?;
+        let attribute_id =
+            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let auto_create = json_extract_bool_opt(args, "auto-create-discrepancies").unwrap_or(true);
+
+        let result =
+            observation_reconcile_impl(entity_id, attribute_id, case_id, auto_create, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -459,7 +826,6 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
     ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        // Get cbu-id (required)
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
@@ -473,7 +839,6 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
 
-        // Get entity-id (required)
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
@@ -487,88 +852,8 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
 
-        // Get pending allegations for this entity
-        let allegations: Vec<(Uuid, Uuid, serde_json::Value, Option<String>)> = sqlx::query_as(
-            r#"SELECT allegation_id, attribute_id, alleged_value, alleged_value_display
-               FROM "ob-poc".client_allegations
-               WHERE cbu_id = $1 AND entity_id = $2 AND verification_status = 'PENDING'"#,
-        )
-        .bind(cbu_id)
-        .bind(entity_id)
-        .fetch_all(pool)
-        .await?;
-
-        let mut verified = 0;
-        let mut contradicted = 0;
-        let mut no_observation = 0;
-
-        for (allegation_id, attribute_id, alleged_value, alleged_display) in allegations {
-            // Get current observation for this attribute
-            let current: Option<(Uuid, Option<String>)> = sqlx::query_as(
-                r#"SELECT observation_id, value_text
-                   FROM "ob-poc".v_attribute_current
-                   WHERE entity_id = $1 AND attribute_id = $2"#,
-            )
-            .bind(entity_id)
-            .bind(attribute_id)
-            .fetch_optional(pool)
-            .await?;
-
-            match current {
-                Some((observation_id, obs_value_text)) => {
-                    // Compare alleged value with observation
-                    let alleged_str = alleged_display
-                        .or_else(|| alleged_value.as_str().map(String::from))
-                        .unwrap_or_default();
-
-                    let matches = obs_value_text
-                        .as_ref()
-                        .map(|v| v.to_lowercase() == alleged_str.to_lowercase())
-                        .unwrap_or(false);
-
-                    if matches {
-                        // Verify the allegation
-                        sqlx::query!(
-                            r#"UPDATE "ob-poc".client_allegations
-                               SET verification_status = 'VERIFIED',
-                                   verified_by_observation_id = $2,
-                                   verified_at = NOW()
-                               WHERE allegation_id = $1"#,
-                            allegation_id,
-                            observation_id
-                        )
-                        .execute(pool)
-                        .await?;
-                        verified += 1;
-                    } else {
-                        // Contradict the allegation
-                        sqlx::query!(
-                            r#"UPDATE "ob-poc".client_allegations
-                               SET verification_status = 'CONTRADICTED',
-                                   verified_by_observation_id = $2,
-                                   verified_at = NOW(),
-                                   verification_notes = 'Value does not match observation'
-                               WHERE allegation_id = $1"#,
-                            allegation_id,
-                            observation_id
-                        )
-                        .execute(pool)
-                        .await?;
-                        contradicted += 1;
-                    }
-                }
-                None => {
-                    no_observation += 1;
-                }
-            }
-        }
-
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "verified": verified,
-            "contradicted": contradicted,
-            "no_observation": no_observation,
-            "total_processed": verified + contradicted + no_observation
-        })))
+        let result = observation_verify_allegations_impl(cbu_id, entity_id, pool).await?;
+        Ok(ExecutionResult::Record(result))
     }
 
     #[cfg(not(feature = "database"))]
@@ -582,6 +867,24 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
             "contradicted": 0,
             "no_observation": 0
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+
+        let result = observation_verify_allegations_impl(cbu_id, entity_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -613,7 +916,6 @@ impl CustomOperation for DocumentExtractObservationsOp {
     ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        // Get document-id (required)
         let document_id: Uuid = verb_call
             .arguments
             .iter()
@@ -627,7 +929,6 @@ impl CustomOperation for DocumentExtractObservationsOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing document-id argument"))?;
 
-        // Get entity-id (required)
         let entity_id: Uuid = verb_call
             .arguments
             .iter()
@@ -641,7 +942,6 @@ impl CustomOperation for DocumentExtractObservationsOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
 
-        // Auto-verify allegations (default true)
         let auto_verify = verb_call
             .arguments
             .iter()
@@ -649,105 +949,9 @@ impl CustomOperation for DocumentExtractObservationsOp {
             .and_then(|a| a.value.as_boolean())
             .unwrap_or(true);
 
-        // Get document type
-        let doc_type: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT document_type_id FROM "ob-poc".document_catalog WHERE doc_id = $1"#,
-        )
-        .bind(document_id)
-        .fetch_optional(pool)
-        .await?;
-
-        let doc_type_id =
-            doc_type.ok_or_else(|| anyhow::anyhow!("Document not found: {}", document_id))?;
-
-        // Get attributes this document can provide (SOURCE direction)
-        let extractable: Vec<(Uuid, String, Option<String>, Option<sqlx::types::BigDecimal>, bool)> =
-            sqlx::query_as(
-                r#"SELECT dal.attribute_id, ar.id, dal.extraction_method,
-                          dal.extraction_confidence_default, dal.is_authoritative
-                   FROM "ob-poc".document_attribute_links dal
-                   JOIN "ob-poc".attribute_registry ar ON ar.uuid = dal.attribute_id
-                   WHERE dal.document_type_id = $1 AND dal.direction = 'SOURCE' AND dal.is_active = TRUE"#,
-            )
-            .bind(doc_type_id)
-            .fetch_all(pool)
-            .await?;
-
-        // For now, we create placeholder observations - actual extraction would call AI/OCR
-        let mut observations_created = 0;
-
-        for (attribute_id, attr_name, extraction_method, confidence, is_authoritative) in
-            &extractable
-        {
-            let observation_id = Uuid::new_v4();
-
-            // Create observation with placeholder value (real impl would extract from document)
-            sqlx::query!(
-                r#"INSERT INTO "ob-poc".attribute_observations
-                   (observation_id, entity_id, attribute_id, value_text, source_type,
-                    source_document_id, extraction_method, confidence, is_authoritative, status)
-                   VALUES ($1, $2, $3, $4, 'DOCUMENT', $5, $6, $7, $8, 'ACTIVE')
-                   ON CONFLICT (entity_id, attribute_id, source_type, source_document_id)
-                   WHERE status = 'ACTIVE'
-                   DO NOTHING"#,
-                observation_id,
-                entity_id,
-                attribute_id,
-                format!("[Extracted from document - {}]", attr_name), // Placeholder
-                document_id,
-                extraction_method.as_deref().unwrap_or("MANUAL"),
-                confidence.clone(),
-                is_authoritative
-            )
-            .execute(pool)
-            .await?;
-
-            observations_created += 1;
-        }
-
-        // Auto-verify allegations if requested
-        let mut allegations_verified = 0;
-        if auto_verify && observations_created > 0 {
-            // Get CBU for this entity's document
-            let cbu_id: Option<Uuid> = sqlx::query_scalar(
-                r#"SELECT cbu_id FROM "ob-poc".document_catalog WHERE doc_id = $1"#,
-            )
-            .bind(document_id)
-            .fetch_optional(pool)
-            .await?;
-
-            if let Some(cbu_id) = cbu_id {
-                // Update matching pending allegations
-                let result = sqlx::query!(
-                    r#"UPDATE "ob-poc".client_allegations ca
-                       SET verification_status = 'VERIFIED',
-                           verified_at = NOW(),
-                           verification_notes = 'Auto-verified by document extraction'
-                       WHERE ca.cbu_id = $1 AND ca.entity_id = $2
-                         AND ca.verification_status = 'PENDING'
-                         AND EXISTS (
-                           SELECT 1 FROM "ob-poc".attribute_observations ao
-                           WHERE ao.entity_id = ca.entity_id
-                             AND ao.attribute_id = ca.attribute_id
-                             AND ao.source_document_id = $3
-                             AND ao.status = 'ACTIVE'
-                         )"#,
-                    cbu_id,
-                    entity_id,
-                    document_id
-                )
-                .execute(pool)
-                .await?;
-
-                allegations_verified = result.rows_affected() as i32;
-            }
-        }
-
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "observations_created": observations_created,
-            "attributes_extractable": extractable.len(),
-            "allegations_verified": allegations_verified
-        })))
+        let result =
+            document_extract_observations_impl(document_id, entity_id, auto_verify, pool).await?;
+        Ok(ExecutionResult::Record(result))
     }
 
     #[cfg(not(feature = "database"))]
@@ -761,5 +965,25 @@ impl CustomOperation for DocumentExtractObservationsOp {
             "attributes_extractable": 0,
             "allegations_verified": 0
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let document_id = json_extract_uuid(args, ctx, "document-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let auto_verify = json_extract_bool_opt(args, "auto-verify-allegations").unwrap_or(true);
+
+        let result =
+            document_extract_observations_impl(document_id, entity_id, auto_verify, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

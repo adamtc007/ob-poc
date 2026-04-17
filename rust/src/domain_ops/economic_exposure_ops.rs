@@ -10,6 +10,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 
+use super::helpers::{json_extract_string_opt, json_extract_uuid};
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -188,6 +189,82 @@ impl CustomOperation for EconomicExposureComputeOp {
             "economic-exposure.compute requires database feature"
         ))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let root_entity_id = json_extract_uuid(args, ctx, "root-entity-id")?;
+
+        let as_of_date_str = json_extract_string_opt(args, "as-of-date");
+        let as_of_date = as_of_date_str
+            .as_deref()
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+
+        let max_depth = args
+            .get("max-depth")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32)
+            .unwrap_or(6);
+
+        let min_pct_str = json_extract_string_opt(args, "min-pct");
+        let min_pct = min_pct_str
+            .as_deref()
+            .and_then(|s| s.parse::<rust_decimal::Decimal>().ok())
+            .unwrap_or_else(|| rust_decimal::Decimal::new(1, 4));
+
+        let max_rows = args
+            .get("max-rows")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32)
+            .unwrap_or(200);
+
+        let stop_on_no_bo_data = args
+            .get("stop-on-no-bo-data")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        let stop_on_policy_none = args
+            .get("stop-on-policy-none")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+
+        let rows = sqlx::query_as::<_, ExposureRow>(
+            r#"
+            SELECT
+                root_entity_id,
+                leaf_entity_id,
+                leaf_name,
+                cumulative_pct,
+                depth,
+                path_entities,
+                path_names,
+                stopped_reason
+            FROM "ob-poc".fn_compute_economic_exposure($1, $2, $3, $4, $5, $6, $7)
+            "#,
+        )
+        .bind(root_entity_id)
+        .bind(as_of_date)
+        .bind(max_depth)
+        .bind(min_pct)
+        .bind(max_rows)
+        .bind(stop_on_no_bo_data)
+        .bind(stop_on_policy_none)
+        .fetch_all(pool)
+        .await?;
+
+        let results: Vec<serde_json::Value> = rows.into_iter().map(|r| r.into()).collect();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            results,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ============================================================================
@@ -265,6 +342,57 @@ impl CustomOperation for EconomicExposureSummaryOp {
         Err(anyhow::anyhow!(
             "economic-exposure.summary requires database feature"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
+
+        let as_of_date_str = json_extract_string_opt(args, "as-of-date");
+        let as_of_date = as_of_date_str
+            .as_deref()
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+
+        let threshold_pct_str = json_extract_string_opt(args, "threshold-pct");
+        let threshold_pct = threshold_pct_str
+            .as_deref()
+            .and_then(|s| s.parse::<rust_decimal::Decimal>().ok())
+            .unwrap_or_else(|| rust_decimal::Decimal::new(5, 0));
+
+        let rows = sqlx::query_as::<_, ExposureSummaryRow>(
+            r#"
+            SELECT
+                investor_entity_id,
+                investor_name,
+                direct_pct,
+                lookthrough_pct,
+                is_above_threshold,
+                role_type,
+                depth,
+                stop_reason
+            FROM "ob-poc".fn_economic_exposure_summary($1, $2, $3)
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(as_of_date)
+        .bind(threshold_pct)
+        .fetch_all(pool)
+        .await?;
+
+        let results: Vec<serde_json::Value> = rows.into_iter().map(|r| r.into()).collect();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            results,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

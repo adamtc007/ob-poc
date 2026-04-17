@@ -260,6 +260,10 @@ impl CustomOperation for SessionStartOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -339,6 +343,10 @@ impl CustomOperation for SessionLoadUniverseOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -399,6 +407,10 @@ impl CustomOperation for SessionLoadGalaxyOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -570,6 +582,10 @@ impl CustomOperation for SessionLoadClusterOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -637,6 +653,10 @@ impl CustomOperation for SessionLoadSystemOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -699,6 +719,10 @@ impl CustomOperation for SessionUnloadSystemOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -780,6 +804,10 @@ impl CustomOperation for SessionFilterJurisdictionOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -827,6 +855,10 @@ impl CustomOperation for SessionClearOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -881,6 +913,10 @@ impl CustomOperation for SessionUndoOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -933,6 +969,10 @@ impl CustomOperation for SessionRedoOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1013,6 +1053,10 @@ impl CustomOperation for SessionInfoOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -1087,6 +1131,10 @@ impl CustomOperation for SessionListOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1238,6 +1286,10 @@ impl CustomOperation for SessionSetClientOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -1300,6 +1352,10 @@ impl CustomOperation for SessionSetPersonaOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1393,6 +1449,10 @@ impl CustomOperation for SessionSetStructureOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -1475,6 +1535,10 @@ impl CustomOperation for SessionSetCaseOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -1555,6 +1619,10 @@ impl CustomOperation for SessionSetMandateOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1688,6 +1756,10 @@ impl CustomOperation for SessionLoadDealOp {
             "Database feature required for session operations"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -1741,6 +1813,10 @@ impl CustomOperation for SessionUnloadDealOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 

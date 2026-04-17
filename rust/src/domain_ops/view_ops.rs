@@ -316,6 +316,10 @@ impl CustomOperation for ViewUniverseOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.universe requires database feature"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -374,6 +378,10 @@ impl CustomOperation for ViewBookOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.book requires database feature"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -439,6 +447,10 @@ impl CustomOperation for ViewCbuOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.cbu requires database feature"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -508,6 +520,10 @@ impl CustomOperation for ViewEntityForestOp {
         Err(anyhow::anyhow!(
             "view.entity-forest requires database feature"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -595,6 +611,10 @@ impl CustomOperation for ViewRefineOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.refine requires database feature"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -644,6 +664,10 @@ impl CustomOperation for ViewClearOp {
             "view.clear-refinements requires database feature"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// view.clear handler - Legacy alias for clearing refinements
@@ -685,6 +709,10 @@ impl CustomOperation for ViewClearAliasOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.clear requires database feature"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -760,6 +788,10 @@ impl CustomOperation for ViewSelectOp {
             "view.set-selection requires database feature"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -824,6 +856,43 @@ impl CustomOperation for ViewLayoutOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.set-layout requires database feature"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_string_opt;
+
+        let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "auto".to_string());
+        let primary_axis = json_extract_string_opt(args, "primary-axis");
+        let size_by = json_extract_string_opt(args, "size-by");
+        let color_by = json_extract_string_opt(args, "color-by");
+
+        let metaphor = match mode.as_str() {
+            "galaxy" => Metaphor::Galaxy,
+            "grid" => Metaphor::Tree,
+            "tree" => Metaphor::Tree,
+            "network" => Metaphor::Network,
+            "pyramid" => Metaphor::Pyramid,
+            _ => Metaphor::Tree,
+        };
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
+            "layout_mode": mode,
+            "metaphor": format!("{:?}", metaphor),
+            "primary_axis": primary_axis,
+            "size_by": size_by,
+            "color_by": color_by,
+            "message": "Layout configuration updated"
+        })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -880,6 +949,10 @@ impl CustomOperation for ViewStatusOp {
         Err(anyhow::anyhow!(
             "view.read-status requires database feature"
         ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -942,6 +1015,10 @@ impl CustomOperation for ViewSelectionInfoOp {
             "view.read-selection-info requires database feature"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -996,6 +1073,26 @@ impl CustomOperation for ViewZoomInOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.zoom-in requires database feature"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        let node_id = json_extract_uuid(args, ctx, "node-id")?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
+            "action": "zoom-in",
+            "node_id": node_id.to_string(),
+            "message": format!("Zoom into node {}. Use session.zoom_in() to execute.", node_id)
+        })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -1044,6 +1141,23 @@ impl CustomOperation for ViewZoomOutOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.zoom-out requires database feature"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
+            "action": "zoom-out",
+            "message": "Zoom out to parent taxonomy. Use session.zoom_out() to execute."
+        })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1106,6 +1220,28 @@ impl CustomOperation for ViewBackToOp {
             "view.navigate-back-to requires database feature"
         ))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_int_opt, json_extract_uuid_opt};
+        let depth = json_extract_int_opt(args, "depth").map(|i| i as usize);
+        let frame_id = json_extract_uuid_opt(args, ctx, "frame-id");
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
+            "action": "navigate-back-to",
+            "depth": depth,
+            "frame_id": frame_id.map(|id| id.to_string()),
+            "message": "Navigate to breadcrumb level. Use session.back_to() to execute."
+        })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================
@@ -1155,6 +1291,23 @@ impl CustomOperation for ViewBreadcrumbsOp {
         Err(anyhow::anyhow!(
             "view.read-breadcrumbs requires database feature"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
+            "action": "read-breadcrumbs",
+            "message": "Get breadcrumbs from session.breadcrumbs() or session.breadcrumbs_with_ids()"
+        })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
