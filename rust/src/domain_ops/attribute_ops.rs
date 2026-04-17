@@ -114,6 +114,10 @@ impl CustomOperation for AttributeListSourcesOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"sources": []})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// List all document types that require (SINK) a given attribute
@@ -190,6 +194,10 @@ impl CustomOperation for AttributeListSinksOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"sinks": []})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -379,6 +387,10 @@ impl CustomOperation for AttributeTraceLineageOp {
             "required_by_resources": {"count": 0, "resources": []}
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// List all attributes linked to a document type
@@ -481,6 +493,10 @@ impl CustomOperation for AttributeListByDocumentOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"attributes": []})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -601,6 +617,10 @@ impl CustomOperation for AttributeCheckCoverageOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "UNKNOWN"})))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// List all attributes for a document type (document.list-attributes handler)
@@ -641,6 +661,10 @@ impl CustomOperation for DocumentListAttributesOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"attributes": []})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -809,6 +833,10 @@ impl CustomOperation for DocumentCheckExtractionCoverageOp {
             "available_documents": {"count": 0},
             "sourceable_attributes": {"count": 0}
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1517,6 +1545,10 @@ impl CustomOperation for AttributeDefineGovernedOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("attribute.define requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Define or update an internal/system attribute with lightweight governance.
@@ -1646,6 +1678,10 @@ impl CustomOperation for AttributeDefineInternalOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("attribute.define-internal requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Update metadata on an internal/system attribute with lightweight governance.
@@ -1772,6 +1808,10 @@ impl CustomOperation for AttributeUpdateInternalOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("attribute.update-internal requires database"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1958,6 +1998,10 @@ impl CustomOperation for AttributeDefineDerivedOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("attribute.define-derived requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Update the evidence grade on a governed attribute definition and linked derivation.
@@ -2091,6 +2135,10 @@ impl CustomOperation for AttributeSetEvidenceGradeOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("attribute.set-evidence-grade requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Deprecate a governed attribute while leaving operational references intact.
@@ -2214,6 +2262,10 @@ impl CustomOperation for AttributeDeprecateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("attribute.deprecate requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Inspect a governed attribute across operational and SemOS sources.
@@ -2314,6 +2366,10 @@ impl CustomOperation for AttributeInspectOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("attribute.inspect requires database"))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Recompute stale derived values from the canonical queue.
@@ -2358,6 +2414,10 @@ impl CustomOperation for DerivationRecomputeStaleOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("derivation.recompute-stale requires database"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2511,5 +2571,9 @@ impl CustomOperation for AttributeBridgeToSemosOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("attribute.bridge-to-semos requires database"))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

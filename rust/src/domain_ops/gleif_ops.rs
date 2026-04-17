@@ -186,6 +186,10 @@ impl CustomOperation for GleifEnrichOp {
             "addresses_added": 0,
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Search GLEIF for entities
@@ -251,6 +255,10 @@ impl CustomOperation for GleifSearchOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -328,6 +336,10 @@ impl CustomOperation for GleifImportTreeOp {
             "entities_updated": 0,
             "relationships_created": 0,
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -441,6 +453,10 @@ impl CustomOperation for GleifRefreshOp {
             "errors": 0,
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Get raw GLEIF record (does not persist)
@@ -493,6 +509,10 @@ impl CustomOperation for GleifGetRecordOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -549,6 +569,10 @@ impl CustomOperation for GleifGetParentOp {
         Ok(ExecutionResult::Record(serde_json::json!({
             "parent_lei": null,
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -799,6 +823,10 @@ impl CustomOperation for GleifImportManagedFundsOp {
             "funds_imported": 0,
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // Helper functions for GleifImportManagedFundsOp
@@ -1006,6 +1034,10 @@ impl CustomOperation for GleifGetChildrenOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Trace ownership chain to UBO terminus
@@ -1116,6 +1148,10 @@ impl CustomOperation for GleifTraceOwnershipOp {
             "terminus": "Unknown",
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Get all funds managed by an investment manager
@@ -1202,6 +1238,10 @@ impl CustomOperation for GleifGetManagedFundsOp {
             "funds": [],
             "total_count": 0,
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1291,6 +1331,10 @@ impl CustomOperation for GleifResolveSuccessorOp {
         Ok(ExecutionResult::Record(serde_json::json!({
             "was_merged": false,
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1386,6 +1430,10 @@ impl CustomOperation for GleifGetUmbrellaOp {
             "umbrella": null,
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Get fund manager for a fund (IS_FUND-MANAGED_BY relationship)
@@ -1477,6 +1525,10 @@ impl CustomOperation for GleifGetManagerOp {
             "manager": null,
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Get master fund for a feeder fund (IS_FEEDER_TO relationship)
@@ -1566,6 +1618,10 @@ impl CustomOperation for GleifGetMasterFundOp {
             "master": null,
         })))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Look up entity LEI by ISIN
@@ -1634,6 +1690,10 @@ impl CustomOperation for GleifLookupByIsinOp {
             "isin": "MOCK",
             "lei": null,
         })))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2153,6 +2213,10 @@ impl CustomOperation for GleifImportToClientGroupOp {
             "Database feature required for gleif.import-to-client-group"
         ))
     }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Consolidated GLEIF lookup — dispatches to specific handlers by target-type.
@@ -2209,5 +2273,9 @@ impl CustomOperation for GleifLookupOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
