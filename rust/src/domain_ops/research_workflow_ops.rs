@@ -389,25 +389,23 @@ async fn workflow_audit_trail_impl(
         .fetch_all(pool)
         .await?;
 
-        result["decisions"] = json!(
-            decisions
-                .iter()
-                .map(|d| {
-                    json!({
-                        "decision_id": d.0,
-                        "search_query": d.1,
-                        "source_provider": d.2,
-                        "candidates_count": d.3,
-                        "selected_key": d.4,
-                        "selected_key_type": d.5,
-                        "confidence": d.6,
-                        "decision_type": d.7,
-                        "auto_selected": d.8,
-                        "created_at": d.9
-                    })
+        result["decisions"] = json!(decisions
+            .iter()
+            .map(|d| {
+                json!({
+                    "decision_id": d.0,
+                    "search_query": d.1,
+                    "source_provider": d.2,
+                    "candidates_count": d.3,
+                    "selected_key": d.4,
+                    "selected_key_type": d.5,
+                    "confidence": d.6,
+                    "decision_type": d.7,
+                    "auto_selected": d.8,
+                    "created_at": d.9
                 })
-                .collect::<Vec<_>>()
-        );
+            })
+            .collect::<Vec<_>>());
     }
 
     if include_actions {
@@ -503,22 +501,20 @@ async fn workflow_audit_trail_impl(
         .fetch_all(pool)
         .await?;
 
-        result["corrections"] = json!(
-            corrections
-                .iter()
-                .map(|c| {
-                    json!({
-                        "correction_id": c.0,
-                        "original_decision_id": c.1,
-                        "correction_type": c.2,
-                        "wrong_key": c.3,
-                        "correct_key": c.4,
-                        "reason": c.5,
-                        "corrected_at": c.6
-                    })
+        result["corrections"] = json!(corrections
+            .iter()
+            .map(|c| {
+                json!({
+                    "correction_id": c.0,
+                    "original_decision_id": c.1,
+                    "correction_type": c.2,
+                    "wrong_key": c.3,
+                    "correct_key": c.4,
+                    "reason": c.5,
+                    "corrected_at": c.6
                 })
-                .collect::<Vec<_>>()
-        );
+            })
+            .collect::<Vec<_>>());
     }
 
     if include_anomalies {
@@ -551,23 +547,21 @@ async fn workflow_audit_trail_impl(
         .fetch_all(pool)
         .await?;
 
-        result["anomalies"] = json!(
-            anomalies
-                .iter()
-                .map(|a| {
-                    json!({
-                        "anomaly_id": a.0,
-                        "action_id": a.1,
-                        "rule_code": a.2,
-                        "severity": a.3,
-                        "description": a.4,
-                        "status": a.5,
-                        "resolution": a.6,
-                        "detected_at": a.7
-                    })
+        result["anomalies"] = json!(anomalies
+            .iter()
+            .map(|a| {
+                json!({
+                    "anomaly_id": a.0,
+                    "action_id": a.1,
+                    "rule_code": a.2,
+                    "severity": a.3,
+                    "description": a.4,
+                    "status": a.5,
+                    "resolution": a.6,
+                    "detected_at": a.7
                 })
-                .collect::<Vec<_>>()
-        );
+            })
+            .collect::<Vec<_>>());
     }
 
     if include_import_runs {
@@ -591,34 +585,32 @@ async fn workflow_audit_trail_impl(
         .fetch_all(pool)
         .await?;
 
-        result["import_runs"] = json!(
-            import_runs
-                .iter()
-                .map(
-                    |(
-                        run_id,
-                        run_kind,
-                        source,
-                        status,
-                        edges_created,
-                        superseded_by,
-                        superseded_reason,
-                        imported_at,
-                    )| {
-                        json!({
-                            "run_id": run_id,
-                            "run_kind": run_kind,
-                            "source": source,
-                            "status": status,
-                            "edges_created": edges_created,
-                            "superseded_by": superseded_by,
-                            "superseded_reason": superseded_reason,
-                            "imported_at": imported_at
-                        })
-                    }
-                )
-                .collect::<Vec<_>>()
-        );
+        result["import_runs"] = json!(import_runs
+            .iter()
+            .map(
+                |(
+                    run_id,
+                    run_kind,
+                    source,
+                    status,
+                    edges_created,
+                    superseded_by,
+                    superseded_reason,
+                    imported_at,
+                )| {
+                    json!({
+                        "run_id": run_id,
+                        "run_kind": run_kind,
+                        "source": source,
+                        "status": status,
+                        "edges_created": edges_created,
+                        "superseded_by": superseded_by,
+                        "superseded_reason": superseded_reason,
+                        "imported_at": imported_at
+                    })
+                }
+            )
+            .collect::<Vec<_>>());
     }
 
     Ok(result)

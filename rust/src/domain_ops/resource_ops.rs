@@ -7,6 +7,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 
+use super::helpers::{
+    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -14,6 +17,282 @@ use crate::services::attribute_identity_service::AttributeIdentityService;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
+
+#[cfg(feature = "database")]
+async fn resource_create_impl(
+    cbu_id: uuid::Uuid,
+    resource_type_code: &str,
+    instance_url: String,
+    instance_identifier: Option<String>,
+    instance_name: Option<String>,
+    product_id: Option<uuid::Uuid>,
+    mut service_id: Option<uuid::Uuid>,
+    depends_on_refs: Vec<uuid::Uuid>,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    use uuid::Uuid;
+
+    let resource_type_id: Option<Uuid> = sqlx::query_scalar(
+        r#"SELECT resource_id FROM "ob-poc".service_resource_types WHERE resource_code = $1"#,
+    )
+    .bind(resource_type_code)
+    .fetch_optional(pool)
+    .await?;
+
+    let resource_type_id = resource_type_id
+        .ok_or_else(|| anyhow::anyhow!("Unknown resource type: {}", resource_type_code))?;
+
+    if service_id.is_none() {
+        let services: Vec<Uuid> = sqlx::query_scalar(
+            r#"SELECT service_id FROM "ob-poc".service_resource_capabilities
+               WHERE resource_id = $1 AND is_active = true
+               ORDER BY priority ASC
+               LIMIT 1"#,
+        )
+        .bind(resource_type_id)
+        .fetch_all(pool)
+        .await?;
+
+        service_id = services.into_iter().next();
+    }
+
+    let instance_id = Uuid::new_v4();
+
+    let row: (Uuid,) = sqlx::query_as(
+        r#"WITH ins AS (
+            INSERT INTO "ob-poc".cbu_resource_instances
+            (instance_id, cbu_id, product_id, service_id, resource_type_id,
+             instance_url, instance_identifier, instance_name, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
+            ON CONFLICT (instance_url) DO NOTHING
+            RETURNING instance_id
+        )
+        SELECT instance_id FROM ins
+        UNION ALL
+        SELECT instance_id FROM "ob-poc".cbu_resource_instances
+        WHERE instance_url = $6
+        AND NOT EXISTS (SELECT 1 FROM ins)
+        LIMIT 1"#,
+    )
+    .bind(instance_id)
+    .bind(cbu_id)
+    .bind(product_id)
+    .bind(service_id)
+    .bind(resource_type_id)
+    .bind(instance_url)
+    .bind(&instance_identifier)
+    .bind(&instance_name)
+    .fetch_one(pool)
+    .await?;
+
+    let result_id = row.0;
+
+    for dep_instance_id in depends_on_refs {
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".resource_instance_dependencies
+               (instance_id, depends_on_instance_id)
+               VALUES ($1, $2)
+               ON CONFLICT DO NOTHING"#,
+        )
+        .bind(result_id)
+        .bind(dep_instance_id)
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(result_id)
+}
+
+#[cfg(feature = "database")]
+async fn resource_set_attr_impl(
+    instance_id: uuid::Uuid,
+    attr_name: &str,
+    value: &str,
+    state: &str,
+    pool: &PgPool,
+) -> Result<uuid::Uuid> {
+    let attribute_id = AttributeIdentityService::new(pool.clone())
+        .resolve_runtime_uuid(attr_name)
+        .await?;
+
+    let attribute_id =
+        attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+    let value_id = uuid::Uuid::new_v4();
+
+    sqlx::query(
+        r#"INSERT INTO "ob-poc".resource_instance_attributes
+           (value_id, instance_id, attribute_id, value_text, state, observed_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())
+           ON CONFLICT (instance_id, attribute_id) DO UPDATE SET
+               value_text = EXCLUDED.value_text,
+               state = EXCLUDED.state,
+               observed_at = NOW()"#,
+    )
+    .bind(value_id)
+    .bind(instance_id)
+    .bind(attribute_id)
+    .bind(value)
+    .bind(state)
+    .execute(pool)
+    .await?;
+
+    Ok(value_id)
+}
+
+#[cfg(feature = "database")]
+async fn resource_activate_impl(instance_id: uuid::Uuid, pool: &PgPool) -> Result<()> {
+    use uuid::Uuid;
+
+    let instance_row: Option<(Option<Uuid>,)> = sqlx::query_as(
+        r#"SELECT resource_type_id FROM "ob-poc".cbu_resource_instances WHERE instance_id = $1"#,
+    )
+    .bind(instance_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let instance_row =
+        instance_row.ok_or_else(|| anyhow::anyhow!("Instance not found: {}", instance_id))?;
+
+    if let Some(resource_type_id) = instance_row.0 {
+        let required_attrs: Vec<Uuid> = sqlx::query_scalar(
+            r#"SELECT attribute_id FROM "ob-poc".resource_attribute_requirements
+               WHERE resource_id = $1 AND is_mandatory = true"#,
+        )
+        .bind(resource_type_id)
+        .fetch_all(pool)
+        .await?;
+
+        let set_attrs: Vec<Uuid> = sqlx::query_scalar(
+            r#"SELECT attribute_id FROM "ob-poc".resource_instance_attributes
+               WHERE instance_id = $1"#,
+        )
+        .bind(instance_id)
+        .fetch_all(pool)
+        .await?;
+
+        let missing: Vec<_> = required_attrs
+            .iter()
+            .filter(|a| !set_attrs.contains(a))
+            .collect();
+
+        if !missing.is_empty() {
+            let missing_uuids: Vec<Uuid> = missing.iter().map(|u| **u).collect();
+            let missing_names: Vec<String> = sqlx::query_scalar(
+                r#"SELECT display_name FROM "ob-poc".attribute_registry WHERE uuid = ANY($1)"#,
+            )
+            .bind(missing_uuids)
+            .fetch_all(pool)
+            .await?;
+
+            return Err(anyhow::anyhow!(
+                "Cannot activate: missing required attributes: {}",
+                missing_names.join(", ")
+            ));
+        }
+    }
+
+    sqlx::query(
+        r#"UPDATE "ob-poc".cbu_resource_instances
+           SET status = 'ACTIVE', activated_at = NOW(), updated_at = NOW()
+           WHERE instance_id = $1"#,
+    )
+    .bind(instance_id)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+#[cfg(feature = "database")]
+async fn resource_suspend_impl(instance_id: uuid::Uuid, pool: &PgPool) -> Result<()> {
+    sqlx::query(
+        r#"UPDATE "ob-poc".cbu_resource_instances
+           SET status = 'SUSPENDED', updated_at = NOW()
+           WHERE instance_id = $1"#,
+    )
+    .bind(instance_id)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+#[cfg(feature = "database")]
+async fn resource_decommission_impl(instance_id: uuid::Uuid, pool: &PgPool) -> Result<()> {
+    sqlx::query(
+        r#"UPDATE "ob-poc".cbu_resource_instances
+           SET status = 'DECOMMISSIONED', decommissioned_at = NOW(), updated_at = NOW()
+           WHERE instance_id = $1"#,
+    )
+    .bind(instance_id)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+#[cfg(feature = "database")]
+async fn resource_validate_attrs_impl(
+    instance_id: uuid::Uuid,
+    pool: &PgPool,
+) -> Result<serde_json::Value> {
+    use uuid::Uuid;
+
+    let resource_type_id: Option<Option<Uuid>> = sqlx::query_scalar(
+        r#"SELECT resource_type_id FROM "ob-poc".cbu_resource_instances WHERE instance_id = $1"#,
+    )
+    .bind(instance_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let resource_type_id = match resource_type_id.and_then(|r| r) {
+        Some(id) => id,
+        None => {
+            return Ok(serde_json::json!({
+                "valid": true,
+                "missing": [],
+                "message": "No resource type defined, skipping validation"
+            }));
+        }
+    };
+
+    let required_attrs: Vec<(Uuid, String)> = sqlx::query_as(
+        r#"SELECT rar.attribute_id, ar.display_name
+           FROM "ob-poc".resource_attribute_requirements rar
+           JOIN "ob-poc".attribute_registry ar ON rar.attribute_id = ar.uuid
+           WHERE rar.resource_id = $1 AND rar.is_mandatory = true
+           ORDER BY rar.display_order"#,
+    )
+    .bind(resource_type_id)
+    .fetch_all(pool)
+    .await?;
+
+    let set_attrs: Vec<Uuid> = sqlx::query_scalar(
+        r#"SELECT attribute_id FROM "ob-poc".resource_instance_attributes
+           WHERE instance_id = $1"#,
+    )
+    .bind(instance_id)
+    .fetch_all(pool)
+    .await?;
+
+    let missing: Vec<String> = required_attrs
+        .iter()
+        .filter(|(id, _)| !set_attrs.contains(id))
+        .map(|(_, name)| name.clone())
+        .collect();
+
+    let valid = missing.is_empty();
+    Ok(serde_json::json!({
+        "valid": valid,
+        "missing": missing,
+        "message": if valid {
+            "All required attributes are set".to_string()
+        } else {
+            format!("Missing {} required attribute(s)", missing.len())
+        }
+    }))
+}
 
 /// Create a resource instance for a CBU (Idempotent)
 ///
@@ -84,18 +363,6 @@ impl CustomOperation for ResourceCreateOp {
                 )
             });
 
-        // Look up resource type ID
-        let resource_type_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT resource_id FROM "ob-poc".service_resource_types WHERE resource_code = $1"#,
-        )
-        .bind(resource_type_code)
-        .fetch_optional(pool)
-        .await?;
-
-        let resource_type_id = resource_type_id
-            .ok_or_else(|| anyhow::anyhow!("Unknown resource type: {}", resource_type_code))?;
-
-        // Get optional arguments
         let instance_identifier = verb_call
             .arguments
             .iter()
@@ -124,7 +391,7 @@ impl CustomOperation for ResourceCreateOp {
             });
 
         // Get service-id if provided, otherwise auto-derive from resource type capabilities
-        let mut service_id: Option<Uuid> = verb_call
+        let service_id: Option<Uuid> = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "service-id")
@@ -136,22 +403,6 @@ impl CustomOperation for ResourceCreateOp {
                 }
             });
 
-        // Auto-derive service_id from service_resource_capabilities if not provided
-        if service_id.is_none() {
-            let services: Vec<Uuid> = sqlx::query_scalar(
-                r#"SELECT service_id FROM "ob-poc".service_resource_capabilities
-                   WHERE resource_id = $1 AND is_active = true
-                   ORDER BY priority ASC
-                   LIMIT 1"#,
-            )
-            .bind(resource_type_id)
-            .fetch_all(pool)
-            .await?;
-
-            service_id = services.into_iter().next();
-        }
-
-        // Extract depends-on references
         let depends_on_refs: Vec<Uuid> = verb_call
             .arguments
             .iter()
@@ -170,55 +421,84 @@ impl CustomOperation for ResourceCreateOp {
             })
             .unwrap_or_default();
 
-        // Idempotent: INSERT or return existing using instance_url as conflict key
-        let instance_id = Uuid::new_v4();
-
-        let row: (Uuid,) = sqlx::query_as(
-            r#"WITH ins AS (
-                INSERT INTO "ob-poc".cbu_resource_instances
-                (instance_id, cbu_id, product_id, service_id, resource_type_id,
-                 instance_url, instance_identifier, instance_name, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
-                ON CONFLICT (instance_url) DO NOTHING
-                RETURNING instance_id
-            )
-            SELECT instance_id FROM ins
-            UNION ALL
-            SELECT instance_id FROM "ob-poc".cbu_resource_instances
-            WHERE instance_url = $6
-            AND NOT EXISTS (SELECT 1 FROM ins)
-            LIMIT 1"#,
+        let result_id = resource_create_impl(
+            cbu_id,
+            resource_type_code,
+            instance_url,
+            instance_identifier,
+            instance_name,
+            product_id,
+            service_id,
+            depends_on_refs,
+            pool,
         )
-        .bind(instance_id)
-        .bind(cbu_id)
-        .bind(product_id)
-        .bind(service_id)
-        .bind(resource_type_id)
-        .bind(instance_url)
-        .bind(&instance_identifier)
-        .bind(&instance_name)
-        .fetch_one(pool)
         .await?;
-
-        let result_id = row.0;
-
-        // Record instance dependencies if any were specified
-        for dep_instance_id in depends_on_refs {
-            sqlx::query(
-                r#"INSERT INTO "ob-poc".resource_instance_dependencies
-                   (instance_id, depends_on_instance_id)
-                   VALUES ($1, $2)
-                   ON CONFLICT DO NOTHING"#,
-            )
-            .bind(result_id)
-            .bind(dep_instance_id)
-            .execute(pool)
-            .await?;
-        }
 
         ctx.bind("instance", result_id);
 
         Ok(ExecutionResult::Uuid(result_id))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use uuid::Uuid;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let resource_type_code = json_extract_string(args, "resource-type")?;
+        let instance_url = json_extract_string_opt(args, "instance-url").unwrap_or_else(|| {
+            format!(
+                "urn:ob-poc:{}:{}:{}",
+                cbu_id,
+                resource_type_code.to_lowercase().replace('_', "-"),
+                Uuid::new_v4()
+            )
+        });
+        let instance_identifier = json_extract_string_opt(args, "instance-id");
+        let instance_name = json_extract_string_opt(args, "instance-name");
+        let product_id = json_extract_uuid_opt(args, ctx, "product-id");
+        let service_id = json_extract_uuid_opt(args, ctx, "service-id");
+        let depends_on_refs = args
+            .get("depends-on")
+            .and_then(|v| v.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| {
+                        item.as_str().and_then(|s| {
+                            if let Some(sym) = s.strip_prefix('@') {
+                                ctx.resolve(sym)
+                            } else {
+                                Uuid::parse_str(s).ok()
+                            }
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        let result_id = resource_create_impl(
+            cbu_id,
+            &resource_type_code,
+            instance_url,
+            instance_identifier,
+            instance_name,
+            product_id,
+            service_id,
+            depends_on_refs,
+            pool,
+        )
+        .await?;
+
+        ctx.bind("instance", result_id);
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            result_id,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -290,13 +570,6 @@ impl CustomOperation for ResourceSetAttrOp {
             .and_then(|a| a.value.as_string())
             .ok_or_else(|| anyhow::anyhow!("Missing value argument"))?;
 
-        let attribute_id = AttributeIdentityService::new(pool.clone())
-            .resolve_runtime_uuid(attr_name)
-            .await?;
-
-        let attribute_id =
-            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
-
         let state = verb_call
             .arguments
             .iter()
@@ -304,26 +577,26 @@ impl CustomOperation for ResourceSetAttrOp {
             .and_then(|a| a.value.as_string())
             .unwrap_or("proposed");
 
-        let value_id = Uuid::new_v4();
-
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".resource_instance_attributes
-               (value_id, instance_id, attribute_id, value_text, state, observed_at)
-               VALUES ($1, $2, $3, $4, $5, NOW())
-               ON CONFLICT (instance_id, attribute_id) DO UPDATE SET
-                   value_text = EXCLUDED.value_text,
-                   state = EXCLUDED.state,
-                   observed_at = NOW()"#,
-        )
-        .bind(value_id)
-        .bind(instance_id)
-        .bind(attribute_id)
-        .bind(value)
-        .bind(state)
-        .execute(pool)
-        .await?;
+        let value_id = resource_set_attr_impl(instance_id, attr_name, value, state, pool).await?;
 
         Ok(ExecutionResult::Uuid(value_id))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
+        let attr_name = json_extract_string(args, "attr")?;
+        let value = json_extract_string(args, "value")?;
+        let state =
+            json_extract_string_opt(args, "state").unwrap_or_else(|| "proposed".to_string());
+        let value_id =
+            resource_set_attr_impl(instance_id, &attr_name, &value, &state, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(value_id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -380,64 +653,21 @@ impl CustomOperation for ResourceActivateOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
 
-        let instance_row: Option<(Option<Uuid>,)> = sqlx::query_as(
-            r#"SELECT resource_type_id FROM "ob-poc".cbu_resource_instances WHERE instance_id = $1"#,
-        )
-        .bind(instance_id)
-        .fetch_optional(pool)
-        .await?;
-
-        let instance_row =
-            instance_row.ok_or_else(|| anyhow::anyhow!("Instance not found: {}", instance_id))?;
-
-        if let Some(resource_type_id) = instance_row.0 {
-            let required_attrs: Vec<Uuid> = sqlx::query_scalar(
-                r#"SELECT attribute_id FROM "ob-poc".resource_attribute_requirements
-                   WHERE resource_id = $1 AND is_mandatory = true"#,
-            )
-            .bind(resource_type_id)
-            .fetch_all(pool)
-            .await?;
-
-            let set_attrs: Vec<Uuid> = sqlx::query_scalar(
-                r#"SELECT attribute_id FROM "ob-poc".resource_instance_attributes
-                   WHERE instance_id = $1"#,
-            )
-            .bind(instance_id)
-            .fetch_all(pool)
-            .await?;
-
-            let missing: Vec<_> = required_attrs
-                .iter()
-                .filter(|a| !set_attrs.contains(a))
-                .collect();
-
-            if !missing.is_empty() {
-                let missing_uuids: Vec<Uuid> = missing.iter().map(|u| **u).collect();
-                let missing_names: Vec<String> = sqlx::query_scalar(
-                    r#"SELECT display_name FROM "ob-poc".attribute_registry WHERE uuid = ANY($1)"#,
-                )
-                .bind(missing_uuids)
-                .fetch_all(pool)
-                .await?;
-
-                return Err(anyhow::anyhow!(
-                    "Cannot activate: missing required attributes: {}",
-                    missing_names.join(", ")
-                ));
-            }
-        }
-
-        sqlx::query(
-            r#"UPDATE "ob-poc".cbu_resource_instances
-               SET status = 'ACTIVE', activated_at = NOW(), updated_at = NOW()
-               WHERE instance_id = $1"#,
-        )
-        .bind(instance_id)
-        .execute(pool)
-        .await?;
+        resource_activate_impl(instance_id, pool).await?;
 
         Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
+        resource_activate_impl(instance_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
     }
 
     #[cfg(not(feature = "database"))]
@@ -492,16 +722,21 @@ impl CustomOperation for ResourceSuspendOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
 
-        sqlx::query(
-            r#"UPDATE "ob-poc".cbu_resource_instances
-               SET status = 'SUSPENDED', updated_at = NOW()
-               WHERE instance_id = $1"#,
-        )
-        .bind(instance_id)
-        .execute(pool)
-        .await?;
+        resource_suspend_impl(instance_id, pool).await?;
 
         Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
+        resource_suspend_impl(instance_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
     }
 
     #[cfg(not(feature = "database"))]
@@ -556,16 +791,21 @@ impl CustomOperation for ResourceDecommissionOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
 
-        sqlx::query(
-            r#"UPDATE "ob-poc".cbu_resource_instances
-               SET status = 'DECOMMISSIONED', decommissioned_at = NOW(), updated_at = NOW()
-               WHERE instance_id = $1"#,
-        )
-        .bind(instance_id)
-        .execute(pool)
-        .await?;
+        resource_decommission_impl(instance_id, pool).await?;
 
         Ok(ExecutionResult::Void)
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
+        resource_decommission_impl(instance_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
     }
 
     #[cfg(not(feature = "database"))]
@@ -620,61 +860,21 @@ impl CustomOperation for ResourceValidateAttrsOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
 
-        let resource_type_id: Option<Option<Uuid>> = sqlx::query_scalar(
-            r#"SELECT resource_type_id FROM "ob-poc".cbu_resource_instances WHERE instance_id = $1"#,
-        )
-        .bind(instance_id)
-        .fetch_optional(pool)
-        .await?;
-
-        let resource_type_id = match resource_type_id.and_then(|r| r) {
-            Some(id) => id,
-            None => {
-                return Ok(ExecutionResult::Record(serde_json::json!({
-                    "valid": true,
-                    "missing": [],
-                    "message": "No resource type defined, skipping validation"
-                })));
-            }
-        };
-
-        let required_attrs: Vec<(Uuid, String)> = sqlx::query_as(
-            r#"SELECT rar.attribute_id, ar.display_name
-               FROM "ob-poc".resource_attribute_requirements rar
-               JOIN "ob-poc".attribute_registry ar ON rar.attribute_id = ar.uuid
-               WHERE rar.resource_id = $1 AND rar.is_mandatory = true
-               ORDER BY rar.display_order"#,
-        )
-        .bind(resource_type_id)
-        .fetch_all(pool)
-        .await?;
-
-        let set_attrs: Vec<Uuid> = sqlx::query_scalar(
-            r#"SELECT attribute_id FROM "ob-poc".resource_instance_attributes
-               WHERE instance_id = $1"#,
-        )
-        .bind(instance_id)
-        .fetch_all(pool)
-        .await?;
-
-        let missing: Vec<String> = required_attrs
-            .iter()
-            .filter(|(id, _)| !set_attrs.contains(id))
-            .map(|(_, name)| name.clone())
-            .collect();
-
-        let valid = missing.is_empty();
-        let result = serde_json::json!({
-            "valid": valid,
-            "missing": missing,
-            "message": if valid {
-                "All required attributes are set".to_string()
-            } else {
-                format!("Missing {} required attribute(s)", missing.len())
-            }
-        });
+        let result = resource_validate_attrs_impl(instance_id, pool).await?;
 
         Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
+        let result = resource_validate_attrs_impl(instance_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
     }
 
     #[cfg(not(feature = "database"))]

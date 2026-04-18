@@ -9,7 +9,7 @@
 //! - Threshold evaluation involves complex comparison logic
 //! - Override recording requires audit trail management
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde_json::json;

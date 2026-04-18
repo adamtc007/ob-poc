@@ -28,6 +28,21 @@ use {
     uuid::Uuid,
 };
 
+#[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    use crate::sem_os_runtime::verb_executor_adapter;
+
+    let vc = verb_executor_adapter::build_verb_call_pub(op.domain(), op.verb(), args);
+    let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
 /// Enrich entity from GLEIF by LEI
 ///
 /// Rationale: Requires external GLEIF API call to fetch LEI data.
@@ -173,6 +188,16 @@ impl CustomOperation for GleifEnrichOp {
         Ok(ExecutionResult::Record(result_json))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -246,6 +271,16 @@ impl CustomOperation for GleifSearchOp {
             .collect();
 
         Ok(ExecutionResult::RecordSet(candidates))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -322,6 +357,16 @@ impl CustomOperation for GleifImportTreeOp {
         }
 
         Ok(ExecutionResult::Record(result_json))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -442,6 +487,16 @@ impl CustomOperation for GleifRefreshOp {
         }
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -502,6 +557,16 @@ impl CustomOperation for GleifGetRecordOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -558,6 +623,16 @@ impl CustomOperation for GleifGetParentOp {
                 "message": "No direct parent found"
             }))),
         }
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -812,6 +887,16 @@ impl CustomOperation for GleifImportManagedFundsOp {
         Ok(ExecutionResult::Record(result_json))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1026,6 +1111,16 @@ impl CustomOperation for GleifGetChildrenOp {
         Ok(ExecutionResult::RecordSet(results))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1137,6 +1232,16 @@ impl CustomOperation for GleifTraceOwnershipOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1226,6 +1331,16 @@ impl CustomOperation for GleifGetManagedFundsOp {
         }
 
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -1320,6 +1435,16 @@ impl CustomOperation for GleifResolveSuccessorOp {
         }
 
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -1418,6 +1543,16 @@ impl CustomOperation for GleifGetUmbrellaOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1513,6 +1648,16 @@ impl CustomOperation for GleifGetManagerOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1606,6 +1751,16 @@ impl CustomOperation for GleifGetMasterFundOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1678,6 +1833,16 @@ impl CustomOperation for GleifLookupByIsinOp {
         }
 
         Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -2203,6 +2368,16 @@ impl CustomOperation for GleifImportToClientGroupOp {
         Ok(ExecutionResult::Record(result))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2264,6 +2439,16 @@ impl CustomOperation for GleifLookupOp {
                 other
             )),
         }
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]

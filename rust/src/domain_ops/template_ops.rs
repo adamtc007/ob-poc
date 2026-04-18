@@ -4,7 +4,7 @@
 //! - `template.invoke` - Single template invocation within DSL
 //! - `template.batch` - Batch template execution over query results
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use std::collections::HashMap;

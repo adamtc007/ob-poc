@@ -273,6 +273,42 @@ impl CustomOperation for ClientGroupEntityManageOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let action = args
+            .get("action")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow::anyhow!(":action required (add|remove|confirm|reject)"))?;
+
+        match action {
+            "add" => ClientGroupEntityAddOp.execute_json(args, ctx, pool).await,
+            "remove" => {
+                ClientGroupEntityRemoveOp
+                    .execute_json(args, ctx, pool)
+                    .await
+            }
+            "confirm" => {
+                ClientGroupConfirmEntityOp
+                    .execute_json(args, ctx, pool)
+                    .await
+            }
+            "reject" => {
+                ClientGroupRejectEntityOp
+                    .execute_json(args, ctx, pool)
+                    .await
+            }
+            other => Err(anyhow::anyhow!(
+                "Unknown entity-manage action '{}'. Valid: add, remove, confirm, reject",
+                other
+            )),
+        }
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -341,7 +377,6 @@ impl CustomOperation for ClientGroupEntityAddOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -349,10 +384,7 @@ impl CustomOperation for ClientGroupEntityAddOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let membership_type = json_extract_string_opt(args, "membership-type")
@@ -368,8 +400,12 @@ impl CustomOperation for ClientGroupEntityAddOp {
                 updated_at = now()
             RETURNING id"#,
         )
-        .bind(group_id).bind(entity_id).bind(&membership_type).bind(&notes)
-        .fetch_one(pool).await?;
+        .bind(group_id)
+        .bind(entity_id)
+        .bind(&membership_type)
+        .bind(&notes)
+        .fetch_one(pool)
+        .await?;
         Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
     }
 
@@ -454,7 +490,6 @@ impl CustomOperation for ClientGroupEntityRemoveOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -462,9 +497,7 @@ impl CustomOperation for ClientGroupEntityRemoveOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid, json_extract_bool_opt,
-        };
+        use super::helpers::{json_extract_bool_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let mark_historical = json_extract_bool_opt(args, "mark-historical").unwrap_or(false);
@@ -473,17 +506,29 @@ impl CustomOperation for ClientGroupEntityRemoveOp {
                 r#"UPDATE "ob-poc".client_group_entity
                 SET membership_type = 'historical', updated_at = now()
                 WHERE group_id = $1 AND entity_id = $2"#,
-            ).bind(group_id).bind(entity_id).execute(pool).await?.rows_affected()
+            )
+            .bind(group_id)
+            .bind(entity_id)
+            .execute(pool)
+            .await?
+            .rows_affected()
         } else {
             sqlx::query(
                 r#"DELETE FROM "ob-poc".client_group_entity
                 WHERE group_id = $1 AND entity_id = $2"#,
-            ).bind(group_id).bind(entity_id).execute(pool).await?.rows_affected()
+            )
+            .bind(group_id)
+            .bind(entity_id)
+            .execute(pool)
+            .await?
+            .rows_affected()
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({
-            "removed": affected > 0,
-            "mark_historical": mark_historical
-        })))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "removed": affected > 0,
+                "mark_historical": mark_historical
+            }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -582,7 +627,6 @@ impl CustomOperation for ClientGroupEntityListOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -590,14 +634,18 @@ impl CustomOperation for ClientGroupEntityListOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_opt, json_extract_int_opt,
-        };
+        use super::helpers::{json_extract_int_opt, json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let membership_type = json_extract_string_opt(args, "membership-type");
         let limit = json_extract_int_opt(args, "limit").unwrap_or(100);
-        let rows: Vec<(Uuid, String, String, String, chrono::DateTime<chrono::Utc>, Vec<String>)> = sqlx::query_as(
+        let rows: Vec<(
+            Uuid,
+            String,
+            String,
+            String,
+            chrono::DateTime<chrono::Utc>,
+            Vec<String>,
+        )> = sqlx::query_as(
             r#"SELECT
                 cge.entity_id,
                 e.name,
@@ -617,19 +665,27 @@ impl CustomOperation for ClientGroupEntityListOp {
             ORDER BY e.name
             LIMIT $3"#,
         )
-        .bind(group_id).bind(&membership_type).bind(limit)
-        .fetch_all(pool).await?;
-        let items: Vec<serde_json::Value> = rows.into_iter().map(|(entity_id, name, mtype, added_by, created_at, tags)| {
-            json!({
-                "entity_id": entity_id,
-                "entity_name": name,
-                "membership_type": mtype,
-                "added_by": added_by,
-                "tags": tags,
-                "created_at": created_at.to_rfc3339(),
+        .bind(group_id)
+        .bind(&membership_type)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+        let items: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(entity_id, name, mtype, added_by, created_at, tags)| {
+                json!({
+                    "entity_id": entity_id,
+                    "entity_name": name,
+                    "membership_type": mtype,
+                    "added_by": added_by,
+                    "tags": tags,
+                    "created_at": created_at.to_rfc3339(),
+                })
             })
-        }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(items))
+            .collect();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -728,7 +784,6 @@ impl CustomOperation for ClientGroupTagAddOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -736,10 +791,7 @@ impl CustomOperation for ClientGroupTagAddOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid, json_extract_string,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let tag = json_extract_string(args, "tag")?;
@@ -749,10 +801,15 @@ impl CustomOperation for ClientGroupTagAddOp {
                 (group_id, entity_id, membership_type, added_by)
             VALUES ($1, $2, 'confirmed', 'tag_add')
             ON CONFLICT (group_id, entity_id) DO NOTHING"#,
-        ).bind(group_id).bind(entity_id).execute(pool).await?;
-        let tag_norm: String = sqlx::query_scalar(
-            r#"SELECT "ob-poc".normalize_tag($1)"#,
-        ).bind(&tag).fetch_one(pool).await?;
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .execute(pool)
+        .await?;
+        let tag_norm: String = sqlx::query_scalar(r#"SELECT "ob-poc".normalize_tag($1)"#)
+            .bind(&tag)
+            .fetch_one(pool)
+            .await?;
         let id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO "ob-poc".client_group_entity_tag
                 (group_id, entity_id, tag, tag_norm, persona, source, confidence)
@@ -762,8 +819,14 @@ impl CustomOperation for ClientGroupTagAddOp {
                 confidence = GREATEST(client_group_entity_tag.confidence, 0.95),
                 source = 'user_confirmed'
             RETURNING id"#,
-        ).bind(group_id).bind(entity_id).bind(&tag).bind(&tag_norm).bind(&persona)
-        .fetch_one(pool).await?;
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .bind(&tag)
+        .bind(&tag_norm)
+        .bind(&persona)
+        .fetch_one(pool)
+        .await?;
         Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
     }
 
@@ -826,7 +889,6 @@ impl CustomOperation for ClientGroupTagRemoveOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -836,10 +898,14 @@ impl CustomOperation for ClientGroupTagRemoveOp {
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let tag_id = json_extract_uuid(args, ctx, "tag-id")?;
-        let affected = sqlx::query(
-            r#"DELETE FROM "ob-poc".client_group_entity_tag WHERE id = $1"#,
-        ).bind(tag_id).execute(pool).await?.rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({ "removed": affected > 0 })))
+        let affected = sqlx::query(r#"DELETE FROM "ob-poc".client_group_entity_tag WHERE id = $1"#)
+            .bind(tag_id)
+            .execute(pool)
+            .await?
+            .rows_affected();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({ "removed": affected > 0 }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -936,7 +1002,6 @@ impl CustomOperation for ClientGroupTagListOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -944,14 +1009,19 @@ impl CustomOperation for ClientGroupTagListOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid, json_extract_uuid_opt,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
         let persona = json_extract_string_opt(args, "persona");
-        let rows: Vec<(Uuid, Uuid, String, String, Option<String>, String, Option<f64>)> = sqlx::query_as(
+        let rows: Vec<(
+            Uuid,
+            Uuid,
+            String,
+            String,
+            Option<String>,
+            String,
+            Option<f64>,
+        )> = sqlx::query_as(
             r#"SELECT
                 cget.id, cget.entity_id, e.name, cget.tag,
                 cget.persona, cget.source, cget.confidence
@@ -962,16 +1032,25 @@ impl CustomOperation for ClientGroupTagListOp {
               AND ($2::UUID IS NULL OR cget.entity_id = $2)
               AND ($3::TEXT IS NULL OR cget.persona IS NULL OR cget.persona = $3)
             ORDER BY e.name, cget.tag"#,
-        ).bind(group_id).bind(entity_id).bind(&persona)
-        .fetch_all(pool).await?;
-        let items: Vec<serde_json::Value> = rows.into_iter().map(|(tag_id, eid, name, tag, persona, source, conf)| {
-            json!({
-                "tag_id": tag_id, "entity_id": eid, "entity_name": name,
-                "tag": tag, "persona": persona, "source": source,
-                "confidence": conf.unwrap_or(1.0),
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .bind(&persona)
+        .fetch_all(pool)
+        .await?;
+        let items: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(tag_id, eid, name, tag, persona, source, conf)| {
+                json!({
+                    "tag_id": tag_id, "entity_id": eid, "entity_name": name,
+                    "tag": tag, "persona": persona, "source": source,
+                    "confidence": conf.unwrap_or(1.0),
+                })
             })
-        }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(items))
+            .collect();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1064,7 +1143,6 @@ impl CustomOperation for ClientGroupSearchOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -1073,8 +1151,7 @@ impl CustomOperation for ClientGroupSearchOp {
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         use super::helpers::{
-            json_extract_uuid, json_extract_string,
-            json_extract_string_opt, json_extract_int_opt,
+            json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
         };
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let query = json_extract_string(args, "query")?;
@@ -1083,13 +1160,23 @@ impl CustomOperation for ClientGroupSearchOp {
         let rows: Vec<(Uuid, String, String, f64, String)> = sqlx::query_as(
             r#"SELECT entity_id, entity_name, tag, confidence, match_type
             FROM "ob-poc".search_entity_tags($1, $2, $3, $4, FALSE)"#,
-        ).bind(group_id).bind(&query).bind(&persona).bind(limit)
-        .fetch_all(pool).await?;
-        let items: Vec<serde_json::Value> = rows.into_iter().map(|(eid, name, tag, conf, mt)| {
-            json!({ "entity_id": eid, "entity_name": name, "matched_tag": tag,
+        )
+        .bind(group_id)
+        .bind(&query)
+        .bind(&persona)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+        let items: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(eid, name, tag, conf, mt)| {
+                json!({ "entity_id": eid, "entity_name": name, "matched_tag": tag,
                      "confidence": conf, "match_type": mt })
-        }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(items))
+            })
+            .collect();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1230,7 +1317,6 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -1239,23 +1325,28 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         use super::helpers::{
+            json_extract_bool_opt, json_extract_string_list_opt, json_extract_string_opt,
             json_extract_uuid,
-            json_extract_string_opt, json_extract_bool_opt,
-            json_extract_string_list_opt,
         };
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let search_terms = json_extract_string_list_opt(args, "search-terms");
         let jurisdiction = json_extract_string_opt(args, "jurisdiction");
         let auto_add = json_extract_bool_opt(args, "auto-add").unwrap_or(false);
-        let group_name: String = sqlx::query_scalar(
-            r#"SELECT canonical_name FROM "ob-poc".client_group WHERE id = $1"#,
-        ).bind(group_id).fetch_one(pool).await?;
+        let group_name: String =
+            sqlx::query_scalar(r#"SELECT canonical_name FROM "ob-poc".client_group WHERE id = $1"#)
+                .bind(group_id)
+                .fetch_one(pool)
+                .await?;
         let mut patterns = vec![format!("%{}%", group_name.to_lowercase())];
         if let Some(terms) = search_terms {
-            for term in terms { patterns.push(format!("%{}%", term.to_lowercase())); }
+            for term in terms {
+                patterns.push(format!("%{}%", term.to_lowercase()));
+            }
         }
         if jurisdiction.is_some() {
-            tracing::debug!("Jurisdiction filter requested but not yet implemented for discover-entities");
+            tracing::debug!(
+                "Jurisdiction filter requested but not yet implemented for discover-entities"
+            );
         }
         let rows: Vec<(Uuid, String, Option<String>, String, bool)> = sqlx::query_as(
             r#"WITH already_members AS (
@@ -1271,7 +1362,11 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
             WHERE LOWER(e.name) LIKE ANY($2::TEXT[])
               AND e.deleted_at IS NULL
             ORDER BY e.name LIMIT 100"#,
-        ).bind(group_id).bind(&patterns).fetch_all(pool).await?;
+        )
+        .bind(group_id)
+        .bind(&patterns)
+        .fetch_all(pool)
+        .await?;
         if auto_add {
             for (eid, _, _, _, already) in &rows {
                 if !already {
@@ -1280,15 +1375,24 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
                             (group_id, entity_id, membership_type, added_by, notes)
                         VALUES ($1, $2, 'suspected', 'discovery', 'Auto-added by discover-entities')
                         ON CONFLICT (group_id, entity_id) DO NOTHING"#,
-                    ).bind(group_id).bind(eid).execute(pool).await?;
+                    )
+                    .bind(group_id)
+                    .bind(eid)
+                    .execute(pool)
+                    .await?;
                 }
             }
         }
-        let items: Vec<serde_json::Value> = rows.into_iter().map(|(eid, name, etype, reason, already)| {
-            json!({ "entity_id": eid, "entity_name": name, "entity_type": etype,
+        let items: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(eid, name, etype, reason, already)| {
+                json!({ "entity_id": eid, "entity_name": name, "entity_type": etype,
                      "match_reason": reason, "already_member": already })
-        }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(items))
+            })
+            .collect();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1401,7 +1505,6 @@ impl CustomOperation for ClientGroupConfirmEntityOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -1409,10 +1512,7 @@ impl CustomOperation for ClientGroupConfirmEntityOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_list_opt,
-        };
+        use super::helpers::{json_extract_string_list_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let tags = json_extract_string_list_opt(args, "tags");
@@ -1420,29 +1520,46 @@ impl CustomOperation for ClientGroupConfirmEntityOp {
             r#"UPDATE "ob-poc".client_group_entity
             SET membership_type = 'confirmed', added_by = 'user_confirmed', updated_at = now()
             WHERE group_id = $1 AND entity_id = $2"#,
-        ).bind(group_id).bind(entity_id).execute(pool).await?.rows_affected();
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .execute(pool)
+        .await?
+        .rows_affected();
         if affected == 0 {
             sqlx::query(
                 r#"INSERT INTO "ob-poc".client_group_entity
                     (group_id, entity_id, membership_type, added_by)
                 VALUES ($1, $2, 'confirmed', 'user_confirmed')"#,
-            ).bind(group_id).bind(entity_id).execute(pool).await?;
+            )
+            .bind(group_id)
+            .bind(entity_id)
+            .execute(pool)
+            .await?;
         }
         if let Some(tag_list) = tags {
             for tag in tag_list {
-                let tag_norm: String = sqlx::query_scalar(
-                    r#"SELECT "ob-poc".normalize_tag($1)"#,
-                ).bind(&tag).fetch_one(pool).await?;
+                let tag_norm: String = sqlx::query_scalar(r#"SELECT "ob-poc".normalize_tag($1)"#)
+                    .bind(&tag)
+                    .fetch_one(pool)
+                    .await?;
                 sqlx::query(
                     r#"INSERT INTO "ob-poc".client_group_entity_tag
                         (group_id, entity_id, tag, tag_norm, source, confidence)
                     VALUES ($1, $2, $3, $4, 'user_confirmed', 1.0)
                     ON CONFLICT DO NOTHING"#,
-                ).bind(group_id).bind(entity_id).bind(&tag).bind(&tag_norm)
-                .execute(pool).await?;
+                )
+                .bind(group_id)
+                .bind(entity_id)
+                .bind(&tag)
+                .bind(&tag_norm)
+                .execute(pool)
+                .await?;
             }
         }
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({ "confirmed": true, "entity_id": entity_id })))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({ "confirmed": true, "entity_id": entity_id }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1524,7 +1641,6 @@ impl CustomOperation for ClientGroupRejectEntityOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -1532,20 +1648,24 @@ impl CustomOperation for ClientGroupRejectEntityOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let reason = json_extract_string_opt(args, "reason");
         let affected = sqlx::query(
             r#"DELETE FROM "ob-poc".client_group_entity WHERE group_id = $1 AND entity_id = $2"#,
-        ).bind(group_id).bind(entity_id).execute(pool).await?.rows_affected();
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .execute(pool)
+        .await?
+        .rows_affected();
         sqlx::query(
             r#"DELETE FROM "ob-poc".client_group_entity_tag WHERE group_id = $1 AND entity_id = $2"#,
         ).bind(group_id).bind(entity_id).execute(pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(json!({ "rejected": affected > 0, "reason": reason })))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({ "rejected": affected > 0, "reason": reason }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1725,7 +1845,6 @@ impl CustomOperation for ClientGroupAssignRoleOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -1733,27 +1852,37 @@ impl CustomOperation for ClientGroupAssignRoleOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid, json_extract_uuid_opt,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let role_id = json_extract_uuid(args, ctx, "role-id")?;
         let target_entity_id = json_extract_uuid_opt(args, ctx, "target-entity-id");
         let effective_from = json_extract_string_opt(args, "effective-from");
-        let source = json_extract_string_opt(args, "source").unwrap_or_else(|| "manual".to_string());
+        let source =
+            json_extract_string_opt(args, "source").unwrap_or_else(|| "manual".to_string());
         let cge_id: Uuid = match sqlx::query_scalar::<_, Uuid>(
             r#"SELECT id FROM "ob-poc".client_group_entity WHERE group_id = $1 AND entity_id = $2"#,
-        ).bind(group_id).bind(entity_id).fetch_optional(pool).await? {
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .fetch_optional(pool)
+        .await?
+        {
             Some(id) => id,
-            None => sqlx::query_scalar(
-                r#"INSERT INTO "ob-poc".client_group_entity
+            None => {
+                sqlx::query_scalar(
+                    r#"INSERT INTO "ob-poc".client_group_entity
                     (group_id, entity_id, membership_type, added_by)
                 VALUES ($1, $2, 'in_group', 'role_assignment') RETURNING id"#,
-            ).bind(group_id).bind(entity_id).fetch_one(pool).await?,
+                )
+                .bind(group_id)
+                .bind(entity_id)
+                .fetch_one(pool)
+                .await?
+            }
         };
-        let eff_from: Option<chrono::NaiveDate> = effective_from.as_ref()
+        let eff_from: Option<chrono::NaiveDate> = effective_from
+            .as_ref()
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
         let id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO "ob-poc".client_group_entity_roles
@@ -1831,7 +1960,6 @@ impl CustomOperation for ClientGroupRemoveRoleOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -1845,8 +1973,14 @@ impl CustomOperation for ClientGroupRemoveRoleOp {
             r#"UPDATE "ob-poc".client_group_entity_roles
             SET effective_to = CURRENT_DATE, updated_at = NOW()
             WHERE id = $1 AND effective_to IS NULL"#,
-        ).bind(role_assignment_id).execute(pool).await?.rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(affected))
+        )
+        .bind(role_assignment_id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            affected,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1954,7 +2088,6 @@ impl CustomOperation for ClientGroupListRolesOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -1962,9 +2095,7 @@ impl CustomOperation for ClientGroupListRolesOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid, json_extract_uuid_opt,
-        };
+        use super::helpers::{json_extract_uuid, json_extract_uuid_opt};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
         let role_id = json_extract_uuid_opt(args, ctx, "role-id");
@@ -1986,8 +2117,12 @@ impl CustomOperation for ClientGroupListRolesOp {
               AND ($3::UUID IS NULL OR cer.role_id = $3)
               AND (cer.effective_to IS NULL OR cer.effective_to > CURRENT_DATE)
             ORDER BY e.name, r.name"#,
-        ).bind(group_id).bind(entity_id).bind(role_id)
-        .fetch_all(pool).await?;
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .bind(role_id)
+        .fetch_all(pool)
+        .await?;
         use sqlx::Row;
         let items: Vec<serde_json::Value> = rows.iter().map(|r| {
             json!({
@@ -2003,7 +2138,9 @@ impl CustomOperation for ClientGroupListRolesOp {
                 "source": r.get::<String, _>("source"),
             })
         }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(items))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2110,7 +2247,6 @@ impl CustomOperation for ClientGroupPartiesOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -2118,10 +2254,7 @@ impl CustomOperation for ClientGroupPartiesOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_opt, json_extract_bool_opt,
-        };
+        use super::helpers::{json_extract_bool_opt, json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let role_category = json_extract_string_opt(args, "role-category");
         let include_external = json_extract_bool_opt(args, "include-external").unwrap_or(true);
@@ -2154,16 +2287,21 @@ impl CustomOperation for ClientGroupPartiesOp {
         ).bind(group_id).bind(include_external).bind(&role_category)
         .fetch_all(pool).await?;
         use sqlx::Row;
-        let items: Vec<serde_json::Value> = rows.iter().map(|r| {
-            json!({
-                "entity_id": r.get::<Uuid, _>("entity_id"),
-                "entity_name": r.get::<String, _>("entity_name"),
-                "membership_type": r.get::<String, _>("membership_type"),
-                "roles": r.get::<Vec<String>, _>("roles"),
-                "role_categories": r.get::<Vec<String>, _>("role_categories"),
+        let items: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|r| {
+                json!({
+                    "entity_id": r.get::<Uuid, _>("entity_id"),
+                    "entity_name": r.get::<String, _>("entity_name"),
+                    "membership_type": r.get::<String, _>("membership_type"),
+                    "roles": r.get::<Vec<String>, _>("roles"),
+                    "role_categories": r.get::<Vec<String>, _>("role_categories"),
+                })
             })
-        }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(items))
+            .collect();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2244,7 +2382,6 @@ impl CustomOperation for ClientGroupAddRelationshipOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -2252,17 +2389,15 @@ impl CustomOperation for ClientGroupAddRelationshipOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let parent_entity_id = json_extract_uuid(args, ctx, "parent-entity-id")?;
         let child_entity_id = json_extract_uuid(args, ctx, "child-entity-id")?;
         let relationship_kind = json_extract_string_opt(args, "relationship-kind")
             .unwrap_or_else(|| "ownership".to_string());
         let effective_from = json_extract_string_opt(args, "effective-from");
-        let eff_from: Option<chrono::NaiveDate> = effective_from.as_ref()
+        let eff_from: Option<chrono::NaiveDate> = effective_from
+            .as_ref()
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
         let id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO "ob-poc".client_group_relationship
@@ -2384,7 +2519,6 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -2392,10 +2526,7 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid, json_extract_uuid_opt,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
         let relationship_kind = json_extract_string_opt(args, "relationship-kind");
@@ -2418,8 +2549,12 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
               AND ($2::UUID IS NULL OR r.parent_entity_id = $2 OR r.child_entity_id = $2)
               AND ($3::TEXT IS NULL OR r.relationship_kind = $3)
             ORDER BY pe.name, ce.name"#,
-        ).bind(group_id).bind(entity_id).bind(&relationship_kind)
-        .fetch_all(pool).await?;
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .bind(&relationship_kind)
+        .fetch_all(pool)
+        .await?;
         use sqlx::Row;
         let items: Vec<serde_json::Value> = rows.iter().map(|r| {
             let pct: Option<bigdecimal::BigDecimal> = r.get("canonical_ownership_pct");
@@ -2435,7 +2570,9 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
                 "review_status": r.get::<String, _>("review_status"),
             })
         }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(items))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2547,7 +2684,6 @@ impl CustomOperation for ClientGroupAddOwnershipSourceOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -2555,15 +2691,14 @@ impl CustomOperation for ClientGroupAddOwnershipSourceOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use std::str::FromStr;
         use super::helpers::{
-            json_extract_uuid, json_extract_uuid_opt, json_extract_string,
-            json_extract_string_opt,
+            json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
         };
+        use std::str::FromStr;
         let relationship_id = json_extract_uuid(args, ctx, "relationship-id")?;
         let source = json_extract_string(args, "source")?;
-        let source_type = json_extract_string_opt(args, "source-type")
-            .unwrap_or_else(|| "discovery".to_string());
+        let source_type =
+            json_extract_string_opt(args, "source-type").unwrap_or_else(|| "discovery".to_string());
         let ownership_pct = json_extract_string_opt(args, "ownership-pct")
             .and_then(|s| bigdecimal::BigDecimal::from_str(&s).ok());
         let voting_pct = json_extract_string_opt(args, "voting-pct")
@@ -2573,21 +2708,33 @@ impl CustomOperation for ClientGroupAddOwnershipSourceOp {
         let source_document_ref = json_extract_string_opt(args, "source-document-ref");
         let source_document_date = json_extract_string_opt(args, "source-document-date");
         let verifies_source_id = json_extract_uuid_opt(args, ctx, "verifies-source-id");
-        let doc_date: Option<chrono::NaiveDate> = source_document_date.as_ref()
+        let doc_date: Option<chrono::NaiveDate> = source_document_date
+            .as_ref()
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let confidence_bd: bigdecimal::BigDecimal = sqlx::query_scalar(
-            r#"SELECT "ob-poc".get_source_confidence($1)"#,
-        ).bind(&source).fetch_one(pool).await?;
+        let confidence_bd: bigdecimal::BigDecimal =
+            sqlx::query_scalar(r#"SELECT "ob-poc".get_source_confidence($1)"#)
+                .bind(&source)
+                .fetch_one(pool)
+                .await?;
         let id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO "ob-poc".client_group_relationship_sources
                 (relationship_id, source, source_type, ownership_pct, voting_pct, control_pct,
                  source_document_ref, source_document_date, verifies_source_id, confidence_score)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id"#,
-        ).bind(relationship_id).bind(&source).bind(&source_type)
-        .bind(&ownership_pct).bind(&voting_pct).bind(&control_pct)
-        .bind(&source_document_ref).bind(doc_date).bind(verifies_source_id).bind(confidence_bd)
-        .fetch_one(pool).await?;
+        )
+        .bind(relationship_id)
+        .bind(&source)
+        .bind(&source_type)
+        .bind(&ownership_pct)
+        .bind(&voting_pct)
+        .bind(&control_pct)
+        .bind(&source_document_ref)
+        .bind(doc_date)
+        .bind(verifies_source_id)
+        .bind(confidence_bd)
+        .fetch_one(pool)
+        .await?;
         Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
     }
 
@@ -2660,7 +2807,6 @@ impl CustomOperation for ClientGroupVerifyOwnershipOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -2668,10 +2814,7 @@ impl CustomOperation for ClientGroupVerifyOwnershipOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let source_id = json_extract_uuid(args, ctx, "source-id")?;
         let verified_by = json_extract_string_opt(args, "verified-by");
         let notes = json_extract_string_opt(args, "notes");
@@ -2680,9 +2823,16 @@ impl CustomOperation for ClientGroupVerifyOwnershipOp {
             SET verification_status = 'verified', verified_by = $2,
                 verified_at = NOW(), verification_notes = $3, updated_at = NOW()
             WHERE id = $1"#,
-        ).bind(source_id).bind(&verified_by).bind(&notes)
-        .execute(pool).await?.rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(affected))
+        )
+        .bind(source_id)
+        .bind(&verified_by)
+        .bind(&notes)
+        .execute(pool)
+        .await?
+        .rows_affected();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            affected,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2766,7 +2916,6 @@ impl CustomOperation for ClientGroupSetCanonicalOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -2774,10 +2923,7 @@ impl CustomOperation for ClientGroupSetCanonicalOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let source_id = json_extract_uuid(args, ctx, "source-id")?;
         let notes = json_extract_string_opt(args, "notes");
         sqlx::query(
@@ -2786,13 +2932,18 @@ impl CustomOperation for ClientGroupSetCanonicalOp {
             WHERE relationship_id = (
                 SELECT relationship_id FROM "ob-poc".client_group_relationship_sources WHERE id = $1
             ) AND is_canonical = true"#,
-        ).bind(source_id).execute(pool).await?;
+        )
+        .bind(source_id)
+        .execute(pool)
+        .await?;
         let affected = sqlx::query(
             r#"UPDATE "ob-poc".client_group_relationship_sources
             SET is_canonical = true, canonical_set_at = NOW(), canonical_notes = $2, updated_at = NOW()
             WHERE id = $1"#,
         ).bind(source_id).bind(&notes).execute(pool).await?.rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(affected))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            affected,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2883,7 +3034,6 @@ impl CustomOperation for ClientGroupListUnverifiedOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -2891,9 +3041,7 @@ impl CustomOperation for ClientGroupListUnverifiedOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid, json_extract_int_opt,
-        };
+        use super::helpers::{json_extract_int_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let limit = json_extract_int_opt(args, "limit").unwrap_or(50);
         let rows = sqlx::query(
@@ -2901,7 +3049,11 @@ impl CustomOperation for ClientGroupListUnverifiedOp {
                    alleged_pct, source_document_ref, source_document_date, verification_count
             FROM "ob-poc".v_cgr_unverified_allegations
             WHERE group_id = $1 LIMIT $2"#,
-        ).bind(group_id).bind(limit).fetch_all(pool).await?;
+        )
+        .bind(group_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
         use sqlx::Row;
         let items: Vec<serde_json::Value> = rows.iter().map(|r| {
             let pct: Option<bigdecimal::BigDecimal> = r.get("alleged_pct");
@@ -2915,7 +3067,9 @@ impl CustomOperation for ClientGroupListUnverifiedOp {
                 "verification_count": r.get::<i64, _>("verification_count"),
             })
         }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(items))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3020,7 +3174,6 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -3028,11 +3181,8 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
         use std::str::FromStr;
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_opt,
-        };
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let min_spread = json_extract_string_opt(args, "min-spread")
             .and_then(|s| bigdecimal::BigDecimal::from_str(&s).ok())
@@ -3050,7 +3200,11 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
             WHERE d.group_id = $1 AND pe.deleted_at IS NULL AND ce.deleted_at IS NULL
               AND d.ownership_spread >= $2
             ORDER BY d.ownership_spread DESC"#,
-        ).bind(group_id).bind(&min_spread).fetch_all(pool).await?;
+        )
+        .bind(group_id)
+        .bind(&min_spread)
+        .fetch_all(pool)
+        .await?;
         use sqlx::Row;
         let items: Vec<serde_json::Value> = rows.iter().map(|r| {
             let spread: bigdecimal::BigDecimal = r.get("ownership_spread");
@@ -3068,7 +3222,9 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
                 "verified_pct": verified.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
             })
         }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(items))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3141,7 +3297,6 @@ impl CustomOperation for ClientGroupStartDiscoveryOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -3149,21 +3304,26 @@ impl CustomOperation for ClientGroupStartDiscoveryOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let source = json_extract_string_opt(args, "source").unwrap_or_else(|| "manual".to_string());
+        let source =
+            json_extract_string_opt(args, "source").unwrap_or_else(|| "manual".to_string());
         let root_lei = json_extract_string_opt(args, "root-lei");
         let affected = sqlx::query(
             r#"UPDATE "ob-poc".client_group
             SET discovery_status = 'in_progress', discovery_started_at = NOW(),
                 discovery_source = $2, discovery_root_lei = $3, updated_at = NOW()
             WHERE id = $1"#,
-        ).bind(group_id).bind(&source).bind(&root_lei)
-        .execute(pool).await?.rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(affected))
+        )
+        .bind(group_id)
+        .bind(&source)
+        .bind(&root_lei)
+        .execute(pool)
+        .await?
+        .rows_affected();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            affected,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3230,7 +3390,6 @@ impl CustomOperation for ClientGroupCompleteDiscoveryOp {
         ))
     }
 
-
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
@@ -3238,18 +3397,21 @@ impl CustomOperation for ClientGroupCompleteDiscoveryOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_uuid,
-            json_extract_string_opt,
-        };
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let _notes = json_extract_string_opt(args, "notes");
         let affected = sqlx::query(
             r#"UPDATE "ob-poc".client_group
             SET discovery_status = 'complete', discovery_completed_at = NOW(), updated_at = NOW()
             WHERE id = $1"#,
-        ).bind(group_id).execute(pool).await?.rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(affected))
+        )
+        .bind(group_id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            affected,
+        ))
     }
 
     fn is_migrated(&self) -> bool {

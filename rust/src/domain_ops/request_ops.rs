@@ -19,6 +19,21 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+#[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    use crate::sem_os_runtime::verb_executor_adapter;
+
+    let vc = verb_executor_adapter::build_verb_call_pub(op.domain(), op.verb(), args);
+    let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Shared Types
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -275,6 +290,16 @@ impl CustomOperation for RequestCreateOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -396,6 +421,16 @@ impl CustomOperation for RequestOverdueOp {
         Ok(ExecutionResult::RecordSet(results))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -508,6 +543,16 @@ impl CustomOperation for RequestFulfillOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -601,6 +646,16 @@ impl CustomOperation for RequestCancelOp {
         .await;
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -754,6 +809,16 @@ impl CustomOperation for RequestExtendOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -871,6 +936,16 @@ impl CustomOperation for RequestRemindOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -974,6 +1049,16 @@ impl CustomOperation for RequestEscalateOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1061,6 +1146,16 @@ impl CustomOperation for RequestWaiveOp {
         }
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -1251,6 +1346,16 @@ impl CustomOperation for DocumentRequestOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1405,6 +1510,16 @@ impl CustomOperation for DocumentUploadOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1503,6 +1618,16 @@ impl CustomOperation for DocumentWaiveOp {
         }
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]

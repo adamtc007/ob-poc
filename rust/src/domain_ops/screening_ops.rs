@@ -122,6 +122,73 @@ impl CustomOperation for ScreeningPepOp {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use uuid::Uuid;
+
+        let entity_id: Uuid = json_extract_uuid(args, ctx, "entity-id")?;
+
+        let workstream = sqlx::query!(
+            r#"SELECT w.workstream_id FROM "ob-poc".entity_workstreams w
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
+               WHERE w.entity_id = $1 AND w.status NOT IN ('COMPLETE', 'BLOCKED')
+               ORDER BY w.created_at DESC
+               LIMIT 1"#,
+            entity_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        let workstream_id = match workstream {
+            Some(row) => row.workstream_id,
+            None => {
+                return Err(anyhow::anyhow!(
+                    "No active workstream for entity. Use case-screening.initiate instead."
+                ));
+            }
+        };
+
+        let existing = sqlx::query!(
+            r#"SELECT screening_id FROM "ob-poc".screenings
+               WHERE workstream_id = $1 AND screening_type = 'PEP' AND status = 'PENDING'
+               LIMIT 1"#,
+            workstream_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(row) = existing {
+            ctx.bind("screening", row.screening_id);
+            return Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+                row.screening_id,
+            ));
+        }
+
+        let screening_id = Uuid::new_v4();
+
+        sqlx::query!(
+            r#"INSERT INTO "ob-poc".screenings
+               (screening_id, workstream_id, screening_type, status)
+               VALUES ($1, $2, 'PEP', 'PENDING')"#,
+            screening_id,
+            workstream_id
+        )
+        .execute(pool)
+        .await?;
+
+        ctx.bind("screening", screening_id);
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            screening_id,
+        ))
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -232,6 +299,73 @@ impl CustomOperation for ScreeningSanctionsOp {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use uuid::Uuid;
+
+        let entity_id: Uuid = json_extract_uuid(args, ctx, "entity-id")?;
+
+        let workstream = sqlx::query!(
+            r#"SELECT w.workstream_id FROM "ob-poc".entity_workstreams w
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
+               WHERE w.entity_id = $1 AND w.status NOT IN ('COMPLETE', 'BLOCKED')
+               ORDER BY w.created_at DESC
+               LIMIT 1"#,
+            entity_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        let workstream_id = match workstream {
+            Some(row) => row.workstream_id,
+            None => {
+                return Err(anyhow::anyhow!(
+                    "No active workstream for entity. Use case-screening.initiate instead."
+                ));
+            }
+        };
+
+        let existing = sqlx::query!(
+            r#"SELECT screening_id FROM "ob-poc".screenings
+               WHERE workstream_id = $1 AND screening_type = 'SANCTIONS' AND status = 'PENDING'
+               LIMIT 1"#,
+            workstream_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(row) = existing {
+            ctx.bind("screening", row.screening_id);
+            return Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+                row.screening_id,
+            ));
+        }
+
+        let screening_id = Uuid::new_v4();
+
+        sqlx::query!(
+            r#"INSERT INTO "ob-poc".screenings
+               (screening_id, workstream_id, screening_type, status)
+               VALUES ($1, $2, 'SANCTIONS', 'PENDING')"#,
+            screening_id,
+            workstream_id
+        )
+        .execute(pool)
+        .await?;
+
+        ctx.bind("screening", screening_id);
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            screening_id,
+        ))
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -274,6 +408,18 @@ impl CustomOperation for ScreeningAdverseMediaOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "screening.adverse-media is not yet implemented"
+        ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         Err(anyhow::anyhow!(
             "screening.adverse-media is not yet implemented"
         ))

@@ -29,6 +29,23 @@ use crate::domain_ops::rule_evaluator;
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+#[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
+        op.domain(),
+        op.verb(),
+        args,
+    );
+    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
 // =============================================================================
 // Result Types
 // =============================================================================
@@ -169,7 +186,6 @@ impl CustomOperation for LegalEntityCreateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let name = json_extract_string(args, "name")?;
         let incorporation_jurisdiction = json_extract_string(args, "incorporation-jurisdiction")?;
         let lei = json_extract_string_opt(args, "lei");
@@ -188,8 +204,9 @@ impl CustomOperation for LegalEntityCreateOp {
             legal_entity_id: id,
             name,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -282,7 +299,6 @@ impl CustomOperation for LegalEntityUpdateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let legal_entity_id = json_extract_uuid(args, ctx, "legal-entity-id")?;
         let name = json_extract_string_opt(args, "name");
         let lei = json_extract_string_opt(args, "lei");
@@ -326,8 +342,9 @@ impl CustomOperation for LegalEntityUpdateOp {
 
         query.execute(pool).await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(legal_entity_id))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            legal_entity_id,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -373,6 +390,16 @@ impl CustomOperation for LegalEntityListOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -464,7 +491,6 @@ impl CustomOperation for RuleFieldRegisterOp {
         _ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let field_key = json_extract_string(args, "field-key")?;
         let field_type = json_extract_string(args, "field-type")?;
         let description = json_extract_string_opt(args, "description");
@@ -495,8 +521,9 @@ impl CustomOperation for RuleFieldRegisterOp {
             description: entry.description,
             source_table: entry.source_table,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -542,6 +569,16 @@ impl CustomOperation for RuleFieldListOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -622,7 +659,6 @@ impl CustomOperation for BookingLocationCreateOp {
         _ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let country_code = json_extract_string(args, "country-code")?;
         let region_code = json_extract_string_opt(args, "region-code");
         let jurisdiction_code = json_extract_string_opt(args, "jurisdiction-code");
@@ -650,8 +686,9 @@ impl CustomOperation for BookingLocationCreateOp {
             booking_location_id: id,
             country_code,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -725,7 +762,6 @@ impl CustomOperation for BookingLocationUpdateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let id = json_extract_uuid(args, ctx, "booking-location-id")?;
         let region_code = json_extract_string_opt(args, "region-code");
         let jurisdiction_code = json_extract_string_opt(args, "jurisdiction-code");
@@ -751,7 +787,6 @@ impl CustomOperation for BookingLocationUpdateOp {
             .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -824,6 +859,16 @@ impl CustomOperation for BookingLocationListOp {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -893,7 +938,6 @@ impl CustomOperation for BookingPrincipalCreateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let legal_entity_id = json_extract_uuid(args, ctx, "legal-entity-id")?;
         let booking_location_id = json_extract_uuid_opt(args, ctx, "booking-location-id");
         let principal_code = json_extract_string(args, "principal-code")?;
@@ -912,8 +956,9 @@ impl CustomOperation for BookingPrincipalCreateOp {
             booking_principal_id: id,
             principal_code,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -987,7 +1032,6 @@ impl CustomOperation for BookingPrincipalUpdateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let id = json_extract_uuid(args, ctx, "booking-principal-id")?;
         let book_code = json_extract_string_opt(args, "book-code");
         let status = json_extract_string_opt(args, "status");
@@ -1013,7 +1057,6 @@ impl CustomOperation for BookingPrincipalUpdateOp {
             .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -1079,7 +1122,6 @@ impl CustomOperation for BookingPrincipalRetireOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let id = json_extract_uuid(args, ctx, "booking-principal-id")?;
         let force = json_extract_bool_opt(args, "force").unwrap_or(false);
 
@@ -1096,8 +1138,9 @@ impl CustomOperation for BookingPrincipalRetireOp {
             booking_principal_id: id,
             active_relationships: active_count,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1416,7 +1459,6 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
         let segment = json_extract_string(args, "segment")?;
         let domicile_country = json_extract_string(args, "domicile-country")?;
@@ -1440,9 +1482,7 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
             .map(|items| {
                 items
                     .iter()
-                    .filter_map(|v| {
-                        v.as_str().and_then(|s| uuid::Uuid::parse_str(s).ok())
-                    })
+                    .filter_map(|v| v.as_str().and_then(|s| uuid::Uuid::parse_str(s).ok()))
                     .collect()
             })
             .unwrap_or_default();
@@ -1681,8 +1721,9 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
             policy_snapshot,
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(eval_result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(eval_result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1756,7 +1797,6 @@ impl CustomOperation for BookingPrincipalSelectOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
         let principal_id = json_extract_uuid(args, ctx, "principal-id")?;
 
@@ -1781,8 +1821,9 @@ impl CustomOperation for BookingPrincipalSelectOp {
             override_gate: None,
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1838,15 +1879,15 @@ impl CustomOperation for BookingPrincipalExplainOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
 
         let eval = BookingPrincipalRepository::get_evaluation(pool, evaluation_id)
             .await?
             .ok_or_else(|| anyhow!("Evaluation not found: {}", evaluation_id))?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(eval)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(eval)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1919,7 +1960,6 @@ impl CustomOperation for ClientPrincipalRelationshipRecordOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
         let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
         let product_offering_id = json_extract_uuid(args, ctx, "product-offering-id")?;
@@ -1939,8 +1979,9 @@ impl CustomOperation for ClientPrincipalRelationshipRecordOp {
             client_group_id,
             booking_principal_id,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1995,14 +2036,14 @@ impl CustomOperation for ClientPrincipalRelationshipTerminateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let relationship_id = json_extract_uuid(args, ctx, "relationship-id")?;
 
         let affected =
             BookingPrincipalRepository::terminate_relationship(pool, relationship_id).await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(affected as u64))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            affected as u64,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2067,7 +2108,6 @@ impl CustomOperation for ClientPrincipalRelationshipListOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
         let status = json_extract_string_opt(args, "status");
 
@@ -2083,8 +2123,9 @@ impl CustomOperation for ClientPrincipalRelationshipListOp {
             .map(|r| serde_json::to_value(r).unwrap_or_default())
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(values))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            values,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2171,7 +2212,6 @@ impl CustomOperation for ClientPrincipalRelationshipCrossSellOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
 
         let active_rels =
@@ -2209,8 +2249,9 @@ impl CustomOperation for ClientPrincipalRelationshipCrossSellOp {
             existing_principals: existing_principal_ids,
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2292,7 +2333,6 @@ impl CustomOperation for ServiceAvailabilitySetOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
         let service_id = json_extract_uuid(args, ctx, "service-id")?;
         let regulatory_status = json_extract_string(args, "regulatory-status")?;
@@ -2321,8 +2361,9 @@ impl CustomOperation for ServiceAvailabilitySetOp {
             booking_principal_id,
             service_id,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2383,7 +2424,6 @@ impl CustomOperation for ServiceAvailabilityListOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
         let records =
@@ -2395,8 +2435,9 @@ impl CustomOperation for ServiceAvailabilityListOp {
             .map(|r| serde_json::to_value(r).unwrap_or_default())
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(values))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            values,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2457,7 +2498,6 @@ impl CustomOperation for ServiceAvailabilityListByPrincipalOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
         let records =
@@ -2469,8 +2509,9 @@ impl CustomOperation for ServiceAvailabilityListByPrincipalOp {
             .map(|r| serde_json::to_value(r).unwrap_or_default())
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(values))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            values,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2561,7 +2602,6 @@ impl CustomOperation for RulesetCreateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let name = json_extract_string(args, "name")?;
         let owner_type = json_extract_string(args, "owner-type")?;
         let owner_id = json_extract_uuid_opt(args, ctx, "owner-id");
@@ -2599,8 +2639,9 @@ impl CustomOperation for RulesetCreateOp {
             name,
             status: "draft".to_string(),
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2706,7 +2747,6 @@ impl CustomOperation for RulesetPublishOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let ruleset_id = json_extract_uuid(args, ctx, "ruleset-id")?;
 
         // Load field dictionary for validation
@@ -2763,8 +2803,9 @@ impl CustomOperation for RulesetPublishOp {
             ));
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(ruleset_id))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            ruleset_id,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2822,7 +2863,6 @@ impl CustomOperation for RulesetRetireOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let ruleset_id = json_extract_uuid(args, ctx, "ruleset-id")?;
 
         let retired = BookingPrincipalRepository::retire_ruleset(pool, ruleset_id).await?;
@@ -2831,8 +2871,9 @@ impl CustomOperation for RulesetRetireOp {
             return Err(anyhow!("Could not retire ruleset — not in active status"));
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(ruleset_id))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            ruleset_id,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2925,7 +2966,6 @@ impl CustomOperation for RuleAddOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let ruleset_id = json_extract_uuid(args, ctx, "ruleset-id")?;
         let name = json_extract_string(args, "name")?;
         let kind = json_extract_string(args, "kind")?;
@@ -2965,8 +3005,9 @@ impl CustomOperation for RuleAddOp {
             ruleset_id,
             name,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3086,7 +3127,6 @@ impl CustomOperation for RuleUpdateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let rule_id = json_extract_uuid(args, ctx, "rule-id")?;
         let name = json_extract_string_opt(args, "name");
         let when_expr_str = json_extract_string_opt(args, "when-expr");
@@ -3158,7 +3198,6 @@ impl CustomOperation for RuleUpdateOp {
         query.execute(pool).await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(rule_id))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -3221,7 +3260,6 @@ impl CustomOperation for RuleDisableOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let rule_id = json_extract_uuid(args, ctx, "rule-id")?;
 
         sqlx::query(
@@ -3236,7 +3274,6 @@ impl CustomOperation for RuleDisableOp {
         .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(rule_id))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -3306,7 +3343,6 @@ impl CustomOperation for ContractPackCreateOp {
         _ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let code = json_extract_string(args, "code")?;
         let name = json_extract_string(args, "name")?;
         let description = json_extract_string_opt(args, "description");
@@ -3323,8 +3359,9 @@ impl CustomOperation for ContractPackCreateOp {
             contract_pack_id: id,
             code,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3390,7 +3427,6 @@ impl CustomOperation for ContractPackAddTemplateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let contract_pack_id = json_extract_uuid(args, ctx, "contract-pack-id")?;
         let template_type = json_extract_string(args, "template-type")?;
         let template_ref = json_extract_string_opt(args, "template-ref");
@@ -3407,8 +3443,9 @@ impl CustomOperation for ContractPackAddTemplateOp {
             contract_template_id: id,
             contract_pack_id,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3500,6 +3537,16 @@ impl CustomOperation for BookingPrincipalCoverageMatrixOp {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -3555,6 +3602,16 @@ impl CustomOperation for BookingPrincipalGapReportOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -3659,7 +3716,6 @@ impl CustomOperation for BookingPrincipalImpactAnalysisOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
         // Find all active relationships for this principal
@@ -3715,8 +3771,9 @@ impl CustomOperation for BookingPrincipalImpactAnalysisOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(impact_entries))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            impact_entries,
+        ))
     }
 
     fn is_migrated(&self) -> bool {

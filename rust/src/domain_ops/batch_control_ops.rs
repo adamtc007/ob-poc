@@ -13,6 +13,9 @@ use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::helpers::{
+    json_extract_int_opt, json_extract_string_list, json_extract_string_opt, json_extract_uuid,
+};
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -37,6 +40,19 @@ pub struct BatchControlResult {
     pub status: Option<serde_json::Value>,
     /// Message describing result
     pub message: String,
+}
+
+#[cfg(feature = "database")]
+fn batch_control_outcome(
+    result: BatchControlResult,
+) -> sem_os_core::execution::VerbExecutionOutcome {
+    sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::json!({
+        "_type": "batch_control",
+        "operation": result.operation,
+        "success": result.success,
+        "status": result.status,
+        "message": result.message
+    }))
 }
 
 // ============================================================================
@@ -87,6 +103,22 @@ impl CustomOperation for BatchPauseOp {
         }))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        tracing::info!("batch.pause called");
+        Ok(batch_control_outcome(BatchControlResult {
+            operation: "pause".to_string(),
+            success: true,
+            status: None,
+            message: "Batch pause requested. Session handler will process.".to_string(),
+        }))
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -126,6 +158,22 @@ impl CustomOperation for BatchResumeOp {
         tracing::info!("batch.resume called");
 
         Ok(ExecutionResult::BatchControl(BatchControlResult {
+            operation: "resume".to_string(),
+            success: true,
+            status: None,
+            message: "Batch resume requested. Session handler will process.".to_string(),
+        }))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        tracing::info!("batch.resume called");
+        Ok(batch_control_outcome(BatchControlResult {
             operation: "resume".to_string(),
             success: true,
             status: None,
@@ -188,6 +236,23 @@ impl CustomOperation for BatchContinueOp {
         }))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let count = json_extract_int_opt(args, "count").unwrap_or(1) as usize;
+        tracing::info!(count, "batch.continue called");
+        Ok(batch_control_outcome(BatchControlResult {
+            operation: "continue".to_string(),
+            success: true,
+            status: Some(serde_json::json!({ "count": count })),
+            message: format!("Continue {} more items requested.", count),
+        }))
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -235,6 +300,23 @@ impl CustomOperation for BatchSkipOp {
         tracing::info!(?reason, "batch.skip called");
 
         Ok(ExecutionResult::BatchControl(BatchControlResult {
+            operation: "skip".to_string(),
+            success: true,
+            status: reason.as_ref().map(|r| serde_json::json!({ "reason": r })),
+            message: reason.unwrap_or_else(|| "Current item skipped.".to_string()),
+        }))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let reason = json_extract_string_opt(args, "reason");
+        tracing::info!(?reason, "batch.skip called");
+        Ok(batch_control_outcome(BatchControlResult {
             operation: "skip".to_string(),
             success: true,
             status: reason.as_ref().map(|r| serde_json::json!({ "reason": r })),
@@ -296,6 +378,23 @@ impl CustomOperation for BatchAbortOp {
         }))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let reason = json_extract_string_opt(args, "reason");
+        tracing::warn!(?reason, "batch.abort called");
+        Ok(batch_control_outcome(BatchControlResult {
+            operation: "abort".to_string(),
+            success: true,
+            status: reason.as_ref().map(|r| serde_json::json!({ "reason": r })),
+            message: reason.unwrap_or_else(|| "Batch execution aborted.".to_string()),
+        }))
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -349,6 +448,24 @@ impl CustomOperation for BatchStatusOp {
         tracing::debug!("batch.status called");
 
         Ok(ExecutionResult::BatchControl(BatchControlResult {
+            operation: "status".to_string(),
+            success: true,
+            status: Some(serde_json::json!({
+                "message": "Status query - session handler will populate actual state"
+            })),
+            message: "Batch status requested.".to_string(),
+        }))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        tracing::debug!("batch.status called");
+        Ok(batch_control_outcome(BatchControlResult {
             operation: "status".to_string(),
             success: true,
             status: Some(serde_json::json!({
@@ -527,6 +644,128 @@ impl CustomOperation for BatchAddProductsOp {
         );
 
         Ok(ExecutionResult::BatchControl(BatchControlResult {
+            operation: "add-products".to_string(),
+            success: failure_count == 0,
+            status: Some(serde_json::json!({
+                "cbu_count": cbu_ids.len(),
+                "products": products,
+                "total_operations": total_ops,
+                "success_count": success_count,
+                "failure_count": failure_count,
+                "errors": errors,
+            })),
+            message: format!(
+                "Added products to {} CBUs: {} success, {} failed",
+                cbu_ids.len(),
+                success_count,
+                failure_count
+            ),
+        }))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_ids = args
+            .get("cbu-ids")
+            .and_then(|v| v.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| {
+                        item.as_str().and_then(|s| {
+                            if let Some(sym) = s.strip_prefix('@') {
+                                ctx.resolve(sym)
+                            } else {
+                                Uuid::parse_str(s).ok()
+                            }
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .or_else(|| {
+                json_extract_uuid(args, ctx, "cbu-ids")
+                    .ok()
+                    .map(|id| vec![id])
+            })
+            .unwrap_or_default();
+        let products = json_extract_string_list(args, "products").unwrap_or_default();
+
+        if cbu_ids.is_empty() {
+            return Err(anyhow!("No CBU IDs provided for batch.add-products"));
+        }
+
+        if products.is_empty() {
+            return Err(anyhow!("No products specified for batch.add-products"));
+        }
+
+        tracing::info!(
+            cbu_count = cbu_ids.len(),
+            products = ?products,
+            "batch.add-products executing"
+        );
+
+        let mut success_count = 0;
+        let mut failure_count = 0;
+        let mut errors: Vec<String> = Vec::new();
+
+        for cbu_id in &cbu_ids {
+            for product in &products {
+                let product_result: Result<Option<Uuid>, _> = sqlx::query_scalar(
+                    r#"SELECT product_id FROM "ob-poc".products WHERE product_code = $1 OR name = $1"#,
+                )
+                .bind(product)
+                .fetch_optional(pool)
+                .await;
+
+                match product_result {
+                    Ok(Some(product_id)) => {
+                        let insert_result = sqlx::query(
+                            r#"
+                            INSERT INTO "ob-poc".cbu_products (cbu_id, product_id)
+                            VALUES ($1, $2)
+                            ON CONFLICT (cbu_id, product_id) DO NOTHING
+                            "#,
+                        )
+                        .bind(cbu_id)
+                        .bind(product_id)
+                        .execute(pool)
+                        .await;
+
+                        match insert_result {
+                            Ok(_) => success_count += 1,
+                            Err(e) => {
+                                failure_count += 1;
+                                errors.push(format!("{}/{}: {}", cbu_id, product, e));
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        failure_count += 1;
+                        errors.push(format!("Product not found: {}", product));
+                    }
+                    Err(e) => {
+                        failure_count += 1;
+                        errors.push(format!("Product lookup failed: {}", e));
+                    }
+                }
+            }
+        }
+
+        let total_ops = cbu_ids.len() * products.len();
+
+        tracing::info!(
+            success_count,
+            failure_count,
+            total_ops,
+            "batch.add-products completed"
+        );
+
+        Ok(batch_control_outcome(BatchControlResult {
             operation: "add-products".to_string(),
             success: failure_count == 0,
             status: Some(serde_json::json!({

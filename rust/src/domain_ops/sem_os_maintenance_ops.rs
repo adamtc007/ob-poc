@@ -80,10 +80,13 @@ impl CustomOperation for MaintenanceHealthPendingOp {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             "SELECT status, COUNT(*)::bigint FROM sem_reg.changesets GROUP BY status ORDER BY status"
         ).fetch_all(pool).await?;
-        let entries: Vec<serde_json::Value> = rows.into_iter()
+        let entries: Vec<serde_json::Value> = rows
+            .into_iter()
             .map(|(status, count)| serde_json::json!({"status": status, "count": count}))
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::json!({"pending_changesets": entries})))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({"pending_changesets": entries}),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -162,10 +165,13 @@ impl CustomOperation for MaintenanceHealthStaleDryrunsOp {
         let rows: Vec<(String, String)> = sqlx::query_as(
             "SELECT c.changeset_id::text, c.status FROM sem_reg.changesets c WHERE c.status = 'dry_run_passed' AND c.updated_at < NOW() - INTERVAL '7 days' ORDER BY c.updated_at ASC LIMIT 50",
         ).fetch_all(pool).await?;
-        let stale: Vec<serde_json::Value> = rows.into_iter()
+        let stale: Vec<serde_json::Value> = rows
+            .into_iter()
             .map(|(id, status)| serde_json::json!({"changeset_id": id, "status": status}))
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::json!({"stale_dryruns": stale, "count": stale.len()})))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({"stale_dryruns": stale, "count": stale.len()}),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -238,7 +244,9 @@ impl CustomOperation for MaintenanceCleanupOp {
         let archived = sqlx::query_scalar::<_, i64>(
             "WITH moved AS (INSERT INTO sem_reg_authoring.change_sets_archive SELECT * FROM sem_reg.changesets WHERE status IN ('rejected', 'dry_run_failed') AND updated_at < NOW() - INTERVAL '90 days' ON CONFLICT DO NOTHING RETURNING 1) SELECT COUNT(*) FROM moved",
         ).fetch_one(pool).await.unwrap_or(0);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::json!({"archived_count": archived, "status": "cleanup_complete"})))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({"archived_count": archived, "status": "cleanup_complete"}),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -296,7 +304,9 @@ impl CustomOperation for MaintenanceBootstrapSeedsOp {
         _ctx: &mut sem_os_core::execution::VerbExecutionContext,
         _pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::json!({"status": "bootstrap_seeds must be triggered via server startup or CLI", "hint": "Use: cargo x sem-reg scan"})))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({"status": "bootstrap_seeds must be triggered via server startup or CLI", "hint": "Use: cargo x sem-reg scan"}),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -360,9 +370,15 @@ impl CustomOperation for MaintenanceDrainOutboxOp {
         _ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        let pending: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sem_reg.outbox_events WHERE processed_at IS NULL")
-            .fetch_one(pool).await.unwrap_or(0);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::json!({"pending_outbox_events": pending, "status": if pending == 0 { "drained" } else { "has_pending" }})))
+        let pending: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sem_reg.outbox_events WHERE processed_at IS NULL",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({"pending_outbox_events": pending, "status": if pending == 0 { "drained" } else { "has_pending" }}),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -454,15 +470,30 @@ impl CustomOperation for MaintenanceReindexEmbeddingsOp {
         use super::helpers::json_extract_bool_opt;
         let force = json_extract_bool_opt(args, "force").unwrap_or(false);
         let mut cmd = tokio::process::Command::new("cargo");
-        cmd.args(["run", "--release", "--package", "ob-semantic-matcher", "--bin", "populate_embeddings"]);
-        if force { cmd.arg("--").arg("--force"); }
+        cmd.args([
+            "run",
+            "--release",
+            "--package",
+            "ob-semantic-matcher",
+            "--bin",
+            "populate_embeddings",
+        ]);
+        if force {
+            cmd.arg("--").arg("--force");
+        }
         let output = cmd.output().await?;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         if output.status.success() {
-            Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::json!({"status": "success", "force": force, "output": stdout.lines().last().unwrap_or("done")})))
+            Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                serde_json::json!({"status": "success", "force": force, "output": stdout.lines().last().unwrap_or("done")}),
+            ))
         } else {
-            Err(anyhow::anyhow!("populate_embeddings failed (exit {}): {}", output.status.code().unwrap_or(-1), stderr.lines().last().unwrap_or("unknown error")))
+            Err(anyhow::anyhow!(
+                "populate_embeddings failed (exit {}): {}",
+                output.status.code().unwrap_or(-1),
+                stderr.lines().last().unwrap_or("unknown error")
+            ))
         }
     }
 
@@ -537,10 +568,13 @@ impl CustomOperation for MaintenanceValidateSchemaSyncOp {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             "SELECT object_type, COUNT(*)::bigint FROM sem_reg.snapshots WHERE status = 'active' GROUP BY object_type ORDER BY object_type",
         ).fetch_all(pool).await?;
-        let counts: Vec<serde_json::Value> = rows.into_iter()
+        let counts: Vec<serde_json::Value> = rows
+            .into_iter()
             .map(|(ot, c)| serde_json::json!({"object_type": ot, "active_count": c}))
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::json!({"active_snapshot_counts": counts, "hint": "Run 'cargo x sem-reg scan --dry-run' for full drift detection"})))
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::json!({"active_snapshot_counts": counts, "hint": "Run 'cargo x sem-reg scan --dry-run' for full drift detection"}),
+        ))
     }
 
     fn is_migrated(&self) -> bool {

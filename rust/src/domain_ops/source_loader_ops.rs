@@ -30,6 +30,23 @@ use {
     std::sync::Arc,
 };
 
+#[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
+        op.domain(),
+        op.verb(),
+        args,
+    );
+    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
 // =============================================================================
 // Generic Source Operations (research.sources domain)
 // =============================================================================
@@ -87,6 +104,16 @@ impl CustomOperation for SourceListOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -148,6 +175,16 @@ impl CustomOperation for SourceInfoOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -235,6 +272,16 @@ impl CustomOperation for SourceSearchOp {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -319,6 +366,16 @@ impl CustomOperation for SourceFetchOp {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -392,6 +449,16 @@ impl CustomOperation for SourceFindForJurisdictionOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -472,6 +539,16 @@ impl CustomOperation for ChSearchOp {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -534,6 +611,16 @@ impl CustomOperation for ChFetchCompanyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -630,6 +717,16 @@ impl CustomOperation for ChFetchPscOp {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -702,6 +799,16 @@ impl CustomOperation for ChFetchOfficersOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -812,6 +919,16 @@ impl CustomOperation for ChImportCompanyOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -885,6 +1002,16 @@ impl CustomOperation for SecSearchOp {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -946,6 +1073,16 @@ impl CustomOperation for SecFetchCompanyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -1034,6 +1171,16 @@ impl CustomOperation for SecFetchBeneficialOwnersOp {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1098,6 +1245,16 @@ impl CustomOperation for SecFetchFilingsOp {
         Ok(ExecutionResult::Record(
             serde_json::json!({ "filings": [] }),
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -1184,6 +1341,16 @@ impl CustomOperation for SecImportCompanyOp {
         Ok(ExecutionResult::Record(serde_json::json!({
             "entity_id": uuid::Uuid::new_v4(),
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {

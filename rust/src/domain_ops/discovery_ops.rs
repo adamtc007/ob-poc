@@ -2056,6 +2056,33 @@ async fn sem_reg_tool(
     tool_error(result)
 }
 
+#[cfg(feature = "database")]
+async fn sem_reg_tool_json(
+    pool: &PgPool,
+    ctx: &sem_os_core::execution::VerbExecutionContext,
+    tool_name: &str,
+    args: Value,
+) -> Result<Value> {
+    let actor = crate::sem_reg::abac::ActorContext {
+        actor_id: ctx.principal.actor_id.clone(),
+        roles: if ctx.principal.is_admin() {
+            vec!["admin".to_string(), "operator".to_string()]
+        } else {
+            vec!["operator".to_string()]
+        },
+        department: None,
+        clearance: Some(crate::sem_reg::types::Classification::Internal),
+        jurisdictions: vec![],
+    };
+    let tool_ctx = SemRegToolContext {
+        pool,
+        actor: &actor,
+        sem_os_service: None,
+    };
+    let result = dispatch_tool(&tool_ctx, tool_name, &args).await;
+    tool_error(result)
+}
+
 #[register_custom_op]
 pub struct DiscoverySearchEntitiesOp;
 
@@ -2636,6 +2663,58 @@ impl CustomOperation for DiscoveryVerbDetailOp {
                 "sem_reg_surface": sem_reg_surface,
             }
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::json_extract_string;
+        let verb_id = json_extract_string(args, "verb-id")?;
+        let verbs = ConfigLoader::from_env().load_verbs()?;
+        let (domain_name, config) = find_verb_config(&verbs, &verb_id)
+            .ok_or_else(|| anyhow!("Unknown verb id: {}", verb_id))?;
+        let sem_reg_surface = sem_reg_tool_json(
+            pool,
+            ctx,
+            "sem_reg_verb_surface",
+            json!({
+                "verb_fqn": verb_id,
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "verb_id": verb_id,
+                "domain": domain_name,
+                "name": verb_id.split('.').nth(1).unwrap_or(""),
+                "description": config.description,
+                "polarity": infer_polarity(config.metadata.as_ref()),
+                "subject_kinds": config.metadata.as_ref().map(|m| m.subject_kinds.clone()).unwrap_or_default(),
+                "phase_tags": config.metadata.as_ref().map(|m| m.phase_tags.clone()).unwrap_or_default(),
+                "parameters": config.args.iter().map(|arg| json!({
+                    "name": arg.name,
+                    "type": format!("{:?}", arg.arg_type).to_lowercase(),
+                    "required": arg.required,
+                    "default": arg.default,
+                    "description": arg.description,
+                    "validation": Value::Null,
+                })).collect::<Vec<_>>(),
+                "preconditions": sem_reg_surface.get("preconditions").cloned().unwrap_or(Value::Null),
+                "postconditions": Value::Null,
+                "governance": {
+                    "status": governance_status(config),
+                    "required_roles": [],
+                    "abac_policy": Value::Null,
+                    "sem_reg_surface": sem_reg_surface,
+                }
+            }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3262,6 +3341,73 @@ impl CustomOperation for DiscoverySearchDataOp {
             "total_matches": filtered_results.len(),
             "results": filtered_results,
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use super::helpers::{
+            json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
+        };
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let domain = json_extract_string(args, "domain")?;
+        let query = json_extract_string(args, "query")?;
+        let aspect = json_extract_string_opt(args, "aspect");
+        let max_results = json_extract_int_opt(args, "max-results").unwrap_or(20) as usize;
+
+        let result = sem_reg_tool_json(
+            pool,
+            ctx,
+            "sem_reg_search",
+            json!({
+                "query": query,
+                "limit": max_results,
+            }),
+        )
+        .await?;
+        let filtered_results: Vec<Value> = result
+            .get("results")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|item| {
+                item.get("fqn")
+                    .and_then(|v| v.as_str())
+                    .map(|fqn| fqn.starts_with(&format!("{}.", domain)))
+                    .unwrap_or(true)
+            })
+            .take(max_results)
+            .map(|item| {
+                json!({
+                    "record_type": item.get("object_type").cloned().unwrap_or(json!("registry_object")),
+                    "record_id": item.get("object_id").cloned().unwrap_or(Value::Null),
+                    "match_field": "definition",
+                    "match_value": item.get("fqn").cloned().unwrap_or(Value::Null),
+                    "match_score": item.get("score").cloned().unwrap_or(Value::Null),
+                    "context": {
+                        "domain": domain,
+                        "aspect": aspect,
+                        "entity_id": entity_id,
+                    }
+                })
+            })
+            .collect();
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "entity_id": entity_id,
+                "domain": domain,
+                "query": query,
+                "aspect": aspect,
+                "total_matches": filtered_results.len(),
+                "results": filtered_results,
+            }),
+        ))
     }
 
     fn is_migrated(&self) -> bool {

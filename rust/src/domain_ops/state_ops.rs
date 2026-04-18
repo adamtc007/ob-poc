@@ -6,7 +6,10 @@ use chrono::{DateTime, Utc};
 use ob_poc_macros::register_custom_op;
 use serde_json::json;
 
-use super::helpers::{extract_string, extract_string_opt, extract_uuid, extract_uuid_opt};
+use super::helpers::{
+    extract_string, extract_string_opt, extract_uuid, extract_uuid_opt, json_extract_string,
+    json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 use crate::state_reducer::{
     handle_state_blocked_why, handle_state_check_consistency, handle_state_derive,
@@ -62,6 +65,29 @@ impl CustomOperation for StateDeriveOp {
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let slot_path = json_extract_string(args, "slot-path")?;
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let machine_name = json_extract_string_opt(args, "state-machine")
+            .unwrap_or_else(|| "entity_kyc_lifecycle".to_string());
+        let state_machine =
+            load_builtin_state_machine(&machine_name).map_err(|err| anyhow!(err.to_string()))?;
+        let result =
+            handle_state_derive(pool, cbu_id, entity_id, &slot_path, case_id, &state_machine)
+                .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -114,6 +140,29 @@ impl CustomOperation for StateDiagnoseOp {
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let slot_path = json_extract_string(args, "slot-path")?;
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let machine_name = json_extract_string_opt(args, "state-machine")
+            .unwrap_or_else(|| "entity_kyc_lifecycle".to_string());
+        let state_machine =
+            load_builtin_state_machine(&machine_name).map_err(|err| anyhow!(err.to_string()))?;
+        let result =
+            handle_state_diagnose(pool, cbu_id, entity_id, &slot_path, case_id, &state_machine)
+                .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -160,6 +209,28 @@ impl CustomOperation for StateDeriveAllOp {
             load_builtin_state_machine(&machine_name).map_err(|err| anyhow!(err.to_string()))?;
         let result = handle_state_derive_all(pool, cbu_id, case_id, &state_machine).await?;
         Ok(ExecutionResult::RecordSet(
+            result
+                .into_iter()
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let machine_name = json_extract_string_opt(args, "state-machine")
+            .unwrap_or_else(|| "entity_kyc_lifecycle".to_string());
+        let state_machine =
+            load_builtin_state_machine(&machine_name).map_err(|err| anyhow!(err.to_string()))?;
+        let result = handle_state_derive_all(pool, cbu_id, case_id, &state_machine).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
             result
                 .into_iter()
                 .map(serde_json::to_value)
@@ -227,6 +298,37 @@ impl CustomOperation for StateBlockedWhyOp {
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let slot_path = json_extract_string(args, "slot-path")?;
+        let verb = json_extract_string(args, "verb")?;
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let machine_name = json_extract_string_opt(args, "state-machine")
+            .unwrap_or_else(|| "entity_kyc_lifecycle".to_string());
+        let state_machine =
+            load_builtin_state_machine(&machine_name).map_err(|err| anyhow!(err.to_string()))?;
+        let result = handle_state_blocked_why(
+            pool,
+            cbu_id,
+            entity_id,
+            &slot_path,
+            &verb,
+            case_id,
+            &state_machine,
+        )
+        .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -273,6 +375,28 @@ impl CustomOperation for StateCheckConsistencyOp {
             load_builtin_state_machine(&machine_name).map_err(|err| anyhow!(err.to_string()))?;
         let result = handle_state_check_consistency(pool, cbu_id, case_id, &state_machine).await?;
         Ok(ExecutionResult::RecordSet(
+            result
+                .into_iter()
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let machine_name = json_extract_string_opt(args, "state-machine")
+            .unwrap_or_else(|| "entity_kyc_lifecycle".to_string());
+        let state_machine =
+            load_builtin_state_machine(&machine_name).map_err(|err| anyhow!(err.to_string()))?;
+        let result = handle_state_check_consistency(pool, cbu_id, case_id, &state_machine).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
             result
                 .into_iter()
                 .map(serde_json::to_value)
@@ -351,6 +475,48 @@ impl CustomOperation for StateOverrideOp {
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let slot_path = json_extract_string(args, "slot-path")?;
+        let override_state = json_extract_string(args, "override-state")?;
+        let justification = json_extract_string(args, "justification")?;
+        let authority = json_extract_string(args, "authority")?;
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let constellation_type = json_extract_string_opt(args, "constellation-type")
+            .unwrap_or_else(|| "entity_kyc_lifecycle".to_string());
+        let machine_name = json_extract_string_opt(args, "state-machine")
+            .unwrap_or_else(|| constellation_type.clone());
+        let expires_at = parse_optional_datetime(json_extract_string_opt(args, "expires-at"))?;
+        let conditions = json_extract_string_opt(args, "conditions");
+        let state_machine =
+            load_builtin_state_machine(&machine_name).map_err(|err| anyhow!(err.to_string()))?;
+        let result = handle_state_override(
+            pool,
+            cbu_id,
+            case_id,
+            &constellation_type,
+            &slot_path,
+            entity_id,
+            &override_state,
+            &justification,
+            &authority,
+            expires_at,
+            conditions.as_deref(),
+            &state_machine,
+        )
+        .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -401,6 +567,27 @@ impl CustomOperation for StateRevokeOverrideOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let override_id = json_extract_uuid(args, ctx, "override-id")?;
+        let revoked_by = json_extract_string_opt(args, "revoked-by")
+            .or_else(|| Some(ctx.principal.actor_id.clone()))
+            .unwrap_or_else(|| "dsl_executor".to_string());
+        let reason = json_extract_string(args, "reason")?;
+        handle_state_revoke_override(pool, override_id, &revoked_by, &reason).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "override_id": override_id,
+                "revoked": true,
+            }),
+        ))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -442,6 +629,23 @@ impl CustomOperation for StateListOverridesOp {
         let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
         let result = handle_state_list_overrides(pool, cbu_id).await?;
         Ok(ExecutionResult::RecordSet(
+            result
+                .into_iter()
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let result = handle_state_list_overrides(pool, cbu_id).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
             result
                 .into_iter()
                 .map(serde_json::to_value)

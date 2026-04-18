@@ -8,7 +8,7 @@
 //! Rationale: Requires semantic state derivation, DSL generation, and multi-step
 //! orchestration that cannot be expressed as simple CRUD operations.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use uuid::Uuid;

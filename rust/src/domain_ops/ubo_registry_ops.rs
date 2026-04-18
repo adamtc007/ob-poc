@@ -19,17 +19,17 @@
 //! - Waive requires authority and reason tracking
 //! - Current status must be validated before any transition
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::CustomOperation;
 use super::helpers::{
     extract_string, extract_string_opt, extract_uuid, json_extract_string, json_extract_string_opt,
     json_extract_uuid,
 };
+use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 

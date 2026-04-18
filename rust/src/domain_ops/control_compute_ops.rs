@@ -17,7 +17,7 @@
 //! - 3: SPECIAL_RIGHTS (veto, golden share)
 //! - 4: OFFICER (bridged from cbu_entity_roles)
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};

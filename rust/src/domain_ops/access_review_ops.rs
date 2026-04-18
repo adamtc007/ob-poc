@@ -12,7 +12,10 @@ use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde_json::json;
 
-use super::helpers::extract_uuid;
+use super::helpers::{
+    extract_uuid, json_extract_string, json_extract_string_list, json_extract_string_opt,
+    json_extract_uuid,
+};
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -164,6 +167,114 @@ impl CustomOperation for AccessReviewPopulateOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
+        let campaign = sqlx::query!(
+            r#"
+            SELECT scope_type, scope_filter
+            FROM "ob-poc".access_review_campaigns
+            WHERE campaign_id = $1
+            "#,
+            campaign_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Campaign not found"))?;
+        sqlx::query!(
+            r#"UPDATE "ob-poc".access_review_campaigns SET status = 'POPULATING' WHERE campaign_id = $1"#,
+            campaign_id
+        )
+        .execute(pool)
+        .await?;
+        let inserted = sqlx::query!(
+            r#"
+            INSERT INTO "ob-poc".access_review_items (
+                campaign_id, membership_id, user_id, team_id, role_key,
+                reviewer_user_id,
+                flag_no_legal_link, flag_dormant_account, flag_never_logged_in,
+                recommendation, risk_score, status
+            )
+            SELECT
+                $1,
+                m.membership_id,
+                m.user_id,
+                m.team_id,
+                m.role_key,
+                m.user_id,
+                (t.team_type IN ('board', 'investment-committee', 'conducting-officers')
+                    AND m.legal_appointment_id IS NULL),
+                (c.last_login_at IS NOT NULL AND c.last_login_at < CURRENT_DATE - 90),
+                (c.last_login_at IS NULL AND m.created_at < CURRENT_DATE - 30),
+                CASE
+                    WHEN c.last_login_at IS NOT NULL AND c.last_login_at < CURRENT_DATE - 90 THEN 'REVOKE'
+                    WHEN c.last_login_at IS NULL AND m.created_at < CURRENT_DATE - 30 THEN 'REVIEW'
+                    WHEN t.team_type IN ('board', 'investment-committee', 'conducting-officers')
+                         AND m.legal_appointment_id IS NULL THEN 'REVIEW'
+                    ELSE 'CONFIRM'
+                END,
+                CASE
+                    WHEN c.last_login_at IS NOT NULL AND c.last_login_at < CURRENT_DATE - 90 THEN 70
+                    WHEN t.team_type IN ('board', 'investment-committee', 'conducting-officers')
+                         AND m.legal_appointment_id IS NULL THEN 80
+                    WHEN c.last_login_at IS NULL AND m.created_at < CURRENT_DATE - 30 THEN 40
+                    ELSE 10
+                END,
+                'PENDING'
+            FROM "ob-poc".memberships m
+            JOIN "ob-poc".teams t ON m.team_id = t.team_id
+            JOIN "ob-poc".clients c ON m.user_id = c.client_id
+            WHERE m.effective_to IS NULL
+              AND t.is_active = true
+              AND (
+                $2 = 'ALL'
+                OR ($2 = 'GOVERNANCE_ONLY'
+                    AND t.team_type IN ('board', 'investment-committee', 'conducting-officers', 'executive'))
+              )
+            ON CONFLICT DO NOTHING
+            "#,
+            campaign_id,
+            campaign.scope_type
+        )
+        .execute(pool)
+        .await?;
+        let total_items = inserted.rows_affected() as i32;
+        let flagged: i64 = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) as "count!"
+            FROM "ob-poc".access_review_items
+            WHERE campaign_id = $1
+              AND (flag_no_legal_link = true OR flag_dormant_account = true OR flag_never_logged_in = true)
+            "#,
+            campaign_id
+        )
+        .fetch_one(pool)
+        .await?;
+        sqlx::query!(
+            r#"
+            UPDATE "ob-poc".access_review_campaigns
+            SET total_items = $2, pending_items = $2, status = 'READY'
+            WHERE campaign_id = $1
+            "#,
+            campaign_id,
+            total_items
+        )
+        .execute(pool)
+        .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "campaign_id": campaign_id,
+                "total_items": total_items,
+                "flagged_items": flagged
+            }),
+        ))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -225,6 +336,40 @@ impl CustomOperation for AccessReviewLaunchOp {
                 "total_items": row.total_items,
                 "status": "ACTIVE"
             }))),
+            None => Err(anyhow::anyhow!(
+                "Campaign not found or not in launchable state"
+            )),
+        }
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
+        let result = sqlx::query!(
+            r#"
+            UPDATE "ob-poc".access_review_campaigns
+            SET status = 'ACTIVE', launched_at = NOW()
+            WHERE campaign_id = $1 AND status IN ('DRAFT', 'READY')
+            RETURNING name, total_items
+            "#,
+            campaign_id
+        )
+        .fetch_optional(pool)
+        .await?;
+        match result {
+            Some(row) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                json!({
+                    "campaign_id": campaign_id,
+                    "name": row.name,
+                    "total_items": row.total_items,
+                    "status": "ACTIVE"
+                }),
+            )),
             None => Err(anyhow::anyhow!(
                 "Campaign not found or not in launchable state"
             )),
@@ -348,6 +493,70 @@ impl CustomOperation for AccessReviewRevokeOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let item_id = json_extract_uuid(args, ctx, "item")?;
+        let reason = json_extract_string(args, "reason")?;
+        let mut tx = pool.begin().await?;
+        let item = sqlx::query!(
+            r#"
+            SELECT membership_id, campaign_id
+            FROM "ob-poc".access_review_items
+            WHERE item_id = $1
+            "#,
+            item_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Review item not found"))?;
+        sqlx::query!(
+            r#"
+            UPDATE "ob-poc".memberships
+            SET effective_to = CURRENT_DATE
+            WHERE membership_id = $1
+            "#,
+            item.membership_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            r#"
+            UPDATE "ob-poc".access_review_items
+            SET status = 'REVOKED', reviewed_at = NOW(), reviewer_notes = $2
+            WHERE item_id = $1
+            "#,
+            item_id,
+            reason
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            r#"
+            UPDATE "ob-poc".access_review_campaigns
+            SET revoked_items = COALESCE(revoked_items, 0) + 1,
+                reviewed_items = COALESCE(reviewed_items, 0) + 1,
+                pending_items = GREATEST(COALESCE(pending_items, 0) - 1, 0)
+            WHERE campaign_id = $1
+            "#,
+            item.campaign_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "item_id": item_id,
+                "membership_id": item.membership_id,
+                "status": "REVOKED"
+            }),
+        ))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -461,6 +670,58 @@ impl CustomOperation for AccessReviewBulkConfirmOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let item_ids: Vec<uuid::Uuid> = json_extract_string_list(args, "items")?
+            .into_iter()
+            .map(|s| s.parse())
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        if item_ids.is_empty() {
+            return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                json!({"confirmed": 0}),
+            ));
+        }
+        let notes = json_extract_string_opt(args, "notes");
+        let mut tx = pool.begin().await?;
+        let updated = sqlx::query!(
+            r#"
+            UPDATE "ob-poc".access_review_items
+            SET status = 'CONFIRMED', reviewed_at = NOW(), reviewer_notes = $2
+            WHERE item_id = ANY($1) AND status = 'PENDING'
+            RETURNING campaign_id
+            "#,
+            &item_ids,
+            notes
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        let confirmed_count = updated.len() as i32;
+        if let Some(first) = updated.first() {
+            sqlx::query!(
+                r#"
+                UPDATE "ob-poc".access_review_campaigns
+                SET confirmed_items = COALESCE(confirmed_items, 0) + $2,
+                    reviewed_items = COALESCE(reviewed_items, 0) + $2,
+                    pending_items = GREATEST(COALESCE(pending_items, 0) - $2, 0)
+                WHERE campaign_id = $1
+                "#,
+                first.campaign_id,
+                confirmed_count
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({"confirmed": confirmed_count}),
+        ))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -554,6 +815,61 @@ impl CustomOperation for AccessReviewConfirmCleanOp {
             "confirmed": confirmed,
             "remaining": remaining
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
+        let mut tx = pool.begin().await?;
+        let result = sqlx::query!(
+            r#"
+            UPDATE "ob-poc".access_review_items
+            SET status = 'CONFIRMED', reviewed_at = NOW(),
+                reviewer_notes = 'Auto-confirmed: no issues detected'
+            WHERE campaign_id = $1
+              AND status = 'PENDING'
+              AND flag_no_legal_link = false
+              AND flag_dormant_account = false
+              AND flag_never_logged_in = false
+              AND risk_score < 40
+            "#,
+            campaign_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        let confirmed = result.rows_affected() as i32;
+        sqlx::query!(
+            r#"
+            UPDATE "ob-poc".access_review_campaigns
+            SET confirmed_items = COALESCE(confirmed_items, 0) + $2,
+                reviewed_items = COALESCE(reviewed_items, 0) + $2,
+                pending_items = GREATEST(COALESCE(pending_items, 0) - $2, 0)
+            WHERE campaign_id = $1
+            "#,
+            campaign_id,
+            confirmed
+        )
+        .execute(&mut *tx)
+        .await?;
+        let remaining: i64 = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) as "count!" FROM "ob-poc".access_review_items
+               WHERE campaign_id = $1 AND status = 'PENDING'"#,
+            campaign_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "confirmed": confirmed,
+                "remaining": remaining
+            }),
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -668,6 +984,61 @@ impl CustomOperation for AccessReviewAttestOp {
         .await?;
 
         Ok(ExecutionResult::Uuid(attestation_id))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        use chrono::Utc;
+        use std::hash::{Hash, Hasher};
+
+        let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
+        let scope = json_extract_string(args, "scope")?;
+        let attestation_text = json_extract_string_opt(args, "attestation-text")
+            .unwrap_or_else(|| DEFAULT_ATTESTATION_TEXT.to_string());
+        let item_ids: Vec<uuid::Uuid> = sqlx::query_scalar!(
+            r#"SELECT item_id FROM "ob-poc".access_review_items
+               WHERE campaign_id = $1 AND status != 'PENDING'"#,
+            campaign_id
+        )
+        .fetch_all(pool)
+        .await?;
+        let items_count = item_ids.len() as i32;
+        let timestamp = Utc::now();
+        let signature_input = format!(
+            "campaign:{}|items:{}|text:{}|time:{}",
+            campaign_id, items_count, attestation_text, timestamp
+        );
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        signature_input.hash(&mut hasher);
+        let signature_hash = format!("{:016x}", hasher.finish());
+        let attestation_id: uuid::Uuid = sqlx::query_scalar!(
+            r#"
+            INSERT INTO "ob-poc".access_attestations (
+                campaign_id, attester_user_id, attester_name, attester_email,
+                attestation_scope, items_count,
+                attestation_text, attested_at, signature_hash
+            )
+            VALUES ($1, '00000000-0000-0000-0000-000000000000'::uuid, 'System', 'system@local',
+                    $2, $3, $4, $5, $6)
+            RETURNING attestation_id
+            "#,
+            campaign_id,
+            scope,
+            items_count,
+            attestation_text,
+            timestamp,
+            signature_hash
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            attestation_id,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -807,6 +1178,90 @@ impl CustomOperation for AccessReviewProcessDeadlineOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
+        let action = json_extract_string(args, "action")?;
+        let mut tx = pool.begin().await?;
+        let affected: i64 = match action.as_str() {
+            "suspend" => {
+                sqlx::query!(
+                    r#"
+                    UPDATE "ob-poc".memberships m
+                    SET effective_to = CURRENT_DATE
+                    FROM "ob-poc".access_review_items i
+                    WHERE i.membership_id = m.membership_id
+                      AND i.campaign_id = $1
+                      AND i.status = 'PENDING'
+                    "#,
+                    campaign_id
+                )
+                .execute(&mut *tx)
+                .await?;
+                let result = sqlx::query!(
+                    r#"
+                    UPDATE "ob-poc".access_review_items
+                    SET status = 'AUTO_SUSPENDED', reviewed_at = NOW(),
+                        reviewer_notes = 'Auto-suspended: unreviewed past deadline'
+                    WHERE campaign_id = $1 AND status = 'PENDING'
+                    "#,
+                    campaign_id
+                )
+                .execute(&mut *tx)
+                .await?;
+                result.rows_affected() as i64
+            }
+            "escalate" => {
+                let result = sqlx::query!(
+                    r#"
+                    UPDATE "ob-poc".access_review_items
+                    SET status = 'ESCALATED', escalated_at = NOW(),
+                        reviewer_notes = 'Escalated: unreviewed past deadline'
+                    WHERE campaign_id = $1 AND status = 'PENDING'
+                    "#,
+                    campaign_id
+                )
+                .execute(&mut *tx)
+                .await?;
+                result.rows_affected() as i64
+            }
+            "report-only" => {
+                sqlx::query_scalar!(
+                    r#"SELECT COUNT(*) as "count!" FROM "ob-poc".access_review_items
+                       WHERE campaign_id = $1 AND status = 'PENDING'"#,
+                    campaign_id
+                )
+                .fetch_one(&mut *tx)
+                .await?
+            }
+            _ => return Err(anyhow::anyhow!("Invalid action: {}", action)),
+        };
+        if action != "report-only" {
+            sqlx::query!(
+                r#"
+                UPDATE "ob-poc".access_review_campaigns
+                SET status = 'COMPLETED', completed_at = NOW()
+                WHERE campaign_id = $1
+                "#,
+                campaign_id
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "action": action,
+                "affected": affected
+            }),
+        ))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -864,6 +1319,32 @@ impl CustomOperation for AccessReviewSendRemindersOp {
             "campaign_id": campaign_id,
             "reviewers_to_notify": pending_count
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
+        let pending_count: i64 = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(DISTINCT reviewer_user_id) as "count!"
+            FROM "ob-poc".access_review_items
+            WHERE campaign_id = $1 AND status = 'PENDING'
+            "#,
+            campaign_id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            json!({
+                "campaign_id": campaign_id,
+                "reviewers_to_notify": pending_count
+            }),
+        ))
     }
 
     #[cfg(not(feature = "database"))]

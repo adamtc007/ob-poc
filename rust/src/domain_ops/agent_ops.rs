@@ -22,6 +22,23 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+#[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
+        op.domain(),
+        op.verb(),
+        args,
+    );
+    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
 // chrono is used for teaching status timestamps
 #[allow(unused_imports)]
 use chrono;
@@ -209,6 +226,16 @@ impl CustomOperation for AgentStartOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -254,6 +281,16 @@ impl CustomOperation for AgentPauseOp {
         ctx.set_pending_agent_pause();
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -303,6 +340,16 @@ impl CustomOperation for AgentResumeOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -348,6 +395,16 @@ impl CustomOperation for AgentStopOp {
         ctx.set_pending_agent_stop();
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -421,6 +478,16 @@ impl CustomOperation for AgentConfirmOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -486,6 +553,16 @@ impl CustomOperation for AgentRejectOp {
         ctx.set_pending_checkpoint_response(checkpoint_id, "reject", 0);
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -554,6 +631,16 @@ impl CustomOperation for AgentSelectOp {
         ctx.set_pending_checkpoint_response(checkpoint_id, "select", candidate_index);
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -689,7 +776,6 @@ impl CustomOperation for AgentStatusOp {
             agent_status_impl(session_id, pool).await?,
         ))
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -830,7 +916,6 @@ impl CustomOperation for AgentHistoryOp {
             agent_history_impl(session_id, limit, pool).await?,
         ))
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -903,6 +988,16 @@ impl CustomOperation for AgentSetThresholdOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -964,6 +1059,16 @@ impl CustomOperation for AgentSetModeOp {
             "mode": mode,
             "message": format!("Mode set to {}", mode)
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -1051,6 +1156,16 @@ impl CustomOperation for AgentSetAuthoringModeOp {
             "allows_full_introspect": mode.allows_full_introspect(),
             "message": format!("Authoring mode set to {}", mode)
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -1169,7 +1284,6 @@ impl CustomOperation for AgentTeachOp {
         };
         Ok(sem_os_core::execution::VerbExecutionOutcome::Record(val))
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1278,7 +1392,6 @@ impl CustomOperation for AgentUnteachOp {
             }),
         ))
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1457,7 +1570,6 @@ impl CustomOperation for AgentTeachingStatusOp {
             }),
         ))
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1519,6 +1631,16 @@ impl CustomOperation for AgentGetModeOp {
             "allows_business_verbs": parsed.allows_business_verbs(),
             "message": format!("Current agent mode: {}", parsed)
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -1610,7 +1732,6 @@ impl CustomOperation for AgentGetPolicyOp {
             }),
         ))
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1715,7 +1836,6 @@ impl CustomOperation for AgentListToolsOp {
                 .collect(),
         ))
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -2015,7 +2135,6 @@ impl CustomOperation for AgentTelemetrySummaryOp {
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -2218,7 +2337,6 @@ impl CustomOperation for AgentLearnOp {
             }),
         ))
     }
-
     fn is_migrated(&self) -> bool {
         true
     }

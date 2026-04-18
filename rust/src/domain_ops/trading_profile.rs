@@ -33,6 +33,23 @@ use ob_poc_types::trading_matrix::{
 #[cfg(feature = "database")]
 use sqlx::{PgPool, Row};
 
+#[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
+        op.domain(),
+        op.verb(),
+        args,
+    );
+    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
 fn forward_component_verb_call(verb_call: &VerbCall, verb: &str) -> VerbCall {
     let arguments = verb_call
         .arguments
@@ -219,6 +236,16 @@ impl CustomOperation for TradingProfileImportOp {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -296,6 +323,16 @@ impl CustomOperation for TradingProfileGetActiveOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -397,6 +434,16 @@ impl CustomOperation for TradingProfileActivateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -699,6 +746,16 @@ impl CustomOperation for TradingProfileMaterializeOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -1477,6 +1534,16 @@ impl CustomOperation for TradingProfileCreateDraftOp {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1622,6 +1689,16 @@ impl CustomOperation for TradingProfileAddComponentOp {
         }
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1749,6 +1826,16 @@ impl CustomOperation for TradingProfileRemoveComponentOp {
         }
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1845,6 +1932,16 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
         Ok(ExecutionResult::Record(json!({})))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1919,6 +2016,16 @@ impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -2049,6 +2156,16 @@ impl CustomOperation for TradingProfileAddMarketOp {
         Ok(ExecutionResult::Record(json!({})))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -2134,6 +2251,16 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -2274,6 +2401,16 @@ impl CustomOperation for TradingProfileAddSsiOp {
         Ok(ExecutionResult::Record(json!({})))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -2348,6 +2485,16 @@ impl CustomOperation for TradingProfileRemoveSsiOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -2492,6 +2639,16 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
         Ok(ExecutionResult::Record(json!({})))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -2577,6 +2734,16 @@ impl CustomOperation for TradingProfileRemoveBookingRuleOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -2700,6 +2867,16 @@ impl CustomOperation for TradingProfileAddIsdaConfigOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -2805,6 +2982,16 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -2930,6 +3117,16 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -3086,6 +3283,16 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -3186,6 +3393,16 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -3264,6 +3481,16 @@ impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -3353,6 +3580,16 @@ impl CustomOperation for TradingProfileRemoveCsaConfigOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -3545,6 +3782,16 @@ impl CustomOperation for TradingProfileAddImMandateOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -3657,6 +3904,16 @@ impl CustomOperation for TradingProfileUpdateImScopeOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -3731,6 +3988,16 @@ impl CustomOperation for TradingProfileRemoveImMandateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -3817,6 +4084,16 @@ impl CustomOperation for TradingProfileSetBaseCurrencyOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -3896,6 +4173,16 @@ impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -3960,6 +4247,16 @@ impl CustomOperation for TradingProfileDiffOp {
         Ok(ExecutionResult::Affected(0))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -4020,6 +4317,16 @@ impl CustomOperation for TradingProfileValidateCoverageOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -4073,6 +4380,16 @@ impl CustomOperation for TradingProfileValidateGoLiveReadyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"is_ready": true})))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -4147,6 +4464,16 @@ impl CustomOperation for TradingProfileSubmitOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "submitted"})))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -4276,6 +4603,16 @@ impl CustomOperation for TradingProfileApproveOp {
         Ok(ExecutionResult::Record(json!({"status": "approved"})))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -4348,6 +4685,16 @@ impl CustomOperation for TradingProfileRejectOp {
         Ok(ExecutionResult::Record(json!({"status": "rejected"})))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -4416,6 +4763,16 @@ impl CustomOperation for TradingProfileArchiveOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "archived"})))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -4524,6 +4881,16 @@ impl CustomOperation for TradingProfileCloneToOp {
         Ok(ExecutionResult::Record(json!({"status": "cloned"})))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -4603,6 +4970,16 @@ impl CustomOperation for TradingProfileCreateNewVersionOp {
         Ok(ExecutionResult::Record(
             json!({"status": "new_version_created"}),
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {

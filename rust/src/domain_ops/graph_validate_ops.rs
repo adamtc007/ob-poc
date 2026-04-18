@@ -11,7 +11,7 @@
 //! The op queries `entity_relationships` from the database, runs all validation checks,
 //! and persists any anomalies found into `"ob-poc".research_anomalies`.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};

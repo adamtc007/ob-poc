@@ -215,16 +215,12 @@ impl CustomOperation for DealCreateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_name = json_extract_string(args, "deal-name")?;
         let primary_client_group_id = json_extract_uuid(args, ctx, "primary-client-group-id")?;
         let deal_reference = json_extract_string_opt(args, "deal-reference");
         let sales_owner = json_extract_string_opt(args, "sales-owner");
         let sales_team = json_extract_string_opt(args, "sales-team");
-        let estimated_revenue: Option<f64> = args
-            .get("estimated-revenue")
-            .and_then(|v| v.as_f64())
-            ;
+        let estimated_revenue: Option<f64> = args.get("estimated-revenue").and_then(|v| v.as_f64());
         let currency_code = json_extract_string_opt(args, "currency-code").unwrap_or("USD".into());
         let notes = json_extract_string_opt(args, "notes");
 
@@ -268,7 +264,6 @@ impl CustomOperation for DealCreateOp {
             deal_status: "PROSPECT".to_string(),
         };
         Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(deal_id))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -347,7 +342,6 @@ impl CustomOperation for DealSearchOp {
         _ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let query = json_extract_string(args, "query")?;
         let pattern = format!("%{}%", query);
 
@@ -377,8 +371,9 @@ impl CustomOperation for DealSearchOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(results))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            results,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -457,14 +452,10 @@ impl CustomOperation for DealUpdateOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let deal_name = json_extract_string_opt(args, "deal-name");
         let sales_owner = json_extract_string_opt(args, "sales-owner");
-        let estimated_revenue: Option<f64> = args
-            .get("estimated-revenue")
-            .and_then(|v| v.as_f64())
-            ;
+        let estimated_revenue: Option<f64> = args.get("estimated-revenue").and_then(|v| v.as_f64());
         let notes = json_extract_string_opt(args, "notes");
 
         let result = sqlx::query(
@@ -487,8 +478,9 @@ impl CustomOperation for DealUpdateOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(result.rows_affected()))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -613,7 +605,6 @@ impl CustomOperation for DealUpdateStatusOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let new_status = json_extract_string(args, "new-status")?;
 
@@ -689,8 +680,9 @@ impl CustomOperation for DealUpdateStatusOp {
             old_status: current_status,
             new_status,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -783,7 +775,6 @@ impl CustomOperation for DealCancelOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let reason = json_extract_string(args, "reason")?;
 
@@ -828,7 +819,6 @@ impl CustomOperation for DealCancelOp {
         .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -919,7 +909,6 @@ impl CustomOperation for DealAddParticipantOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let participant_role = json_extract_string_opt(args, "participant-role")
@@ -958,7 +947,6 @@ impl CustomOperation for DealAddParticipantOp {
         .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -1031,7 +1019,6 @@ impl CustomOperation for DealRemoveParticipantOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let participant_role = json_extract_string_opt(args, "participant-role");
@@ -1055,8 +1042,9 @@ impl CustomOperation for DealRemoveParticipantOp {
             .await?
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(result.rows_affected()))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1152,7 +1140,6 @@ impl CustomOperation for DealAddContractOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
         let contract_role =
@@ -1196,7 +1183,6 @@ impl CustomOperation for DealAddContractOp {
         .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -1273,7 +1259,6 @@ impl CustomOperation for DealRemoveContractOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
 
@@ -1301,8 +1286,9 @@ impl CustomOperation for DealRemoveContractOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(result.rows_affected()))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1404,15 +1390,12 @@ impl CustomOperation for DealAddProductOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let product_id = json_extract_uuid(args, ctx, "product-id")?;
         let product_status = json_extract_string_opt(args, "product-status")
             .unwrap_or_else(|| "PROPOSED".to_string());
-        let indicative_revenue: Option<f64> = args
-            .get("indicative-revenue")
-            .and_then(|v| v.as_f64())
-            ;
+        let indicative_revenue: Option<f64> =
+            args.get("indicative-revenue").and_then(|v| v.as_f64());
         let currency_code =
             json_extract_string_opt(args, "currency-code").unwrap_or_else(|| "USD".to_string());
         let notes = json_extract_string_opt(args, "notes");
@@ -1453,8 +1436,9 @@ impl CustomOperation for DealAddProductOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(deal_product_id.0))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            deal_product_id.0,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1550,7 +1534,6 @@ impl CustomOperation for DealUpdateProductStatusOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let product_id = json_extract_uuid(args, ctx, "product-id")?;
         let product_status = json_extract_string(args, "product-status")?;
@@ -1597,8 +1580,9 @@ impl CustomOperation for DealUpdateProductStatusOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(result.rows_affected()))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1675,7 +1659,6 @@ impl CustomOperation for DealRemoveProductOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let product_id = json_extract_uuid(args, ctx, "product-id")?;
 
@@ -1703,8 +1686,9 @@ impl CustomOperation for DealRemoveProductOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(result.rows_affected()))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1806,7 +1790,6 @@ impl CustomOperation for DealCreateRateCardOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
         let product_id = json_extract_uuid(args, ctx, "product-id")?;
@@ -1855,8 +1838,9 @@ impl CustomOperation for DealCreateRateCardOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(rate_card_id))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            rate_card_id,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1968,29 +1952,17 @@ impl CustomOperation for DealAddRateCardLineOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let rate_card_id = json_extract_uuid(args, ctx, "rate-card-id")?;
         let fee_type = json_extract_string(args, "fee-type")?;
         let fee_subtype =
             json_extract_string_opt(args, "fee-subtype").unwrap_or_else(|| "DEFAULT".to_string());
         let pricing_model = json_extract_string(args, "pricing-model")?;
-        let rate_value: Option<f64> = args
-            .get("rate-value")
-            .and_then(|v| v.as_f64())
-            ;
-        let minimum_fee: Option<f64> = args
-            .get("minimum-fee")
-            .and_then(|v| v.as_f64())
-            ;
-        let maximum_fee: Option<f64> = args
-            .get("maximum-fee")
-            .and_then(|v| v.as_f64())
-            ;
+        let rate_value: Option<f64> = args.get("rate-value").and_then(|v| v.as_f64());
+        let minimum_fee: Option<f64> = args.get("minimum-fee").and_then(|v| v.as_f64());
+        let maximum_fee: Option<f64> = args.get("maximum-fee").and_then(|v| v.as_f64());
         let currency_code =
             json_extract_string_opt(args, "currency-code").unwrap_or_else(|| "USD".to_string());
-        let tier_brackets = args
-            .get("tier-brackets")
-            .and_then(|v| Some(v.clone()));
+        let tier_brackets = args.get("tier-brackets").and_then(|v| Some(v.clone()));
         let fee_basis = json_extract_string_opt(args, "fee-basis");
         let description = json_extract_string_opt(args, "description");
 
@@ -2032,7 +2004,6 @@ impl CustomOperation for DealAddRateCardLineOp {
         .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(line_id))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -2135,23 +2106,11 @@ impl CustomOperation for DealUpdateRateCardLineOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let line_id = json_extract_uuid(args, ctx, "line-id")?;
-        let rate_value: Option<f64> = args
-            .get("rate-value")
-            .and_then(|v| v.as_f64())
-            ;
-        let minimum_fee: Option<f64> = args
-            .get("minimum-fee")
-            .and_then(|v| v.as_f64())
-            ;
-        let maximum_fee: Option<f64> = args
-            .get("maximum-fee")
-            .and_then(|v| v.as_f64())
-            ;
-        let tier_brackets = args
-            .get("tier-brackets")
-            .and_then(|v| Some(v.clone()));
+        let rate_value: Option<f64> = args.get("rate-value").and_then(|v| v.as_f64());
+        let minimum_fee: Option<f64> = args.get("minimum-fee").and_then(|v| v.as_f64());
+        let maximum_fee: Option<f64> = args.get("maximum-fee").and_then(|v| v.as_f64());
+        let tier_brackets = args.get("tier-brackets").and_then(|v| Some(v.clone()));
 
         // Validate rate card is not AGREED
         let status: String = sqlx::query_scalar(
@@ -2189,8 +2148,9 @@ impl CustomOperation for DealUpdateRateCardLineOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(result.rows_affected()))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2262,7 +2222,6 @@ impl CustomOperation for DealRemoveRateCardLineOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let line_id = json_extract_uuid(args, ctx, "line-id")?;
 
         // Check for dependent billing targets
@@ -2285,8 +2244,9 @@ impl CustomOperation for DealRemoveRateCardLineOp {
             .execute(pool)
             .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(result.rows_affected()))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2382,7 +2342,6 @@ impl CustomOperation for DealProposeRateCardOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let rate_card_id = json_extract_uuid(args, ctx, "rate-card-id")?;
 
         // Validate at least one line exists
@@ -2430,7 +2389,6 @@ impl CustomOperation for DealProposeRateCardOp {
         .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -2551,7 +2509,6 @@ impl CustomOperation for DealCounterRateCardOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let rate_card_id = json_extract_uuid(args, ctx, "rate-card-id")?;
         // counter-lines would be JSON array of {line_id, proposed_rate, proposed_minimum, proposed_maximum}
         // For simplicity, we create a clone and let caller update lines separately
@@ -2623,8 +2580,9 @@ impl CustomOperation for DealCounterRateCardOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(new_rate_card_id))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            new_rate_card_id,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2711,7 +2669,6 @@ impl CustomOperation for DealAgreeRateCardOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let rate_card_id = json_extract_uuid(args, ctx, "rate-card-id")?;
 
         // Validate status
@@ -2750,7 +2707,6 @@ impl CustomOperation for DealAgreeRateCardOp {
         .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -2859,7 +2815,6 @@ impl CustomOperation for DealAddSlaOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid_opt(args, ctx, "contract-id");
         let product_id = json_extract_uuid_opt(args, ctx, "product-id");
@@ -2870,10 +2825,7 @@ impl CustomOperation for DealAddSlaOp {
         let target_value = json_extract_string(args, "target-value")?;
         let measurement_unit = json_extract_string_opt(args, "measurement-unit");
         let penalty_type = json_extract_string_opt(args, "penalty-type");
-        let penalty_value: Option<f64> = args
-            .get("penalty-value")
-            .and_then(|v| v.as_f64())
-            ;
+        let penalty_value: Option<f64> = args.get("penalty-value").and_then(|v| v.as_f64());
         let effective_from = json_extract_string(args, "effective-from")?;
 
         let sla_id: Uuid = sqlx::query_scalar(
@@ -2916,7 +2868,6 @@ impl CustomOperation for DealAddSlaOp {
         .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(sla_id))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -2990,7 +2941,6 @@ impl CustomOperation for DealAddDocumentOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
         let document_type = json_extract_string(args, "document-type")?;
@@ -3012,7 +2962,6 @@ impl CustomOperation for DealAddDocumentOp {
         .await?;
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -3075,7 +3024,6 @@ impl CustomOperation for DealUpdateDocumentStatusOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
         let document_status = json_extract_string(args, "document-status")?;
@@ -3089,8 +3037,9 @@ impl CustomOperation for DealUpdateDocumentStatusOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(result.rows_affected()))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3161,7 +3110,6 @@ impl CustomOperation for DealAddUboAssessmentOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let kyc_case_id = json_extract_uuid_opt(args, ctx, "kyc-case-id");
@@ -3179,8 +3127,9 @@ impl CustomOperation for DealAddUboAssessmentOp {
         .fetch_one(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(assessment_id))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            assessment_id,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3251,7 +3200,6 @@ impl CustomOperation for DealUpdateUboAssessmentOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let assessment_id = json_extract_uuid(args, ctx, "assessment-id")?;
         let assessment_status = json_extract_string_opt(args, "assessment-status");
         let risk_rating = json_extract_string_opt(args, "risk-rating");
@@ -3273,8 +3221,9 @@ impl CustomOperation for DealUpdateUboAssessmentOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(result.rows_affected()))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+            result.rows_affected(),
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3419,7 +3368,6 @@ impl CustomOperation for DealRequestOnboardingOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -3511,8 +3459,9 @@ impl CustomOperation for DealRequestOnboardingOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(request_id))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            request_id,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3673,7 +3622,6 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
         let requires_kyc = json_extract_bool_opt(args, "requires-kyc").unwrap_or(true);
@@ -3714,10 +3662,8 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
             .get("requests")
             .ok_or_else(|| anyhow!("requests argument is required"))?;
 
-        let requests: Vec<serde_json::Value> = serde_json::from_value(
-            requests_arg.clone(),
-        )
-        .unwrap_or_default();
+        let requests: Vec<serde_json::Value> =
+            serde_json::from_value(requests_arg.clone()).unwrap_or_default();
 
         let mut request_ids = Vec::new();
 
@@ -3785,8 +3731,9 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
             count: request_ids.len() as i32,
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3900,7 +3847,6 @@ impl CustomOperation for DealUpdateOnboardingStatusOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let request_id = json_extract_uuid(args, ctx, "request-id")?;
         let request_status = json_extract_string(args, "request-status")?;
         let kyc_case_id = json_extract_uuid_opt(args, ctx, "kyc-case-id");
@@ -3966,7 +3912,6 @@ impl CustomOperation for DealUpdateOnboardingStatusOp {
         }
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
-    
     }
 
     fn is_migrated(&self) -> bool {
@@ -4098,7 +4043,6 @@ impl CustomOperation for DealSummaryOp {
         ctx: &mut sem_os_core::execution::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
 
         // Get deal
@@ -4178,7 +4122,6 @@ impl CustomOperation for DealSummaryOp {
         });
 
         Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
-    
     }
 
     fn is_migrated(&self) -> bool {

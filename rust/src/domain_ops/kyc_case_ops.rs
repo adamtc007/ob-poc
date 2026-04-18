@@ -22,7 +22,10 @@ use crate::ontology::{
     is_valid_transition as lifecycle_is_valid_transition, ontology,
 };
 
-use super::helpers::{extract_string, extract_string_opt, extract_uuid, extract_uuid_opt};
+use super::helpers::{
+    extract_string, extract_string_opt, extract_uuid, extract_uuid_opt, json_extract_string_opt,
+    json_extract_uuid, json_extract_uuid_opt,
+};
 use super::CustomOperation;
 
 // ============================================================================
@@ -180,6 +183,85 @@ impl CustomOperation for KycCaseCreateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let deal_id = json_extract_uuid_opt(args, ctx, "deal-id");
+        let mut client_group_id = json_extract_uuid_opt(args, ctx, "client-group-id");
+        let case_type =
+            json_extract_string_opt(args, "case-type").unwrap_or_else(|| "NEW_CLIENT".to_string());
+        let sla_deadline: Option<String> = json_extract_string_opt(args, "sla-deadline");
+        let assigned_analyst_id = json_extract_uuid_opt(args, ctx, "assigned-analyst-id");
+        let notes = json_extract_string_opt(args, "notes");
+
+        if let Some(did) = deal_id {
+            let row: Option<(String, Uuid)> = sqlx::query_as(
+                r#"SELECT deal_status, primary_client_group_id
+                   FROM "ob-poc".deals
+                   WHERE deal_id = $1"#,
+            )
+            .bind(did)
+            .fetch_optional(pool)
+            .await?;
+
+            let (deal_status, deal_client_group_id) =
+                row.ok_or_else(|| anyhow!("Deal not found: {}", did))?;
+
+            if !KYC_ELIGIBLE_DEAL_STATUSES.contains(&deal_status.as_str()) {
+                return Err(anyhow!(
+                    "Deal {} is in status '{}', but KYC case creation requires one of: {}",
+                    did,
+                    deal_status,
+                    KYC_ELIGIBLE_DEAL_STATUSES.join(", ")
+                ));
+            }
+
+            if client_group_id.is_none() {
+                client_group_id = Some(deal_client_group_id);
+            }
+        }
+
+        let case_id = Uuid::new_v4();
+
+        let case_ref: String = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".cases (
+                   case_id, cbu_id, case_type, sla_deadline,
+                   assigned_analyst_id, notes, deal_id, client_group_id
+               )
+               VALUES ($1, $2, $3, $4::timestamptz, $5, $6, $7, $8)
+               RETURNING case_ref"#,
+        )
+        .bind(case_id)
+        .bind(cbu_id)
+        .bind(&case_type)
+        .bind(&sla_deadline)
+        .bind(assigned_analyst_id)
+        .bind(&notes)
+        .bind(deal_id)
+        .bind(client_group_id)
+        .fetch_one(pool)
+        .await?;
+
+        let result = KycCaseCreateResult {
+            case_id,
+            case_ref,
+            cbu_id,
+            deal_id,
+            client_group_id,
+            case_type,
+            status: "INTAKE".to_string(),
+        };
+
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     fn is_migrated(&self) -> bool {

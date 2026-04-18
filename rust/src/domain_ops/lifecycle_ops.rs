@@ -15,6 +15,21 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+#[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    use crate::sem_os_runtime::verb_executor_adapter;
+
+    let vc = verb_executor_adapter::build_verb_call_pub(op.domain(), op.verb(), args);
+    let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
 // ============================================================================
 // PROVISION OPERATION
 // ============================================================================
@@ -264,6 +279,16 @@ impl CustomOperation for LifecycleProvisionOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -378,6 +403,16 @@ impl CustomOperation for LifecycleAnalyzeGapsOp {
             .collect();
 
         Ok(ExecutionResult::RecordSet(result))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -497,6 +532,16 @@ impl CustomOperation for LifecycleCheckReadinessOp {
             "blocking_gaps": blocking_gaps,
             "warnings": warnings
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -621,6 +666,16 @@ impl CustomOperation for LifecycleDiscoverOp {
             "mandatory_lifecycles": mandatory,
             "optional_lifecycles": optional
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -796,6 +851,16 @@ impl CustomOperation for LifecycleGeneratePlanOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -904,6 +969,16 @@ impl CustomOperation for LifecycleExecutePlanOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -995,6 +1070,16 @@ impl CustomOperation for ServiceResourceProvisionLifecycleOp {
         LifecycleProvisionOp.execute(verb_call, ctx, pool).await
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        LifecycleProvisionOp.execute_json(args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1033,6 +1118,16 @@ impl CustomOperation for ServiceResourceAnalyzeLifecycleGapsOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         LifecycleAnalyzeGapsOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        LifecycleAnalyzeGapsOp.execute_json(args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -1077,6 +1172,18 @@ impl CustomOperation for ServiceResourceCheckLifecycleReadinessOp {
             .await
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        LifecycleCheckReadinessOp
+            .execute_json(args, ctx, pool)
+            .await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1115,6 +1222,16 @@ impl CustomOperation for ServiceResourceDiscoverLifecyclesOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         LifecycleDiscoverOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        LifecycleDiscoverOp.execute_json(args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -1157,6 +1274,16 @@ impl CustomOperation for ServiceResourceGenerateLifecyclePlanOp {
         LifecycleGeneratePlanOp.execute(verb_call, ctx, pool).await
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        LifecycleGeneratePlanOp.execute_json(args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1195,6 +1322,16 @@ impl CustomOperation for ServiceResourceExecuteLifecyclePlanOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         LifecycleExecutePlanOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        LifecycleExecutePlanOp.execute_json(args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]

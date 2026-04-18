@@ -39,6 +39,23 @@ use crate::session::UnifiedSession;
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+#[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
+        op.domain(),
+        op.verb(),
+        args,
+    );
+    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
 // =============================================================================
 // RESULT TYPES
 // =============================================================================
@@ -261,6 +278,16 @@ impl CustomOperation for SessionStartOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -344,6 +371,16 @@ impl CustomOperation for SessionLoadUniverseOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -407,6 +444,16 @@ impl CustomOperation for SessionLoadGalaxyOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -583,6 +630,16 @@ impl CustomOperation for SessionLoadClusterOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -654,6 +711,16 @@ impl CustomOperation for SessionLoadSystemOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -719,6 +786,16 @@ impl CustomOperation for SessionUnloadSystemOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -805,6 +882,16 @@ impl CustomOperation for SessionFilterJurisdictionOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -855,6 +942,16 @@ impl CustomOperation for SessionClearOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -914,6 +1011,16 @@ impl CustomOperation for SessionUndoOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -969,6 +1076,16 @@ impl CustomOperation for SessionRedoOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -1054,6 +1171,16 @@ impl CustomOperation for SessionInfoOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1131,6 +1258,16 @@ impl CustomOperation for SessionListOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -1287,6 +1424,16 @@ impl CustomOperation for SessionSetClientOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1352,6 +1499,16 @@ impl CustomOperation for SessionSetPersonaOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -1450,6 +1607,16 @@ impl CustomOperation for SessionSetStructureOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1536,6 +1703,16 @@ impl CustomOperation for SessionSetCaseOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1619,6 +1796,16 @@ impl CustomOperation for SessionSetMandateOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
@@ -1757,6 +1944,16 @@ impl CustomOperation for SessionLoadDealOp {
         ))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1813,6 +2010,16 @@ impl CustomOperation for SessionUnloadDealOp {
         Err(anyhow::anyhow!(
             "Database feature required for session operations"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {

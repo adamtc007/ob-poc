@@ -28,7 +28,10 @@ use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::helpers::{extract_string, extract_string_opt, extract_uuid};
+use super::helpers::{
+    extract_string, extract_string_opt, extract_uuid, json_extract_string, json_extract_string_opt,
+    json_extract_uuid,
+};
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -99,6 +102,194 @@ async fn fetch_evidence_status(pool: &PgPool, evidence_id: Uuid) -> Result<Strin
         .ok_or_else(|| anyhow!("Evidence record not found: {}", evidence_id))
 }
 
+#[cfg(feature = "database")]
+async fn evidence_require_impl(
+    registry_id: Uuid,
+    evidence_type: String,
+    description: Option<String>,
+    doc_type: Option<String>,
+    pool: &PgPool,
+) -> Result<EvidenceRequireResult> {
+    let evidence_id: Uuid = sqlx::query_scalar(
+        r#"
+        INSERT INTO "ob-poc".kyc_ubo_evidence
+            (registry_id, evidence_type, description, doc_type, status)
+        VALUES ($1, $2, $3, $4, 'REQUIRED')
+        RETURNING evidence_id
+        "#,
+    )
+    .bind(registry_id)
+    .bind(&evidence_type)
+    .bind(&description)
+    .bind(&doc_type)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(EvidenceRequireResult {
+        evidence_id,
+        registry_id,
+        evidence_type,
+        status: "REQUIRED".to_string(),
+    })
+}
+
+#[cfg(feature = "database")]
+async fn evidence_link_impl(
+    evidence_id: Uuid,
+    document_id: Uuid,
+    pool: &PgPool,
+) -> Result<EvidenceLinkResult> {
+    let current_status = fetch_evidence_status(pool, evidence_id).await?;
+
+    if current_status != "REQUIRED" && current_status != "REJECTED" {
+        return Err(anyhow!(
+            "Cannot link document: evidence is in status '{}'. \
+             Only REQUIRED or REJECTED evidence can have documents linked.",
+            current_status
+        ));
+    }
+
+    sqlx::query(
+        r#"
+        UPDATE "ob-poc".kyc_ubo_evidence
+        SET document_id = $2,
+            status = 'RECEIVED',
+            updated_at = NOW()
+        WHERE evidence_id = $1
+        "#,
+    )
+    .bind(evidence_id)
+    .bind(document_id)
+    .execute(pool)
+    .await?;
+
+    Ok(EvidenceLinkResult {
+        evidence_id,
+        document_id,
+        previous_status: current_status,
+        new_status: "RECEIVED".to_string(),
+    })
+}
+
+#[cfg(feature = "database")]
+async fn evidence_verify_impl(
+    evidence_id: Uuid,
+    verified_by: String,
+    notes: Option<String>,
+    pool: &PgPool,
+) -> Result<EvidenceVerifyResult> {
+    let current_status = fetch_evidence_status(pool, evidence_id).await?;
+
+    if current_status != "RECEIVED" {
+        return Err(anyhow!(
+            "Cannot verify: evidence is in status '{}'. \
+             Only RECEIVED evidence can be verified.",
+            current_status
+        ));
+    }
+
+    let verified_at: chrono::DateTime<chrono::Utc> = sqlx::query_scalar(
+        r#"
+        UPDATE "ob-poc".kyc_ubo_evidence
+        SET status = 'VERIFIED',
+            verified_at = NOW(),
+            verified_by = $2,
+            notes = COALESCE($3, notes),
+            updated_at = NOW()
+        WHERE evidence_id = $1
+        RETURNING verified_at
+        "#,
+    )
+    .bind(evidence_id)
+    .bind(&verified_by)
+    .bind(&notes)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(EvidenceVerifyResult {
+        evidence_id,
+        verified_by,
+        verified_at,
+    })
+}
+
+#[cfg(feature = "database")]
+async fn evidence_reject_impl(
+    evidence_id: Uuid,
+    reason: String,
+    pool: &PgPool,
+) -> Result<EvidenceRejectResult> {
+    let current_status = fetch_evidence_status(pool, evidence_id).await?;
+
+    if current_status != "RECEIVED" {
+        return Err(anyhow!(
+            "Cannot reject: evidence is in status '{}'. \
+             Only RECEIVED evidence can be rejected.",
+            current_status
+        ));
+    }
+
+    let previous_document_id: Option<Uuid> = sqlx::query_scalar(
+        r#"SELECT document_id FROM "ob-poc".kyc_ubo_evidence WHERE evidence_id = $1"#,
+    )
+    .bind(evidence_id)
+    .fetch_one(pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+        UPDATE "ob-poc".kyc_ubo_evidence
+        SET status = 'REJECTED',
+            document_id = NULL,
+            notes = $2,
+            updated_at = NOW()
+        WHERE evidence_id = $1
+        "#,
+    )
+    .bind(evidence_id)
+    .bind(&reason)
+    .execute(pool)
+    .await?;
+
+    Ok(EvidenceRejectResult {
+        evidence_id,
+        reason,
+        previous_document_id,
+    })
+}
+
+#[cfg(feature = "database")]
+async fn evidence_waive_impl(
+    evidence_id: Uuid,
+    reason: String,
+    authority: String,
+    pool: &PgPool,
+) -> Result<EvidenceWaiveResult> {
+    let _current_status = fetch_evidence_status(pool, evidence_id).await?;
+
+    sqlx::query(
+        r#"
+        UPDATE "ob-poc".kyc_ubo_evidence
+        SET status = 'WAIVED',
+            waived_reason = $2,
+            waived_by = $3,
+            updated_at = NOW()
+        WHERE evidence_id = $1
+        "#,
+    )
+    .bind(evidence_id)
+    .bind(&reason)
+    .bind(&authority)
+    .execute(pool)
+    .await?;
+
+    Ok(EvidenceWaiveResult {
+        evidence_id,
+        reason,
+        waived_by: authority,
+    })
+}
+
 // =============================================================================
 // EvidenceRequireOp — INSERT new evidence requirement
 // =============================================================================
@@ -136,31 +327,29 @@ impl CustomOperation for EvidenceRequireOp {
         let evidence_type = extract_string(verb_call, "evidence-type")?;
         let description = extract_string_opt(verb_call, "description");
         let doc_type = extract_string_opt(verb_call, "doc-type");
-
-        let evidence_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO "ob-poc".kyc_ubo_evidence
-                (registry_id, evidence_type, description, doc_type, status)
-            VALUES ($1, $2, $3, $4, 'REQUIRED')
-            RETURNING evidence_id
-            "#,
-        )
-        .bind(registry_id)
-        .bind(&evidence_type)
-        .bind(&description)
-        .bind(&doc_type)
-        .fetch_one(pool)
-        .await?;
-
-        ctx.bind("evidence", evidence_id);
-
-        let result = EvidenceRequireResult {
-            evidence_id,
-            registry_id,
-            evidence_type,
-            status: "REQUIRED".to_string(),
-        };
+        let result =
+            evidence_require_impl(registry_id, evidence_type, description, doc_type, pool).await?;
+        ctx.bind("evidence", result.evidence_id);
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
+        let evidence_type = json_extract_string(args, "evidence-type")?;
+        let description = json_extract_string_opt(args, "description");
+        let doc_type = json_extract_string_opt(args, "doc-type");
+        let result =
+            evidence_require_impl(registry_id, evidence_type, description, doc_type, pool).await?;
+        ctx.bind("evidence", result.evidence_id);
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -211,38 +400,23 @@ impl CustomOperation for EvidenceLinkOp {
     ) -> Result<ExecutionResult> {
         let evidence_id = extract_uuid(verb_call, ctx, "evidence-id")?;
         let document_id = extract_uuid(verb_call, ctx, "document-id")?;
-
-        let current_status = fetch_evidence_status(pool, evidence_id).await?;
-
-        if current_status != "REQUIRED" && current_status != "REJECTED" {
-            return Err(anyhow!(
-                "Cannot link document: evidence is in status '{}'. \
-                 Only REQUIRED or REJECTED evidence can have documents linked.",
-                current_status
-            ));
-        }
-
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".kyc_ubo_evidence
-            SET document_id = $2,
-                status = 'RECEIVED',
-                updated_at = NOW()
-            WHERE evidence_id = $1
-            "#,
-        )
-        .bind(evidence_id)
-        .bind(document_id)
-        .execute(pool)
-        .await?;
-
-        let result = EvidenceLinkResult {
-            evidence_id,
-            document_id,
-            previous_status: current_status,
-            new_status: "RECEIVED".to_string(),
-        };
+        let result = evidence_link_impl(evidence_id, document_id, pool).await?;
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
+        let document_id = json_extract_uuid(args, ctx, "document-id")?;
+        let result = evidence_link_impl(evidence_id, document_id, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -294,41 +468,24 @@ impl CustomOperation for EvidenceVerifyOp {
         let evidence_id = extract_uuid(verb_call, ctx, "evidence-id")?;
         let verified_by = extract_string(verb_call, "verified-by")?;
         let notes = extract_string_opt(verb_call, "notes");
-
-        let current_status = fetch_evidence_status(pool, evidence_id).await?;
-
-        if current_status != "RECEIVED" {
-            return Err(anyhow!(
-                "Cannot verify: evidence is in status '{}'. \
-                 Only RECEIVED evidence can be verified.",
-                current_status
-            ));
-        }
-
-        let verified_at: chrono::DateTime<chrono::Utc> = sqlx::query_scalar(
-            r#"
-            UPDATE "ob-poc".kyc_ubo_evidence
-            SET status = 'VERIFIED',
-                verified_at = NOW(),
-                verified_by = $2,
-                notes = COALESCE($3, notes),
-                updated_at = NOW()
-            WHERE evidence_id = $1
-            RETURNING verified_at
-            "#,
-        )
-        .bind(evidence_id)
-        .bind(&verified_by)
-        .bind(&notes)
-        .fetch_one(pool)
-        .await?;
-
-        let result = EvidenceVerifyResult {
-            evidence_id,
-            verified_by,
-            verified_at,
-        };
+        let result = evidence_verify_impl(evidence_id, verified_by, notes, pool).await?;
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
+        let verified_by = json_extract_string(args, "verified-by")?;
+        let notes = json_extract_string_opt(args, "notes");
+        let result = evidence_verify_impl(evidence_id, verified_by, notes, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -379,46 +536,23 @@ impl CustomOperation for EvidenceRejectOp {
     ) -> Result<ExecutionResult> {
         let evidence_id = extract_uuid(verb_call, ctx, "evidence-id")?;
         let reason = extract_string(verb_call, "reason")?;
-
-        let current_status = fetch_evidence_status(pool, evidence_id).await?;
-
-        if current_status != "RECEIVED" {
-            return Err(anyhow!(
-                "Cannot reject: evidence is in status '{}'. \
-                 Only RECEIVED evidence can be rejected.",
-                current_status
-            ));
-        }
-
-        // Fetch the current document_id before clearing it
-        let previous_document_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT document_id FROM "ob-poc".kyc_ubo_evidence WHERE evidence_id = $1"#,
-        )
-        .bind(evidence_id)
-        .fetch_one(pool)
-        .await?;
-
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".kyc_ubo_evidence
-            SET status = 'REJECTED',
-                document_id = NULL,
-                notes = $2,
-                updated_at = NOW()
-            WHERE evidence_id = $1
-            "#,
-        )
-        .bind(evidence_id)
-        .bind(&reason)
-        .execute(pool)
-        .await?;
-
-        let result = EvidenceRejectResult {
-            evidence_id,
-            reason,
-            previous_document_id,
-        };
+        let result = evidence_reject_impl(evidence_id, reason, pool).await?;
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
+        let reason = json_extract_string(args, "reason")?;
+        let result = evidence_reject_impl(evidence_id, reason, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -470,32 +604,24 @@ impl CustomOperation for EvidenceWaiveOp {
         let evidence_id = extract_uuid(verb_call, ctx, "evidence-id")?;
         let reason = extract_string(verb_call, "reason")?;
         let authority = extract_string(verb_call, "authority")?;
-
-        // Verify the evidence record exists (fetch_evidence_status validates existence)
-        let _current_status = fetch_evidence_status(pool, evidence_id).await?;
-
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".kyc_ubo_evidence
-            SET status = 'WAIVED',
-                waived_reason = $2,
-                waived_by = $3,
-                updated_at = NOW()
-            WHERE evidence_id = $1
-            "#,
-        )
-        .bind(evidence_id)
-        .bind(&reason)
-        .bind(&authority)
-        .execute(pool)
-        .await?;
-
-        let result = EvidenceWaiveResult {
-            evidence_id,
-            reason,
-            waived_by: authority,
-        };
+        let result = evidence_waive_impl(evidence_id, reason, authority, pool).await?;
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
+        let reason = json_extract_string(args, "reason")?;
+        let authority = json_extract_string(args, "authority")?;
+        let result = evidence_waive_impl(evidence_id, reason, authority, pool).await?;
+        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
     #[cfg(not(feature = "database"))]
@@ -538,6 +664,16 @@ impl CustomOperation for EvidenceCreateRequirementOp {
         EvidenceRequireOp.execute(verb_call, ctx, pool).await
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        EvidenceRequireOp.execute_json(args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -576,6 +712,16 @@ impl CustomOperation for EvidenceAttachDocumentOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         EvidenceLinkOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        EvidenceLinkOp.execute_json(args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -618,6 +764,16 @@ impl CustomOperation for EvidenceMarkVerifiedOp {
         EvidenceVerifyOp.execute(verb_call, ctx, pool).await
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        EvidenceVerifyOp.execute_json(args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -658,6 +814,16 @@ impl CustomOperation for EvidenceMarkRejectedOp {
         EvidenceRejectOp.execute(verb_call, ctx, pool).await
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        EvidenceRejectOp.execute_json(args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -696,6 +862,16 @@ impl CustomOperation for EvidenceMarkWaivedOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         EvidenceWaiveOp.execute(verb_call, ctx, pool).await
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        EvidenceWaiveOp.execute_json(args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]

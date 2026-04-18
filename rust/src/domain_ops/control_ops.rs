@@ -20,6 +20,21 @@ use sqlx::PgPool;
 use super::helpers::get_required_uuid;
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
+#[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    use crate::sem_os_runtime::verb_executor_adapter;
+
+    let vc = verb_executor_adapter::build_verb_call_pub(op.domain(), op.verb(), args);
+    let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
 // ============================================================================
 // ControlAnalyzeOp - Comprehensive control analysis for any entity type
 // ============================================================================
@@ -432,6 +447,16 @@ impl CustomOperation for ControlAnalyzeOp {
         Ok(ExecutionResult::Record(result))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -644,6 +669,16 @@ impl CustomOperation for ControlBuildGraphOp {
         });
 
         Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -926,6 +961,16 @@ impl CustomOperation for ControlIdentifyUbosOp {
         Ok(ExecutionResult::Record(result))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1115,6 +1160,16 @@ impl CustomOperation for ControlTraceChainOp {
         Ok(ExecutionResult::Record(result))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1300,6 +1355,16 @@ impl CustomOperation for ControlReconcileOwnershipOp {
         });
 
         Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -1663,6 +1728,16 @@ impl CustomOperation for ShowBoardControllerOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1794,6 +1869,16 @@ impl CustomOperation for RecomputeBoardControllerOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1901,6 +1986,16 @@ impl CustomOperation for SetBoardControllerOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1979,6 +2074,16 @@ impl CustomOperation for ClearBoardControllerOverrideOp {
             "now_using_computed": true,
             "computed_controller_entity_id": computed_controller_id
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -2070,6 +2175,16 @@ impl CustomOperation for ImportPscRegisterOp {
             "message": "PSC import requires Companies House API integration",
             "imported_at": chrono::Utc::now().to_rfc3339()
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -2181,6 +2296,16 @@ impl CustomOperation for ImportGleifControlOp {
             "message": "GLEIF import uses existing gleif.* verbs for data retrieval",
             "imported_at": chrono::Utc::now().to_rfc3339()
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]

@@ -6,12 +6,12 @@
 //! - Priority-based lookups (find pricing source)
 //! - Multi-table joins (list open SLA breaches)
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 
-use crate::domain_ops::CustomOperation;
 use crate::domain_ops::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
+use crate::domain_ops::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 

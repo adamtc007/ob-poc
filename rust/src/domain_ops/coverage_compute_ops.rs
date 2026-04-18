@@ -29,7 +29,7 @@
 //! - KYC/UBO Architecture v0.5, section 6.3 (coverage computation)
 //! - KYC/UBO Architecture v0.5, section 2A.3 (prong model)
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};

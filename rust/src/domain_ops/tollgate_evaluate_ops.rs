@@ -11,7 +11,7 @@
 //! - Threshold loading from reference data is dynamic (JSONB)
 //! - Multi-table aggregation across workstreams, ownership graph, and sources
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};

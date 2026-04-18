@@ -19,6 +19,23 @@ use crate::ontology::{ontology, SearchKeyDef};
 use sqlx::PgPool;
 
 #[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
+        op.domain(),
+        op.verb(),
+        args,
+    );
+    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
+#[cfg(feature = "database")]
 use {
     crate::domain_ops::affinity_graph_cache::load_affinity_graph_cached,
     crate::sem_reg::{entity_type_def::EntityTypeDefBody, store::SnapshotStore, types::ObjectType},
@@ -330,6 +347,20 @@ impl CustomOperation for SchemaDomainDescribeOp {
             &entity_type,
         )))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Describe the structure semantics of an entity type.
@@ -373,6 +404,20 @@ impl CustomOperation for SchemaEntityDescribeOp {
         Ok(ExecutionResult::Record(describe_entity_structure(
             &entity_type,
         )))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -425,6 +470,20 @@ impl CustomOperation for SchemaEntityListFieldsOp {
             "field_count": record["field_count"].clone(),
             "source": record["source"].clone(),
         })))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -480,6 +539,20 @@ impl CustomOperation for SchemaEntityListRelationshipsOp {
             "source": record["source"].clone(),
         })))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// List verbs for an entity type's domain.
@@ -532,6 +605,20 @@ impl CustomOperation for SchemaEntityListVerbsOp {
             "source": record["source"].clone(),
         })))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 // ── Schema Introspection ──────────────────────────────────────────
@@ -580,7 +667,6 @@ impl CustomOperation for SchemaIntrospectOp {
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -635,7 +721,6 @@ impl CustomOperation for SchemaExtractAttributesOp {
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -685,7 +770,6 @@ impl CustomOperation for SchemaExtractVerbsOp {
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -735,7 +819,6 @@ impl CustomOperation for SchemaExtractEntitiesOp {
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -785,7 +868,6 @@ impl CustomOperation for SchemaCrossReferenceOp {
     ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
     }
-
     fn is_migrated(&self) -> bool {
         true
     }
@@ -1055,6 +1137,20 @@ impl CustomOperation for SchemaGenerateErdOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("schema.generate-erd requires database"))
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
 }
 
 /// Generate a verb-flow diagram showing what data a verb touches.
@@ -1132,6 +1228,20 @@ impl CustomOperation for SchemaGenerateVerbFlowOp {
         Err(anyhow::anyhow!(
             "schema.generate-verb-flow requires database"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1239,5 +1349,19 @@ impl CustomOperation for SchemaGenerateDiscoveryMapOp {
         Err(anyhow::anyhow!(
             "schema.generate-discovery-map requires database"
         ))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }

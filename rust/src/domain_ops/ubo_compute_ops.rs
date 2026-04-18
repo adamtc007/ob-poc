@@ -14,7 +14,7 @@
 //! - "ob-poc".entities + entity_types (terminus detection: natural person)
 //! - "ob-poc".ubo_determination_runs (output)
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};

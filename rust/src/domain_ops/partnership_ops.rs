@@ -3,7 +3,7 @@
 //! Plugin handlers for partnership.yaml verbs that require custom logic.
 //! Uses "ob-poc".partnership_capital table for partner capital tracking.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 use serde_json::json;
@@ -12,10 +12,10 @@ use uuid::Uuid;
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-use super::CustomOperation;
 use super::helpers::{
     get_required_uuid, json_extract_string, json_extract_string_opt, json_extract_uuid,
 };
+use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 

@@ -22,6 +22,21 @@ use ob_poc_types::trading_matrix::{
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+#[cfg(feature = "database")]
+async fn execute_json_via_legacy<T: CustomOperation + Sync>(
+    op: &T,
+    args: &serde_json::Value,
+    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    pool: &PgPool,
+) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    use crate::sem_os_runtime::verb_executor_adapter;
+
+    let vc = verb_executor_adapter::build_verb_call_pub(op.domain(), op.verb(), args);
+    let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
+    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
+}
+
 // =============================================================================
 // HELPER: Load and save CA section
 // =============================================================================
@@ -122,6 +137,16 @@ impl CustomOperation for TradingProfileCaEnableEventTypesOp {
         })))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -198,6 +223,16 @@ impl CustomOperation for TradingProfileCaDisableEventTypesOp {
         save_ca_section(pool, profile_id, doc, ca).await?;
 
         Ok(ExecutionResult::Affected(event_types.len() as u64))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -294,6 +329,16 @@ impl CustomOperation for TradingProfileCaSetNotificationOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -388,6 +433,16 @@ impl CustomOperation for TradingProfileCaSetElectionOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -479,6 +534,16 @@ impl CustomOperation for TradingProfileCaSetDefaultOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -547,6 +612,16 @@ impl CustomOperation for TradingProfileCaRemoveDefaultOp {
         save_ca_section(pool, profile_id, doc, ca).await?;
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -664,6 +739,16 @@ impl CustomOperation for TradingProfileCaAddCutoffOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -742,6 +827,16 @@ impl CustomOperation for TradingProfileCaRemoveCutoffOp {
         Ok(ExecutionResult::Affected(1))
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -810,7 +905,7 @@ impl CustomOperation for TradingProfileCaLinkSsiOp {
                 return Err(anyhow::anyhow!(
                     "Invalid proceeds-type: {}",
                     proceeds_type_str
-                ))
+                ));
             }
         };
 
@@ -848,6 +943,16 @@ impl CustomOperation for TradingProfileCaLinkSsiOp {
         save_ca_section(pool, profile_id, doc, ca).await?;
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -918,7 +1023,7 @@ impl CustomOperation for TradingProfileCaRemoveSsiOp {
                 return Err(anyhow::anyhow!(
                     "Invalid proceeds-type: {}",
                     proceeds_type_str
-                ))
+                ));
             }
         };
 
@@ -938,6 +1043,16 @@ impl CustomOperation for TradingProfileCaRemoveSsiOp {
         save_ca_section(pool, profile_id, doc, ca).await?;
 
         Ok(ExecutionResult::Affected(1))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]
@@ -997,6 +1112,16 @@ impl CustomOperation for TradingProfileCaGetPolicyOp {
         let (_, ca) = load_ca_section(pool, profile_id).await?;
 
         Ok(ExecutionResult::Record(serde_json::to_value(&ca)?))
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        execute_json_via_legacy(self, args, ctx, pool).await
     }
 
     #[cfg(not(feature = "database"))]

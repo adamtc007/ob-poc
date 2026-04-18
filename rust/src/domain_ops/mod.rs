@@ -473,7 +473,10 @@ impl CustomOperationRegistry {
 
     /// Count of ops migrated to execute_json.
     pub fn migrated_count(&self) -> usize {
-        self.operations.values().filter(|op| op.is_migrated()).count()
+        self.operations
+            .values()
+            .filter(|op| op.is_migrated())
+            .count()
     }
 
     /// Internal registration with duplicate detection.
