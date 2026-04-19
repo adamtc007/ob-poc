@@ -3,9 +3,14 @@
 //! Executes CRUD verbs using `VerbContractBody` metadata (table, schema,
 //! operation, column mappings). No hand-coded Rust per verb.
 //!
-//! This is the SemOS-native replacement for ob-poc's `GenericCrudExecutor`.
-//! Operations are added incrementally — unsupported operations return
+//! This is the data-plane interpreter that replaces per-verb Rust impls
+//! for the CRUD portion of `domain_ops`. Unsupported operations return
 //! `SemOsError::InvalidInput` until migrated.
+//!
+//! Phase 3 note (three-plane architecture v0.3 §13): this module was
+//! relocated here from `sem_os_postgres::crud_executor` because CRUD
+//! interpretation is a data-plane concern. `sem_os_postgres` retains
+//! only metadata-loading code.
 
 use async_trait::async_trait;
 use sqlx::postgres::PgRow;
@@ -14,7 +19,7 @@ use tracing::debug;
 use uuid::Uuid;
 
 use sem_os_core::error::SemOsError;
-use dsl_runtime::{CrudExecutionPort, VerbExecutionContext, VerbExecutionOutcome};
+use crate::{CrudExecutionPort, VerbExecutionContext, VerbExecutionOutcome};
 use sem_os_core::verb_contract::{VerbArgDef, VerbContractBody, VerbCrudMapping};
 
 /// SemOS-native CRUD executor backed by PostgreSQL.
@@ -35,7 +40,7 @@ impl CrudExecutionPort for PgCrudExecutor {
         contract: &VerbContractBody,
         args: serde_json::Value,
         _ctx: &VerbExecutionContext,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let crud = contract.crud_mapping.as_ref().ok_or_else(|| {
             SemOsError::InvalidInput(format!("Verb {} has no crud_mapping", contract.fqn))
         })?;
@@ -120,7 +125,7 @@ impl PgCrudExecutor {
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
         returns: &Option<sem_os_core::verb_contract::VerbReturnSpec>,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let mut conditions = Vec::new();
         let mut bind_values: Vec<SqlValue> = Vec::new();
@@ -196,7 +201,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
 
         let pk_col = crud
@@ -272,7 +277,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let key_col = crud.key_column.as_deref().ok_or_else(|| {
             SemOsError::InvalidInput("Update requires key_column in crud_mapping".into())
@@ -333,7 +338,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let is_soft = soft_delete_predicate(schema, table).is_some();
 
@@ -405,7 +410,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
 
         let pk_col = crud
@@ -486,7 +491,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let junction = crud
             .junction
@@ -536,7 +541,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let junction = crud
             .junction
@@ -585,7 +590,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let junction = crud
             .junction
@@ -680,7 +685,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let junction = crud
             .junction
@@ -736,7 +741,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let junction = crud
             .junction
@@ -793,7 +798,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let primary = crud.primary_table.as_deref().ok_or_else(|| {
             SemOsError::InvalidInput("select_with_join requires primary_table".into())
@@ -845,7 +850,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
 
         let fk_col = crud
@@ -912,7 +917,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
 
         // Resolve entity type code from args or verb name
@@ -1067,7 +1072,7 @@ impl PgCrudExecutor {
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
         args: &serde_json::Value,
-    ) -> dsl_runtime::Result<VerbExecutionOutcome> {
+    ) -> crate::Result<VerbExecutionOutcome> {
         let args_map = args.as_object().cloned().unwrap_or_default();
         let type_code = resolve_entity_type_code(crud, &args_map)?;
 
@@ -1228,7 +1233,7 @@ fn json_to_sql_value(
     value: &serde_json::Value,
     arg_type: &str,
     arg_name: &str,
-) -> dsl_runtime::Result<SqlValue> {
+) -> crate::Result<SqlValue> {
     match arg_type {
         "string" | "str" | "lookup" => {
             let s = value.as_str().ok_or_else(|| {
@@ -1284,7 +1289,7 @@ async fn execute_query_one(
     pool: &PgPool,
     sql: &str,
     values: &[SqlValue],
-) -> dsl_runtime::Result<PgRow> {
+) -> crate::Result<PgRow> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
@@ -1299,7 +1304,7 @@ async fn execute_non_query(
     pool: &PgPool,
     sql: &str,
     values: &[SqlValue],
-) -> dsl_runtime::Result<u64> {
+) -> crate::Result<u64> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
@@ -1315,7 +1320,7 @@ async fn execute_query(
     pool: &PgPool,
     sql: &str,
     values: &[SqlValue],
-) -> dsl_runtime::Result<Vec<PgRow>> {
+) -> crate::Result<Vec<PgRow>> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
@@ -1353,7 +1358,7 @@ fn infer_pk_column(table: &str) -> &str {
 fn resolve_entity_type_code(
     crud: &VerbCrudMapping,
     args: &serde_json::Map<String, serde_json::Value>,
-) -> dsl_runtime::Result<String> {
+) -> crate::Result<String> {
     // 1. Explicit type_code in config (not currently in VerbCrudMapping — future)
     // 2. entity-type arg
     if let Some(et) = args.get("entity-type").and_then(|v| v.as_str()) {
@@ -1397,7 +1402,7 @@ fn soft_delete_predicate(schema: &str, table: &str) -> Option<String> {
     }
 }
 
-fn row_to_json(row: &PgRow) -> dsl_runtime::Result<serde_json::Value> {
+fn row_to_json(row: &PgRow) -> crate::Result<serde_json::Value> {
     let mut map = serde_json::Map::new();
 
     for column in row.columns() {

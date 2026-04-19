@@ -7,17 +7,20 @@
 //! - PgOutboxStore (real SQL, not stub)
 //! - PgEvidenceStore
 //! - PgProjectionWriter (stub until S2.2)
+//!
+//! Phase 3 note (three-plane architecture v0.3 §13): `PgCrudExecutor`
+//! moved to `dsl-runtime` because CRUD interpretation is a data-plane
+//! concern. `sem_os_postgres` retains only metadata-loading and
+//! store-implementation code.
 
 pub mod authoring;
 pub mod cleanup;
 pub mod constellation_hydration;
-pub mod crud_executor;
 pub(crate) mod sqlx_types;
 pub mod store;
 
 pub use authoring::{PgAuthoringStore, PgScratchSchemaRunner};
 pub use cleanup::PgCleanupStore;
-pub use crud_executor::PgCrudExecutor;
 pub use store::{
     PgAuditStore, PgBootstrapAuditStore, PgChangesetStore, PgEvidenceStore, PgObjectStore,
     PgOutboxStore, PgProjectionWriter, PgSnapshotStore,

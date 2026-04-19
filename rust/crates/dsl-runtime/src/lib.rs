@@ -44,12 +44,14 @@
 //! surface is added here deliberately so the plane boundary is reviewable
 //! at a glance.
 
+pub mod crud_executor;
 pub mod custom_op;
 pub mod execution;
 pub mod port;
 pub mod registrar;
 
 // Explicit re-exports — do NOT add `pub use module::*`.
+pub use crud_executor::PgCrudExecutor;
 pub use custom_op::{CustomOpFactory, CustomOperation, CustomOperationRegistry};
 pub use execution::{
     Result, VerbExecutionContext, VerbExecutionOutcome, VerbExecutionResult, VerbSideEffects,

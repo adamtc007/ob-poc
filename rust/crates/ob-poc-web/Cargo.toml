@@ -51,5 +51,10 @@ sem_os_core = { path = "../sem_os_core" }
 sem_os_client = { path = "../sem_os_client" }
 sem_os_postgres = { path = "../sem_os_postgres" }
 
+# DSL runtime — data-plane interpreter (owns PgCrudExecutor, VerbExecutionPort).
+# Phase 3 relocation of PgCrudExecutor from sem_os_postgres to dsl-runtime
+# means the startup wiring now imports it from this crate.
+dsl-runtime = { path = "../dsl-runtime" }
+
 [features]
 default = []

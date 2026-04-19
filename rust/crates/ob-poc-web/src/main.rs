@@ -772,16 +772,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_runbook_store(runbook_store)
             .with_orchestrated_verbs(orchestrated_verbs);
 
-        // Wire SemOS VerbExecutionPort — CRUD verbs route through PgCrudExecutor,
-        // plugin verbs fall through to DslExecutor via the adapter.
+        // Wire the VerbExecutionPort — CRUD verbs route through the
+        // dsl-runtime-native PgCrudExecutor, plugin verbs fall through
+        // to DslExecutor via the adapter.
+        //
+        // Phase 3 (three-plane architecture v0.3 §13): PgCrudExecutor
+        // relocated from sem_os_postgres to dsl-runtime.
         {
+            use dsl_runtime::PgCrudExecutor;
             use ob_poc::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
-            use sem_os_postgres::PgCrudExecutor;
 
             let verb_executor = ObPocVerbExecutor::from_pool(pool.clone())
                 .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())));
             orchestrator = orchestrator.with_verb_execution_port(Arc::new(verb_executor));
-            tracing::info!("SemOS VerbExecutionPort wired with PgCrudExecutor");
+            tracing::info!("VerbExecutionPort wired with dsl_runtime::PgCrudExecutor");
         }
 
         // Wire the V2 executor that supports parking (WorkflowDispatcher or RealDslExecutor)
