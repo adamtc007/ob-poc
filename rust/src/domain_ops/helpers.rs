@@ -477,6 +477,71 @@ pub async fn extract_entity_ref_opt(
 }
 
 // ============================================================================
+// VerbExecutionContext extensions transport (Phase 2.5 Slice B+)
+// ============================================================================
+// Native `execute_json` bodies read/write session-scoped side-channel state
+// through `VerbExecutionContext.extensions` under stable JSON keys. These
+// helpers replace the legacy `ExecutionContext.pending_*` field access
+// pattern used by session/view/agent ops.
+
+use crate::session::{UnifiedSession, ViewState};
+
+/// JSON key used to carry the pending `UnifiedSession` across the
+/// dispatch boundary.
+pub const EXT_KEY_PENDING_SESSION: &str = "pending_session";
+
+/// JSON key used to carry the pending `ViewState` across the dispatch
+/// boundary.
+pub const EXT_KEY_PENDING_VIEW_STATE: &str = "pending_view_state";
+
+fn ext_obj_mut(ctx: &mut dsl_runtime::VerbExecutionContext) -> &mut serde_json::Map<String, serde_json::Value> {
+    if !ctx.extensions.is_object() {
+        ctx.extensions = serde_json::Value::Object(serde_json::Map::new());
+    }
+    ctx.extensions.as_object_mut().unwrap()
+}
+
+/// Consume the pending `UnifiedSession` from `sem_ctx.extensions` if any.
+pub fn ext_take_pending_session(ctx: &mut dsl_runtime::VerbExecutionContext) -> Option<UnifiedSession> {
+    let obj = ctx.extensions.as_object_mut()?;
+    let v = obj.remove(EXT_KEY_PENDING_SESSION)?;
+    serde_json::from_value(v).ok()
+}
+
+/// Write a `UnifiedSession` to `sem_ctx.extensions` under the pending-session key.
+pub fn ext_set_pending_session(ctx: &mut dsl_runtime::VerbExecutionContext, session: UnifiedSession) {
+    if let Ok(v) = serde_json::to_value(&session) {
+        ext_obj_mut(ctx).insert(EXT_KEY_PENDING_SESSION.to_string(), v);
+    }
+}
+
+/// Get-or-create the pending `UnifiedSession` in `sem_ctx.extensions`.
+/// Mirrors `ExecutionContext::get_or_create_session_mut` but over JSON
+/// transport — caller mutates the owned value, then writes back via
+/// `ext_set_pending_session`.
+pub fn ext_take_or_create_pending_session(
+    ctx: &mut dsl_runtime::VerbExecutionContext,
+) -> UnifiedSession {
+    ext_take_pending_session(ctx).unwrap_or_else(UnifiedSession::new)
+}
+
+/// Write a `ViewState` to `sem_ctx.extensions` under the pending-view-state key.
+pub fn ext_set_pending_view_state(ctx: &mut dsl_runtime::VerbExecutionContext, view: ViewState) {
+    if let Ok(v) = serde_json::to_value(&view) {
+        ext_obj_mut(ctx).insert(EXT_KEY_PENDING_VIEW_STATE.to_string(), v);
+    }
+}
+
+/// Read a string-valued key from `sem_ctx.extensions`.
+pub fn ext_get_string(ctx: &dsl_runtime::VerbExecutionContext, key: &str) -> Option<String> {
+    ctx.extensions
+        .as_object()?
+        .get(key)?
+        .as_str()
+        .map(|s| s.to_string())
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
