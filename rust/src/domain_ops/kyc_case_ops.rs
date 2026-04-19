@@ -90,6 +90,93 @@ impl CustomOperation for KycCaseCreateOp {
         "Deal-aware case creation: validates pre-contract KYC eligibility, infers client_group_id from deal, generates case_ref via DB trigger"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let deal_id = json_extract_uuid_opt(args, ctx, "deal-id");
+        let mut client_group_id = json_extract_uuid_opt(args, ctx, "client-group-id");
+        let case_type =
+            json_extract_string_opt(args, "case-type").unwrap_or_else(|| "NEW_CLIENT".to_string());
+        let sla_deadline: Option<String> = json_extract_string_opt(args, "sla-deadline");
+        let assigned_analyst_id = json_extract_uuid_opt(args, ctx, "assigned-analyst-id");
+        let notes = json_extract_string_opt(args, "notes");
+
+        if let Some(did) = deal_id {
+            let row: Option<(String, Uuid)> = sqlx::query_as(
+                r#"SELECT deal_status, primary_client_group_id
+                   FROM "ob-poc".deals
+                   WHERE deal_id = $1"#,
+            )
+            .bind(did)
+            .fetch_optional(pool)
+            .await?;
+
+            let (deal_status, deal_client_group_id) =
+                row.ok_or_else(|| anyhow!("Deal not found: {}", did))?;
+
+            if !KYC_ELIGIBLE_DEAL_STATUSES.contains(&deal_status.as_str()) {
+                return Err(anyhow!(
+                    "Deal {} is in status '{}', but KYC case creation requires one of: {}",
+                    did,
+                    deal_status,
+                    KYC_ELIGIBLE_DEAL_STATUSES.join(", ")
+                ));
+            }
+
+            if client_group_id.is_none() {
+                client_group_id = Some(deal_client_group_id);
+            }
+        }
+
+        let case_id = Uuid::new_v4();
+
+        let case_ref: String = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".cases (
+                   case_id, cbu_id, case_type, sla_deadline,
+                   assigned_analyst_id, notes, deal_id, client_group_id
+               )
+               VALUES ($1, $2, $3, $4::timestamptz, $5, $6, $7, $8)
+               RETURNING case_ref"#,
+        )
+        .bind(case_id)
+        .bind(cbu_id)
+        .bind(&case_type)
+        .bind(&sla_deadline)
+        .bind(assigned_analyst_id)
+        .bind(&notes)
+        .bind(deal_id)
+        .bind(client_group_id)
+        .fetch_one(pool)
+        .await?;
+
+        let result = KycCaseCreateResult {
+            case_id,
+            case_ref,
+            cbu_id,
+            deal_id,
+            client_group_id,
+            case_type,
+            status: "INTAKE".to_string(),
+        };
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl KycCaseCreateOp {
     #[cfg(feature = "database")]
     #[governed_query(verb = "kyc-case.create", skip_principal_check = true)]
     async fn execute(
@@ -175,7 +262,6 @@ impl CustomOperation for KycCaseCreateOp {
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -183,89 +269,6 @@ impl CustomOperation for KycCaseCreateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let deal_id = json_extract_uuid_opt(args, ctx, "deal-id");
-        let mut client_group_id = json_extract_uuid_opt(args, ctx, "client-group-id");
-        let case_type =
-            json_extract_string_opt(args, "case-type").unwrap_or_else(|| "NEW_CLIENT".to_string());
-        let sla_deadline: Option<String> = json_extract_string_opt(args, "sla-deadline");
-        let assigned_analyst_id = json_extract_uuid_opt(args, ctx, "assigned-analyst-id");
-        let notes = json_extract_string_opt(args, "notes");
-
-        if let Some(did) = deal_id {
-            let row: Option<(String, Uuid)> = sqlx::query_as(
-                r#"SELECT deal_status, primary_client_group_id
-                   FROM "ob-poc".deals
-                   WHERE deal_id = $1"#,
-            )
-            .bind(did)
-            .fetch_optional(pool)
-            .await?;
-
-            let (deal_status, deal_client_group_id) =
-                row.ok_or_else(|| anyhow!("Deal not found: {}", did))?;
-
-            if !KYC_ELIGIBLE_DEAL_STATUSES.contains(&deal_status.as_str()) {
-                return Err(anyhow!(
-                    "Deal {} is in status '{}', but KYC case creation requires one of: {}",
-                    did,
-                    deal_status,
-                    KYC_ELIGIBLE_DEAL_STATUSES.join(", ")
-                ));
-            }
-
-            if client_group_id.is_none() {
-                client_group_id = Some(deal_client_group_id);
-            }
-        }
-
-        let case_id = Uuid::new_v4();
-
-        let case_ref: String = sqlx::query_scalar(
-            r#"INSERT INTO "ob-poc".cases (
-                   case_id, cbu_id, case_type, sla_deadline,
-                   assigned_analyst_id, notes, deal_id, client_group_id
-               )
-               VALUES ($1, $2, $3, $4::timestamptz, $5, $6, $7, $8)
-               RETURNING case_ref"#,
-        )
-        .bind(case_id)
-        .bind(cbu_id)
-        .bind(&case_type)
-        .bind(&sla_deadline)
-        .bind(assigned_analyst_id)
-        .bind(&notes)
-        .bind(deal_id)
-        .bind(client_group_id)
-        .fetch_one(pool)
-        .await?;
-
-        let result = KycCaseCreateResult {
-            case_id,
-            case_ref,
-            cbu_id,
-            deal_id,
-            client_group_id,
-            case_type,
-            status: "INTAKE".to_string(),
-        };
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -594,69 +597,7 @@ impl CustomOperation for KycCaseUpdateStatusOp {
         "Enforces case state machine transitions — prevents skipping compliance stages"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let requested_status = extract_string(verb_call, "status")?;
-        let notes = extract_string_opt(verb_call, "notes");
 
-        // Reject terminal statuses — callers must use kyc-case.close
-        if is_terminal_status(&requested_status) {
-            return Err(anyhow!(
-                "Use kyc-case.close for terminal status '{}'. The update-status verb handles non-terminal transitions only.",
-                requested_status
-            ));
-        }
-
-        // Load current case status
-        let current_status: String =
-            sqlx::query_scalar(r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#)
-                .bind(case_id)
-                .fetch_optional(pool)
-                .await?
-                .ok_or_else(|| anyhow!("KYC case not found: {}", case_id))?;
-
-        // Validate the transition
-        if !is_valid_transition(&current_status, &requested_status) {
-            return Err(anyhow!(
-                "Invalid transition: {} → {}. Allowed transitions from {}: [{}]",
-                current_status,
-                requested_status,
-                current_status,
-                valid_next_statuses(&current_status)
-            ));
-        }
-
-        // Apply the transition
-        sqlx::query(
-            r#"UPDATE "ob-poc".cases
-               SET status = $2,
-                   notes = COALESCE($3, notes),
-                   updated_at = NOW()
-               WHERE case_id = $1"#,
-        )
-        .bind(case_id)
-        .bind(&requested_status)
-        .bind(&notes)
-        .execute(pool)
-        .await?;
-
-        Ok(ExecutionResult::Affected(1))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -720,6 +661,71 @@ impl CustomOperation for KycCaseUpdateStatusOp {
     }
 }
 
+impl KycCaseUpdateStatusOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
+        let requested_status = extract_string(verb_call, "status")?;
+        let notes = extract_string_opt(verb_call, "notes");
+
+        // Reject terminal statuses — callers must use kyc-case.close
+        if is_terminal_status(&requested_status) {
+            return Err(anyhow!(
+                "Use kyc-case.close for terminal status '{}'. The update-status verb handles non-terminal transitions only.",
+                requested_status
+            ));
+        }
+
+        // Load current case status
+        let current_status: String =
+            sqlx::query_scalar(r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#)
+                .bind(case_id)
+                .fetch_optional(pool)
+                .await?
+                .ok_or_else(|| anyhow!("KYC case not found: {}", case_id))?;
+
+        // Validate the transition
+        if !is_valid_transition(&current_status, &requested_status) {
+            return Err(anyhow!(
+                "Invalid transition: {} → {}. Allowed transitions from {}: [{}]",
+                current_status,
+                requested_status,
+                current_status,
+                valid_next_statuses(&current_status)
+            ));
+        }
+
+        // Apply the transition
+        sqlx::query(
+            r#"UPDATE "ob-poc".cases
+               SET status = $2,
+                   notes = COALESCE($3, notes),
+                   updated_at = NOW()
+               WHERE case_id = $1"#,
+        )
+        .bind(case_id)
+        .bind(&requested_status)
+        .bind(&notes)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Affected(1))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
+    }
+}
+
 // ============================================================================
 // KycCaseCloseOp - Close case with deal gate event emission
 // ============================================================================
@@ -747,38 +753,7 @@ impl CustomOperation for KycCaseCloseOp {
         "Validates REVIEW status, sets closed_at, and emits KYC_GATE_COMPLETED deal event when APPROVED with linked deal"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let status = extract_string(verb_call, "status")?;
-        let notes = extract_string_opt(verb_call, "notes");
 
-        // Validate the requested status is a valid terminal status
-        if !CLOSE_STATUSES.contains(&status.as_str()) {
-            return Err(anyhow!(
-                "Invalid close status '{}'. Must be one of: {}",
-                status,
-                CLOSE_STATUSES.join(", ")
-            ));
-        }
-
-        let result = kyc_case_close_impl(case_id, &status, notes.as_deref(), pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -810,6 +785,40 @@ impl CustomOperation for KycCaseCloseOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl KycCaseCloseOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
+        let status = extract_string(verb_call, "status")?;
+        let notes = extract_string_opt(verb_call, "notes");
+
+        // Validate the requested status is a valid terminal status
+        if !CLOSE_STATUSES.contains(&status.as_str()) {
+            return Err(anyhow!(
+                "Invalid close status '{}'. Must be one of: {}",
+                status,
+                CLOSE_STATUSES.join(", ")
+            ));
+        }
+
+        let result = kyc_case_close_impl(case_id, &status, notes.as_deref(), pool).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -920,26 +929,7 @@ impl CustomOperation for KycCaseStateOp {
         "Returns case summary with workstreams and embedded awaiting requests - requires complex join query"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let result = kyc_case_state_impl(case_id, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -956,6 +946,28 @@ impl CustomOperation for KycCaseStateOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl KycCaseStateOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
+        let result = kyc_case_state_impl(case_id, pool).await?;
+        Ok(ExecutionResult::Record(result))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -1203,26 +1215,7 @@ impl CustomOperation for WorkstreamStateOp {
         "Returns workstream with embedded awaiting requests, checks, and documents"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let workstream_id = extract_uuid(verb_call, ctx, "workstream-id")?;
-        let result = workstream_state_impl(workstream_id, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -1239,6 +1232,28 @@ impl CustomOperation for WorkstreamStateOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl WorkstreamStateOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let workstream_id = extract_uuid(verb_call, ctx, "workstream-id")?;
+        let result = workstream_state_impl(workstream_id, pool).await?;
+        Ok(ExecutionResult::Record(result))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
     }
 }
 

@@ -67,6 +67,88 @@ impl CustomOperation for FindImForTradeOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use serde_json::json;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let instrument_class = json_extract_string(args, "instrument-class")?;
+        let market = json_extract_string_opt(args, "market");
+        let currency = json_extract_string_opt(args, "currency");
+        let isda_asset_class = json_extract_string_opt(args, "isda-asset-class");
+
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                assignment_id,
+                manager_lei,
+                manager_name,
+                manager_role,
+                priority,
+                instruction_method,
+                scope_all
+            FROM "ob-poc".cbu_im_assignments
+            WHERE cbu_id = $1
+              AND status = 'ACTIVE'
+              AND (
+                  scope_all = true
+                  OR (
+                      (scope_instrument_classes IS NULL OR $2 = ANY(scope_instrument_classes))
+                      AND (scope_markets IS NULL OR $3 = ANY(scope_markets) OR $3 IS NULL)
+                      AND (scope_currencies IS NULL OR $4 = ANY(scope_currencies) OR $4 IS NULL)
+                      AND (scope_isda_asset_classes IS NULL OR $5 = ANY(scope_isda_asset_classes) OR $5 IS NULL)
+                  )
+              )
+            ORDER BY
+                scope_all ASC,
+                priority ASC
+            LIMIT 1
+            "#,
+            cbu_id,
+            instrument_class,
+            market,
+            currency,
+            isda_asset_class
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        match row {
+            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                json!({
+                    "assignment_id": r.assignment_id.to_string(),
+                    "manager_lei": r.manager_lei,
+                    "manager_name": r.manager_name,
+                    "manager_role": r.manager_role,
+                    "priority": r.priority,
+                    "instruction_method": r.instruction_method,
+                    "scope_all": r.scope_all
+                }),
+            )),
+            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                json!({
+                    "error": "no_matching_im",
+                    "message": format!(
+                        "No IM assignment found for instrument_class={}, market={:?}, currency={:?}",
+                        instrument_class, market, currency
+                    )
+                }),
+            )),
+        }
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl FindImForTradeOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -194,85 +276,6 @@ impl CustomOperation for FindImForTradeOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required for find-for-trade"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use serde_json::json;
-
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let instrument_class = json_extract_string(args, "instrument-class")?;
-        let market = json_extract_string_opt(args, "market");
-        let currency = json_extract_string_opt(args, "currency");
-        let isda_asset_class = json_extract_string_opt(args, "isda-asset-class");
-
-        let row = sqlx::query!(
-            r#"
-            SELECT
-                assignment_id,
-                manager_lei,
-                manager_name,
-                manager_role,
-                priority,
-                instruction_method,
-                scope_all
-            FROM "ob-poc".cbu_im_assignments
-            WHERE cbu_id = $1
-              AND status = 'ACTIVE'
-              AND (
-                  scope_all = true
-                  OR (
-                      (scope_instrument_classes IS NULL OR $2 = ANY(scope_instrument_classes))
-                      AND (scope_markets IS NULL OR $3 = ANY(scope_markets) OR $3 IS NULL)
-                      AND (scope_currencies IS NULL OR $4 = ANY(scope_currencies) OR $4 IS NULL)
-                      AND (scope_isda_asset_classes IS NULL OR $5 = ANY(scope_isda_asset_classes) OR $5 IS NULL)
-                  )
-              )
-            ORDER BY
-                scope_all ASC,
-                priority ASC
-            LIMIT 1
-            "#,
-            cbu_id,
-            instrument_class,
-            market,
-            currency,
-            isda_asset_class
-        )
-        .fetch_optional(pool)
-        .await?;
-
-        match row {
-            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                json!({
-                    "assignment_id": r.assignment_id.to_string(),
-                    "manager_lei": r.manager_lei,
-                    "manager_name": r.manager_name,
-                    "manager_role": r.manager_role,
-                    "priority": r.priority,
-                    "instruction_method": r.instruction_method,
-                    "scope_all": r.scope_all
-                }),
-            )),
-            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                json!({
-                    "error": "no_matching_im",
-                    "message": format!(
-                        "No IM assignment found for instrument_class={}, market={:?}, currency={:?}",
-                        instrument_class, market, currency
-                    )
-                }),
-            )),
-        }
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // ============================================================================
@@ -297,6 +300,110 @@ impl CustomOperation for FindPricingForInstrumentOp {
     fn rationale(&self) -> &'static str {
         "Priority-based pricing source lookup with fallback chain"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use serde_json::json;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let instrument_class = json_extract_string(args, "instrument-class")?;
+        let market = json_extract_string_opt(args, "market");
+        let currency = json_extract_string_opt(args, "currency");
+
+        let class_id: Option<uuid::Uuid> = sqlx::query_scalar!(
+            r#"SELECT class_id FROM "ob-poc".instrument_classes WHERE code = $1"#,
+            instrument_class
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        let class_id = match class_id {
+            Some(id) => id,
+            None => {
+                return Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                    json!({
+                        "error": "unknown_instrument_class",
+                        "message": format!("Unknown instrument class: {}", instrument_class)
+                    }),
+                ));
+            }
+        };
+
+        let market_id: Option<uuid::Uuid> = if let Some(ref mic) = market {
+            sqlx::query_scalar!(
+                r#"SELECT market_id FROM "ob-poc".markets WHERE mic = $1"#,
+                mic
+            )
+            .fetch_optional(pool)
+            .await?
+        } else {
+            None
+        };
+
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                config_id,
+                source,
+                price_type,
+                fallback_source,
+                max_age_hours,
+                tolerance_pct,
+                stale_action,
+                priority
+            FROM "ob-poc".cbu_pricing_config
+            WHERE cbu_id = $1
+              AND is_active = true
+              AND instrument_class_id = $2
+              AND (market_id IS NULL OR market_id = $3 OR $3 IS NULL)
+              AND (currency IS NULL OR currency = $4 OR $4 IS NULL)
+            ORDER BY priority ASC
+            LIMIT 1
+            "#,
+            cbu_id,
+            class_id,
+            market_id,
+            currency
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        match row {
+            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                json!({
+                    "config_id": r.config_id.to_string(),
+                    "source": r.source,
+                    "price_type": r.price_type,
+                    "fallback_source": r.fallback_source,
+                    "max_age_hours": r.max_age_hours,
+                    "tolerance_pct": r.tolerance_pct,
+                    "stale_action": r.stale_action,
+                    "priority": r.priority
+                }),
+            )),
+            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                json!({
+                    "error": "no_pricing_config",
+                    "message": format!(
+                        "No pricing config found for instrument_class={}, market={:?}, currency={:?}",
+                        instrument_class, market, currency
+                    )
+                }),
+            )),
+        }
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl FindPricingForInstrumentOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -435,107 +542,6 @@ impl CustomOperation for FindPricingForInstrumentOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required for find-for-instrument"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use serde_json::json;
-
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let instrument_class = json_extract_string(args, "instrument-class")?;
-        let market = json_extract_string_opt(args, "market");
-        let currency = json_extract_string_opt(args, "currency");
-
-        let class_id: Option<uuid::Uuid> = sqlx::query_scalar!(
-            r#"SELECT class_id FROM "ob-poc".instrument_classes WHERE code = $1"#,
-            instrument_class
-        )
-        .fetch_optional(pool)
-        .await?;
-
-        let class_id = match class_id {
-            Some(id) => id,
-            None => {
-                return Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                    json!({
-                        "error": "unknown_instrument_class",
-                        "message": format!("Unknown instrument class: {}", instrument_class)
-                    }),
-                ));
-            }
-        };
-
-        let market_id: Option<uuid::Uuid> = if let Some(ref mic) = market {
-            sqlx::query_scalar!(
-                r#"SELECT market_id FROM "ob-poc".markets WHERE mic = $1"#,
-                mic
-            )
-            .fetch_optional(pool)
-            .await?
-        } else {
-            None
-        };
-
-        let row = sqlx::query!(
-            r#"
-            SELECT
-                config_id,
-                source,
-                price_type,
-                fallback_source,
-                max_age_hours,
-                tolerance_pct,
-                stale_action,
-                priority
-            FROM "ob-poc".cbu_pricing_config
-            WHERE cbu_id = $1
-              AND is_active = true
-              AND instrument_class_id = $2
-              AND (market_id IS NULL OR market_id = $3 OR $3 IS NULL)
-              AND (currency IS NULL OR currency = $4 OR $4 IS NULL)
-            ORDER BY priority ASC
-            LIMIT 1
-            "#,
-            cbu_id,
-            class_id,
-            market_id,
-            currency
-        )
-        .fetch_optional(pool)
-        .await?;
-
-        match row {
-            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                json!({
-                    "config_id": r.config_id.to_string(),
-                    "source": r.source,
-                    "price_type": r.price_type,
-                    "fallback_source": r.fallback_source,
-                    "max_age_hours": r.max_age_hours,
-                    "tolerance_pct": r.tolerance_pct,
-                    "stale_action": r.stale_action,
-                    "priority": r.priority
-                }),
-            )),
-            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                json!({
-                    "error": "no_pricing_config",
-                    "message": format!(
-                        "No pricing config found for instrument_class={}, market={:?}, currency={:?}",
-                        instrument_class, market, currency
-                    )
-                }),
-            )),
-        }
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // ============================================================================
@@ -560,6 +566,99 @@ impl CustomOperation for ListOpenSlaBreachesOp {
     fn rationale(&self) -> &'static str {
         "Multi-table join with template details and severity filtering"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use serde_json::json;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let severity = json_extract_string_opt(args, "severity");
+
+        let rows: Vec<SlaBreachRow> = sqlx::query_as(
+            r#"
+            SELECT
+                b.breach_id,
+                b.breach_severity,
+                b.breach_date,
+                b.root_cause_category,
+                b.root_cause_description,
+                b.remediation_status,
+                b.remediation_plan,
+                b.remediation_due_date,
+                b.escalated_to,
+                c.commitment_id,
+                t.template_code,
+                t.name as template_name,
+                mt.metric_code,
+                mt.name as metric_name,
+                m.measured_value,
+                COALESCE(c.override_target_value, t.target_value) as target_value,
+                m.period_start,
+                m.period_end
+            FROM "ob-poc".sla_breaches b
+            JOIN "ob-poc".cbu_sla_commitments c ON b.commitment_id = c.commitment_id
+            JOIN "ob-poc".sla_templates t ON c.template_id = t.template_id
+            JOIN "ob-poc".sla_metric_types mt ON t.metric_code = mt.metric_code
+            JOIN "ob-poc".sla_measurements m ON b.measurement_id = m.measurement_id
+            WHERE c.cbu_id = $1
+              AND b.remediation_status IN ('OPEN', 'IN_PROGRESS', 'ESCALATED')
+              AND ($2::text IS NULL OR b.breach_severity = $2)
+            ORDER BY
+                CASE b.breach_severity
+                    WHEN 'CRITICAL' THEN 1
+                    WHEN 'MAJOR' THEN 2
+                    WHEN 'MINOR' THEN 3
+                END,
+                b.breach_date DESC
+            "#,
+        )
+        .bind(cbu_id)
+        .bind(&severity)
+        .fetch_all(pool)
+        .await?;
+
+        let breaches: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|r| {
+                json!({
+                    "breach_id": r.breach_id.to_string(),
+                    "breach_severity": r.breach_severity,
+                    "breach_date": r.breach_date.map(|d| d.to_string()),
+                    "root_cause_category": r.root_cause_category,
+                    "root_cause_description": r.root_cause_description,
+                    "remediation_status": r.remediation_status,
+                    "remediation_plan": r.remediation_plan,
+                    "remediation_due_date": r.remediation_due_date.map(|d| d.to_string()),
+                    "escalated_to": r.escalated_to,
+                    "commitment_id": r.commitment_id.to_string(),
+                    "template_code": r.template_code,
+                    "template_name": r.template_name,
+                    "metric_code": r.metric_code,
+                    "metric_name": r.metric_name,
+                    "measured_value": r.measured_value,
+                    "target_value": r.target_value,
+                    "period_start": r.period_start.map(|d| d.to_string()),
+                    "period_end": r.period_end.map(|d| d.to_string())
+                })
+            })
+            .collect();
+
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            breaches,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ListOpenSlaBreachesOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -673,96 +772,6 @@ impl CustomOperation for ListOpenSlaBreachesOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required for list-open-breaches"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use serde_json::json;
-
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let severity = json_extract_string_opt(args, "severity");
-
-        let rows: Vec<SlaBreachRow> = sqlx::query_as(
-            r#"
-            SELECT
-                b.breach_id,
-                b.breach_severity,
-                b.breach_date,
-                b.root_cause_category,
-                b.root_cause_description,
-                b.remediation_status,
-                b.remediation_plan,
-                b.remediation_due_date,
-                b.escalated_to,
-                c.commitment_id,
-                t.template_code,
-                t.name as template_name,
-                mt.metric_code,
-                mt.name as metric_name,
-                m.measured_value,
-                COALESCE(c.override_target_value, t.target_value) as target_value,
-                m.period_start,
-                m.period_end
-            FROM "ob-poc".sla_breaches b
-            JOIN "ob-poc".cbu_sla_commitments c ON b.commitment_id = c.commitment_id
-            JOIN "ob-poc".sla_templates t ON c.template_id = t.template_id
-            JOIN "ob-poc".sla_metric_types mt ON t.metric_code = mt.metric_code
-            JOIN "ob-poc".sla_measurements m ON b.measurement_id = m.measurement_id
-            WHERE c.cbu_id = $1
-              AND b.remediation_status IN ('OPEN', 'IN_PROGRESS', 'ESCALATED')
-              AND ($2::text IS NULL OR b.breach_severity = $2)
-            ORDER BY
-                CASE b.breach_severity
-                    WHEN 'CRITICAL' THEN 1
-                    WHEN 'MAJOR' THEN 2
-                    WHEN 'MINOR' THEN 3
-                END,
-                b.breach_date DESC
-            "#,
-        )
-        .bind(cbu_id)
-        .bind(&severity)
-        .fetch_all(pool)
-        .await?;
-
-        let breaches: Vec<serde_json::Value> = rows
-            .iter()
-            .map(|r| {
-                json!({
-                    "breach_id": r.breach_id.to_string(),
-                    "breach_severity": r.breach_severity,
-                    "breach_date": r.breach_date.map(|d| d.to_string()),
-                    "root_cause_category": r.root_cause_category,
-                    "root_cause_description": r.root_cause_description,
-                    "remediation_status": r.remediation_status,
-                    "remediation_plan": r.remediation_plan,
-                    "remediation_due_date": r.remediation_due_date.map(|d| d.to_string()),
-                    "escalated_to": r.escalated_to,
-                    "commitment_id": r.commitment_id.to_string(),
-                    "template_code": r.template_code,
-                    "template_name": r.template_name,
-                    "metric_code": r.metric_code,
-                    "metric_name": r.metric_name,
-                    "measured_value": r.measured_value,
-                    "target_value": r.target_value,
-                    "period_start": r.period_start.map(|d| d.to_string()),
-                    "period_end": r.period_end.map(|d| d.to_string())
-                })
-            })
-            .collect();
-
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            breaches,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 

@@ -127,6 +127,40 @@ impl CustomOperation for PartnershipContributionOp {
         "Capital contributions require updating capital accounts and recalculating ownership percentages"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
+        let partner_id = json_extract_uuid(args, ctx, "partner-entity-id")?;
+        let amount: rust_decimal::Decimal = json_extract_string(args, "amount")?
+            .parse()
+            .map_err(|_| anyhow!("amount is required"))?;
+        let contribution_date = json_extract_string_opt(args, "contribution-date")
+            .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
+        let result = partnership_contribution_impl(
+            partnership_id,
+            partner_id,
+            amount,
+            contribution_date,
+            pool,
+        )
+        .await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PartnershipContributionOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -159,7 +193,6 @@ impl CustomOperation for PartnershipContributionOp {
 
         Ok(ExecutionResult::Record(result))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -169,36 +202,6 @@ impl CustomOperation for PartnershipContributionOp {
         Err(anyhow!(
             "Database feature required for partnership.record-contribution"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
-        let partner_id = json_extract_uuid(args, ctx, "partner-entity-id")?;
-        let amount: rust_decimal::Decimal = json_extract_string(args, "amount")?
-            .parse()
-            .map_err(|_| anyhow!("amount is required"))?;
-        let contribution_date = json_extract_string_opt(args, "contribution-date")
-            .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
-        let result = partnership_contribution_impl(
-            partnership_id,
-            partner_id,
-            amount,
-            contribution_date,
-            pool,
-        )
-        .await?;
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -301,6 +304,43 @@ impl CustomOperation for PartnershipDistributionOp {
         "Distributions require updating capital_returned and validating against contribution history"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
+        let partner_id = json_extract_uuid(args, ctx, "partner-entity-id")?;
+        let amount: rust_decimal::Decimal = json_extract_string(args, "amount")?
+            .parse()
+            .map_err(|_| anyhow!("amount is required"))?;
+        let distribution_type = json_extract_string_opt(args, "distribution-type")
+            .unwrap_or_else(|| "capital_return".to_string());
+        let distribution_date = json_extract_string_opt(args, "distribution-date")
+            .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
+        let result = partnership_distribution_impl(
+            partnership_id,
+            partner_id,
+            amount,
+            distribution_type,
+            distribution_date,
+            pool,
+        )
+        .await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PartnershipDistributionOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -339,7 +379,6 @@ impl CustomOperation for PartnershipDistributionOp {
 
         Ok(ExecutionResult::Record(result))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -349,39 +388,6 @@ impl CustomOperation for PartnershipDistributionOp {
         Err(anyhow!(
             "Database feature required for partnership.record-distribution"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
-        let partner_id = json_extract_uuid(args, ctx, "partner-entity-id")?;
-        let amount: rust_decimal::Decimal = json_extract_string(args, "amount")?
-            .parse()
-            .map_err(|_| anyhow!("amount is required"))?;
-        let distribution_type = json_extract_string_opt(args, "distribution-type")
-            .unwrap_or_else(|| "capital_return".to_string());
-        let distribution_date = json_extract_string_opt(args, "distribution-date")
-            .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
-        let result = partnership_distribution_impl(
-            partnership_id,
-            partner_id,
-            amount,
-            distribution_type,
-            distribution_date,
-            pool,
-        )
-        .await?;
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -529,29 +535,7 @@ impl CustomOperation for PartnershipReconcileOp {
         "Reconciliation validates profit shares sum to 100% and identifies discrepancies"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let partnership_id = get_required_uuid(verb_call, "partnership-entity-id")?;
-        Ok(ExecutionResult::Record(
-            partnership_reconcile_impl(partnership_id, pool).await?,
-        ))
-    }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!(
-            "Database feature required for partnership.reconcile"
-        ))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -568,6 +552,31 @@ impl CustomOperation for PartnershipReconcileOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl PartnershipReconcileOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let partnership_id = get_required_uuid(verb_call, "partnership-entity-id")?;
+        Ok(ExecutionResult::Record(
+            partnership_reconcile_impl(partnership_id, pool).await?,
+        ))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!(
+            "Database feature required for partnership.reconcile"
+        ))
     }
 }
 
@@ -736,29 +745,7 @@ impl CustomOperation for PartnershipAnalyzeControlOp {
         "Partnership control analysis identifies GPs (presumptive control) and LP investors"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let partnership_id = get_required_uuid(verb_call, "partnership-entity-id")?;
-        Ok(ExecutionResult::Record(
-            partnership_analyze_control_impl(partnership_id, pool).await?,
-        ))
-    }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!(
-            "Database feature required for partnership.analyze-control"
-        ))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -775,6 +762,31 @@ impl CustomOperation for PartnershipAnalyzeControlOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl PartnershipAnalyzeControlOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let partnership_id = get_required_uuid(verb_call, "partnership-entity-id")?;
+        Ok(ExecutionResult::Record(
+            partnership_analyze_control_impl(partnership_id, pool).await?,
+        ))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!(
+            "Database feature required for partnership.analyze-control"
+        ))
     }
 }
 

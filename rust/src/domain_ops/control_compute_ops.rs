@@ -289,33 +289,6 @@ impl CustomOperation for ControlComputeOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let entity_id_filter = extract_uuid_opt(verb_call, ctx, "entity-id");
-        let result = control_compute_impl(case_id, entity_id_filter, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "case_id": Uuid::nil(),
-            "entity_id": Uuid::nil(),
-            "controllers": [],
-            "governance_controller_identified": false
-        })))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -334,6 +307,34 @@ impl CustomOperation for ControlComputeOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl ControlComputeOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
+        let entity_id_filter = extract_uuid_opt(verb_call, ctx, "entity-id");
+        let result = control_compute_impl(case_id, entity_id_filter, pool).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "case_id": Uuid::nil(),
+            "entity_id": Uuid::nil(),
+            "controllers": [],
+            "governance_controller_identified": false
+        })))
     }
 }
 

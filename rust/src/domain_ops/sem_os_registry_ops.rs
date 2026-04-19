@@ -34,25 +34,6 @@ macro_rules! registry_op {
             }
 
             #[cfg(feature = "database")]
-            async fn execute(
-                &self,
-                verb_call: &VerbCall,
-                ctx: &mut ExecutionContext,
-                pool: &PgPool,
-            ) -> Result<ExecutionResult> {
-                delegate_to_tool(pool, ctx, verb_call, $tool).await
-            }
-
-            #[cfg(not(feature = "database"))]
-            async fn execute(
-                &self,
-                _verb_call: &VerbCall,
-                _ctx: &mut ExecutionContext,
-            ) -> Result<ExecutionResult> {
-                Err(anyhow::anyhow!("registry.{} requires database", $verb))
-            }
-
-            #[cfg(feature = "database")]
             async fn execute_json(
                 &self,
                 args: &serde_json::Value,
@@ -64,6 +45,29 @@ macro_rules! registry_op {
 
             fn is_migrated(&self) -> bool {
                 true
+            }
+        }
+
+        impl $struct_name {
+            #[cfg(feature = "database")]
+            #[allow(dead_code)]
+            async fn execute(
+                &self,
+                verb_call: &VerbCall,
+                ctx: &mut ExecutionContext,
+                pool: &PgPool,
+            ) -> Result<ExecutionResult> {
+                delegate_to_tool(pool, ctx, verb_call, $tool).await
+            }
+
+            #[cfg(not(feature = "database"))]
+            #[allow(dead_code)]
+            async fn execute(
+                &self,
+                _verb_call: &VerbCall,
+                _ctx: &mut ExecutionContext,
+            ) -> Result<ExecutionResult> {
+                Err(anyhow::anyhow!("registry.{} requires database", $verb))
             }
         }
     };
@@ -86,6 +90,34 @@ impl CustomOperation for RegistryDescribeObjectOp {
     fn rationale(&self) -> &'static str {
         "Polymorphic routing by object_type to sem_reg_describe_* tools"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let object_type = args
+            .get("object-type")
+            .or_else(|| args.get("object_type"))
+            .and_then(|v| v.as_str());
+        let tool_name = match object_type {
+            Some("verb_contract") | Some("verb") => "sem_reg_describe_verb",
+            Some("entity_type_def") | Some("entity_type") => "sem_reg_describe_entity_type",
+            Some("policy_rule") | Some("policy") => "sem_reg_describe_policy",
+            Some("view_def") | Some("view") => "sem_reg_describe_view",
+            _ => "sem_reg_describe_attribute",
+        };
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, tool_name).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl RegistryDescribeObjectOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -121,31 +153,6 @@ impl CustomOperation for RegistryDescribeObjectOp {
             "registry.describe-object requires database"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let object_type = args
-            .get("object-type")
-            .or_else(|| args.get("object_type"))
-            .and_then(|v| v.as_str());
-        let tool_name = match object_type {
-            Some("verb_contract") | Some("verb") => "sem_reg_describe_verb",
-            Some("entity_type_def") | Some("entity_type") => "sem_reg_describe_entity_type",
-            Some("policy_rule") | Some("policy") => "sem_reg_describe_policy",
-            Some("view_def") | Some("view") => "sem_reg_describe_view",
-            _ => "sem_reg_describe_attribute",
-        };
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, tool_name).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // ── Search & List ──────────────────────────────────────────────────
@@ -172,6 +179,32 @@ impl CustomOperation for RegistryListObjectsOp {
     fn rationale(&self) -> &'static str {
         "Polymorphic routing by object_type to sem_reg_list_* tools"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let object_type = args
+            .get("object-type")
+            .or_else(|| args.get("object_type"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("verb_contract");
+        let tool_name = match object_type {
+            "attribute_def" | "attribute" => "sem_reg_list_attributes",
+            _ => "sem_reg_list_verbs",
+        };
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, tool_name).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl RegistryListObjectsOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -201,29 +234,6 @@ impl CustomOperation for RegistryListObjectsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("registry.list-objects requires database"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let object_type = args
-            .get("object-type")
-            .or_else(|| args.get("object_type"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("verb_contract");
-        let tool_name = match object_type {
-            "attribute_def" | "attribute" => "sem_reg_list_attributes",
-            _ => "sem_reg_list_verbs",
-        };
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, tool_name).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -401,6 +411,23 @@ impl CustomOperation for RegistryActiveManifestOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        registry_active_manifest_impl(pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl RegistryActiveManifestOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         _verb_call: &VerbCall,
@@ -424,19 +451,5 @@ impl CustomOperation for RegistryActiveManifestOp {
         Err(anyhow::anyhow!(
             "registry.active-manifest requires database"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        registry_active_manifest_impl(pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

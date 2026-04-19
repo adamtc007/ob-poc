@@ -22,24 +22,6 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-#[cfg(feature = "database")]
-async fn execute_json_via_legacy<T: CustomOperation + Sync>(
-    op: &T,
-    args: &serde_json::Value,
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-    pool: &PgPool,
-) -> Result<dsl_runtime::VerbExecutionOutcome> {
-    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
-        op.domain(),
-        op.verb(),
-        args,
-    );
-    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
-    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
-    crate::sem_os_runtime::verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
-}
-
 // chrono is used for teaching status timestamps
 #[allow(unused_imports)]
 use chrono;
@@ -153,7 +135,26 @@ impl CustomOperation for AgentStartOp {
     fn rationale(&self) -> &'static str {
         "Starts agent mode with a specific research task"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentStartOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -227,20 +228,6 @@ impl CustomOperation for AgentStartOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -252,6 +239,7 @@ impl CustomOperation for AgentStartOp {
         ))
     }
 }
+
 
 /// Pause the running agent loop
 #[register_custom_op]
@@ -270,7 +258,26 @@ impl CustomOperation for AgentPauseOp {
     fn rationale(&self) -> &'static str {
         "Pauses the running agent loop"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentPauseOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -284,20 +291,6 @@ impl CustomOperation for AgentPauseOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -309,6 +302,7 @@ impl CustomOperation for AgentPauseOp {
         ))
     }
 }
+
 
 /// Resume a paused agent loop
 #[register_custom_op]
@@ -327,7 +321,26 @@ impl CustomOperation for AgentResumeOp {
     fn rationale(&self) -> &'static str {
         "Resumes a paused agent loop"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentResumeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -341,20 +354,6 @@ impl CustomOperation for AgentResumeOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -366,6 +365,7 @@ impl CustomOperation for AgentResumeOp {
         ))
     }
 }
+
 
 /// Stop the agent loop completely
 #[register_custom_op]
@@ -384,7 +384,26 @@ impl CustomOperation for AgentStopOp {
     fn rationale(&self) -> &'static str {
         "Stops the agent loop completely"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentStopOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -398,20 +417,6 @@ impl CustomOperation for AgentStopOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -423,6 +428,7 @@ impl CustomOperation for AgentStopOp {
         ))
     }
 }
+
 
 // ============================================================================
 // Checkpoint Operations
@@ -445,7 +451,26 @@ impl CustomOperation for AgentConfirmOp {
     fn rationale(&self) -> &'static str {
         "Confirms a checkpoint decision and proceeds"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentConfirmOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -479,20 +504,6 @@ impl CustomOperation for AgentConfirmOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -504,6 +515,7 @@ impl CustomOperation for AgentConfirmOp {
         ))
     }
 }
+
 
 /// Reject a checkpoint and skip this decision
 #[register_custom_op]
@@ -522,7 +534,26 @@ impl CustomOperation for AgentRejectOp {
     fn rationale(&self) -> &'static str {
         "Rejects a checkpoint and skips this decision"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentRejectOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -556,20 +587,6 @@ impl CustomOperation for AgentRejectOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -581,6 +598,7 @@ impl CustomOperation for AgentRejectOp {
         ))
     }
 }
+
 
 /// Select a specific candidate from checkpoint options
 #[register_custom_op]
@@ -599,7 +617,26 @@ impl CustomOperation for AgentSelectOp {
     fn rationale(&self) -> &'static str {
         "Selects a specific candidate from checkpoint options"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentSelectOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -634,20 +671,6 @@ impl CustomOperation for AgentSelectOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -659,6 +682,7 @@ impl CustomOperation for AgentSelectOp {
         ))
     }
 }
+
 
 // ============================================================================
 // Status Operations
@@ -746,21 +770,7 @@ impl CustomOperation for AgentStatusOp {
     fn rationale(&self) -> &'static str {
         "Gets current agent status"
     }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let session_id = get_session_id(ctx);
-        Ok(ExecutionResult::Record(
-            agent_status_impl(session_id, pool).await?,
-        ))
-    }
-
-    #[cfg(feature = "database")]
+#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
@@ -780,6 +790,20 @@ impl CustomOperation for AgentStatusOp {
     fn is_migrated(&self) -> bool {
         true
     }
+}
+impl AgentStatusOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let session_id = get_session_id(ctx);
+        Ok(ExecutionResult::Record(
+            agent_status_impl(session_id, pool).await?,
+        ))
+    }
 
     #[cfg(not(feature = "database"))]
     async fn execute(
@@ -792,6 +816,7 @@ impl CustomOperation for AgentStatusOp {
         ))
     }
 }
+
 
 /// Get agent decision and action history for current session
 #[register_custom_op]
@@ -883,22 +908,7 @@ impl CustomOperation for AgentHistoryOp {
     fn rationale(&self) -> &'static str {
         "Gets agent decision and action history"
     }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let session_id = get_session_id(ctx);
-        let limit = get_optional_integer(verb_call, "limit").unwrap_or(50) as i64;
-        Ok(ExecutionResult::Record(
-            agent_history_impl(session_id, limit, pool).await?,
-        ))
-    }
-
-    #[cfg(feature = "database")]
+#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -920,6 +930,21 @@ impl CustomOperation for AgentHistoryOp {
     fn is_migrated(&self) -> bool {
         true
     }
+}
+impl AgentHistoryOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let session_id = get_session_id(ctx);
+        let limit = get_optional_integer(verb_call, "limit").unwrap_or(50) as i64;
+        Ok(ExecutionResult::Record(
+            agent_history_impl(session_id, limit, pool).await?,
+        ))
+    }
 
     #[cfg(not(feature = "database"))]
     async fn execute(
@@ -932,6 +957,7 @@ impl CustomOperation for AgentHistoryOp {
         ))
     }
 }
+
 
 // ============================================================================
 // Configuration Operations
@@ -954,7 +980,26 @@ impl CustomOperation for AgentSetThresholdOp {
     fn rationale(&self) -> &'static str {
         "Sets confidence thresholds for auto-selection"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentSetThresholdOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -989,20 +1034,6 @@ impl CustomOperation for AgentSetThresholdOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1014,6 +1045,7 @@ impl CustomOperation for AgentSetThresholdOp {
         ))
     }
 }
+
 
 /// Switch between agent and hybrid modes
 #[register_custom_op]
@@ -1032,7 +1064,26 @@ impl CustomOperation for AgentSetModeOp {
     fn rationale(&self) -> &'static str {
         "Switches between manual, agent, and hybrid modes"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentSetModeOp {
     #[cfg(feature = "database")]
     #[governed_query(verb = "agent.set-mode", skip_principal_check = true)]
     async fn execute(
@@ -1062,20 +1113,6 @@ impl CustomOperation for AgentSetModeOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1087,6 +1124,7 @@ impl CustomOperation for AgentSetModeOp {
         ))
     }
 }
+
 
 /// Switch between Research and Governed authoring modes.
 ///
@@ -1108,7 +1146,26 @@ impl CustomOperation for AgentSetAuthoringModeOp {
     fn rationale(&self) -> &'static str {
         "Controls Research vs Governed authoring mode boundary"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentSetAuthoringModeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1159,20 +1216,6 @@ impl CustomOperation for AgentSetAuthoringModeOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1184,6 +1227,7 @@ impl CustomOperation for AgentSetAuthoringModeOp {
         ))
     }
 }
+
 
 // ============================================================================
 // Teaching Operations (Direct Pattern Learning)
@@ -1206,7 +1250,45 @@ impl CustomOperation for AgentTeachOp {
     fn rationale(&self) -> &'static str {
         "Teaches a phrase→verb mapping for improved intent recognition"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt};
+        let phrase = json_extract_string(args, "phrase")?;
+        let verb = json_extract_string(args, "verb")?;
+        let source =
+            json_extract_string_opt(args, "source").unwrap_or_else(|| "dsl_teaching".to_string());
 
+        let result: (bool,) = sqlx::query_as(r#"SELECT "ob-poc".teach_phrase($1, $2, $3)"#)
+            .bind(&phrase)
+            .bind(&verb)
+            .bind(&source)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to teach phrase: {}", e))?;
+
+        let val = if result.0 {
+            json!({
+                "success": true, "taught": true, "phrase": phrase, "verb": verb, "source": source,
+                "message": format!("Taught: '{}' → {}. Run (agent.activate-teaching) to activate.", phrase, verb)
+            })
+        } else {
+            json!({
+                "success": false, "taught": false, "phrase": phrase, "verb": verb,
+                "error": "Pattern already exists or verb not found"
+            })
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(val))
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentTeachOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1251,44 +1333,6 @@ impl CustomOperation for AgentTeachOp {
         }
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_string_opt};
-        let phrase = json_extract_string(args, "phrase")?;
-        let verb = json_extract_string(args, "verb")?;
-        let source =
-            json_extract_string_opt(args, "source").unwrap_or_else(|| "dsl_teaching".to_string());
-
-        let result: (bool,) = sqlx::query_as(r#"SELECT "ob-poc".teach_phrase($1, $2, $3)"#)
-            .bind(&phrase)
-            .bind(&verb)
-            .bind(&source)
-            .fetch_one(pool)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to teach phrase: {}", e))?;
-
-        let val = if result.0 {
-            json!({
-                "success": true, "taught": true, "phrase": phrase, "verb": verb, "source": source,
-                "message": format!("Taught: '{}' → {}. Run (agent.activate-teaching) to activate.", phrase, verb)
-            })
-        } else {
-            json!({
-                "success": false, "taught": false, "phrase": phrase, "verb": verb,
-                "error": "Pattern already exists or verb not found"
-            })
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(val))
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1300,6 +1344,7 @@ impl CustomOperation for AgentTeachOp {
         ))
     }
 }
+
 
 /// Remove a previously taught phrase→verb mapping
 #[register_custom_op]
@@ -1318,45 +1363,7 @@ impl CustomOperation for AgentUnteachOp {
     fn rationale(&self) -> &'static str {
         "Removes a taught phrase→verb mapping"
     }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let phrase = get_required_string(verb_call, "phrase")?;
-        let verb = get_optional_string(verb_call, "verb");
-        let reason =
-            get_optional_string(verb_call, "reason").unwrap_or_else(|| "dsl_unteach".to_string());
-
-        // Call the database function
-        let result: (i32,) = sqlx::query_as(r#"SELECT "ob-poc".unteach_phrase($1, $2, $3)"#)
-            .bind(&phrase)
-            .bind(verb.as_deref())
-            .bind(&reason)
-            .fetch_one(pool)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to unteach phrase: {}", e))?;
-
-        let removed_count = result.0;
-
-        Ok(ExecutionResult::Record(json!({
-            "success": true,
-            "untaught": removed_count > 0,
-            "phrase": phrase,
-            "verb": verb,
-            "removed_count": removed_count,
-            "message": if removed_count > 0 {
-                format!("Removed {} pattern(s) for phrase '{}'", removed_count, phrase)
-            } else {
-                "No matching patterns found to remove".to_string()
-            }
-        })))
-    }
-
-    #[cfg(feature = "database")]
+#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -1396,6 +1403,44 @@ impl CustomOperation for AgentUnteachOp {
     fn is_migrated(&self) -> bool {
         true
     }
+}
+impl AgentUnteachOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let phrase = get_required_string(verb_call, "phrase")?;
+        let verb = get_optional_string(verb_call, "verb");
+        let reason =
+            get_optional_string(verb_call, "reason").unwrap_or_else(|| "dsl_unteach".to_string());
+
+        // Call the database function
+        let result: (i32,) = sqlx::query_as(r#"SELECT "ob-poc".unteach_phrase($1, $2, $3)"#)
+            .bind(&phrase)
+            .bind(verb.as_deref())
+            .bind(&reason)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to unteach phrase: {}", e))?;
+
+        let removed_count = result.0;
+
+        Ok(ExecutionResult::Record(json!({
+            "success": true,
+            "untaught": removed_count > 0,
+            "phrase": phrase,
+            "verb": verb,
+            "removed_count": removed_count,
+            "message": if removed_count > 0 {
+                format!("Removed {} pattern(s) for phrase '{}'", removed_count, phrase)
+            } else {
+                "No matching patterns found to remove".to_string()
+            }
+        })))
+    }
 
     #[cfg(not(feature = "database"))]
     async fn execute(
@@ -1408,6 +1453,7 @@ impl CustomOperation for AgentUnteachOp {
         ))
     }
 }
+
 
 /// Show recently taught patterns and their embedding status
 #[register_custom_op]
@@ -1426,7 +1472,77 @@ impl CustomOperation for AgentTeachingStatusOp {
     fn rationale(&self) -> &'static str {
         "Shows recently taught patterns and statistics"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_bool_opt, json_extract_int_opt};
+        let limit = json_extract_int_opt(args, "limit").unwrap_or(20) as i32;
+        let include_stats = json_extract_bool_opt(args, "include-stats").unwrap_or(true);
 
+        let recent: Vec<(String, String, String, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
+            r#"
+            SELECT phrase, verb, source, taught_at
+            FROM "ob-poc".v_recently_taught
+            ORDER BY taught_at DESC
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to get recently taught: {}", e))?;
+
+        let recent_json: Vec<serde_json::Value> = recent
+            .iter()
+            .map(|(phrase, verb, source, taught_at)| {
+                json!({
+                    "phrase": phrase, "verb": verb, "source": source,
+                    "taught_at": taught_at.to_rfc3339()
+                })
+            })
+            .collect();
+
+        let stats = if include_stats {
+            let row: Option<(i64, i64, i64, Option<chrono::DateTime<chrono::Utc>>)> =
+                sqlx::query_as(
+                    r#"
+                    SELECT total_taught, taught_today, taught_this_week, most_recent
+                    FROM "ob-poc".v_teaching_stats
+                    "#,
+                )
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to get teaching stats: {}", e))?;
+
+            row.map(|(total, today, week, most_recent)| {
+                json!({
+                    "total_taught": total, "taught_today": today,
+                    "taught_this_week": week,
+                    "most_recent": most_recent.map(|t| t.to_rfc3339())
+                })
+            })
+        } else {
+            None
+        };
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "success": true,
+                "recent_count": recent_json.len(),
+                "recent": recent_json,
+                "stats": stats
+            }),
+        ))
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentTeachingStatusOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1505,76 +1621,6 @@ impl CustomOperation for AgentTeachingStatusOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_bool_opt, json_extract_int_opt};
-        let limit = json_extract_int_opt(args, "limit").unwrap_or(20) as i32;
-        let include_stats = json_extract_bool_opt(args, "include-stats").unwrap_or(true);
-
-        let recent: Vec<(String, String, String, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
-            r#"
-            SELECT phrase, verb, source, taught_at
-            FROM "ob-poc".v_recently_taught
-            ORDER BY taught_at DESC
-            LIMIT $1
-            "#,
-        )
-        .bind(limit)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to get recently taught: {}", e))?;
-
-        let recent_json: Vec<serde_json::Value> = recent
-            .iter()
-            .map(|(phrase, verb, source, taught_at)| {
-                json!({
-                    "phrase": phrase, "verb": verb, "source": source,
-                    "taught_at": taught_at.to_rfc3339()
-                })
-            })
-            .collect();
-
-        let stats = if include_stats {
-            let row: Option<(i64, i64, i64, Option<chrono::DateTime<chrono::Utc>>)> =
-                sqlx::query_as(
-                    r#"
-                    SELECT total_taught, taught_today, taught_this_week, most_recent
-                    FROM "ob-poc".v_teaching_stats
-                    "#,
-                )
-                .fetch_optional(pool)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to get teaching stats: {}", e))?;
-
-            row.map(|(total, today, week, most_recent)| {
-                json!({
-                    "total_taught": total, "taught_today": today,
-                    "taught_this_week": week,
-                    "most_recent": most_recent.map(|t| t.to_rfc3339())
-                })
-            })
-        } else {
-            None
-        };
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "success": true,
-                "recent_count": recent_json.len(),
-                "recent": recent_json,
-                "stats": stats
-            }),
-        ))
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1586,6 +1632,7 @@ impl CustomOperation for AgentTeachingStatusOp {
         ))
     }
 }
+
 
 // ============================================================================
 // AgentGetModeOp - Read current agent operating mode
@@ -1607,7 +1654,26 @@ impl CustomOperation for AgentGetModeOp {
     fn rationale(&self) -> &'static str {
         "Reads the current AgentMode (Research or Governed) from session context"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentGetModeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1634,20 +1700,6 @@ impl CustomOperation for AgentGetModeOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1659,6 +1711,7 @@ impl CustomOperation for AgentGetModeOp {
         ))
     }
 }
+
 
 // ============================================================================
 // AgentGetPolicyOp - Read current PolicyGate snapshot
@@ -1680,34 +1733,7 @@ impl CustomOperation for AgentGetPolicyOp {
     fn rationale(&self) -> &'static str {
         "Reads the current PolicyGate configuration from environment"
     }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Read policy flags from environment (same as PolicyGate reads them)
-        let strict_pipeline =
-            std::env::var("OBPOC_STRICT_SINGLE_PIPELINE").unwrap_or_else(|_| "true".to_string());
-        let allow_raw_execute =
-            std::env::var("OBPOC_ALLOW_RAW_EXECUTE").unwrap_or_else(|_| "false".to_string());
-        let strict_semreg =
-            std::env::var("OBPOC_STRICT_SEMREG").unwrap_or_else(|_| "true".to_string());
-        let allow_legacy_generate =
-            std::env::var("OBPOC_ALLOW_LEGACY_GENERATE").unwrap_or_else(|_| "false".to_string());
-
-        Ok(ExecutionResult::Record(json!({
-            "strict_single_pipeline": strict_pipeline == "true",
-            "allow_raw_execute": allow_raw_execute == "true",
-            "strict_semreg": strict_semreg == "true",
-            "allow_legacy_generate": allow_legacy_generate == "true",
-            "message": "Current PolicyGate configuration"
-        })))
-    }
-
-    #[cfg(feature = "database")]
+#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
@@ -1736,6 +1762,33 @@ impl CustomOperation for AgentGetPolicyOp {
     fn is_migrated(&self) -> bool {
         true
     }
+}
+impl AgentGetPolicyOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Read policy flags from environment (same as PolicyGate reads them)
+        let strict_pipeline =
+            std::env::var("OBPOC_STRICT_SINGLE_PIPELINE").unwrap_or_else(|_| "true".to_string());
+        let allow_raw_execute =
+            std::env::var("OBPOC_ALLOW_RAW_EXECUTE").unwrap_or_else(|_| "false".to_string());
+        let strict_semreg =
+            std::env::var("OBPOC_STRICT_SEMREG").unwrap_or_else(|_| "true".to_string());
+        let allow_legacy_generate =
+            std::env::var("OBPOC_ALLOW_LEGACY_GENERATE").unwrap_or_else(|_| "false".to_string());
+
+        Ok(ExecutionResult::Record(json!({
+            "strict_single_pipeline": strict_pipeline == "true",
+            "allow_raw_execute": allow_raw_execute == "true",
+            "strict_semreg": strict_semreg == "true",
+            "allow_legacy_generate": allow_legacy_generate == "true",
+            "message": "Current PolicyGate configuration"
+        })))
+    }
 
     #[cfg(not(feature = "database"))]
     async fn execute(
@@ -1748,6 +1801,7 @@ impl CustomOperation for AgentGetPolicyOp {
         ))
     }
 }
+
 
 // ============================================================================
 // AgentListToolsOp - List available MCP tool specifications
@@ -1769,7 +1823,41 @@ impl CustomOperation for AgentListToolsOp {
     fn rationale(&self) -> &'static str {
         "Lists available MCP tool specifications from the sem_reg agent module"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_string_opt;
+        let category_filter = json_extract_string_opt(args, "category");
 
+        let all_specs = crate::sem_reg::agent::mcp_tools::all_tool_specs();
+        let tools: Vec<serde_json::Value> = all_specs
+            .into_iter()
+            .filter(|spec| {
+                if let Some(ref cat) = category_filter {
+                    spec.name.contains(cat.as_str())
+                } else {
+                    true
+                }
+            })
+            .map(|spec| json!({ "name": spec.name, "description": spec.description }))
+            .collect();
+
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            tools
+                .into_iter()
+                .map(|v| serde_json::to_value(v).unwrap_or_default())
+                .collect(),
+        ))
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentListToolsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1807,40 +1895,6 @@ impl CustomOperation for AgentListToolsOp {
         ))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_string_opt;
-        let category_filter = json_extract_string_opt(args, "category");
-
-        let all_specs = crate::sem_reg::agent::mcp_tools::all_tool_specs();
-        let tools: Vec<serde_json::Value> = all_specs
-            .into_iter()
-            .filter(|spec| {
-                if let Some(ref cat) = category_filter {
-                    spec.name.contains(cat.as_str())
-                } else {
-                    true
-                }
-            })
-            .map(|spec| json!({ "name": spec.name, "description": spec.description }))
-            .collect();
-
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            tools
-                .into_iter()
-                .map(|v| serde_json::to_value(v).unwrap_or_default())
-                .collect(),
-        ))
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1852,6 +1906,7 @@ impl CustomOperation for AgentListToolsOp {
         ))
     }
 }
+
 
 // ============================================================================
 // AgentTelemetrySummaryOp - Query intent telemetry for pipeline health
@@ -1873,7 +1928,138 @@ impl CustomOperation for AgentTelemetrySummaryOp {
     fn rationale(&self) -> &'static str {
         "Queries intent_events telemetry views for pipeline health analysis"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_bool_opt, json_extract_int_opt};
+        let days_back = json_extract_int_opt(args, "days-back").unwrap_or(7) as i32;
+        let min_count = json_extract_int_opt(args, "min-count").unwrap_or(2) as i64;
+        let include_ccir = json_extract_bool_opt(args, "include-ccir").unwrap_or(false);
 
+        let clarify_rows: Vec<(String, i64)> = sqlx::query_as(
+            r#"
+            SELECT chosen_verb_fqn, count(*) AS clarify_count
+            FROM "ob-poc".intent_events
+            WHERE outcome = 'needs_clarification'
+              AND chosen_verb_fqn IS NOT NULL
+              AND ts > now() - make_interval(days => $1)
+            GROUP BY chosen_verb_fqn
+            HAVING count(*) >= $2
+            ORDER BY clarify_count DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(days_back)
+        .bind(min_count)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let failure_rows: Vec<(String, Option<String>, i64)> = sqlx::query_as(
+            r#"
+            SELECT outcome, error_code, count(*) AS event_count
+            FROM "ob-poc".intent_events
+            WHERE outcome NOT IN ('ready', 'scope_resolved', 'macro_expanded')
+              AND ts > now() - make_interval(days => $1)
+            GROUP BY outcome, error_code
+            HAVING count(*) >= $2
+            ORDER BY event_count DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(days_back)
+        .bind(min_count)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let deny_rows: Vec<(String, i64)> = sqlx::query_as(
+            r#"
+            SELECT denied_verb, count(*) AS deny_count
+            FROM (
+                SELECT jsonb_array_elements_text(semreg_denied_verbs) AS denied_verb
+                FROM "ob-poc".intent_events
+                WHERE semreg_denied_verbs IS NOT NULL
+                  AND jsonb_array_length(semreg_denied_verbs) > 0
+                  AND ts > now() - make_interval(days => $1)
+            ) sub
+            GROUP BY denied_verb
+            HAVING count(*) >= $2
+            ORDER BY deny_count DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(days_back)
+        .bind(min_count)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let total: (i64,) = sqlx::query_as(
+            r#"
+            SELECT count(*) FROM "ob-poc".intent_events
+            WHERE ts > now() - make_interval(days => $1)
+            "#,
+        )
+        .bind(days_back)
+        .fetch_one(pool)
+        .await
+        .unwrap_or((0,));
+
+        let mut result = json!({
+            "period_days": days_back,
+            "min_count_threshold": min_count,
+            "total_events": total.0,
+            "clarify_hotspots": clarify_rows.iter().map(|(verb, count)| {
+                json!({"verb": verb, "count": count})
+            }).collect::<Vec<_>>(),
+            "failure_modes": failure_rows.iter().map(|(outcome, code, count)| {
+                json!({"outcome": outcome, "error_code": code, "count": count})
+            }).collect::<Vec<_>>(),
+            "semreg_denies": deny_rows.iter().map(|(verb, count)| {
+                json!({"verb": verb, "deny_count": count})
+            }).collect::<Vec<_>>(),
+        });
+
+        if include_ccir {
+            let ccir_row: (i64, i64, i64) = sqlx::query_as(
+                r#"
+                SELECT
+                    count(*) FILTER (WHERE allowed_verbs_fingerprint IS NOT NULL) AS fingerprinted,
+                    coalesce(avg(pruned_verbs_count) FILTER (WHERE pruned_verbs_count IS NOT NULL), 0)::bigint AS avg_pruned,
+                    count(*) FILTER (WHERE toctou_recheck_performed = true) AS toctou_rechecks
+                FROM "ob-poc".intent_events
+                WHERE ts > now() - make_interval(days => $1)
+                "#,
+            )
+            .bind(days_back)
+            .fetch_one(pool)
+            .await
+            .unwrap_or((0, 0, 0));
+
+            if let serde_json::Value::Object(ref mut map) = result {
+                map.insert(
+                    "ccir".to_string(),
+                    json!({
+                        "events_with_fingerprint": ccir_row.0,
+                        "avg_pruned_verbs": ccir_row.1,
+                        "toctou_rechecks": ccir_row.2,
+                    }),
+                );
+            }
+        }
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl AgentTelemetrySummaryOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2009,137 +2195,6 @@ impl CustomOperation for AgentTelemetrySummaryOp {
         Ok(ExecutionResult::Record(result))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_bool_opt, json_extract_int_opt};
-        let days_back = json_extract_int_opt(args, "days-back").unwrap_or(7) as i32;
-        let min_count = json_extract_int_opt(args, "min-count").unwrap_or(2) as i64;
-        let include_ccir = json_extract_bool_opt(args, "include-ccir").unwrap_or(false);
-
-        let clarify_rows: Vec<(String, i64)> = sqlx::query_as(
-            r#"
-            SELECT chosen_verb_fqn, count(*) AS clarify_count
-            FROM "ob-poc".intent_events
-            WHERE outcome = 'needs_clarification'
-              AND chosen_verb_fqn IS NOT NULL
-              AND ts > now() - make_interval(days => $1)
-            GROUP BY chosen_verb_fqn
-            HAVING count(*) >= $2
-            ORDER BY clarify_count DESC
-            LIMIT 20
-            "#,
-        )
-        .bind(days_back)
-        .bind(min_count)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-
-        let failure_rows: Vec<(String, Option<String>, i64)> = sqlx::query_as(
-            r#"
-            SELECT outcome, error_code, count(*) AS event_count
-            FROM "ob-poc".intent_events
-            WHERE outcome NOT IN ('ready', 'scope_resolved', 'macro_expanded')
-              AND ts > now() - make_interval(days => $1)
-            GROUP BY outcome, error_code
-            HAVING count(*) >= $2
-            ORDER BY event_count DESC
-            LIMIT 20
-            "#,
-        )
-        .bind(days_back)
-        .bind(min_count)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-
-        let deny_rows: Vec<(String, i64)> = sqlx::query_as(
-            r#"
-            SELECT denied_verb, count(*) AS deny_count
-            FROM (
-                SELECT jsonb_array_elements_text(semreg_denied_verbs) AS denied_verb
-                FROM "ob-poc".intent_events
-                WHERE semreg_denied_verbs IS NOT NULL
-                  AND jsonb_array_length(semreg_denied_verbs) > 0
-                  AND ts > now() - make_interval(days => $1)
-            ) sub
-            GROUP BY denied_verb
-            HAVING count(*) >= $2
-            ORDER BY deny_count DESC
-            LIMIT 20
-            "#,
-        )
-        .bind(days_back)
-        .bind(min_count)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-
-        let total: (i64,) = sqlx::query_as(
-            r#"
-            SELECT count(*) FROM "ob-poc".intent_events
-            WHERE ts > now() - make_interval(days => $1)
-            "#,
-        )
-        .bind(days_back)
-        .fetch_one(pool)
-        .await
-        .unwrap_or((0,));
-
-        let mut result = json!({
-            "period_days": days_back,
-            "min_count_threshold": min_count,
-            "total_events": total.0,
-            "clarify_hotspots": clarify_rows.iter().map(|(verb, count)| {
-                json!({"verb": verb, "count": count})
-            }).collect::<Vec<_>>(),
-            "failure_modes": failure_rows.iter().map(|(outcome, code, count)| {
-                json!({"outcome": outcome, "error_code": code, "count": count})
-            }).collect::<Vec<_>>(),
-            "semreg_denies": deny_rows.iter().map(|(verb, count)| {
-                json!({"verb": verb, "deny_count": count})
-            }).collect::<Vec<_>>(),
-        });
-
-        if include_ccir {
-            let ccir_row: (i64, i64, i64) = sqlx::query_as(
-                r#"
-                SELECT
-                    count(*) FILTER (WHERE allowed_verbs_fingerprint IS NOT NULL) AS fingerprinted,
-                    coalesce(avg(pruned_verbs_count) FILTER (WHERE pruned_verbs_count IS NOT NULL), 0)::bigint AS avg_pruned,
-                    count(*) FILTER (WHERE toctou_recheck_performed = true) AS toctou_rechecks
-                FROM "ob-poc".intent_events
-                WHERE ts > now() - make_interval(days => $1)
-                "#,
-            )
-            .bind(days_back)
-            .fetch_one(pool)
-            .await
-            .unwrap_or((0, 0, 0));
-
-            if let serde_json::Value::Object(ref mut map) = result {
-                map.insert(
-                    "ccir".to_string(),
-                    json!({
-                        "events_with_fingerprint": ccir_row.0,
-                        "avg_pruned_verbs": ccir_row.1,
-                        "toctou_rechecks": ccir_row.2,
-                    }),
-                );
-            }
-        }
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2151,6 +2206,7 @@ impl CustomOperation for AgentTelemetrySummaryOp {
         ))
     }
 }
+
 
 // ============================================================================
 // AgentLearnOp - Activate taught patterns by running populate_embeddings
@@ -2172,90 +2228,7 @@ impl CustomOperation for AgentLearnOp {
     fn rationale(&self) -> &'static str {
         "Activates taught patterns by generating embeddings for semantic search"
     }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Count pending patterns before
-        let pending_before: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM "ob-poc".v_recently_taught rt
-            WHERE NOT EXISTS (
-                SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
-                WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb
-            )
-            "#,
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to count pending patterns: {}", e))?;
-
-        if pending_before.0 == 0 {
-            return Ok(ExecutionResult::Record(json!({
-                "success": true,
-                "message": "No pending patterns to embed",
-                "embedded_count": 0
-            })));
-        }
-
-        tracing::info!(
-            "Running populate_embeddings for {} pending patterns...",
-            pending_before.0
-        );
-
-        // Run populate_embeddings synchronously (it's fast for delta loads)
-        let output = tokio::process::Command::new("cargo")
-            .args([
-                "run",
-                "--release",
-                "-p",
-                "ob-semantic-matcher",
-                "--bin",
-                "populate_embeddings",
-            ])
-            .current_dir(env!("CARGO_MANIFEST_DIR"))
-            .output()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to run populate_embeddings: {}", e))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Ok(ExecutionResult::Record(json!({
-                "success": false,
-                "error": format!("populate_embeddings failed: {}", stderr)
-            })));
-        }
-
-        // Count how many were actually embedded
-        let pending_after: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM "ob-poc".v_recently_taught rt
-            WHERE NOT EXISTS (
-                SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
-                WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb
-            )
-            "#,
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to count remaining patterns: {}", e))?;
-
-        let embedded_count = pending_before.0 - pending_after.0;
-
-        Ok(ExecutionResult::Record(json!({
-            "success": true,
-            "message": format!("Activated {} new patterns for semantic search", embedded_count),
-            "embedded_count": embedded_count,
-            "pending_before": pending_before.0,
-            "pending_after": pending_after.0
-        })))
-    }
-
-    #[cfg(feature = "database")]
+#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
@@ -2341,6 +2314,89 @@ impl CustomOperation for AgentLearnOp {
     fn is_migrated(&self) -> bool {
         true
     }
+}
+impl AgentLearnOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Count pending patterns before
+        let pending_before: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM "ob-poc".v_recently_taught rt
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
+                WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb
+            )
+            "#,
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to count pending patterns: {}", e))?;
+
+        if pending_before.0 == 0 {
+            return Ok(ExecutionResult::Record(json!({
+                "success": true,
+                "message": "No pending patterns to embed",
+                "embedded_count": 0
+            })));
+        }
+
+        tracing::info!(
+            "Running populate_embeddings for {} pending patterns...",
+            pending_before.0
+        );
+
+        // Run populate_embeddings synchronously (it's fast for delta loads)
+        let output = tokio::process::Command::new("cargo")
+            .args([
+                "run",
+                "--release",
+                "-p",
+                "ob-semantic-matcher",
+                "--bin",
+                "populate_embeddings",
+            ])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to run populate_embeddings: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Ok(ExecutionResult::Record(json!({
+                "success": false,
+                "error": format!("populate_embeddings failed: {}", stderr)
+            })));
+        }
+
+        // Count how many were actually embedded
+        let pending_after: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM "ob-poc".v_recently_taught rt
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
+                WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb
+            )
+            "#,
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to count remaining patterns: {}", e))?;
+
+        let embedded_count = pending_before.0 - pending_after.0;
+
+        Ok(ExecutionResult::Record(json!({
+            "success": true,
+            "message": format!("Activated {} new patterns for semantic search", embedded_count),
+            "embedded_count": embedded_count,
+            "pending_before": pending_before.0,
+            "pending_after": pending_after.0
+        })))
+    }
 
     #[cfg(not(feature = "database"))]
     async fn execute(
@@ -2353,3 +2409,4 @@ impl CustomOperation for AgentLearnOp {
         ))
     }
 }
+

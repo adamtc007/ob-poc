@@ -316,6 +316,76 @@ impl CustomOperation for ResourceCreateOp {
         "Requires resource_type lookup by code and CBU/product/service FK resolution"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use uuid::Uuid;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let resource_type_code = json_extract_string(args, "resource-type")?;
+        let instance_url = json_extract_string_opt(args, "instance-url").unwrap_or_else(|| {
+            format!(
+                "urn:ob-poc:{}:{}:{}",
+                cbu_id,
+                resource_type_code.to_lowercase().replace('_', "-"),
+                Uuid::new_v4()
+            )
+        });
+        let instance_identifier = json_extract_string_opt(args, "instance-id");
+        let instance_name = json_extract_string_opt(args, "instance-name");
+        let product_id = json_extract_uuid_opt(args, ctx, "product-id");
+        let service_id = json_extract_uuid_opt(args, ctx, "service-id");
+        let depends_on_refs = args
+            .get("depends-on")
+            .and_then(|v| v.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| {
+                        item.as_str().and_then(|s| {
+                            if let Some(sym) = s.strip_prefix('@') {
+                                ctx.resolve(sym)
+                            } else {
+                                Uuid::parse_str(s).ok()
+                            }
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        let result_id = resource_create_impl(
+            cbu_id,
+            &resource_type_code,
+            instance_url,
+            instance_identifier,
+            instance_name,
+            product_id,
+            service_id,
+            depends_on_refs,
+            pool,
+        )
+        .await?;
+
+        ctx.bind("instance", result_id);
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            result_id,
+        ))
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ResourceCreateOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -438,69 +508,6 @@ impl CustomOperation for ResourceCreateOp {
 
         Ok(ExecutionResult::Uuid(result_id))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use uuid::Uuid;
-
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let resource_type_code = json_extract_string(args, "resource-type")?;
-        let instance_url = json_extract_string_opt(args, "instance-url").unwrap_or_else(|| {
-            format!(
-                "urn:ob-poc:{}:{}:{}",
-                cbu_id,
-                resource_type_code.to_lowercase().replace('_', "-"),
-                Uuid::new_v4()
-            )
-        });
-        let instance_identifier = json_extract_string_opt(args, "instance-id");
-        let instance_name = json_extract_string_opt(args, "instance-name");
-        let product_id = json_extract_uuid_opt(args, ctx, "product-id");
-        let service_id = json_extract_uuid_opt(args, ctx, "service-id");
-        let depends_on_refs = args
-            .get("depends-on")
-            .and_then(|v| v.as_array())
-            .map(|items| {
-                items
-                    .iter()
-                    .filter_map(|item| {
-                        item.as_str().and_then(|s| {
-                            if let Some(sym) = s.strip_prefix('@') {
-                                ctx.resolve(sym)
-                            } else {
-                                Uuid::parse_str(s).ok()
-                            }
-                        })
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-        let result_id = resource_create_impl(
-            cbu_id,
-            &resource_type_code,
-            instance_url,
-            instance_identifier,
-            instance_name,
-            product_id,
-            service_id,
-            depends_on_refs,
-            pool,
-        )
-        .await?;
-
-        ctx.bind("instance", result_id);
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            result_id,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -508,10 +515,6 @@ impl CustomOperation for ResourceCreateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -534,6 +537,31 @@ impl CustomOperation for ResourceSetAttrOp {
         "Requires attribute lookup by name and typed value storage"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
+        let attr_name = json_extract_string(args, "attr")?;
+        let value = json_extract_string(args, "value")?;
+        let state =
+            json_extract_string_opt(args, "state").unwrap_or_else(|| "proposed".to_string());
+        let value_id =
+            resource_set_attr_impl(instance_id, &attr_name, &value, &state, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(value_id))
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ResourceSetAttrOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -581,24 +609,6 @@ impl CustomOperation for ResourceSetAttrOp {
 
         Ok(ExecutionResult::Uuid(value_id))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
-        let attr_name = json_extract_string(args, "attr")?;
-        let value = json_extract_string(args, "value")?;
-        let state =
-            json_extract_string_opt(args, "state").unwrap_or_else(|| "proposed".to_string());
-        let value_id =
-            resource_set_attr_impl(instance_id, &attr_name, &value, &state, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(value_id))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -606,10 +616,6 @@ impl CustomOperation for ResourceSetAttrOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -631,6 +637,26 @@ impl CustomOperation for ResourceActivateOp {
         "Validates required attributes before status transition"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
+        resource_activate_impl(instance_id, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Void)
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ResourceActivateOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -657,19 +683,6 @@ impl CustomOperation for ResourceActivateOp {
 
         Ok(ExecutionResult::Void)
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
-        resource_activate_impl(instance_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Void)
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -677,10 +690,6 @@ impl CustomOperation for ResourceActivateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -700,6 +709,26 @@ impl CustomOperation for ResourceSuspendOp {
         "Status transition with optional reason logging"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
+        resource_suspend_impl(instance_id, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Void)
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ResourceSuspendOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -726,19 +755,6 @@ impl CustomOperation for ResourceSuspendOp {
 
         Ok(ExecutionResult::Void)
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
-        resource_suspend_impl(instance_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Void)
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -746,10 +762,6 @@ impl CustomOperation for ResourceSuspendOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -769,6 +781,26 @@ impl CustomOperation for ResourceDecommissionOp {
         "Terminal status transition with timestamp"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
+        resource_decommission_impl(instance_id, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Void)
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ResourceDecommissionOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -795,19 +827,6 @@ impl CustomOperation for ResourceDecommissionOp {
 
         Ok(ExecutionResult::Void)
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
-        resource_decommission_impl(instance_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Void)
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -815,10 +834,6 @@ impl CustomOperation for ResourceDecommissionOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -838,6 +853,26 @@ impl CustomOperation for ResourceValidateAttrsOp {
         "Validates required attributes against resource_attribute_requirements"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
+        let result = resource_validate_attrs_impl(instance_id, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ResourceValidateAttrsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -864,19 +899,6 @@ impl CustomOperation for ResourceValidateAttrsOp {
 
         Ok(ExecutionResult::Record(result))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
-        let result = resource_validate_attrs_impl(instance_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -888,9 +910,5 @@ impl CustomOperation for ResourceValidateAttrsOp {
             "missing": [],
             "message": "Validation skipped (no database)"
         })))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

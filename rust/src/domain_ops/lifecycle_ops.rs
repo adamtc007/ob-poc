@@ -15,22 +15,6 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-#[cfg(feature = "database")]
-async fn execute_json_via_legacy<T: CustomOperation + Sync>(
-    op: &T,
-    args: &serde_json::Value,
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-    pool: &PgPool,
-) -> Result<dsl_runtime::VerbExecutionOutcome> {
-    use crate::sem_os_runtime::verb_executor_adapter;
-
-    let vc = verb_executor_adapter::build_verb_call_pub(op.domain(), op.verb(), args);
-    let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
-    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
-    verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-    Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
-}
-
 // ============================================================================
 // PROVISION OPERATION
 // ============================================================================
@@ -54,7 +38,25 @@ impl CustomOperation for LifecycleProvisionOp {
     fn rationale(&self) -> &'static str {
         "Requires resource_type lookup, context scoping, and instance URL generation"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl LifecycleProvisionOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -280,16 +282,6 @@ impl CustomOperation for LifecycleProvisionOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -298,11 +290,8 @@ impl CustomOperation for LifecycleProvisionOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ============================================================================
 // GAP ANALYSIS OPERATION
@@ -326,7 +315,25 @@ impl CustomOperation for LifecycleAnalyzeGapsOp {
     fn rationale(&self) -> &'static str {
         "Complex gap analysis query against view joining universe, lifecycles, and instances"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl LifecycleAnalyzeGapsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -406,16 +413,6 @@ impl CustomOperation for LifecycleAnalyzeGapsOp {
         Ok(ExecutionResult::RecordSet(result))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -424,11 +421,8 @@ impl CustomOperation for LifecycleAnalyzeGapsOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ============================================================================
 // CHECK READINESS OPERATION
@@ -452,7 +446,25 @@ impl CustomOperation for LifecycleCheckReadinessOp {
     fn rationale(&self) -> &'static str {
         "Combines gap analysis with blocking/warning classification"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl LifecycleCheckReadinessOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -535,16 +547,6 @@ impl CustomOperation for LifecycleCheckReadinessOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -557,11 +559,8 @@ impl CustomOperation for LifecycleCheckReadinessOp {
             "warnings": []
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ============================================================================
 // DISCOVER OPERATION
@@ -585,7 +584,25 @@ impl CustomOperation for LifecycleDiscoverOp {
     fn rationale(&self) -> &'static str {
         "Complex multi-join query for lifecycle/resource discovery"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl LifecycleDiscoverOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -669,16 +686,6 @@ impl CustomOperation for LifecycleDiscoverOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -692,11 +699,8 @@ impl CustomOperation for LifecycleDiscoverOp {
             "optional_lifecycles": []
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ============================================================================
 // GENERATE PLAN OPERATION
@@ -720,7 +724,25 @@ impl CustomOperation for LifecycleGeneratePlanOp {
     fn rationale(&self) -> &'static str {
         "Generates DSL statements from gap analysis with user response handling"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl LifecycleGeneratePlanOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -852,16 +874,6 @@ impl CustomOperation for LifecycleGeneratePlanOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -874,11 +886,8 @@ impl CustomOperation for LifecycleGeneratePlanOp {
             "ready_to_execute": true
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ============================================================================
 // EXECUTE PLAN OPERATION
@@ -901,7 +910,25 @@ impl CustomOperation for LifecycleExecutePlanOp {
     fn rationale(&self) -> &'static str {
         "Executes DSL plan with dry-run support and result aggregation"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl LifecycleExecutePlanOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -970,16 +997,6 @@ impl CustomOperation for LifecycleExecutePlanOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -992,11 +1009,8 @@ impl CustomOperation for LifecycleExecutePlanOp {
             "results": []
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -1060,7 +1074,20 @@ impl CustomOperation for ServiceResourceProvisionLifecycleOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.provision"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        LifecycleProvisionOp.execute_json(args, ctx, pool).await
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ServiceResourceProvisionLifecycleOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1071,16 +1098,6 @@ impl CustomOperation for ServiceResourceProvisionLifecycleOp {
         LifecycleProvisionOp.execute(verb_call, ctx, pool).await
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        LifecycleProvisionOp.execute_json(args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1089,11 +1106,8 @@ impl CustomOperation for ServiceResourceProvisionLifecycleOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Compatibility alias for `service-resource.analyze-lifecycle-gaps`.
 #[register_custom_op]
@@ -1110,7 +1124,20 @@ impl CustomOperation for ServiceResourceAnalyzeLifecycleGapsOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.analyze-gaps"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        LifecycleAnalyzeGapsOp.execute_json(args, ctx, pool).await
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ServiceResourceAnalyzeLifecycleGapsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1121,16 +1148,6 @@ impl CustomOperation for ServiceResourceAnalyzeLifecycleGapsOp {
         LifecycleAnalyzeGapsOp.execute(verb_call, ctx, pool).await
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        LifecycleAnalyzeGapsOp.execute_json(args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1139,11 +1156,8 @@ impl CustomOperation for ServiceResourceAnalyzeLifecycleGapsOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Compatibility alias for `service-resource.check-lifecycle-readiness`.
 #[register_custom_op]
@@ -1160,7 +1174,22 @@ impl CustomOperation for ServiceResourceCheckLifecycleReadinessOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.check-readiness"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        LifecycleCheckReadinessOp
+            .execute_json(args, ctx, pool)
+            .await
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ServiceResourceCheckLifecycleReadinessOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1173,18 +1202,6 @@ impl CustomOperation for ServiceResourceCheckLifecycleReadinessOp {
             .await
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        LifecycleCheckReadinessOp
-            .execute_json(args, ctx, pool)
-            .await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1193,11 +1210,8 @@ impl CustomOperation for ServiceResourceCheckLifecycleReadinessOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Compatibility alias for `service-resource.discover-lifecycles`.
 #[register_custom_op]
@@ -1214,7 +1228,20 @@ impl CustomOperation for ServiceResourceDiscoverLifecyclesOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.discover"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        LifecycleDiscoverOp.execute_json(args, ctx, pool).await
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ServiceResourceDiscoverLifecyclesOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1225,16 +1252,6 @@ impl CustomOperation for ServiceResourceDiscoverLifecyclesOp {
         LifecycleDiscoverOp.execute(verb_call, ctx, pool).await
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        LifecycleDiscoverOp.execute_json(args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1243,11 +1260,8 @@ impl CustomOperation for ServiceResourceDiscoverLifecyclesOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Compatibility alias for `service-resource.generate-lifecycle-plan`.
 #[register_custom_op]
@@ -1264,7 +1278,20 @@ impl CustomOperation for ServiceResourceGenerateLifecyclePlanOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.generate-plan"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        LifecycleGeneratePlanOp.execute_json(args, ctx, pool).await
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ServiceResourceGenerateLifecyclePlanOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1275,16 +1302,6 @@ impl CustomOperation for ServiceResourceGenerateLifecyclePlanOp {
         LifecycleGeneratePlanOp.execute(verb_call, ctx, pool).await
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        LifecycleGeneratePlanOp.execute_json(args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1293,11 +1310,8 @@ impl CustomOperation for ServiceResourceGenerateLifecyclePlanOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Compatibility alias for `service-resource.execute-lifecycle-plan`.
 #[register_custom_op]
@@ -1314,7 +1328,20 @@ impl CustomOperation for ServiceResourceExecuteLifecyclePlanOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.execute-plan"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        LifecycleExecutePlanOp.execute_json(args, ctx, pool).await
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ServiceResourceExecuteLifecyclePlanOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1325,16 +1352,6 @@ impl CustomOperation for ServiceResourceExecuteLifecyclePlanOp {
         LifecycleExecutePlanOp.execute(verb_call, ctx, pool).await
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        LifecycleExecutePlanOp.execute_json(args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1343,8 +1360,5 @@ impl CustomOperation for ServiceResourceExecuteLifecyclePlanOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+

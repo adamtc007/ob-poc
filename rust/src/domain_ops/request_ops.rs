@@ -19,22 +19,6 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-#[cfg(feature = "database")]
-async fn execute_json_via_legacy<T: CustomOperation + Sync>(
-    op: &T,
-    args: &serde_json::Value,
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-    pool: &PgPool,
-) -> Result<dsl_runtime::VerbExecutionOutcome> {
-    use crate::sem_os_runtime::verb_executor_adapter;
-
-    let vc = verb_executor_adapter::build_verb_call_pub(op.domain(), op.verb(), args);
-    let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
-    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
-    verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-    Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // Shared Types
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -80,7 +64,25 @@ impl CustomOperation for RequestCreateOp {
     fn rationale(&self) -> &'static str {
         "Creates outstanding request with computed defaults from request_types config"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl RequestCreateOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -291,16 +293,6 @@ impl CustomOperation for RequestCreateOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -309,11 +301,8 @@ impl CustomOperation for RequestCreateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Overdue Operation
@@ -336,7 +325,25 @@ impl CustomOperation for RequestOverdueOp {
     fn rationale(&self) -> &'static str {
         "Queries overdue requests with optional grace period consideration"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl RequestOverdueOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -422,16 +429,6 @@ impl CustomOperation for RequestOverdueOp {
         Ok(ExecutionResult::RecordSet(results))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -440,11 +437,8 @@ impl CustomOperation for RequestOverdueOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Fulfill Operation
@@ -467,7 +461,25 @@ impl CustomOperation for RequestFulfillOp {
     fn rationale(&self) -> &'static str {
         "Fulfills request and potentially unblocks workstream"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl RequestFulfillOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -544,16 +556,6 @@ impl CustomOperation for RequestFulfillOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -562,11 +564,8 @@ impl CustomOperation for RequestFulfillOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Cancel Operation
@@ -589,7 +588,25 @@ impl CustomOperation for RequestCancelOp {
     fn rationale(&self) -> &'static str {
         "Cancels request and potentially unblocks workstream"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl RequestCancelOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -649,16 +666,6 @@ impl CustomOperation for RequestCancelOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -667,11 +674,8 @@ impl CustomOperation for RequestCancelOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Extend Operation
@@ -694,7 +698,25 @@ impl CustomOperation for RequestExtendOp {
     fn rationale(&self) -> &'static str {
         "Extends due date with audit trail"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl RequestExtendOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -810,16 +832,6 @@ impl CustomOperation for RequestExtendOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -828,11 +840,8 @@ impl CustomOperation for RequestExtendOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Remind Operation
@@ -855,7 +864,25 @@ impl CustomOperation for RequestRemindOp {
     fn rationale(&self) -> &'static str {
         "Records reminder with rate limiting"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl RequestRemindOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -937,16 +964,6 @@ impl CustomOperation for RequestRemindOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -955,11 +972,8 @@ impl CustomOperation for RequestRemindOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Escalate Operation
@@ -982,7 +996,25 @@ impl CustomOperation for RequestEscalateOp {
     fn rationale(&self) -> &'static str {
         "Escalates request with level tracking"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl RequestEscalateOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1050,16 +1082,6 @@ impl CustomOperation for RequestEscalateOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1068,11 +1090,8 @@ impl CustomOperation for RequestEscalateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Waive Operation
@@ -1095,7 +1114,25 @@ impl CustomOperation for RequestWaiveOp {
     fn rationale(&self) -> &'static str {
         "Waives request with approval tracking and unblocks workstream"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl RequestWaiveOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1149,16 +1186,6 @@ impl CustomOperation for RequestWaiveOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1167,11 +1194,8 @@ impl CustomOperation for RequestWaiveOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Document Request Operation (convenience wrapper)
@@ -1194,7 +1218,25 @@ impl CustomOperation for DocumentRequestOp {
     fn rationale(&self) -> &'static str {
         "Creates DOCUMENT type outstanding request with computed defaults"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl DocumentRequestOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1347,16 +1389,6 @@ impl CustomOperation for DocumentRequestOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1365,11 +1397,8 @@ impl CustomOperation for DocumentRequestOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Document Upload Operation (auto-fulfillment)
@@ -1392,7 +1421,25 @@ impl CustomOperation for DocumentUploadOp {
     fn rationale(&self) -> &'static str {
         "Catalogs document and auto-fulfills matching pending request"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl DocumentUploadOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1511,16 +1558,6 @@ impl CustomOperation for DocumentUploadOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1529,11 +1566,8 @@ impl CustomOperation for DocumentUploadOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Document Waive Request Operation
@@ -1556,7 +1590,25 @@ impl CustomOperation for DocumentWaiveOp {
     fn rationale(&self) -> &'static str {
         "Waives document request by type for a workstream"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl DocumentWaiveOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1621,16 +1673,6 @@ impl CustomOperation for DocumentWaiveOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1639,11 +1681,8 @@ impl CustomOperation for DocumentWaiveOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helper Functions

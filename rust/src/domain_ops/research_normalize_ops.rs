@@ -128,47 +128,7 @@ impl CustomOperation for ResearchGenericNormalizeOp {
         "Requires custom canonicalization logic (recursive key sorting, string trimming) and SHA-256 content hashing for deduplication"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let source_name = extract_string(verb_call, "source-name")?;
-        let payload_raw = extract_string(verb_call, "payload")?;
-        let _schema_name = extract_string_opt(verb_call, "schema-name");
-        let result = normalize_payload_impl(source_name, &payload_raw)?;
 
-        let payload_id = Uuid::new_v4();
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".research_normalized_payloads
-                (payload_id, source_name, content_hash, canonical_payload, normalized_at)
-            VALUES ($1, $2, $3, $4, NOW())
-            ON CONFLICT (content_hash) DO NOTHING"#,
-        )
-        .bind(payload_id)
-        .bind(&result.source_name)
-        .bind(&result.content_hash)
-        .bind(&result.canonical_json)
-        .execute(pool)
-        .await?;
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let source_name = extract_string(verb_call, "source-name")?;
-        let payload_raw = extract_string(verb_call, "payload")?;
-        let result = normalize_payload_impl(source_name, &payload_raw)?;
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -205,6 +165,49 @@ impl CustomOperation for ResearchGenericNormalizeOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl ResearchGenericNormalizeOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let source_name = extract_string(verb_call, "source-name")?;
+        let payload_raw = extract_string(verb_call, "payload")?;
+        let _schema_name = extract_string_opt(verb_call, "schema-name");
+        let result = normalize_payload_impl(source_name, &payload_raw)?;
+
+        let payload_id = Uuid::new_v4();
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".research_normalized_payloads
+                (payload_id, source_name, content_hash, canonical_payload, normalized_at)
+            VALUES ($1, $2, $3, $4, NOW())
+            ON CONFLICT (content_hash) DO NOTHING"#,
+        )
+        .bind(payload_id)
+        .bind(&result.source_name)
+        .bind(&result.content_hash)
+        .bind(&result.canonical_json)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let source_name = extract_string(verb_call, "source-name")?;
+        let payload_raw = extract_string(verb_call, "payload")?;
+        let result = normalize_payload_impl(source_name, &payload_raw)?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 

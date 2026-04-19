@@ -56,6 +56,74 @@ impl CustomOperation for DilutionGrantOptionsOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
+        let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
+        let units: rust_decimal::Decimal = json_extract_string_opt(args, "units")
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| anyhow!("units is required"))?;
+        let strike_price: rust_decimal::Decimal = json_extract_string_opt(args, "strike-price")
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| anyhow!("strike-price is required"))?;
+        let grant_date = dilution_date_arg_json(args, "grant-date");
+        let vesting_start_date = json_extract_string_opt(args, "vesting-start-date")
+            .as_deref()
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        let expiry_date = json_extract_string_opt(args, "expiry-date")
+            .as_deref()
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        let vesting_months = json_extract_int_opt(args, "vesting-months").map(|i| i as i32);
+        let cliff_months = json_extract_int_opt(args, "cliff-months").map(|i| i as i32);
+        let plan_name = json_extract_string_opt(args, "plan-name");
+        let issuer_entity_id: Uuid = sqlx::query_scalar(
+            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
+        )
+        .bind(share_class_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
+        let instrument_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".dilution_instruments (
+                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
+                units_authorized, units_outstanding, strike_price, grant_date,
+                vesting_start_date, expiry_date, vesting_months, cliff_months,
+                status, plan_name
+            ) VALUES ($1, $2, $3, 'OPTION', $4, $4, $5, $6, $7, $8, $9, $10, 'OUTSTANDING', $11)
+            RETURNING instrument_id
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(share_class_id)
+        .bind(holder_entity_id)
+        .bind(units)
+        .bind(strike_price)
+        .bind(grant_date)
+        .bind(vesting_start_date)
+        .bind(expiry_date)
+        .bind(vesting_months)
+        .bind(cliff_months)
+        .bind(&plan_name)
+        .fetch_one(pool)
+        .await?;
+        ctx.bind("dilution_instrument", instrument_id);
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            instrument_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DilutionGrantOptionsOp {
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -144,69 +212,6 @@ impl CustomOperation for DilutionGrantOptionsOp {
 
         Ok(ExecutionResult::Uuid(instrument_id))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
-        let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
-        let units: rust_decimal::Decimal = json_extract_string_opt(args, "units")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("units is required"))?;
-        let strike_price: rust_decimal::Decimal = json_extract_string_opt(args, "strike-price")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("strike-price is required"))?;
-        let grant_date = dilution_date_arg_json(args, "grant-date");
-        let vesting_start_date = json_extract_string_opt(args, "vesting-start-date")
-            .as_deref()
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let expiry_date = json_extract_string_opt(args, "expiry-date")
-            .as_deref()
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let vesting_months = json_extract_int_opt(args, "vesting-months").map(|i| i as i32);
-        let cliff_months = json_extract_int_opt(args, "cliff-months").map(|i| i as i32);
-        let plan_name = json_extract_string_opt(args, "plan-name");
-        let issuer_entity_id: Uuid = sqlx::query_scalar(
-            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
-        )
-        .bind(share_class_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
-        let instrument_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO "ob-poc".dilution_instruments (
-                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
-                units_authorized, units_outstanding, strike_price, grant_date,
-                vesting_start_date, expiry_date, vesting_months, cliff_months,
-                status, plan_name
-            ) VALUES ($1, $2, $3, 'OPTION', $4, $4, $5, $6, $7, $8, $9, $10, 'OUTSTANDING', $11)
-            RETURNING instrument_id
-            "#,
-        )
-        .bind(issuer_entity_id)
-        .bind(share_class_id)
-        .bind(holder_entity_id)
-        .bind(units)
-        .bind(strike_price)
-        .bind(grant_date)
-        .bind(vesting_start_date)
-        .bind(expiry_date)
-        .bind(vesting_months)
-        .bind(cliff_months)
-        .bind(&plan_name)
-        .fetch_one(pool)
-        .await?;
-        ctx.bind("dilution_instrument", instrument_id);
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            instrument_id,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -214,10 +219,6 @@ impl CustomOperation for DilutionGrantOptionsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -243,6 +244,65 @@ impl CustomOperation for DilutionIssueWarrantOp {
         "Warrants are tradeable dilution instruments with strike price"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
+        let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
+        let units: rust_decimal::Decimal = json_extract_string_opt(args, "units")
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| anyhow!("units is required"))?;
+        let strike_price: rust_decimal::Decimal = json_extract_string_opt(args, "strike-price")
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| anyhow!("strike-price is required"))?;
+        let grant_date = dilution_date_arg_json(args, "grant-date");
+        let expiry_date = json_extract_string_opt(args, "expiry-date")
+            .as_deref()
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        let warrant_series = json_extract_string_opt(args, "warrant-series");
+        let issuer_entity_id: Uuid = sqlx::query_scalar(
+            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
+        )
+        .bind(share_class_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
+        let instrument_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".dilution_instruments (
+                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
+                units_authorized, units_outstanding, strike_price, grant_date,
+                expiry_date, status, warrant_series
+            ) VALUES ($1, $2, $3, 'WARRANT', $4, $4, $5, $6, $7, 'OUTSTANDING', $8)
+            RETURNING instrument_id
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(share_class_id)
+        .bind(holder_entity_id)
+        .bind(units)
+        .bind(strike_price)
+        .bind(grant_date)
+        .bind(expiry_date)
+        .bind(&warrant_series)
+        .fetch_one(pool)
+        .await?;
+        ctx.bind("dilution_instrument", instrument_id);
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            instrument_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DilutionIssueWarrantOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -316,60 +376,6 @@ impl CustomOperation for DilutionIssueWarrantOp {
 
         Ok(ExecutionResult::Uuid(instrument_id))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
-        let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
-        let units: rust_decimal::Decimal = json_extract_string_opt(args, "units")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("units is required"))?;
-        let strike_price: rust_decimal::Decimal = json_extract_string_opt(args, "strike-price")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("strike-price is required"))?;
-        let grant_date = dilution_date_arg_json(args, "grant-date");
-        let expiry_date = json_extract_string_opt(args, "expiry-date")
-            .as_deref()
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let warrant_series = json_extract_string_opt(args, "warrant-series");
-        let issuer_entity_id: Uuid = sqlx::query_scalar(
-            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
-        )
-        .bind(share_class_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
-        let instrument_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO "ob-poc".dilution_instruments (
-                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
-                units_authorized, units_outstanding, strike_price, grant_date,
-                expiry_date, status, warrant_series
-            ) VALUES ($1, $2, $3, 'WARRANT', $4, $4, $5, $6, $7, 'OUTSTANDING', $8)
-            RETURNING instrument_id
-            "#,
-        )
-        .bind(issuer_entity_id)
-        .bind(share_class_id)
-        .bind(holder_entity_id)
-        .bind(units)
-        .bind(strike_price)
-        .bind(grant_date)
-        .bind(expiry_date)
-        .bind(&warrant_series)
-        .fetch_one(pool)
-        .await?;
-        ctx.bind("dilution_instrument", instrument_id);
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            instrument_id,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -377,10 +383,6 @@ impl CustomOperation for DilutionIssueWarrantOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -406,6 +408,58 @@ impl CustomOperation for DilutionCreateSafeOp {
         "SAFEs convert to equity at a future priced round with cap/discount"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
+        let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
+        let principal: rust_decimal::Decimal = json_extract_string_opt(args, "principal")
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| anyhow!("principal is required"))?;
+        let valuation_cap: Option<rust_decimal::Decimal> =
+            json_extract_string_opt(args, "valuation-cap").and_then(|s| s.parse().ok());
+        let discount_pct: Option<rust_decimal::Decimal> =
+            json_extract_string_opt(args, "discount-pct").and_then(|s| s.parse().ok());
+        let grant_date = dilution_date_arg_json(args, "investment-date");
+        let target_share_class_id = json_extract_uuid_opt(args, ctx, "target-share-class-id");
+        let safe_type =
+            json_extract_string_opt(args, "safe-type").unwrap_or_else(|| "POST_MONEY".to_string());
+        let instrument_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".dilution_instruments (
+                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
+                principal_amount, valuation_cap, discount_pct, grant_date,
+                status, safe_type
+            ) VALUES ($1, $2, $3, 'SAFE', $4, $5, $6, $7, 'OUTSTANDING', $8)
+            RETURNING instrument_id
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(target_share_class_id)
+        .bind(holder_entity_id)
+        .bind(principal)
+        .bind(valuation_cap)
+        .bind(discount_pct)
+        .bind(grant_date)
+        .bind(&safe_type)
+        .fetch_one(pool)
+        .await?;
+        ctx.bind("dilution_instrument", instrument_id);
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            instrument_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DilutionCreateSafeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -471,53 +525,6 @@ impl CustomOperation for DilutionCreateSafeOp {
 
         Ok(ExecutionResult::Uuid(instrument_id))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
-        let principal: rust_decimal::Decimal = json_extract_string_opt(args, "principal")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("principal is required"))?;
-        let valuation_cap: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "valuation-cap").and_then(|s| s.parse().ok());
-        let discount_pct: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "discount-pct").and_then(|s| s.parse().ok());
-        let grant_date = dilution_date_arg_json(args, "investment-date");
-        let target_share_class_id = json_extract_uuid_opt(args, ctx, "target-share-class-id");
-        let safe_type =
-            json_extract_string_opt(args, "safe-type").unwrap_or_else(|| "POST_MONEY".to_string());
-        let instrument_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO "ob-poc".dilution_instruments (
-                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
-                principal_amount, valuation_cap, discount_pct, grant_date,
-                status, safe_type
-            ) VALUES ($1, $2, $3, 'SAFE', $4, $5, $6, $7, 'OUTSTANDING', $8)
-            RETURNING instrument_id
-            "#,
-        )
-        .bind(issuer_entity_id)
-        .bind(target_share_class_id)
-        .bind(holder_entity_id)
-        .bind(principal)
-        .bind(valuation_cap)
-        .bind(discount_pct)
-        .bind(grant_date)
-        .bind(&safe_type)
-        .fetch_one(pool)
-        .await?;
-        ctx.bind("dilution_instrument", instrument_id);
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            instrument_id,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -525,10 +532,6 @@ impl CustomOperation for DilutionCreateSafeOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -554,6 +557,62 @@ impl CustomOperation for DilutionCreateConvertibleNoteOp {
         "Convertible notes are debt instruments that convert to equity"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
+        let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
+        let principal: rust_decimal::Decimal = json_extract_string_opt(args, "principal")
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| anyhow!("principal is required"))?;
+        let interest_rate: Option<rust_decimal::Decimal> =
+            json_extract_string_opt(args, "interest-rate").and_then(|s| s.parse().ok());
+        let valuation_cap: Option<rust_decimal::Decimal> =
+            json_extract_string_opt(args, "valuation-cap").and_then(|s| s.parse().ok());
+        let discount_pct: Option<rust_decimal::Decimal> =
+            json_extract_string_opt(args, "discount-pct").and_then(|s| s.parse().ok());
+        let grant_date = dilution_date_arg_json(args, "issue-date");
+        let maturity_date = json_extract_string_opt(args, "maturity-date")
+            .as_deref()
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        let target_share_class_id = json_extract_uuid_opt(args, ctx, "target-share-class-id");
+        let instrument_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".dilution_instruments (
+                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
+                principal_amount, interest_rate, valuation_cap, discount_pct,
+                grant_date, maturity_date, status
+            ) VALUES ($1, $2, $3, 'CONVERTIBLE_NOTE', $4, $5, $6, $7, $8, $9, 'OUTSTANDING')
+            RETURNING instrument_id
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(target_share_class_id)
+        .bind(holder_entity_id)
+        .bind(principal)
+        .bind(interest_rate)
+        .bind(valuation_cap)
+        .bind(discount_pct)
+        .bind(grant_date)
+        .bind(maturity_date)
+        .fetch_one(pool)
+        .await?;
+        ctx.bind("dilution_instrument", instrument_id);
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            instrument_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DilutionCreateConvertibleNoteOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -626,57 +685,6 @@ impl CustomOperation for DilutionCreateConvertibleNoteOp {
 
         Ok(ExecutionResult::Uuid(instrument_id))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
-        let principal: rust_decimal::Decimal = json_extract_string_opt(args, "principal")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("principal is required"))?;
-        let interest_rate: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "interest-rate").and_then(|s| s.parse().ok());
-        let valuation_cap: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "valuation-cap").and_then(|s| s.parse().ok());
-        let discount_pct: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "discount-pct").and_then(|s| s.parse().ok());
-        let grant_date = dilution_date_arg_json(args, "issue-date");
-        let maturity_date = json_extract_string_opt(args, "maturity-date")
-            .as_deref()
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let target_share_class_id = json_extract_uuid_opt(args, ctx, "target-share-class-id");
-        let instrument_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO "ob-poc".dilution_instruments (
-                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
-                principal_amount, interest_rate, valuation_cap, discount_pct,
-                grant_date, maturity_date, status
-            ) VALUES ($1, $2, $3, 'CONVERTIBLE_NOTE', $4, $5, $6, $7, $8, $9, 'OUTSTANDING')
-            RETURNING instrument_id
-            "#,
-        )
-        .bind(issuer_entity_id)
-        .bind(target_share_class_id)
-        .bind(holder_entity_id)
-        .bind(principal)
-        .bind(interest_rate)
-        .bind(valuation_cap)
-        .bind(discount_pct)
-        .bind(grant_date)
-        .bind(maturity_date)
-        .fetch_one(pool)
-        .await?;
-        ctx.bind("dilution_instrument", instrument_id);
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            instrument_id,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -684,10 +692,6 @@ impl CustomOperation for DilutionCreateConvertibleNoteOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -752,6 +756,81 @@ impl CustomOperation for DilutionExerciseOp {
         "Exercise converts dilution instrument to actual shares, updating supply"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let instrument_id = json_extract_uuid(args, ctx, "instrument-id")?;
+        let units_to_exercise: rust_decimal::Decimal = json_extract_string_opt(args, "units")
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| anyhow!("units is required"))?;
+        let exercise_date = dilution_date_arg_json(args, "exercise-date");
+        let exercise_price_override =
+            json_extract_string_opt(args, "exercise-price").and_then(|s| s.parse().ok());
+        let is_cashless = json_extract_bool_opt(args, "is-cashless").unwrap_or(false);
+        if units_to_exercise <= rust_decimal::Decimal::ZERO {
+            return Err(anyhow!("units must be positive"));
+        }
+        let idempotency_key = format!(
+            "exercise:{}:{}:{}",
+            instrument_id, units_to_exercise, exercise_date
+        );
+        let existing: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT exercise_id FROM "ob-poc".dilution_exercise_events WHERE idempotency_key = $1"#,
+        )
+        .bind(&idempotency_key)
+        .fetch_optional(pool)
+        .await?;
+        if let Some(exercise_id) = existing {
+            ctx.bind("dilution_exercise", exercise_id);
+            return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+                exercise_id,
+            ));
+        }
+        let max_retries = 3;
+        let params = ExerciseParams {
+            instrument_id,
+            units_to_exercise,
+            exercise_date,
+            exercise_price_override,
+            is_cashless,
+            idempotency_key,
+        };
+        for attempt in 0..max_retries {
+            match self.try_exercise(pool, &params).await {
+                Ok((exercise_id, _shares_issued)) => {
+                    ctx.bind("dilution_exercise", exercise_id);
+                    return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+                        exercise_id,
+                    ));
+                }
+                Err(e) => {
+                    let err_str = e.to_string();
+                    let is_serialization = err_str.contains("SERIALIZATION")
+                        || err_str.contains("could not serialize");
+                    if is_serialization && attempt < max_retries - 1 {
+                        tokio::time::sleep(std::time::Duration::from_millis(
+                            50 * (attempt + 1) as u64,
+                        ))
+                        .await;
+                        continue;
+                    }
+                    return Err(e);
+                }
+            }
+        }
+        Err(anyhow!("Exercise failed after {} retries", max_retries))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DilutionExerciseOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -855,76 +934,6 @@ impl CustomOperation for DilutionExerciseOp {
 
         Err(anyhow!("Exercise failed after {} retries", max_retries))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let instrument_id = json_extract_uuid(args, ctx, "instrument-id")?;
-        let units_to_exercise: rust_decimal::Decimal = json_extract_string_opt(args, "units")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("units is required"))?;
-        let exercise_date = dilution_date_arg_json(args, "exercise-date");
-        let exercise_price_override =
-            json_extract_string_opt(args, "exercise-price").and_then(|s| s.parse().ok());
-        let is_cashless = json_extract_bool_opt(args, "is-cashless").unwrap_or(false);
-        if units_to_exercise <= rust_decimal::Decimal::ZERO {
-            return Err(anyhow!("units must be positive"));
-        }
-        let idempotency_key = format!(
-            "exercise:{}:{}:{}",
-            instrument_id, units_to_exercise, exercise_date
-        );
-        let existing: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT exercise_id FROM "ob-poc".dilution_exercise_events WHERE idempotency_key = $1"#,
-        )
-        .bind(&idempotency_key)
-        .fetch_optional(pool)
-        .await?;
-        if let Some(exercise_id) = existing {
-            ctx.bind("dilution_exercise", exercise_id);
-            return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-                exercise_id,
-            ));
-        }
-        let max_retries = 3;
-        let params = ExerciseParams {
-            instrument_id,
-            units_to_exercise,
-            exercise_date,
-            exercise_price_override,
-            is_cashless,
-            idempotency_key,
-        };
-        for attempt in 0..max_retries {
-            match self.try_exercise(pool, &params).await {
-                Ok((exercise_id, _shares_issued)) => {
-                    ctx.bind("dilution_exercise", exercise_id);
-                    return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-                        exercise_id,
-                    ));
-                }
-                Err(e) => {
-                    let err_str = e.to_string();
-                    let is_serialization = err_str.contains("SERIALIZATION")
-                        || err_str.contains("could not serialize");
-                    if is_serialization && attempt < max_retries - 1 {
-                        tokio::time::sleep(std::time::Duration::from_millis(
-                            50 * (attempt + 1) as u64,
-                        ))
-                        .await;
-                        continue;
-                    }
-                    return Err(e);
-                }
-            }
-        }
-        Err(anyhow!("Exercise failed after {} retries", max_retries))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -932,10 +941,6 @@ impl CustomOperation for DilutionExerciseOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1174,6 +1179,82 @@ impl CustomOperation for DilutionForfeitOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let instrument_id = json_extract_uuid(args, ctx, "instrument-id")?;
+        let units: Option<rust_decimal::Decimal> =
+            json_extract_string_opt(args, "units").and_then(|s| s.parse().ok());
+        let forfeit_date = dilution_date_arg_json(args, "forfeit-date");
+        let reason = json_extract_string_opt(args, "reason");
+        let instrument: Option<(rust_decimal::Decimal,)> = sqlx::query_as(
+            r#"
+            SELECT units_outstanding
+            FROM "ob-poc".dilution_instruments
+            WHERE instrument_id = $1 AND status = 'OUTSTANDING'
+            "#,
+        )
+        .bind(instrument_id)
+        .fetch_optional(pool)
+        .await?;
+        let (outstanding,) = instrument
+            .ok_or_else(|| anyhow!("Instrument {} not found or not outstanding", instrument_id))?;
+        let units_to_forfeit = units.unwrap_or(outstanding);
+        if units_to_forfeit > outstanding {
+            return Err(anyhow!(
+                "Cannot forfeit {} units: only {} outstanding",
+                units_to_forfeit,
+                outstanding
+            ));
+        }
+        let mut tx = pool.begin().await?;
+        let event_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".dilution_exercise_events (
+                instrument_id, exercise_type, units, exercise_date, notes, status
+            ) VALUES ($1, 'FORFEIT', $2, $3, $4, 'COMPLETED')
+            RETURNING event_id
+            "#,
+        )
+        .bind(instrument_id)
+        .bind(units_to_forfeit)
+        .bind(forfeit_date)
+        .bind(&reason)
+        .fetch_one(&mut *tx)
+        .await?;
+        let remaining = outstanding - units_to_forfeit;
+        let new_status = if remaining == rust_decimal::Decimal::ZERO {
+            "FORFEITED"
+        } else {
+            "OUTSTANDING"
+        };
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".dilution_instruments
+            SET units_outstanding = $2, status = $3, updated_at = now()
+            WHERE instrument_id = $1
+            "#,
+        )
+        .bind(instrument_id)
+        .bind(remaining)
+        .bind(new_status)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        ctx.bind("dilution_exercise", event_id);
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(event_id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DilutionForfeitOp {
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -1270,77 +1351,6 @@ impl CustomOperation for DilutionForfeitOp {
 
         Ok(ExecutionResult::Uuid(event_id))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let instrument_id = json_extract_uuid(args, ctx, "instrument-id")?;
-        let units: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "units").and_then(|s| s.parse().ok());
-        let forfeit_date = dilution_date_arg_json(args, "forfeit-date");
-        let reason = json_extract_string_opt(args, "reason");
-        let instrument: Option<(rust_decimal::Decimal,)> = sqlx::query_as(
-            r#"
-            SELECT units_outstanding
-            FROM "ob-poc".dilution_instruments
-            WHERE instrument_id = $1 AND status = 'OUTSTANDING'
-            "#,
-        )
-        .bind(instrument_id)
-        .fetch_optional(pool)
-        .await?;
-        let (outstanding,) = instrument
-            .ok_or_else(|| anyhow!("Instrument {} not found or not outstanding", instrument_id))?;
-        let units_to_forfeit = units.unwrap_or(outstanding);
-        if units_to_forfeit > outstanding {
-            return Err(anyhow!(
-                "Cannot forfeit {} units: only {} outstanding",
-                units_to_forfeit,
-                outstanding
-            ));
-        }
-        let mut tx = pool.begin().await?;
-        let event_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO "ob-poc".dilution_exercise_events (
-                instrument_id, exercise_type, units, exercise_date, notes, status
-            ) VALUES ($1, 'FORFEIT', $2, $3, $4, 'COMPLETED')
-            RETURNING event_id
-            "#,
-        )
-        .bind(instrument_id)
-        .bind(units_to_forfeit)
-        .bind(forfeit_date)
-        .bind(&reason)
-        .fetch_one(&mut *tx)
-        .await?;
-        let remaining = outstanding - units_to_forfeit;
-        let new_status = if remaining == rust_decimal::Decimal::ZERO {
-            "FORFEITED"
-        } else {
-            "OUTSTANDING"
-        };
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".dilution_instruments
-            SET units_outstanding = $2, status = $3, updated_at = now()
-            WHERE instrument_id = $1
-            "#,
-        )
-        .bind(instrument_id)
-        .bind(remaining)
-        .bind(new_status)
-        .execute(&mut *tx)
-        .await?;
-        tx.commit().await?;
-        ctx.bind("dilution_exercise", event_id);
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(event_id))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1348,10 +1358,6 @@ impl CustomOperation for DilutionForfeitOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1377,6 +1383,125 @@ impl CustomOperation for DilutionListOp {
         "Dilution listing with filtering by type and status"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
+        let instrument_type = json_extract_string_opt(args, "instrument-type");
+        let status =
+            json_extract_string_opt(args, "status").unwrap_or_else(|| "OUTSTANDING".to_string());
+        let instruments: Vec<(
+            Uuid,
+            Uuid,
+            Option<Uuid>,
+            Uuid,
+            String,
+            rust_decimal::Decimal,
+            rust_decimal::Decimal,
+            Option<rust_decimal::Decimal>,
+            Option<rust_decimal::Decimal>,
+            Option<rust_decimal::Decimal>,
+            NaiveDate,
+            Option<NaiveDate>,
+            String,
+        )> = if let Some(ref itype) = instrument_type {
+            sqlx::query_as(
+                r#"
+                SELECT instrument_id, issuer_entity_id, share_class_id, holder_entity_id,
+                       instrument_type, units_authorized, units_outstanding,
+                       strike_price, principal_amount, valuation_cap,
+                       grant_date, expiry_date, status
+                FROM "ob-poc".dilution_instruments
+                WHERE issuer_entity_id = $1 AND instrument_type = $2 AND status = $3
+                ORDER BY grant_date DESC
+                "#,
+            )
+            .bind(issuer_entity_id)
+            .bind(itype)
+            .bind(&status)
+            .fetch_all(pool)
+            .await?
+        } else if status == "ALL" {
+            sqlx::query_as(
+                r#"
+                SELECT instrument_id, issuer_entity_id, share_class_id, holder_entity_id,
+                       instrument_type, units_authorized, units_outstanding,
+                       strike_price, principal_amount, valuation_cap,
+                       grant_date, expiry_date, status
+                FROM "ob-poc".dilution_instruments
+                WHERE issuer_entity_id = $1
+                ORDER BY grant_date DESC
+                "#,
+            )
+            .bind(issuer_entity_id)
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_as(
+                r#"
+                SELECT instrument_id, issuer_entity_id, share_class_id, holder_entity_id,
+                       instrument_type, units_authorized, units_outstanding,
+                       strike_price, principal_amount, valuation_cap,
+                       grant_date, expiry_date, status
+                FROM "ob-poc".dilution_instruments
+                WHERE issuer_entity_id = $1 AND status = $2
+                ORDER BY grant_date DESC
+                "#,
+            )
+            .bind(issuer_entity_id)
+            .bind(&status)
+            .fetch_all(pool)
+            .await?
+        };
+        let instrument_data: Vec<serde_json::Value> =
+            futures::future::try_join_all(instruments.iter().map(|i| async {
+                let holder_name: Option<String> = sqlx::query_scalar(
+                    r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL"#,
+                )
+                .bind(i.3)
+                .fetch_optional(pool)
+                .await?;
+                let share_class_name: Option<String> = if let Some(sc_id) = i.2 {
+                    sqlx::query_scalar(r#"SELECT name FROM "ob-poc".share_classes WHERE id = $1"#)
+                        .bind(sc_id)
+                        .fetch_optional(pool)
+                        .await?
+                } else {
+                    None
+                };
+                Ok::<_, anyhow::Error>(json!({
+                    "instrument_id": i.0,
+                    "share_class_id": i.2,
+                    "share_class_name": share_class_name,
+                    "holder_entity_id": i.3,
+                    "holder_name": holder_name,
+                    "instrument_type": i.4,
+                    "units_authorized": i.5.to_string(),
+                    "units_outstanding": i.6.to_string(),
+                    "strike_price": i.7.map(|d| d.to_string()),
+                    "principal_amount": i.8.map(|d| d.to_string()),
+                    "valuation_cap": i.9.map(|d| d.to_string()),
+                    "grant_date": i.10.to_string(),
+                    "expiry_date": i.11.map(|d| d.to_string()),
+                    "status": i.12
+                }))
+            }))
+            .await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            instrument_data,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DilutionListOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1493,120 +1618,6 @@ impl CustomOperation for DilutionListOp {
 
         Ok(ExecutionResult::RecordSet(instrument_data))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let instrument_type = json_extract_string_opt(args, "instrument-type");
-        let status =
-            json_extract_string_opt(args, "status").unwrap_or_else(|| "OUTSTANDING".to_string());
-        let instruments: Vec<(
-            Uuid,
-            Uuid,
-            Option<Uuid>,
-            Uuid,
-            String,
-            rust_decimal::Decimal,
-            rust_decimal::Decimal,
-            Option<rust_decimal::Decimal>,
-            Option<rust_decimal::Decimal>,
-            Option<rust_decimal::Decimal>,
-            NaiveDate,
-            Option<NaiveDate>,
-            String,
-        )> = if let Some(ref itype) = instrument_type {
-            sqlx::query_as(
-                r#"
-                SELECT instrument_id, issuer_entity_id, share_class_id, holder_entity_id,
-                       instrument_type, units_authorized, units_outstanding,
-                       strike_price, principal_amount, valuation_cap,
-                       grant_date, expiry_date, status
-                FROM "ob-poc".dilution_instruments
-                WHERE issuer_entity_id = $1 AND instrument_type = $2 AND status = $3
-                ORDER BY grant_date DESC
-                "#,
-            )
-            .bind(issuer_entity_id)
-            .bind(itype)
-            .bind(&status)
-            .fetch_all(pool)
-            .await?
-        } else if status == "ALL" {
-            sqlx::query_as(
-                r#"
-                SELECT instrument_id, issuer_entity_id, share_class_id, holder_entity_id,
-                       instrument_type, units_authorized, units_outstanding,
-                       strike_price, principal_amount, valuation_cap,
-                       grant_date, expiry_date, status
-                FROM "ob-poc".dilution_instruments
-                WHERE issuer_entity_id = $1
-                ORDER BY grant_date DESC
-                "#,
-            )
-            .bind(issuer_entity_id)
-            .fetch_all(pool)
-            .await?
-        } else {
-            sqlx::query_as(
-                r#"
-                SELECT instrument_id, issuer_entity_id, share_class_id, holder_entity_id,
-                       instrument_type, units_authorized, units_outstanding,
-                       strike_price, principal_amount, valuation_cap,
-                       grant_date, expiry_date, status
-                FROM "ob-poc".dilution_instruments
-                WHERE issuer_entity_id = $1 AND status = $2
-                ORDER BY grant_date DESC
-                "#,
-            )
-            .bind(issuer_entity_id)
-            .bind(&status)
-            .fetch_all(pool)
-            .await?
-        };
-        let instrument_data: Vec<serde_json::Value> =
-            futures::future::try_join_all(instruments.iter().map(|i| async {
-                let holder_name: Option<String> = sqlx::query_scalar(
-                    r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL"#,
-                )
-                .bind(i.3)
-                .fetch_optional(pool)
-                .await?;
-                let share_class_name: Option<String> = if let Some(sc_id) = i.2 {
-                    sqlx::query_scalar(r#"SELECT name FROM "ob-poc".share_classes WHERE id = $1"#)
-                        .bind(sc_id)
-                        .fetch_optional(pool)
-                        .await?
-                } else {
-                    None
-                };
-                Ok::<_, anyhow::Error>(json!({
-                    "instrument_id": i.0,
-                    "share_class_id": i.2,
-                    "share_class_name": share_class_name,
-                    "holder_entity_id": i.3,
-                    "holder_name": holder_name,
-                    "instrument_type": i.4,
-                    "units_authorized": i.5.to_string(),
-                    "units_outstanding": i.6.to_string(),
-                    "strike_price": i.7.map(|d| d.to_string()),
-                    "principal_amount": i.8.map(|d| d.to_string()),
-                    "valuation_cap": i.9.map(|d| d.to_string()),
-                    "grant_date": i.10.to_string(),
-                    "expiry_date": i.11.map(|d| d.to_string()),
-                    "status": i.12
-                }))
-            }))
-            .await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            instrument_data,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1614,10 +1625,6 @@ impl CustomOperation for DilutionListOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1639,6 +1646,93 @@ impl CustomOperation for DilutionGetSummaryOp {
         "Dilution summary aggregates across instrument types using SQL view"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
+        let as_of = dilution_date_arg_json(args, "as-of");
+        let basis =
+            json_extract_string_opt(args, "basis").unwrap_or_else(|| "EXERCISABLE".to_string());
+        let summary: Vec<(
+            Uuid,
+            String,
+            String,
+            rust_decimal::Decimal,
+            rust_decimal::Decimal,
+            rust_decimal::Decimal,
+            Option<rust_decimal::Decimal>,
+        )> = sqlx::query_as(
+            r#"
+            SELECT issuer_entity_id, share_class_name, instrument_type,
+                   units_authorized, units_outstanding, units_exercised, weighted_avg_strike
+            FROM "ob-poc".v_dilution_summary
+            WHERE issuer_entity_id = $1
+            ORDER BY instrument_type
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .fetch_all(pool)
+        .await?;
+        let mut total_outstanding = rust_decimal::Decimal::ZERO;
+        let mut total_potential_shares = rust_decimal::Decimal::ZERO;
+        let summary_data: Vec<serde_json::Value> = summary
+            .iter()
+            .map(
+                |(_, class_name, itype, authorized, outstanding, exercised, avg_strike)| {
+                    total_outstanding += outstanding;
+                    total_potential_shares += outstanding;
+                    json!({
+                        "share_class_name": class_name,
+                        "instrument_type": itype,
+                        "units_authorized": authorized.to_string(),
+                        "units_outstanding": outstanding.to_string(),
+                        "units_exercised": exercised.to_string(),
+                        "weighted_avg_strike": avg_strike.map(|d| d.to_string())
+                    })
+                },
+            )
+            .collect();
+        let outstanding_shares: rust_decimal::Decimal = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(SUM(scs.outstanding_units), 0)
+            FROM "ob-poc".share_classes sc
+            LEFT JOIN "ob-poc".share_class_supply scs ON scs.share_class_id = sc.id
+            WHERE sc.issuer_entity_id = $1
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .fetch_one(pool)
+        .await?;
+        let fully_diluted = outstanding_shares + total_potential_shares;
+        let dilution_pct = if fully_diluted > rust_decimal::Decimal::ZERO {
+            (total_potential_shares / fully_diluted * rust_decimal::Decimal::from(100)).round_dp(4)
+        } else {
+            rust_decimal::Decimal::ZERO
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "issuer_entity_id": issuer_entity_id,
+                "as_of_date": as_of.to_string(),
+                "basis": basis,
+                "current_outstanding_shares": outstanding_shares.to_string(),
+                "total_dilution_instruments_outstanding": total_outstanding.to_string(),
+                "fully_diluted_shares": fully_diluted.to_string(),
+                "dilution_pct": dilution_pct.to_string(),
+                "by_instrument_type": summary_data
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DilutionGetSummaryOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1730,88 +1824,6 @@ impl CustomOperation for DilutionGetSummaryOp {
             "by_instrument_type": summary_data
         })))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of = dilution_date_arg_json(args, "as-of");
-        let basis =
-            json_extract_string_opt(args, "basis").unwrap_or_else(|| "EXERCISABLE".to_string());
-        let summary: Vec<(
-            Uuid,
-            String,
-            String,
-            rust_decimal::Decimal,
-            rust_decimal::Decimal,
-            rust_decimal::Decimal,
-            Option<rust_decimal::Decimal>,
-        )> = sqlx::query_as(
-            r#"
-            SELECT issuer_entity_id, share_class_name, instrument_type,
-                   units_authorized, units_outstanding, units_exercised, weighted_avg_strike
-            FROM "ob-poc".v_dilution_summary
-            WHERE issuer_entity_id = $1
-            ORDER BY instrument_type
-            "#,
-        )
-        .bind(issuer_entity_id)
-        .fetch_all(pool)
-        .await?;
-        let mut total_outstanding = rust_decimal::Decimal::ZERO;
-        let mut total_potential_shares = rust_decimal::Decimal::ZERO;
-        let summary_data: Vec<serde_json::Value> = summary
-            .iter()
-            .map(
-                |(_, class_name, itype, authorized, outstanding, exercised, avg_strike)| {
-                    total_outstanding += outstanding;
-                    total_potential_shares += outstanding;
-                    json!({
-                        "share_class_name": class_name,
-                        "instrument_type": itype,
-                        "units_authorized": authorized.to_string(),
-                        "units_outstanding": outstanding.to_string(),
-                        "units_exercised": exercised.to_string(),
-                        "weighted_avg_strike": avg_strike.map(|d| d.to_string())
-                    })
-                },
-            )
-            .collect();
-        let outstanding_shares: rust_decimal::Decimal = sqlx::query_scalar(
-            r#"
-            SELECT COALESCE(SUM(scs.outstanding_units), 0)
-            FROM "ob-poc".share_classes sc
-            LEFT JOIN "ob-poc".share_class_supply scs ON scs.share_class_id = sc.id
-            WHERE sc.issuer_entity_id = $1
-            "#,
-        )
-        .bind(issuer_entity_id)
-        .fetch_one(pool)
-        .await?;
-        let fully_diluted = outstanding_shares + total_potential_shares;
-        let dilution_pct = if fully_diluted > rust_decimal::Decimal::ZERO {
-            (total_potential_shares / fully_diluted * rust_decimal::Decimal::from(100)).round_dp(4)
-        } else {
-            rust_decimal::Decimal::ZERO
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "issuer_entity_id": issuer_entity_id,
-                "as_of_date": as_of.to_string(),
-                "basis": basis,
-                "current_outstanding_shares": outstanding_shares.to_string(),
-                "total_dilution_instruments_outstanding": total_outstanding.to_string(),
-                "fully_diluted_shares": fully_diluted.to_string(),
-                "dilution_pct": dilution_pct.to_string(),
-                "by_instrument_type": summary_data
-            }),
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1819,9 +1831,5 @@ impl CustomOperation for DilutionGetSummaryOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

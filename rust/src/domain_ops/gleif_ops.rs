@@ -28,22 +28,6 @@ use {
     uuid::Uuid,
 };
 
-#[cfg(feature = "database")]
-async fn execute_json_via_legacy<T: CustomOperation + Sync>(
-    op: &T,
-    args: &serde_json::Value,
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-    pool: &PgPool,
-) -> Result<dsl_runtime::VerbExecutionOutcome> {
-    use crate::sem_os_runtime::verb_executor_adapter;
-
-    let vc = verb_executor_adapter::build_verb_call_pub(op.domain(), op.verb(), args);
-    let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
-    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
-    verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-    Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
-}
-
 /// Enrich entity from GLEIF by LEI
 ///
 /// Rationale: Requires external GLEIF API call to fetch LEI data.
@@ -61,7 +45,25 @@ impl CustomOperation for GleifEnrichOp {
     fn rationale(&self) -> &'static str {
         "Requires external GLEIF API call to fetch and persist LEI data"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifEnrichOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -189,16 +191,6 @@ impl CustomOperation for GleifEnrichOp {
         Ok(ExecutionResult::Record(result_json))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -212,11 +204,8 @@ impl CustomOperation for GleifEnrichOp {
             "addresses_added": 0,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Search GLEIF for entities
 ///
@@ -235,7 +224,25 @@ impl CustomOperation for GleifSearchOp {
     fn rationale(&self) -> &'static str {
         "Requires external GLEIF API search call"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifSearchOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -274,16 +281,6 @@ impl CustomOperation for GleifSearchOp {
         Ok(ExecutionResult::RecordSet(candidates))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -292,11 +289,8 @@ impl CustomOperation for GleifSearchOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Import corporate tree from GLEIF
 ///
@@ -315,7 +309,25 @@ impl CustomOperation for GleifImportTreeOp {
     fn rationale(&self) -> &'static str {
         "Requires multiple GLEIF API calls to traverse and import corporate structure"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifImportTreeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -360,16 +372,6 @@ impl CustomOperation for GleifImportTreeOp {
         Ok(ExecutionResult::Record(result_json))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -383,11 +385,8 @@ impl CustomOperation for GleifImportTreeOp {
             "relationships_created": 0,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Refresh stale GLEIF data
 ///
@@ -406,7 +405,25 @@ impl CustomOperation for GleifRefreshOp {
     fn rationale(&self) -> &'static str {
         "Requires GLEIF API calls to refresh stale entity data"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifRefreshOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -488,16 +505,6 @@ impl CustomOperation for GleifRefreshOp {
         }
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -509,11 +516,8 @@ impl CustomOperation for GleifRefreshOp {
             "errors": 0,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Get raw GLEIF record (does not persist)
 ///
@@ -532,7 +536,25 @@ impl CustomOperation for GleifGetRecordOp {
     fn rationale(&self) -> &'static str {
         "Direct GLEIF API call for record inspection"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifGetRecordOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -558,16 +580,6 @@ impl CustomOperation for GleifGetRecordOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -576,11 +588,8 @@ impl CustomOperation for GleifGetRecordOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Get direct parent from GLEIF
 ///
@@ -599,7 +608,25 @@ impl CustomOperation for GleifGetParentOp {
     fn rationale(&self) -> &'static str {
         "Direct GLEIF API call for parent relationship"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifGetParentOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -626,16 +653,6 @@ impl CustomOperation for GleifGetParentOp {
         }
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -646,11 +663,8 @@ impl CustomOperation for GleifGetParentOp {
             "parent_lei": null,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Import managed funds from GLEIF with full CBU structure
 ///
@@ -669,7 +683,25 @@ impl CustomOperation for GleifImportManagedFundsOp {
     fn rationale(&self) -> &'static str {
         "Fetches managed funds from GLEIF API and creates entities + CBUs with role assignments"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifImportManagedFundsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -888,16 +920,6 @@ impl CustomOperation for GleifImportManagedFundsOp {
         Ok(ExecutionResult::Record(result_json))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -909,11 +931,8 @@ impl CustomOperation for GleifImportManagedFundsOp {
             "funds_imported": 0,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // Helper functions for GleifImportManagedFundsOp
 #[cfg(feature = "database")]
@@ -1084,7 +1103,25 @@ impl CustomOperation for GleifGetChildrenOp {
     fn rationale(&self) -> &'static str {
         "Direct GLEIF API call for child entities"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifGetChildrenOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1112,16 +1149,6 @@ impl CustomOperation for GleifGetChildrenOp {
         Ok(ExecutionResult::RecordSet(results))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1130,11 +1157,8 @@ impl CustomOperation for GleifGetChildrenOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Trace ownership chain to UBO terminus
 #[register_custom_op]
@@ -1151,7 +1175,25 @@ impl CustomOperation for GleifTraceOwnershipOp {
     fn rationale(&self) -> &'static str {
         "Follows parent relationships to UBO terminus via GLEIF API"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifTraceOwnershipOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1233,16 +1275,6 @@ impl CustomOperation for GleifTraceOwnershipOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1254,11 +1286,8 @@ impl CustomOperation for GleifTraceOwnershipOp {
             "terminus": "Unknown",
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Get all funds managed by an investment manager
 #[register_custom_op]
@@ -1275,7 +1304,25 @@ impl CustomOperation for GleifGetManagedFundsOp {
     fn rationale(&self) -> &'static str {
         "Fetches all funds managed by an investment manager from GLEIF"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifGetManagedFundsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1334,16 +1381,6 @@ impl CustomOperation for GleifGetManagedFundsOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1355,11 +1392,8 @@ impl CustomOperation for GleifGetManagedFundsOp {
             "total_count": 0,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Resolve merged/inactive LEI to current successor
 #[register_custom_op]
@@ -1376,7 +1410,25 @@ impl CustomOperation for GleifResolveSuccessorOp {
     fn rationale(&self) -> &'static str {
         "Follows successor chain for merged/inactive entities"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifResolveSuccessorOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1438,16 +1490,6 @@ impl CustomOperation for GleifResolveSuccessorOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1458,11 +1500,8 @@ impl CustomOperation for GleifResolveSuccessorOp {
             "was_merged": false,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // Fund Structure Relationship Verbs (Lean GLEIF API)
@@ -1486,7 +1525,25 @@ impl CustomOperation for GleifGetUmbrellaOp {
     fn rationale(&self) -> &'static str {
         "Single GLEIF API lookup for IS_SUBFUND_OF relationship"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifGetUmbrellaOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1544,16 +1601,6 @@ impl CustomOperation for GleifGetUmbrellaOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1566,11 +1613,8 @@ impl CustomOperation for GleifGetUmbrellaOp {
             "umbrella": null,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Get fund manager for a fund (IS_FUND-MANAGED_BY relationship)
 ///
@@ -1590,7 +1634,25 @@ impl CustomOperation for GleifGetManagerOp {
     fn rationale(&self) -> &'static str {
         "Single GLEIF API lookup for IS_FUND-MANAGED_BY relationship"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifGetManagerOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1649,16 +1711,6 @@ impl CustomOperation for GleifGetManagerOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1671,11 +1723,8 @@ impl CustomOperation for GleifGetManagerOp {
             "manager": null,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Get master fund for a feeder fund (IS_FEEDER_TO relationship)
 ///
@@ -1694,7 +1743,25 @@ impl CustomOperation for GleifGetMasterFundOp {
     fn rationale(&self) -> &'static str {
         "Single GLEIF API lookup for IS_FEEDER_TO relationship"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifGetMasterFundOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1752,16 +1819,6 @@ impl CustomOperation for GleifGetMasterFundOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1774,11 +1831,8 @@ impl CustomOperation for GleifGetMasterFundOp {
             "master": null,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Look up entity LEI by ISIN
 ///
@@ -1797,7 +1851,25 @@ impl CustomOperation for GleifLookupByIsinOp {
     fn rationale(&self) -> &'static str {
         "Single GLEIF API lookup for ISIN to LEI mapping"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifLookupByIsinOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1836,16 +1908,6 @@ impl CustomOperation for GleifLookupByIsinOp {
         Ok(ExecutionResult::Record(result))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1857,11 +1919,8 @@ impl CustomOperation for GleifLookupByIsinOp {
             "lei": null,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // Helper Functions
@@ -1942,7 +2001,25 @@ impl CustomOperation for GleifImportToClientGroupOp {
     fn rationale(&self) -> &'static str {
         "Imports GLEIF tree and populates client_group tables with role tagging"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifImportToClientGroupOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2369,16 +2446,6 @@ impl CustomOperation for GleifImportToClientGroupOp {
         Ok(ExecutionResult::Record(result))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2389,11 +2456,8 @@ impl CustomOperation for GleifImportToClientGroupOp {
             "Database feature required for gleif.import-to-client-group"
         ))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Consolidated GLEIF lookup — dispatches to specific handlers by target-type.
 ///
@@ -2415,7 +2479,25 @@ impl CustomOperation for GleifLookupOp {
     fn rationale(&self) -> &'static str {
         "Consolidated GLEIF relationship lookup — dispatches by target-type"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl GleifLookupOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2442,16 +2524,6 @@ impl CustomOperation for GleifLookupOp {
         }
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2460,8 +2532,5 @@ impl CustomOperation for GleifLookupOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+

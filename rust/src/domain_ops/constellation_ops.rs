@@ -34,29 +34,6 @@ impl CustomOperation for ConstellationHydrateOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
-        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
-        let map_name = extract_string(verb_call, "map-name")?;
-        let result = handle_constellation_hydrate(pool, cbu_id, case_id, &map_name).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("constellation.hydrate requires database"))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -74,6 +51,30 @@ impl CustomOperation for ConstellationHydrateOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl ConstellationHydrateOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
+        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
+        let map_name = extract_string(verb_call, "map-name")?;
+        let result = handle_constellation_hydrate(pool, cbu_id, case_id, &map_name).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("constellation.hydrate requires database"))
     }
 }
 
@@ -95,29 +96,6 @@ impl CustomOperation for ConstellationSummaryOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
-        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
-        let map_name = extract_string(verb_call, "map-name")?;
-        let result = handle_constellation_summary(pool, cbu_id, case_id, &map_name).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("constellation.summary requires database"))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -135,5 +113,29 @@ impl CustomOperation for ConstellationSummaryOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl ConstellationSummaryOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
+        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
+        let map_name = extract_string(verb_call, "map-name")?;
+        let result = handle_constellation_summary(pool, cbu_id, case_id, &map_name).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("constellation.summary requires database"))
     }
 }

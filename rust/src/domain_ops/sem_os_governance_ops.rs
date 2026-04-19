@@ -34,6 +34,24 @@ impl CustomOperation for GovernanceGatePrecheckOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_gate_precheck")
+            .await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl GovernanceGatePrecheckOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -53,21 +71,6 @@ impl CustomOperation for GovernanceGatePrecheckOp {
             "governance.gate-precheck requires database"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_gate_precheck")
-            .await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Submit changeset for review.
@@ -85,6 +88,24 @@ impl CustomOperation for GovernanceSubmitForReviewOp {
     fn rationale(&self) -> &'static str {
         "Delegates to stew_submit_for_review Phase 0 tool"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_submit_for_review")
+            .await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl GovernanceSubmitForReviewOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -106,21 +127,6 @@ impl CustomOperation for GovernanceSubmitForReviewOp {
             "governance.submit-for-review requires database"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_submit_for_review")
-            .await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Record a review decision on a changeset.
@@ -137,27 +143,6 @@ impl CustomOperation for GovernanceRecordReviewOp {
     }
     fn rationale(&self) -> &'static str {
         "Delegates to stew_record_review_decision Phase 0 tool"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        delegate_to_stew_tool(pool, ctx, verb_call, "stew_record_review_decision").await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "governance.record-review requires database"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -181,6 +166,30 @@ impl CustomOperation for GovernanceRecordReviewOp {
     }
 }
 
+impl GovernanceRecordReviewOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        delegate_to_stew_tool(pool, ctx, verb_call, "stew_record_review_decision").await
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "governance.record-review requires database"
+        ))
+    }
+}
+
 // ── CoreService-Delegated Ops (via direct SQL/tool dispatch) ──────
 
 /// Validate a changeset (Stage 1 artifact integrity).
@@ -200,6 +209,23 @@ impl CustomOperation for GovernanceValidateOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl GovernanceValidateOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -216,20 +242,6 @@ impl CustomOperation for GovernanceValidateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("governance.validate requires database"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan").await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -250,6 +262,23 @@ impl CustomOperation for GovernanceDryRunOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl GovernanceDryRunOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -266,20 +295,6 @@ impl CustomOperation for GovernanceDryRunOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("governance.dry-run requires database"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan").await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -300,6 +315,24 @@ impl CustomOperation for GovernancePlanPublishOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_impact_analysis")
+            .await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl GovernancePlanPublishOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -316,21 +349,6 @@ impl CustomOperation for GovernancePlanPublishOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("governance.plan-publish requires database"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_impact_analysis")
-            .await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -351,6 +369,23 @@ impl CustomOperation for GovernancePublishOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_publish").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl GovernancePublishOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -367,20 +402,6 @@ impl CustomOperation for GovernancePublishOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("governance.publish requires database"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_publish").await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -401,6 +422,23 @@ impl CustomOperation for GovernancePublishBatchOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_publish").await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl GovernancePublishBatchOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -419,20 +457,6 @@ impl CustomOperation for GovernancePublishBatchOp {
         Err(anyhow::anyhow!(
             "governance.publish-batch requires database"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_publish").await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -471,6 +495,24 @@ impl CustomOperation for GovernanceRollbackOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let target = super::helpers::json_extract_string(args, "target-snapshot-set-id")?;
+        governance_rollback_impl(&target, pool).await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl GovernanceRollbackOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -498,20 +540,5 @@ impl CustomOperation for GovernanceRollbackOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("governance.rollback requires database"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let target = super::helpers::json_extract_string(args, "target-snapshot-set-id")?;
-        governance_rollback_impl(&target, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

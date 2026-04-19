@@ -44,6 +44,29 @@ impl CustomOperation for SemanticStateOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let registry = SemanticStageRegistry::load_default()
+            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
+        let state = derive_semantic_state(pool, &registry, cbu_id).await?;
+        let result = serde_json::to_value(&state)?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SemanticStateOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -78,26 +101,6 @@ impl CustomOperation for SemanticStateOp {
         Ok(ExecutionResult::Record(result))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let registry = SemanticStageRegistry::load_default()
-            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
-        let state = derive_semantic_state(pool, &registry, cbu_id).await?;
-        let result = serde_json::to_value(&state)?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -127,6 +130,34 @@ impl CustomOperation for SemanticListStagesOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use serde_json::json;
+        let registry = SemanticStageRegistry::load_default()
+            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
+        let stages: Vec<serde_json::Value> = registry.stages_in_order()
+            .map(|stage| json!({
+                "code": stage.code, "name": stage.name, "description": stage.description,
+                "required_entities": stage.required_entities, "depends_on": stage.depends_on, "blocking": stage.blocking
+            }))
+            .collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({ "stages": stages }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SemanticListStagesOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         _verb_call: &VerbCall,
@@ -153,31 +184,6 @@ impl CustomOperation for SemanticListStagesOp {
             .collect();
 
         Ok(ExecutionResult::Record(json!({ "stages": stages })))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use serde_json::json;
-        let registry = SemanticStageRegistry::load_default()
-            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
-        let stages: Vec<serde_json::Value> = registry.stages_in_order()
-            .map(|stage| json!({
-                "code": stage.code, "name": stage.name, "description": stage.description,
-                "required_entities": stage.required_entities, "depends_on": stage.depends_on, "blocking": stage.blocking
-            }))
-            .collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({ "stages": stages }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -226,6 +232,41 @@ impl CustomOperation for SemanticStagesForProductOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_string;
+        use serde_json::json;
+        let product = json_extract_string(args, "product")?;
+        let registry = SemanticStageRegistry::load_default()
+            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
+        let stage_codes = registry.stages_for_product(&product);
+        let stages: Vec<serde_json::Value> = stage_codes
+            .iter()
+            .filter_map(|code| registry.get_stage(code))
+            .map(|stage| {
+                json!({
+                    "code": stage.code, "name": stage.name, "description": stage.description,
+                    "required_entities": stage.required_entities, "blocking": stage.blocking
+                })
+            })
+            .collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({"product": product, "stages": stages}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SemanticStagesForProductOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -264,38 +305,6 @@ impl CustomOperation for SemanticStagesForProductOp {
             "product": product,
             "stages": stages
         })))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_string;
-        use serde_json::json;
-        let product = json_extract_string(args, "product")?;
-        let registry = SemanticStageRegistry::load_default()
-            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
-        let stage_codes = registry.stages_for_product(&product);
-        let stages: Vec<serde_json::Value> = stage_codes
-            .iter()
-            .filter_map(|code| registry.get_stage(code))
-            .map(|stage| {
-                json!({
-                    "code": stage.code, "name": stage.name, "description": stage.description,
-                    "required_entities": stage.required_entities, "blocking": stage.blocking
-                })
-            })
-            .collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({"product": product, "stages": stages}),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 
     #[cfg(not(feature = "database"))]
@@ -356,6 +365,47 @@ impl CustomOperation for SemanticNextActionsOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use serde_json::json;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let registry = SemanticStageRegistry::load_default()
+            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
+        let state = derive_semantic_state(pool, &registry, cbu_id).await?;
+        let actions: Vec<serde_json::Value> = state
+            .next_actionable
+            .iter()
+            .filter_map(|code| {
+                registry.get_stage(code).map(|stage| {
+                    json!({
+                        "stage_code": code, "stage_name": stage.name,
+                        "required_entities": stage.required_entities,
+                        "suggested_verbs": get_suggested_verbs(&stage.required_entities)
+                    })
+                })
+            })
+            .collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "cbu_id": cbu_id, "cbu_name": state.cbu_name,
+                "next_actions": actions, "blocking_stages": state.blocking_stages
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SemanticNextActionsOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -407,44 +457,6 @@ impl CustomOperation for SemanticNextActionsOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use serde_json::json;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let registry = SemanticStageRegistry::load_default()
-            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
-        let state = derive_semantic_state(pool, &registry, cbu_id).await?;
-        let actions: Vec<serde_json::Value> = state
-            .next_actionable
-            .iter()
-            .filter_map(|code| {
-                registry.get_stage(code).map(|stage| {
-                    json!({
-                        "stage_code": code, "stage_name": stage.name,
-                        "required_entities": stage.required_entities,
-                        "suggested_verbs": get_suggested_verbs(&stage.required_entities)
-                    })
-                })
-            })
-            .collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "cbu_id": cbu_id, "cbu_name": state.cbu_name,
-                "next_actions": actions, "blocking_stages": state.blocking_stages
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -472,6 +484,48 @@ impl CustomOperation for SemanticMissingEntitiesOp {
     fn rationale(&self) -> &'static str {
         "Requires entity existence checks across multiple tables"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+        use serde_json::json;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let stage_filter = json_extract_string_opt(args, "stage");
+        let registry = SemanticStageRegistry::load_default()
+            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
+        let state = derive_semantic_state(pool, &registry, cbu_id).await?;
+        let missing: Vec<&ob_poc_types::semantic_stage::MissingEntity> =
+            if let Some(ref stage) = stage_filter {
+                state
+                    .missing_entities
+                    .iter()
+                    .filter(|e| &e.stage == stage)
+                    .collect()
+            } else {
+                state.missing_entities.iter().collect()
+            };
+        let result: Vec<serde_json::Value> = missing.iter().map(|e| json!({
+            "entity_type": e.entity_type, "stage": e.stage, "stage_name": e.stage_name,
+            "semantic_purpose": e.semantic_purpose, "suggested_verb": get_creation_verb(&e.entity_type)
+        })).collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "cbu_id": cbu_id, "cbu_name": state.cbu_name, "missing_entities": result
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SemanticMissingEntitiesOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -539,45 +593,6 @@ impl CustomOperation for SemanticMissingEntitiesOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-        use serde_json::json;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let stage_filter = json_extract_string_opt(args, "stage");
-        let registry = SemanticStageRegistry::load_default()
-            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
-        let state = derive_semantic_state(pool, &registry, cbu_id).await?;
-        let missing: Vec<&ob_poc_types::semantic_stage::MissingEntity> =
-            if let Some(ref stage) = stage_filter {
-                state
-                    .missing_entities
-                    .iter()
-                    .filter(|e| &e.stage == stage)
-                    .collect()
-            } else {
-                state.missing_entities.iter().collect()
-            };
-        let result: Vec<serde_json::Value> = missing.iter().map(|e| json!({
-            "entity_type": e.entity_type, "stage": e.stage, "stage_name": e.stage_name,
-            "semantic_purpose": e.semantic_purpose, "suggested_verb": get_creation_verb(&e.entity_type)
-        })).collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "cbu_id": cbu_id, "cbu_name": state.cbu_name, "missing_entities": result
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -605,6 +620,32 @@ impl CustomOperation for SemanticPromptContextOp {
     fn rationale(&self) -> &'static str {
         "Formats semantic state for agent system prompt - requires full state derivation"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use serde_json::json;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let registry = SemanticStageRegistry::load_default()
+            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
+        let state = derive_semantic_state(pool, &registry, cbu_id).await?;
+        let prompt_context = state.to_prompt_context();
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({"prompt_context": prompt_context}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SemanticPromptContextOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -640,29 +681,6 @@ impl CustomOperation for SemanticPromptContextOp {
         Ok(ExecutionResult::Record(json!({
             "prompt_context": prompt_context
         })))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use serde_json::json;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let registry = SemanticStageRegistry::load_default()
-            .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
-        let state = derive_semantic_state(pool, &registry, cbu_id).await?;
-        let prompt_context = state.to_prompt_context();
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({"prompt_context": prompt_context}),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 
     #[cfg(not(feature = "database"))]

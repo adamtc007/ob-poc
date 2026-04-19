@@ -45,6 +45,33 @@ impl CustomOperation for TeamTransferMemberOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_uuid};
+        let from_team = json_extract_uuid(args, ctx, "from-team")?;
+        let to_team = json_extract_uuid(args, ctx, "to-team")?;
+        let user_id = json_extract_uuid(args, ctx, "user")?;
+        let new_role = json_extract_string(args, "new-role")?;
+
+        let new_membership_id =
+            team_transfer_member_impl(from_team, to_team, user_id, &new_role, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            new_membership_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl TeamTransferMemberOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -77,30 +104,6 @@ impl CustomOperation for TeamTransferMemberOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_uuid};
-        let from_team = json_extract_uuid(args, ctx, "from-team")?;
-        let to_team = json_extract_uuid(args, ctx, "to-team")?;
-        let user_id = json_extract_uuid(args, ctx, "user")?;
-        let new_role = json_extract_string(args, "new-role")?;
-
-        let new_membership_id =
-            team_transfer_member_impl(from_team, to_team, user_id, &new_role, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            new_membership_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 

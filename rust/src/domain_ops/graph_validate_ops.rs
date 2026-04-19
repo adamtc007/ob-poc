@@ -124,26 +124,7 @@ impl CustomOperation for GraphValidateOp {
          terminus reachability) that cannot be expressed as data-driven CRUD"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
-        let result = graph_validate_impl(case_id, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -163,6 +144,28 @@ impl CustomOperation for GraphValidateOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl GraphValidateOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
+        let result = graph_validate_impl(case_id, pool).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
     }
 }
 

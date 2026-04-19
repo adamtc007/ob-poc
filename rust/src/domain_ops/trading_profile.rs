@@ -33,24 +33,6 @@ use ob_poc_types::trading_matrix::{
 #[cfg(feature = "database")]
 use sqlx::{PgPool, Row};
 
-#[cfg(feature = "database")]
-async fn execute_json_via_legacy<T: CustomOperation + Sync>(
-    op: &T,
-    args: &serde_json::Value,
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-    pool: &PgPool,
-) -> Result<dsl_runtime::VerbExecutionOutcome> {
-    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
-        op.domain(),
-        op.verb(),
-        args,
-    );
-    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
-    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
-    crate::sem_os_runtime::verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
-}
-
 fn forward_component_verb_call(verb_call: &VerbCall, verb: &str) -> VerbCall {
     let arguments = verb_call
         .arguments
@@ -125,7 +107,26 @@ impl CustomOperation for TradingProfileImportOp {
     fn rationale(&self) -> &'static str {
         "Requires file I/O, YAML parsing, hash computation, and validation"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileImportOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -236,21 +237,8 @@ impl CustomOperation for TradingProfileImportOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // GET ACTIVE OPERATION
@@ -271,7 +259,26 @@ impl CustomOperation for TradingProfileGetActiveOp {
     fn rationale(&self) -> &'static str {
         "Custom query to find ACTIVE status profile"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileGetActiveOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -325,21 +332,8 @@ impl CustomOperation for TradingProfileGetActiveOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // ACTIVATE OPERATION
@@ -360,7 +354,26 @@ impl CustomOperation for TradingProfileActivateOp {
     fn rationale(&self) -> &'static str {
         "Requires transaction to supersede previous active profile"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileActivateOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -436,21 +449,8 @@ impl CustomOperation for TradingProfileActivateOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // MATERIALIZE OPERATION
@@ -478,7 +478,26 @@ impl CustomOperation for TradingProfileMaterializeOp {
     fn rationale(&self) -> &'static str {
         "Complex multi-table sync with FK lookups and transaction management"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileMaterializeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -748,21 +767,8 @@ impl CustomOperation for TradingProfileMaterializeOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -1444,7 +1450,26 @@ impl CustomOperation for TradingProfileCreateDraftOp {
     fn rationale(&self) -> &'static str {
         "Creates new DRAFT profile document with optional cloning from existing"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCreateDraftOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1534,21 +1559,8 @@ impl CustomOperation for TradingProfileCreateDraftOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(Uuid::new_v4()))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // COMPONENT DISPATCH OPERATIONS
@@ -1570,7 +1582,26 @@ impl CustomOperation for TradingProfileAddComponentOp {
     fn rationale(&self) -> &'static str {
         "Dispatches generic component additions to the existing trading-profile authoring ops"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddComponentOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1689,21 +1720,8 @@ impl CustomOperation for TradingProfileAddComponentOp {
             )),
         }
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 #[register_custom_op]
 pub struct TradingProfileRemoveComponentOp;
@@ -1721,7 +1739,26 @@ impl CustomOperation for TradingProfileRemoveComponentOp {
     fn rationale(&self) -> &'static str {
         "Dispatches generic component removals to the existing trading-profile authoring ops"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileRemoveComponentOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1826,21 +1863,8 @@ impl CustomOperation for TradingProfileRemoveComponentOp {
             )),
         }
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Add instrument class to trading profile universe
 #[register_custom_op]
@@ -1857,7 +1881,26 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
     fn rationale(&self) -> &'static str {
         "Modifies JSONB document to add instrument class"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddInstrumentClassOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1932,21 +1975,8 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Remove instrument class from trading profile universe
 #[register_custom_op]
@@ -1963,7 +1993,26 @@ impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
     fn rationale(&self) -> &'static str {
         "Modifies JSONB document to remove instrument class"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileRemoveInstrumentClassOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2018,21 +2067,8 @@ impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Add market to trading profile universe under an instrument class
 #[register_custom_op]
@@ -2049,7 +2085,26 @@ impl CustomOperation for TradingProfileAddMarketOp {
     fn rationale(&self) -> &'static str {
         "Modifies JSONB document to add market under instrument class"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddMarketOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2156,21 +2211,8 @@ impl CustomOperation for TradingProfileAddMarketOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Remove market from trading profile universe
 #[register_custom_op]
@@ -2187,7 +2229,26 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
     fn rationale(&self) -> &'static str {
         "Modifies JSONB document to remove market"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileRemoveMarketOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2253,21 +2314,8 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Add standing instruction to trading profile
 #[register_custom_op]
@@ -2284,7 +2332,26 @@ impl CustomOperation for TradingProfileAddSsiOp {
     fn rationale(&self) -> &'static str {
         "Modifies JSONB document to add SSI"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddSsiOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2401,21 +2468,8 @@ impl CustomOperation for TradingProfileAddSsiOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Remove standing instruction from trading profile
 #[register_custom_op]
@@ -2432,7 +2486,26 @@ impl CustomOperation for TradingProfileRemoveSsiOp {
     fn rationale(&self) -> &'static str {
         "Modifies JSONB document to remove SSI"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileRemoveSsiOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2487,21 +2560,8 @@ impl CustomOperation for TradingProfileRemoveSsiOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Add booking rule to trading profile
 #[register_custom_op]
@@ -2518,7 +2578,26 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
     fn rationale(&self) -> &'static str {
         "Modifies JSONB document to add booking rule"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddBookingRuleOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2639,21 +2718,8 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Remove booking rule from trading profile
 #[register_custom_op]
@@ -2670,7 +2736,26 @@ impl CustomOperation for TradingProfileRemoveBookingRuleOp {
     fn rationale(&self) -> &'static str {
         "Modifies JSONB document to remove booking rule"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileRemoveBookingRuleOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2736,21 +2821,8 @@ impl CustomOperation for TradingProfileRemoveBookingRuleOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // ISDA/CSA CONSTRUCTION OPERATIONS (Phase 2)
@@ -2773,7 +2845,26 @@ impl CustomOperation for TradingProfileAddIsdaConfigOp {
     fn rationale(&self) -> &'static str {
         "Adds ISDA master agreement configuration to the document"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddIsdaConfigOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2867,21 +2958,8 @@ impl CustomOperation for TradingProfileAddIsdaConfigOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Add product coverage to an ISDA agreement
 #[register_custom_op]
@@ -2900,7 +2978,26 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
     fn rationale(&self) -> &'static str {
         "Adds product coverage to an ISDA master agreement"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddIsdaCoverageOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2984,21 +3081,8 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Add CSA configuration to an ISDA agreement
 #[register_custom_op]
@@ -3017,7 +3101,26 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
     fn rationale(&self) -> &'static str {
         "Adds Credit Support Annex configuration to an ISDA agreement"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddCsaConfigOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -3119,21 +3222,8 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Add eligible collateral to a CSA
 #[register_custom_op]
@@ -3152,7 +3242,26 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
     fn rationale(&self) -> &'static str {
         "Adds eligible collateral type to a Credit Support Annex"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddCsaCollateralOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -3283,21 +3392,8 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Link CSA to collateral SSI
 #[register_custom_op]
@@ -3316,7 +3412,26 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
     fn rationale(&self) -> &'static str {
         "Links a CSA to a collateral SSI for margin transfers"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileLinkCsaSsiOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -3393,21 +3508,8 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Remove ISDA configuration from trading profile
 #[register_custom_op]
@@ -3426,7 +3528,26 @@ impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
     fn rationale(&self) -> &'static str {
         "Removes ISDA master agreement and all children from the document"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileRemoveIsdaConfigOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -3483,21 +3604,8 @@ impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Remove CSA configuration from trading profile
 #[register_custom_op]
@@ -3516,7 +3624,26 @@ impl CustomOperation for TradingProfileRemoveCsaConfigOp {
     fn rationale(&self) -> &'static str {
         "Removes CSA from ISDA agreement in the document"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileRemoveCsaConfigOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -3582,21 +3709,8 @@ impl CustomOperation for TradingProfileRemoveCsaConfigOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // IM MANDATE OPERATIONS (Phase 3)
@@ -3619,7 +3733,26 @@ impl CustomOperation for TradingProfileAddImMandateOp {
     fn rationale(&self) -> &'static str {
         "Adds Investment Manager mandate configuration to the document"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddImMandateOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -3782,21 +3915,8 @@ impl CustomOperation for TradingProfileAddImMandateOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Update Investment Manager scope
 #[register_custom_op]
@@ -3815,7 +3935,26 @@ impl CustomOperation for TradingProfileUpdateImScopeOp {
     fn rationale(&self) -> &'static str {
         "Updates the scope of an existing Investment Manager mandate"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileUpdateImScopeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -3904,21 +4043,8 @@ impl CustomOperation for TradingProfileUpdateImScopeOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Remove Investment Manager mandate
 #[register_custom_op]
@@ -3937,7 +4063,26 @@ impl CustomOperation for TradingProfileRemoveImMandateOp {
     fn rationale(&self) -> &'static str {
         "Removes an Investment Manager mandate from the document"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileRemoveImMandateOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -3990,21 +4135,8 @@ impl CustomOperation for TradingProfileRemoveImMandateOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // SETTLEMENT CONFIG OPERATIONS (Phase 3)
@@ -4028,7 +4160,26 @@ impl CustomOperation for TradingProfileSetBaseCurrencyOp {
     fn rationale(&self) -> &'static str {
         "Sets the base currency for the trading profile document"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileSetBaseCurrencyOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4084,21 +4235,8 @@ impl CustomOperation for TradingProfileSetBaseCurrencyOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Add allowed currency to the trading profile.
 #[register_custom_op]
@@ -4117,7 +4255,26 @@ impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
     fn rationale(&self) -> &'static str {
         "Adds an allowed currency to the trading profile document"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileAddAllowedCurrencyOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4173,21 +4330,8 @@ impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // SYNC OPERATIONS (Phase 4)
@@ -4211,7 +4355,26 @@ impl CustomOperation for TradingProfileDiffOp {
     fn rationale(&self) -> &'static str {
         "Compares document with operational tables to identify sync differences"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileDiffOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4247,21 +4410,8 @@ impl CustomOperation for TradingProfileDiffOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 // =============================================================================
 // PHASE 5: VALIDATION OPERATIONS
 // =============================================================================
@@ -4281,7 +4431,26 @@ impl CustomOperation for TradingProfileValidateCoverageOp {
     fn rationale(&self) -> &'static str {
         "Validates that booking rules cover all market/instrument/currency combinations in the universe"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileValidateCoverageOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4317,21 +4486,8 @@ impl CustomOperation for TradingProfileValidateCoverageOp {
             json!({"is_valid": true, "coverage_percentage": 100.0}),
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Validate that a profile is ready for go-live
 #[register_custom_op]
@@ -4348,7 +4504,26 @@ impl CustomOperation for TradingProfileValidateGoLiveReadyOp {
     fn rationale(&self) -> &'static str {
         "Validates that a trading profile has all required components for production use"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileValidateGoLiveReadyOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4382,21 +4557,8 @@ impl CustomOperation for TradingProfileValidateGoLiveReadyOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"is_ready": true})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // PHASE 6: Document Lifecycle Operations
@@ -4420,7 +4582,26 @@ impl CustomOperation for TradingProfileSubmitOp {
     fn rationale(&self) -> &'static str {
         "Submits a draft trading profile for review. Validates the profile is ready before transitioning from Draft to PendingReview status."
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileSubmitOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4466,21 +4647,8 @@ impl CustomOperation for TradingProfileSubmitOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "submitted"})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Approve a profile pending review
 /// Transitions: PendingReview → Active
@@ -4500,7 +4668,26 @@ impl CustomOperation for TradingProfileApproveOp {
     fn rationale(&self) -> &'static str {
         "Approves a trading profile pending review, transitioning it to Active status. Any previously active profile for the same CBU is superseded."
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileApproveOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4603,21 +4790,8 @@ impl CustomOperation for TradingProfileApproveOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "approved"})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Reject a profile pending review
 /// Transitions: PendingReview → Draft
@@ -4637,7 +4811,26 @@ impl CustomOperation for TradingProfileRejectOp {
     fn rationale(&self) -> &'static str {
         "Rejects a trading profile pending review, transitioning it back to Draft status with a rejection reason for remediation."
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileRejectOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4685,21 +4878,8 @@ impl CustomOperation for TradingProfileRejectOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "rejected"})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Archive an active or superseded profile
 /// Transitions: Active|Superseded → Archived
@@ -4719,7 +4899,26 @@ impl CustomOperation for TradingProfileArchiveOp {
     fn rationale(&self) -> &'static str {
         "Archives an active or superseded trading profile, removing it from operational use while preserving the audit trail."
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileArchiveOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4765,21 +4964,8 @@ impl CustomOperation for TradingProfileArchiveOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "archived"})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CLONE OPERATION
@@ -4810,7 +4996,26 @@ impl CustomOperation for TradingProfileCloneToOp {
     fn rationale(&self) -> &'static str {
         "Clones a trading profile document to another CBU, creating a new DRAFT profile that can be customized before activation."
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCloneToOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4881,21 +5086,8 @@ impl CustomOperation for TradingProfileCloneToOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "cloned"})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CREATE NEW VERSION OPERATION
@@ -4919,7 +5111,26 @@ impl CustomOperation for TradingProfileCreateNewVersionOp {
     fn rationale(&self) -> &'static str {
         "Creates a new DRAFT version from the current ACTIVE profile. Enforces that only one working version exists at a time."
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCreateNewVersionOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -4972,18 +5183,5 @@ impl CustomOperation for TradingProfileCreateNewVersionOp {
             json!({"status": "new_version_created"}),
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+

@@ -84,57 +84,7 @@ impl CustomOperation for PackSelectOp {
         "Records pack selection on the runbook so session state is derivable from runbook fold"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let pack_id = get_required_string(verb_call, "pack-id")?;
-        let pack_version =
-            get_optional_string(verb_call, "pack-version").unwrap_or_else(|| "latest".to_string());
-        let manifest_hash = get_optional_string(verb_call, "manifest-hash");
-        let handoff_from = get_optional_string(verb_call, "handoff-from");
 
-        // The pack selection itself is recorded by the RunbookEntry being on the runbook.
-        // The ContextStack.from_runbook() fold reads entries with verb="pack.select"
-        // and derives the active pack from the pack-id arg.
-        //
-        // This op returns the result for the entry's result field.
-        let result = PackSelectResult {
-            pack_id: pack_id.clone(),
-            pack_name: pack_id.clone(), // Name resolved by orchestrator before calling
-            pack_version,
-            manifest_hash,
-            handoff_from,
-        };
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let pack_id = get_required_string(verb_call, "pack-id")?;
-        let pack_version =
-            get_optional_string(verb_call, "pack-version").unwrap_or_else(|| "latest".to_string());
-        let manifest_hash = get_optional_string(verb_call, "manifest-hash");
-        let handoff_from = get_optional_string(verb_call, "handoff-from");
-
-        let result = PackSelectResult {
-            pack_id: pack_id.clone(),
-            pack_name: pack_id.clone(),
-            pack_version,
-            manifest_hash,
-            handoff_from,
-        };
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -168,6 +118,59 @@ impl CustomOperation for PackSelectOp {
     }
 }
 
+impl PackSelectOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let pack_id = get_required_string(verb_call, "pack-id")?;
+        let pack_version =
+            get_optional_string(verb_call, "pack-version").unwrap_or_else(|| "latest".to_string());
+        let manifest_hash = get_optional_string(verb_call, "manifest-hash");
+        let handoff_from = get_optional_string(verb_call, "handoff-from");
+
+        // The pack selection itself is recorded by the RunbookEntry being on the runbook.
+        // The ContextStack.from_runbook() fold reads entries with verb="pack.select"
+        // and derives the active pack from the pack-id arg.
+        //
+        // This op returns the result for the entry's result field.
+        let result = PackSelectResult {
+            pack_id: pack_id.clone(),
+            pack_name: pack_id.clone(), // Name resolved by orchestrator before calling
+            pack_version,
+            manifest_hash,
+            handoff_from,
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let pack_id = get_required_string(verb_call, "pack-id")?;
+        let pack_version =
+            get_optional_string(verb_call, "pack-version").unwrap_or_else(|| "latest".to_string());
+        let manifest_hash = get_optional_string(verb_call, "manifest-hash");
+        let handoff_from = get_optional_string(verb_call, "handoff-from");
+
+        let result = PackSelectResult {
+            pack_id: pack_id.clone(),
+            pack_name: pack_id.clone(),
+            pack_version,
+            manifest_hash,
+            handoff_from,
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+}
+
 // =============================================================================
 // pack.answer — Record a Q&A answer on the runbook
 // =============================================================================
@@ -189,49 +192,7 @@ impl CustomOperation for PackAnswerOp {
         "Records pack Q&A answers on the runbook so accumulated answers are derivable from fold"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let field = get_required_string(verb_call, "field")?;
-        let value = get_required_string(verb_call, "value")?;
-        let pack_id = get_optional_string(verb_call, "pack-id");
 
-        // The answer is recorded by the RunbookEntry being on the runbook.
-        // ContextStack.from_runbook() reads entries with verb="pack.answer"
-        // and accumulates answers in the accumulated_answers map.
-        let result = PackAnswerResult {
-            field,
-            value,
-            accepted: true,
-            pack_id,
-        };
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let field = get_required_string(verb_call, "field")?;
-        let value = get_required_string(verb_call, "value")?;
-        let pack_id = get_optional_string(verb_call, "pack-id");
-
-        let result = PackAnswerResult {
-            field,
-            value,
-            accepted: true,
-            pack_id,
-        };
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -259,5 +220,50 @@ impl CustomOperation for PackAnswerOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl PackAnswerOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let field = get_required_string(verb_call, "field")?;
+        let value = get_required_string(verb_call, "value")?;
+        let pack_id = get_optional_string(verb_call, "pack-id");
+
+        // The answer is recorded by the RunbookEntry being on the runbook.
+        // ContextStack.from_runbook() reads entries with verb="pack.answer"
+        // and accumulates answers in the accumulated_answers map.
+        let result = PackAnswerResult {
+            field,
+            value,
+            accepted: true,
+            pack_id,
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let field = get_required_string(verb_call, "field")?;
+        let value = get_required_string(verb_call, "value")?;
+        let pack_id = get_optional_string(verb_call, "pack-id");
+
+        let result = PackAnswerResult {
+            field,
+            value,
+            accepted: true,
+            pack_id,
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }

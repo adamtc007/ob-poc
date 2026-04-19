@@ -320,28 +320,6 @@ impl CustomOperation for CoverageComputeOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let determination_run_id = extract_uuid(verb_call, ctx, "determination-run-id")?;
-        let result = coverage_compute_impl(case_id, determination_run_id, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -360,6 +338,29 @@ impl CustomOperation for CoverageComputeOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl CoverageComputeOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
+        let determination_run_id = extract_uuid(verb_call, ctx, "determination-run-id")?;
+        let result = coverage_compute_impl(case_id, determination_run_id, pool).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
     }
 }
 

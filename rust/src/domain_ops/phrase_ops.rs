@@ -488,6 +488,127 @@ impl CustomOperation for PhraseObserveMissesOp {
         "Watermark-based incremental scan across session_traces with pattern aggregation"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let limit = json_extract_string_opt(args, "limit")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(100);
+        let watermark: (i64,) = sqlx::query_as(
+            r#"SELECT last_observed_sequence FROM "ob-poc".phrase_observation_state WHERE id = 1"#,
+        )
+        .fetch_one(pool)
+        .await?;
+        let last_seq = watermark.0;
+        let miss_rows: Vec<(String, i64)> = sqlx::query_as(
+            r#"
+            SELECT
+                op->>'utterance' AS utterance,
+                COUNT(*)::bigint AS occurrences
+            FROM "ob-poc".session_traces
+            WHERE sequence > $1
+              AND op->>'kind' = 'utterance'
+              AND (
+                  op->'result'->>'match_status' = 'no_match'
+                  OR op->'result'->>'match_status' IS NULL
+              )
+              AND op->>'utterance' IS NOT NULL
+            GROUP BY op->>'utterance'
+            ORDER BY occurrences DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(last_seq)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+        let wrong_match_rows: Vec<(String, String, i64)> = sqlx::query_as(
+            r#"
+            SELECT
+                op->>'utterance' AS utterance,
+                op->'result'->>'matched_verb' AS matched_verb,
+                COUNT(*)::bigint AS occurrences
+            FROM "ob-poc".session_traces
+            WHERE sequence > $1
+              AND op->>'kind' = 'utterance'
+              AND op->'result'->>'match_status' = 'wrong_match'
+              AND op->>'utterance' IS NOT NULL
+            GROUP BY op->>'utterance', op->'result'->>'matched_verb'
+            ORDER BY occurrences DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(last_seq)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+        let new_watermark: (Option<i64>,) = sqlx::query_as(
+            r#"SELECT MAX(sequence) FROM "ob-poc".session_traces WHERE sequence > $1"#,
+        )
+        .bind(last_seq)
+        .fetch_one(pool)
+        .await?;
+        let advanced_to = new_watermark.0.unwrap_or(last_seq);
+        let miss_count = miss_rows.iter().map(|(_, c)| c).sum::<i64>();
+        let wrong_match_count = wrong_match_rows.iter().map(|(_, _, c)| c).sum::<i64>();
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".phrase_observation_state
+            SET last_observed_sequence = $1,
+                last_run_at = NOW(),
+                patterns_found = $2,
+                wrong_match_patterns_found = $3
+            WHERE id = 1
+            "#,
+        )
+        .bind(advanced_to)
+        .bind(miss_count as i32)
+        .bind(wrong_match_count as i32)
+        .execute(pool)
+        .await?;
+        let top_miss_patterns: Vec<MissPattern> = miss_rows
+            .into_iter()
+            .map(|(utterance, occurrences)| MissPattern {
+                utterance,
+                occurrences,
+                first_seen: String::new(),
+                last_seen: String::new(),
+            })
+            .collect();
+        let top_wrong_match_patterns: Vec<WrongMatchPattern> = wrong_match_rows
+            .into_iter()
+            .map(|(utterance, matched_verb, occurrences)| WrongMatchPattern {
+                utterance,
+                matched_verb,
+                occurrences,
+            })
+            .collect();
+        let result = ObserveMissesResult {
+            miss_count,
+            wrong_match_count,
+            top_miss_patterns,
+            top_wrong_match_patterns,
+            watermark_advanced_to: advanced_to,
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PhraseObserveMissesOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -614,120 +735,6 @@ impl CustomOperation for PhraseObserveMissesOp {
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let limit = json_extract_string_opt(args, "limit")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(100);
-        let watermark: (i64,) = sqlx::query_as(
-            r#"SELECT last_observed_sequence FROM "ob-poc".phrase_observation_state WHERE id = 1"#,
-        )
-        .fetch_one(pool)
-        .await?;
-        let last_seq = watermark.0;
-        let miss_rows: Vec<(String, i64)> = sqlx::query_as(
-            r#"
-            SELECT
-                op->>'utterance' AS utterance,
-                COUNT(*)::bigint AS occurrences
-            FROM "ob-poc".session_traces
-            WHERE sequence > $1
-              AND op->>'kind' = 'utterance'
-              AND (
-                  op->'result'->>'match_status' = 'no_match'
-                  OR op->'result'->>'match_status' IS NULL
-              )
-              AND op->>'utterance' IS NOT NULL
-            GROUP BY op->>'utterance'
-            ORDER BY occurrences DESC
-            LIMIT $2
-            "#,
-        )
-        .bind(last_seq)
-        .bind(limit)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-        let wrong_match_rows: Vec<(String, String, i64)> = sqlx::query_as(
-            r#"
-            SELECT
-                op->>'utterance' AS utterance,
-                op->'result'->>'matched_verb' AS matched_verb,
-                COUNT(*)::bigint AS occurrences
-            FROM "ob-poc".session_traces
-            WHERE sequence > $1
-              AND op->>'kind' = 'utterance'
-              AND op->'result'->>'match_status' = 'wrong_match'
-              AND op->>'utterance' IS NOT NULL
-            GROUP BY op->>'utterance', op->'result'->>'matched_verb'
-            ORDER BY occurrences DESC
-            LIMIT $2
-            "#,
-        )
-        .bind(last_seq)
-        .bind(limit)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-        let new_watermark: (Option<i64>,) = sqlx::query_as(
-            r#"SELECT MAX(sequence) FROM "ob-poc".session_traces WHERE sequence > $1"#,
-        )
-        .bind(last_seq)
-        .fetch_one(pool)
-        .await?;
-        let advanced_to = new_watermark.0.unwrap_or(last_seq);
-        let miss_count = miss_rows.iter().map(|(_, c)| c).sum::<i64>();
-        let wrong_match_count = wrong_match_rows.iter().map(|(_, _, c)| c).sum::<i64>();
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".phrase_observation_state
-            SET last_observed_sequence = $1,
-                last_run_at = NOW(),
-                patterns_found = $2,
-                wrong_match_patterns_found = $3
-            WHERE id = 1
-            "#,
-        )
-        .bind(advanced_to)
-        .bind(miss_count as i32)
-        .bind(wrong_match_count as i32)
-        .execute(pool)
-        .await?;
-        let top_miss_patterns: Vec<MissPattern> = miss_rows
-            .into_iter()
-            .map(|(utterance, occurrences)| MissPattern {
-                utterance,
-                occurrences,
-                first_seen: String::new(),
-                last_seen: String::new(),
-            })
-            .collect();
-        let top_wrong_match_patterns: Vec<WrongMatchPattern> = wrong_match_rows
-            .into_iter()
-            .map(|(utterance, matched_verb, occurrences)| WrongMatchPattern {
-                utterance,
-                matched_verb,
-                occurrences,
-            })
-            .collect();
-        let result = ObserveMissesResult {
-            miss_count,
-            wrong_match_count,
-            top_miss_patterns,
-            top_wrong_match_patterns,
-            watermark_advanced_to: advanced_to,
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -737,10 +744,6 @@ impl CustomOperation for PhraseObserveMissesOp {
         Err(anyhow::anyhow!(
             "phrase.observe-misses requires database feature"
         ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -763,55 +766,6 @@ impl CustomOperation for PhraseCoverageReportOp {
         "Cross-join between dsl_verbs and verb_pattern_embeddings with domain-level aggregation"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Query verb count per domain and phrase count per domain
-        let rows: Vec<(String, i64, i64)> = sqlx::query_as(
-            r#"
-            SELECT
-                v.domain,
-                COUNT(DISTINCT v.verb_fqn)::bigint AS verb_count,
-                COALESCE(e.phrase_count, 0)::bigint AS phrase_count
-            FROM "ob-poc".dsl_verbs v
-            LEFT JOIN (
-                SELECT
-                    split_part(verb_fqn, '.', 1) AS domain,
-                    COUNT(*)::bigint AS phrase_count
-                FROM "ob-poc".verb_pattern_embeddings
-                GROUP BY split_part(verb_fqn, '.', 1)
-            ) e ON e.domain = v.domain
-            GROUP BY v.domain, e.phrase_count
-            ORDER BY verb_count DESC
-            "#,
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let entries: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(|(domain, verb_count, phrase_count)| {
-                let avg = if verb_count > 0 {
-                    phrase_count as f64 / verb_count as f64
-                } else {
-                    0.0
-                };
-                let coverage = WorkspaceCoverage {
-                    domain,
-                    verb_count,
-                    phrase_count,
-                    avg_phrases_per_verb: (avg * 100.0).round() / 100.0,
-                };
-                serde_json::to_value(coverage).unwrap_or_default()
-            })
-            .collect();
-
-        Ok(ExecutionResult::RecordSet(entries))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -862,6 +816,62 @@ impl CustomOperation for PhraseCoverageReportOp {
         ))
     }
 
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PhraseCoverageReportOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Query verb count per domain and phrase count per domain
+        let rows: Vec<(String, i64, i64)> = sqlx::query_as(
+            r#"
+            SELECT
+                v.domain,
+                COUNT(DISTINCT v.verb_fqn)::bigint AS verb_count,
+                COALESCE(e.phrase_count, 0)::bigint AS phrase_count
+            FROM "ob-poc".dsl_verbs v
+            LEFT JOIN (
+                SELECT
+                    split_part(verb_fqn, '.', 1) AS domain,
+                    COUNT(*)::bigint AS phrase_count
+                FROM "ob-poc".verb_pattern_embeddings
+                GROUP BY split_part(verb_fqn, '.', 1)
+            ) e ON e.domain = v.domain
+            GROUP BY v.domain, e.phrase_count
+            ORDER BY verb_count DESC
+            "#,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let entries: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(domain, verb_count, phrase_count)| {
+                let avg = if verb_count > 0 {
+                    phrase_count as f64 / verb_count as f64
+                } else {
+                    0.0
+                };
+                let coverage = WorkspaceCoverage {
+                    domain,
+                    verb_count,
+                    phrase_count,
+                    avg_phrases_per_verb: (avg * 100.0).round() / 100.0,
+                };
+                serde_json::to_value(coverage).unwrap_or_default()
+            })
+            .collect();
+
+        Ok(ExecutionResult::RecordSet(entries))
+    }
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -871,10 +881,6 @@ impl CustomOperation for PhraseCoverageReportOp {
         Err(anyhow::anyhow!(
             "phrase.coverage-report requires database feature"
         ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -901,22 +907,6 @@ impl CustomOperation for PhraseCheckCollisionsOp {
         "Multi-source collision check: phrase_bank exact, embeddings exact, semantic similarity"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let phrase = get_required_string(verb_call, "phrase")?;
-        let target_verb = get_required_string(verb_call, "target-verb")?;
-        let workspace = get_optional_string(verb_call, "workspace");
-
-        let (report, _max_similarity) =
-            run_collision_check(pool, &phrase, &target_verb, workspace.as_deref()).await?;
-
-        Ok(ExecutionResult::Record(serde_json::to_value(report)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -935,6 +925,29 @@ impl CustomOperation for PhraseCheckCollisionsOp {
         ))
     }
 
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PhraseCheckCollisionsOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let phrase = get_required_string(verb_call, "phrase")?;
+        let target_verb = get_required_string(verb_call, "target-verb")?;
+        let workspace = get_optional_string(verb_call, "workspace");
+
+        let (report, _max_similarity) =
+            run_collision_check(pool, &phrase, &target_verb, workspace.as_deref()).await?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(report)?))
+    }
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -944,10 +957,6 @@ impl CustomOperation for PhraseCheckCollisionsOp {
         Err(anyhow::anyhow!(
             "phrase.check-collisions requires database feature"
         ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -971,6 +980,68 @@ impl CustomOperation for PhraseProposeOp {
         "Proposal creation with collision check, risk tier assignment, and SemOS changeset wiring"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let phrase = json_extract_string(args, "phrase")?;
+        let target_verb = json_extract_string(args, "target-verb")?;
+        let workspace = json_extract_string_opt(args, "workspace");
+        let rationale = json_extract_string_opt(args, "rationale");
+        let (collision_report, max_similarity) =
+            run_collision_check(pool, &phrase, &target_verb, workspace.as_deref()).await?;
+        let confidence = compute_proposal_confidence(max_similarity);
+        let risk_tier = risk_tier_for_verb(&target_verb);
+        let collision_report_json = serde_json::to_value(&collision_report)?;
+        let definition = serde_json::json!({
+            "phrase": phrase,
+            "verb_fqn": target_verb,
+            "workspace": workspace,
+            "source": "governed",
+            "risk_tier": risk_tier,
+            "state": "proposed",
+            "confidence": confidence,
+            "rationale": rationale,
+            "collision_report": collision_report_json,
+        });
+        let semantic_id = format!("phrase:{}:{}", target_verb, phrase);
+        let object_id = crate::sem_reg::ids::object_id_for(ObjectType::PhraseMapping, &semantic_id);
+        let mut tx = pool.begin().await?;
+        let meta = next_phrase_meta(
+            None,
+            object_id,
+            &ctx.principal.actor_id,
+            ChangeType::NonBreaking,
+            rationale.clone(),
+            SnapshotStatus::Active,
+        );
+        let snapshot_id = publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+        tx.commit().await?;
+        let result = PhraseProposalResult {
+            snapshot_id,
+            phrase,
+            verb_fqn: target_verb,
+            confidence,
+            risk_tier: risk_tier.to_string(),
+            collision_safe: collision_report.safe_to_propose,
+            state: "proposed".to_string(),
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PhraseProposeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1035,61 +1106,6 @@ impl CustomOperation for PhraseProposeOp {
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let phrase = json_extract_string(args, "phrase")?;
-        let target_verb = json_extract_string(args, "target-verb")?;
-        let workspace = json_extract_string_opt(args, "workspace");
-        let rationale = json_extract_string_opt(args, "rationale");
-        let (collision_report, max_similarity) =
-            run_collision_check(pool, &phrase, &target_verb, workspace.as_deref()).await?;
-        let confidence = compute_proposal_confidence(max_similarity);
-        let risk_tier = risk_tier_for_verb(&target_verb);
-        let collision_report_json = serde_json::to_value(&collision_report)?;
-        let definition = serde_json::json!({
-            "phrase": phrase,
-            "verb_fqn": target_verb,
-            "workspace": workspace,
-            "source": "governed",
-            "risk_tier": risk_tier,
-            "state": "proposed",
-            "confidence": confidence,
-            "rationale": rationale,
-            "collision_report": collision_report_json,
-        });
-        let semantic_id = format!("phrase:{}:{}", target_verb, phrase);
-        let object_id = crate::sem_reg::ids::object_id_for(ObjectType::PhraseMapping, &semantic_id);
-        let mut tx = pool.begin().await?;
-        let meta = next_phrase_meta(
-            None,
-            object_id,
-            &ctx.principal.actor_id,
-            ChangeType::NonBreaking,
-            rationale.clone(),
-            SnapshotStatus::Active,
-        );
-        let snapshot_id = publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
-        tx.commit().await?;
-        let result = PhraseProposalResult {
-            snapshot_id,
-            phrase,
-            verb_fqn: target_verb,
-            confidence,
-            risk_tier: risk_tier.to_string(),
-            collision_safe: collision_report.safe_to_propose,
-            state: "proposed".to_string(),
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1097,10 +1113,6 @@ impl CustomOperation for PhraseProposeOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("phrase.propose requires database feature"))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1120,6 +1132,197 @@ impl CustomOperation for PhraseBatchProposeOp {
         "Batch proposal generation with per-phrase collision checks and risk tier aggregation"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let limit = json_extract_string_opt(args, "limit")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(50) as usize;
+        let watermark_result: Result<(i64,), _> = sqlx::query_as(
+            r#"SELECT last_observed_sequence FROM "ob-poc".phrase_observation_state WHERE id = 1"#,
+        )
+        .fetch_one(pool)
+        .await;
+        let last_seq = match watermark_result {
+            Ok((seq,)) => seq,
+            Err(_) => {
+                let result = BatchProposeResult {
+                    proposals_generated: 0,
+                    skipped_duplicates: 0,
+                    message: "No phrase observation state found. Run phrase.observe-misses first."
+                        .to_string(),
+                };
+                return Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                    serde_json::to_value(result)?,
+                ));
+            }
+        };
+        let miss_rows: Vec<(String,)> = sqlx::query_as(
+            r#"
+            SELECT DISTINCT op->>'utterance' AS utterance
+            FROM "ob-poc".session_traces
+            WHERE sequence > $1
+              AND op->>'kind' = 'utterance'
+              AND (
+                  op->'result'->>'match_status' = 'no_match'
+                  OR op->'result'->>'match_status' IS NULL
+              )
+              AND op->>'utterance' IS NOT NULL
+            ORDER BY utterance
+            "#,
+        )
+        .bind(last_seq)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+        if miss_rows.is_empty() {
+            let result = BatchProposeResult {
+                proposals_generated: 0,
+                skipped_duplicates: 0,
+                message: "No session trace data available for observation".to_string(),
+            };
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                serde_json::to_value(result)?,
+            ));
+        }
+        let mut seen_phrases = std::collections::HashSet::new();
+        let mut proposals: Vec<serde_json::Value> = Vec::new();
+        let mut skipped = 0_i64;
+        for (utterance,) in &miss_rows {
+            if proposals.len() >= limit {
+                break;
+            }
+            let phrase = utterance.trim().to_string();
+            if phrase.is_empty() || !seen_phrases.insert(phrase.clone()) {
+                skipped += 1;
+                continue;
+            }
+            let best_match: Option<(String, f64)> = sqlx::query_as(
+                r#"
+                SELECT verb_fqn, 1.0 - (embedding <=> (
+                    SELECT embedding FROM "ob-poc".verb_pattern_embeddings
+                    WHERE pattern = $1
+                    LIMIT 1
+                )) AS similarity
+                FROM "ob-poc".verb_pattern_embeddings
+                WHERE pattern != $1
+                ORDER BY embedding <=> (
+                    SELECT embedding FROM "ob-poc".verb_pattern_embeddings
+                    WHERE pattern = $1
+                    LIMIT 1
+                )
+                LIMIT 1
+                "#,
+            )
+            .bind(&phrase)
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten();
+            let (target_verb, _best_sim) = match best_match {
+                Some(m) => m,
+                None => {
+                    skipped += 1;
+                    continue;
+                }
+            };
+            let (collision_report, max_similarity) =
+                run_collision_check(pool, &phrase, &target_verb, None).await?;
+            let confidence = compute_proposal_confidence(max_similarity);
+            let risk_tier = risk_tier_for_verb(&target_verb);
+            let collision_report_json = serde_json::to_value(&collision_report)?;
+            let definition = serde_json::json!({
+                "phrase": phrase,
+                "verb_fqn": target_verb,
+                "workspace": null,
+                "source": "governed",
+                "risk_tier": risk_tier,
+                "state": "proposed",
+                "confidence": confidence,
+                "rationale": "Auto-generated from session trace miss patterns",
+                "collision_report": collision_report_json,
+            });
+            let semantic_id = format!("phrase:{}:{}", target_verb, phrase);
+            let object_id =
+                crate::sem_reg::ids::object_id_for(ObjectType::PhraseMapping, &semantic_id);
+            let mut tx = pool.begin().await?;
+            let meta = next_phrase_meta(
+                None,
+                object_id,
+                &ctx.principal.actor_id,
+                ChangeType::NonBreaking,
+                Some("Auto-generated from session trace miss patterns".to_string()),
+                SnapshotStatus::Active,
+            );
+            let snapshot_id = publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+            tx.commit().await?;
+            let proposal = PhraseProposalResult {
+                snapshot_id,
+                phrase,
+                verb_fqn: target_verb,
+                confidence,
+                risk_tier: risk_tier.to_string(),
+                collision_safe: collision_report.safe_to_propose,
+                state: "proposed".to_string(),
+            };
+            proposals.push(serde_json::to_value(proposal)?);
+        }
+        proposals.sort_by(|a, b| {
+            let tier_order = |t: &str| -> u8 {
+                match t {
+                    "critical" => 0,
+                    "elevated" => 1,
+                    "standard" => 2,
+                    _ => 3,
+                }
+            };
+            let a_tier = a
+                .get("risk_tier")
+                .and_then(|v| v.as_str())
+                .unwrap_or("elevated");
+            let b_tier = b
+                .get("risk_tier")
+                .and_then(|v| v.as_str())
+                .unwrap_or("elevated");
+            let tier_cmp = tier_order(a_tier).cmp(&tier_order(b_tier));
+            if tier_cmp != std::cmp::Ordering::Equal {
+                return tier_cmp;
+            }
+            let a_conf = a.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let b_conf = b.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            b_conf
+                .partial_cmp(&a_conf)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let generated = proposals.len() as i64;
+        let mut result_set = Vec::with_capacity(proposals.len() + 1);
+        let summary = BatchProposeResult {
+            proposals_generated: generated,
+            skipped_duplicates: skipped,
+            message: format!(
+                "Generated {} proposals from session trace miss patterns",
+                generated
+            ),
+        };
+        result_set.push(serde_json::to_value(summary)?);
+        result_set.extend(proposals);
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            result_set,
+        ))
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PhraseBatchProposeOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1326,190 +1529,6 @@ impl CustomOperation for PhraseBatchProposeOp {
 
         Ok(ExecutionResult::RecordSet(result_set))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let limit = json_extract_string_opt(args, "limit")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(50) as usize;
-        let watermark_result: Result<(i64,), _> = sqlx::query_as(
-            r#"SELECT last_observed_sequence FROM "ob-poc".phrase_observation_state WHERE id = 1"#,
-        )
-        .fetch_one(pool)
-        .await;
-        let last_seq = match watermark_result {
-            Ok((seq,)) => seq,
-            Err(_) => {
-                let result = BatchProposeResult {
-                    proposals_generated: 0,
-                    skipped_duplicates: 0,
-                    message: "No phrase observation state found. Run phrase.observe-misses first."
-                        .to_string(),
-                };
-                return Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                    serde_json::to_value(result)?,
-                ));
-            }
-        };
-        let miss_rows: Vec<(String,)> = sqlx::query_as(
-            r#"
-            SELECT DISTINCT op->>'utterance' AS utterance
-            FROM "ob-poc".session_traces
-            WHERE sequence > $1
-              AND op->>'kind' = 'utterance'
-              AND (
-                  op->'result'->>'match_status' = 'no_match'
-                  OR op->'result'->>'match_status' IS NULL
-              )
-              AND op->>'utterance' IS NOT NULL
-            ORDER BY utterance
-            "#,
-        )
-        .bind(last_seq)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-        if miss_rows.is_empty() {
-            let result = BatchProposeResult {
-                proposals_generated: 0,
-                skipped_duplicates: 0,
-                message: "No session trace data available for observation".to_string(),
-            };
-            return Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                serde_json::to_value(result)?,
-            ));
-        }
-        let mut seen_phrases = std::collections::HashSet::new();
-        let mut proposals: Vec<serde_json::Value> = Vec::new();
-        let mut skipped = 0_i64;
-        for (utterance,) in &miss_rows {
-            if proposals.len() >= limit {
-                break;
-            }
-            let phrase = utterance.trim().to_string();
-            if phrase.is_empty() || !seen_phrases.insert(phrase.clone()) {
-                skipped += 1;
-                continue;
-            }
-            let best_match: Option<(String, f64)> = sqlx::query_as(
-                r#"
-                SELECT verb_fqn, 1.0 - (embedding <=> (
-                    SELECT embedding FROM "ob-poc".verb_pattern_embeddings
-                    WHERE pattern = $1
-                    LIMIT 1
-                )) AS similarity
-                FROM "ob-poc".verb_pattern_embeddings
-                WHERE pattern != $1
-                ORDER BY embedding <=> (
-                    SELECT embedding FROM "ob-poc".verb_pattern_embeddings
-                    WHERE pattern = $1
-                    LIMIT 1
-                )
-                LIMIT 1
-                "#,
-            )
-            .bind(&phrase)
-            .fetch_optional(pool)
-            .await
-            .ok()
-            .flatten();
-            let (target_verb, _best_sim) = match best_match {
-                Some(m) => m,
-                None => {
-                    skipped += 1;
-                    continue;
-                }
-            };
-            let (collision_report, max_similarity) =
-                run_collision_check(pool, &phrase, &target_verb, None).await?;
-            let confidence = compute_proposal_confidence(max_similarity);
-            let risk_tier = risk_tier_for_verb(&target_verb);
-            let collision_report_json = serde_json::to_value(&collision_report)?;
-            let definition = serde_json::json!({
-                "phrase": phrase,
-                "verb_fqn": target_verb,
-                "workspace": null,
-                "source": "governed",
-                "risk_tier": risk_tier,
-                "state": "proposed",
-                "confidence": confidence,
-                "rationale": "Auto-generated from session trace miss patterns",
-                "collision_report": collision_report_json,
-            });
-            let semantic_id = format!("phrase:{}:{}", target_verb, phrase);
-            let object_id =
-                crate::sem_reg::ids::object_id_for(ObjectType::PhraseMapping, &semantic_id);
-            let mut tx = pool.begin().await?;
-            let meta = next_phrase_meta(
-                None,
-                object_id,
-                &ctx.principal.actor_id,
-                ChangeType::NonBreaking,
-                Some("Auto-generated from session trace miss patterns".to_string()),
-                SnapshotStatus::Active,
-            );
-            let snapshot_id = publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
-            tx.commit().await?;
-            let proposal = PhraseProposalResult {
-                snapshot_id,
-                phrase,
-                verb_fqn: target_verb,
-                confidence,
-                risk_tier: risk_tier.to_string(),
-                collision_safe: collision_report.safe_to_propose,
-                state: "proposed".to_string(),
-            };
-            proposals.push(serde_json::to_value(proposal)?);
-        }
-        proposals.sort_by(|a, b| {
-            let tier_order = |t: &str| -> u8 {
-                match t {
-                    "critical" => 0,
-                    "elevated" => 1,
-                    "standard" => 2,
-                    _ => 3,
-                }
-            };
-            let a_tier = a
-                .get("risk_tier")
-                .and_then(|v| v.as_str())
-                .unwrap_or("elevated");
-            let b_tier = b
-                .get("risk_tier")
-                .and_then(|v| v.as_str())
-                .unwrap_or("elevated");
-            let tier_cmp = tier_order(a_tier).cmp(&tier_order(b_tier));
-            if tier_cmp != std::cmp::Ordering::Equal {
-                return tier_cmp;
-            }
-            let a_conf = a.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let b_conf = b.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            b_conf
-                .partial_cmp(&a_conf)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        let generated = proposals.len() as i64;
-        let mut result_set = Vec::with_capacity(proposals.len() + 1);
-        let summary = BatchProposeResult {
-            proposals_generated: generated,
-            skipped_duplicates: skipped,
-            message: format!(
-                "Generated {} proposals from session trace miss patterns",
-                generated
-            ),
-        };
-        result_set.push(serde_json::to_value(summary)?);
-        result_set.extend(proposals);
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            result_set,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1519,10 +1538,6 @@ impl CustomOperation for PhraseBatchProposeOp {
         Err(anyhow::anyhow!(
             "phrase.batch-propose requires database feature"
         ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1546,77 +1561,6 @@ impl CustomOperation for PhraseReviewProposalsOp {
         "Multi-table join across proposals, collision reports, and risk tiers with grouping"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Query active phrase_mapping snapshots that are not yet published
-        let rows: Vec<(Uuid, serde_json::Value, String, i32, i32)> = sqlx::query_as(
-            r#"
-            SELECT
-                snapshot_id,
-                definition,
-                created_by,
-                version_major,
-                version_minor
-            FROM sem_reg.snapshots
-            WHERE object_type = 'phrase_mapping'
-              AND status = 'active'
-              AND effective_until IS NULL
-              AND COALESCE(definition->>'state', 'proposed') != 'published'
-            ORDER BY effective_from DESC
-            "#,
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let proposals: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(
-                |(snapshot_id, definition, created_by, ver_major, ver_minor)| {
-                    let phrase = definition
-                        .get("phrase")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let verb_fqn = definition
-                        .get("verb_fqn")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let workspace = definition
-                        .get("workspace")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-                    let state = definition
-                        .get("state")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("proposed")
-                        .to_string();
-                    let collision_report = definition.get("collision_report").cloned();
-                    let evidence = definition.get("evidence").cloned();
-
-                    serde_json::to_value(PhraseProposalSummary {
-                        snapshot_id,
-                        phrase,
-                        verb_fqn,
-                        workspace,
-                        state,
-                        created_by,
-                        version: format!("{}.{}", ver_major, ver_minor),
-                        collision_report,
-                        evidence,
-                    })
-                    .unwrap_or_default()
-                },
-            )
-            .collect();
-
-        Ok(ExecutionResult::RecordSet(proposals))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -1688,6 +1632,84 @@ impl CustomOperation for PhraseReviewProposalsOp {
         ))
     }
 
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PhraseReviewProposalsOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Query active phrase_mapping snapshots that are not yet published
+        let rows: Vec<(Uuid, serde_json::Value, String, i32, i32)> = sqlx::query_as(
+            r#"
+            SELECT
+                snapshot_id,
+                definition,
+                created_by,
+                version_major,
+                version_minor
+            FROM sem_reg.snapshots
+            WHERE object_type = 'phrase_mapping'
+              AND status = 'active'
+              AND effective_until IS NULL
+              AND COALESCE(definition->>'state', 'proposed') != 'published'
+            ORDER BY effective_from DESC
+            "#,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let proposals: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(
+                |(snapshot_id, definition, created_by, ver_major, ver_minor)| {
+                    let phrase = definition
+                        .get("phrase")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let verb_fqn = definition
+                        .get("verb_fqn")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let workspace = definition
+                        .get("workspace")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let state = definition
+                        .get("state")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("proposed")
+                        .to_string();
+                    let collision_report = definition.get("collision_report").cloned();
+                    let evidence = definition.get("evidence").cloned();
+
+                    serde_json::to_value(PhraseProposalSummary {
+                        snapshot_id,
+                        phrase,
+                        verb_fqn,
+                        workspace,
+                        state,
+                        created_by,
+                        version: format!("{}.{}", ver_major, ver_minor),
+                        collision_report,
+                        evidence,
+                    })
+                    .unwrap_or_default()
+                },
+            )
+            .collect();
+
+        Ok(ExecutionResult::RecordSet(proposals))
+    }
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1697,10 +1719,6 @@ impl CustomOperation for PhraseReviewProposalsOp {
         Err(anyhow::anyhow!(
             "phrase.review-proposals requires database feature"
         ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1725,6 +1743,74 @@ impl CustomOperation for PhraseApproveOp {
         "Approval requires SemOS changeset creation, phrase_bank insertion, and embedding generation"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let proposal_id_str = json_extract_string(args, "proposal-id")?;
+        let proposal_id: Uuid = proposal_id_str
+            .parse()
+            .map_err(|_| anyhow!("Invalid UUID for proposal-id: {}", proposal_id_str))?;
+        let rationale = json_extract_string_opt(args, "rationale");
+        let proposal = SnapshotStore::get_by_id(pool, proposal_id)
+            .await?
+            .ok_or_else(|| anyhow!("Phrase proposal snapshot {} not found", proposal_id))?;
+        if proposal.object_type != ObjectType::PhraseMapping {
+            return Err(anyhow!(
+                "Snapshot {} is not a phrase_mapping (found {:?})",
+                proposal_id,
+                proposal.object_type
+            ));
+        }
+        let mut definition: serde_json::Value = proposal.definition.clone();
+        definition["state"] = serde_json::Value::String("published".to_string());
+        if let Some(ref r) = rationale {
+            definition["approval_rationale"] = serde_json::Value::String(r.clone());
+        }
+        let mut tx = pool.begin().await?;
+        let meta = next_phrase_meta(
+            Some(&proposal),
+            proposal.object_id,
+            &ctx.principal.actor_id,
+            ChangeType::NonBreaking,
+            rationale,
+            SnapshotStatus::Active,
+        );
+        let published_snapshot_id =
+            publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+        tx.commit().await?;
+        let phrase = definition
+            .get("phrase")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let verb_fqn = definition
+            .get("verb_fqn")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let result = PhraseApproveResult {
+            published_snapshot_id,
+            phrase,
+            verb_fqn,
+            status: "published".to_string(),
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PhraseApproveOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1794,67 +1880,6 @@ impl CustomOperation for PhraseApproveOp {
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let proposal_id_str = json_extract_string(args, "proposal-id")?;
-        let proposal_id: Uuid = proposal_id_str
-            .parse()
-            .map_err(|_| anyhow!("Invalid UUID for proposal-id: {}", proposal_id_str))?;
-        let rationale = json_extract_string_opt(args, "rationale");
-        let proposal = SnapshotStore::get_by_id(pool, proposal_id)
-            .await?
-            .ok_or_else(|| anyhow!("Phrase proposal snapshot {} not found", proposal_id))?;
-        if proposal.object_type != ObjectType::PhraseMapping {
-            return Err(anyhow!(
-                "Snapshot {} is not a phrase_mapping (found {:?})",
-                proposal_id,
-                proposal.object_type
-            ));
-        }
-        let mut definition: serde_json::Value = proposal.definition.clone();
-        definition["state"] = serde_json::Value::String("published".to_string());
-        if let Some(ref r) = rationale {
-            definition["approval_rationale"] = serde_json::Value::String(r.clone());
-        }
-        let mut tx = pool.begin().await?;
-        let meta = next_phrase_meta(
-            Some(&proposal),
-            proposal.object_id,
-            &ctx.principal.actor_id,
-            ChangeType::NonBreaking,
-            rationale,
-            SnapshotStatus::Active,
-        );
-        let published_snapshot_id =
-            publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
-        tx.commit().await?;
-        let phrase = definition
-            .get("phrase")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        let verb_fqn = definition
-            .get("verb_fqn")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        let result = PhraseApproveResult {
-            published_snapshot_id,
-            phrase,
-            verb_fqn,
-            status: "published".to_string(),
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1862,10 +1887,6 @@ impl CustomOperation for PhraseApproveOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("phrase.approve requires database feature"))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1888,6 +1909,61 @@ impl CustomOperation for PhraseRejectOp {
         "Rejection requires state transition and audit trail recording"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let proposal_id_str = json_extract_string(args, "proposal-id")?;
+        let proposal_id: Uuid = proposal_id_str
+            .parse()
+            .map_err(|_| anyhow!("Invalid UUID for proposal-id: {}", proposal_id_str))?;
+        let reason = json_extract_string(args, "reason")?;
+        let proposal = SnapshotStore::get_by_id(pool, proposal_id)
+            .await?
+            .ok_or_else(|| anyhow!("Phrase proposal snapshot {} not found", proposal_id))?;
+        if proposal.object_type != ObjectType::PhraseMapping {
+            return Err(anyhow!(
+                "Snapshot {} is not a phrase_mapping (found {:?})",
+                proposal_id,
+                proposal.object_type
+            ));
+        }
+        let mut definition: serde_json::Value = proposal.definition.clone();
+        definition["state"] = serde_json::Value::String("rejected".to_string());
+        definition["rejection_reason"] = serde_json::Value::String(reason.clone());
+        let mut tx = pool.begin().await?;
+        let meta = next_phrase_meta(
+            Some(&proposal),
+            proposal.object_id,
+            &ctx.principal.actor_id,
+            ChangeType::NonBreaking,
+            Some(reason.clone()),
+            SnapshotStatus::Deprecated,
+        );
+        let rejected_snapshot_id =
+            publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+        tx.commit().await?;
+        let result = PhraseLifecycleResult {
+            snapshot_id: rejected_snapshot_id,
+            state: "rejected".to_string(),
+            reason: Some(reason),
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PhraseRejectOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1941,54 +2017,6 @@ impl CustomOperation for PhraseRejectOp {
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let proposal_id_str = json_extract_string(args, "proposal-id")?;
-        let proposal_id: Uuid = proposal_id_str
-            .parse()
-            .map_err(|_| anyhow!("Invalid UUID for proposal-id: {}", proposal_id_str))?;
-        let reason = json_extract_string(args, "reason")?;
-        let proposal = SnapshotStore::get_by_id(pool, proposal_id)
-            .await?
-            .ok_or_else(|| anyhow!("Phrase proposal snapshot {} not found", proposal_id))?;
-        if proposal.object_type != ObjectType::PhraseMapping {
-            return Err(anyhow!(
-                "Snapshot {} is not a phrase_mapping (found {:?})",
-                proposal_id,
-                proposal.object_type
-            ));
-        }
-        let mut definition: serde_json::Value = proposal.definition.clone();
-        definition["state"] = serde_json::Value::String("rejected".to_string());
-        definition["rejection_reason"] = serde_json::Value::String(reason.clone());
-        let mut tx = pool.begin().await?;
-        let meta = next_phrase_meta(
-            Some(&proposal),
-            proposal.object_id,
-            &ctx.principal.actor_id,
-            ChangeType::NonBreaking,
-            Some(reason.clone()),
-            SnapshotStatus::Deprecated,
-        );
-        let rejected_snapshot_id =
-            publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
-        tx.commit().await?;
-        let result = PhraseLifecycleResult {
-            snapshot_id: rejected_snapshot_id,
-            state: "rejected".to_string(),
-            reason: Some(reason),
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1996,10 +2024,6 @@ impl CustomOperation for PhraseRejectOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("phrase.reject requires database feature"))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -2022,6 +2046,63 @@ impl CustomOperation for PhraseDeferOp {
         "Deferral requires state transition and optional reason recording"
     }
 
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let proposal_id_str = json_extract_string(args, "proposal-id")?;
+        let proposal_id: Uuid = proposal_id_str
+            .parse()
+            .map_err(|_| anyhow!("Invalid UUID for proposal-id: {}", proposal_id_str))?;
+        let reason = json_extract_string_opt(args, "reason");
+        let proposal = SnapshotStore::get_by_id(pool, proposal_id)
+            .await?
+            .ok_or_else(|| anyhow!("Phrase proposal snapshot {} not found", proposal_id))?;
+        if proposal.object_type != ObjectType::PhraseMapping {
+            return Err(anyhow!(
+                "Snapshot {} is not a phrase_mapping (found {:?})",
+                proposal_id,
+                proposal.object_type
+            ));
+        }
+        let mut definition: serde_json::Value = proposal.definition.clone();
+        definition["state"] = serde_json::Value::String("deferred".to_string());
+        if let Some(ref r) = reason {
+            definition["deferral_reason"] = serde_json::Value::String(r.clone());
+        }
+        let mut tx = pool.begin().await?;
+        let meta = next_phrase_meta(
+            Some(&proposal),
+            proposal.object_id,
+            &ctx.principal.actor_id,
+            ChangeType::NonBreaking,
+            reason.clone(),
+            SnapshotStatus::Active,
+        );
+        let deferred_snapshot_id =
+            publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+        tx.commit().await?;
+        let result = PhraseLifecycleResult {
+            snapshot_id: deferred_snapshot_id,
+            state: "deferred".to_string(),
+            reason,
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PhraseDeferOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2077,56 +2158,6 @@ impl CustomOperation for PhraseDeferOp {
 
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let proposal_id_str = json_extract_string(args, "proposal-id")?;
-        let proposal_id: Uuid = proposal_id_str
-            .parse()
-            .map_err(|_| anyhow!("Invalid UUID for proposal-id: {}", proposal_id_str))?;
-        let reason = json_extract_string_opt(args, "reason");
-        let proposal = SnapshotStore::get_by_id(pool, proposal_id)
-            .await?
-            .ok_or_else(|| anyhow!("Phrase proposal snapshot {} not found", proposal_id))?;
-        if proposal.object_type != ObjectType::PhraseMapping {
-            return Err(anyhow!(
-                "Snapshot {} is not a phrase_mapping (found {:?})",
-                proposal_id,
-                proposal.object_type
-            ));
-        }
-        let mut definition: serde_json::Value = proposal.definition.clone();
-        definition["state"] = serde_json::Value::String("deferred".to_string());
-        if let Some(ref r) = reason {
-            definition["deferral_reason"] = serde_json::Value::String(r.clone());
-        }
-        let mut tx = pool.begin().await?;
-        let meta = next_phrase_meta(
-            Some(&proposal),
-            proposal.object_id,
-            &ctx.principal.actor_id,
-            ChangeType::NonBreaking,
-            reason.clone(),
-            SnapshotStatus::Active,
-        );
-        let deferred_snapshot_id =
-            publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
-        tx.commit().await?;
-        let result = PhraseLifecycleResult {
-            snapshot_id: deferred_snapshot_id,
-            state: "deferred".to_string(),
-            reason,
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2134,9 +2165,5 @@ impl CustomOperation for PhraseDeferOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("phrase.defer requires database feature"))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

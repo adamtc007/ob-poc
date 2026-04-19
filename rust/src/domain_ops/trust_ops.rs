@@ -252,6 +252,28 @@ impl CustomOperation for TrustAnalyzeControlOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+
+        let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let result = trust_analyze_control_impl(trust_entity_id, cbu_id, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl TrustAnalyzeControlOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -273,25 +295,6 @@ impl CustomOperation for TrustAnalyzeControlOp {
         Err(anyhow!(
             "Database feature required for trust.analyze-control"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-
-        let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let result = trust_analyze_control_impl(trust_entity_id, cbu_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -463,6 +466,31 @@ impl CustomOperation for TrustIdentifyUbosOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+
+        let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let threshold = json_extract_string_opt(args, "threshold")
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(25.0);
+        let result = trust_identify_ubos_impl(trust_entity_id, cbu_id, threshold, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl TrustIdentifyUbosOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -488,28 +516,6 @@ impl CustomOperation for TrustIdentifyUbosOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required for trust.identify-ubos"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-
-        let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let threshold = json_extract_string_opt(args, "threshold")
-            .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(25.0);
-        let result = trust_identify_ubos_impl(trust_entity_id, cbu_id, threshold, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -632,6 +638,28 @@ impl CustomOperation for TrustClassifyOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+
+        let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let result = trust_classify_impl(trust_entity_id, cbu_id, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl TrustClassifyOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -651,25 +679,6 @@ impl CustomOperation for TrustClassifyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required for trust.classify"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-
-        let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let result = trust_classify_impl(trust_entity_id, cbu_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 

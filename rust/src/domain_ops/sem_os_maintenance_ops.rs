@@ -32,6 +32,32 @@ impl CustomOperation for MaintenanceHealthPendingOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let rows: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT status, COUNT(*)::bigint FROM sem_reg.changesets GROUP BY status ORDER BY status"
+        ).fetch_all(pool).await?;
+        let entries: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(status, count)| serde_json::json!({"status": status, "count": count}))
+            .collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::json!({"pending_changesets": entries}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl MaintenanceHealthPendingOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         _verb_call: &VerbCall,
@@ -69,29 +95,6 @@ impl CustomOperation for MaintenanceHealthPendingOp {
             "maintenance.health-pending requires database"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let rows: Vec<(String, i64)> = sqlx::query_as(
-            "SELECT status, COUNT(*)::bigint FROM sem_reg.changesets GROUP BY status ORDER BY status"
-        ).fetch_all(pool).await?;
-        let entries: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(|(status, count)| serde_json::json!({"status": status, "count": count}))
-            .collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::json!({"pending_changesets": entries}),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Check for stale dry-run results.
@@ -109,6 +112,32 @@ impl CustomOperation for MaintenanceHealthStaleDryrunsOp {
     fn rationale(&self) -> &'static str {
         "Detects dry-run results older than threshold"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "SELECT c.changeset_id::text, c.status FROM sem_reg.changesets c WHERE c.status = 'dry_run_passed' AND c.updated_at < NOW() - INTERVAL '7 days' ORDER BY c.updated_at ASC LIMIT 50",
+        ).fetch_all(pool).await?;
+        let stale: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(id, status)| serde_json::json!({"changeset_id": id, "status": status}))
+            .collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::json!({"stale_dryruns": stale, "count": stale.len()}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl MaintenanceHealthStaleDryrunsOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -154,29 +183,6 @@ impl CustomOperation for MaintenanceHealthStaleDryrunsOp {
             "maintenance.health-stale-dryruns requires database"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let rows: Vec<(String, String)> = sqlx::query_as(
-            "SELECT c.changeset_id::text, c.status FROM sem_reg.changesets c WHERE c.status = 'dry_run_passed' AND c.updated_at < NOW() - INTERVAL '7 days' ORDER BY c.updated_at ASC LIMIT 50",
-        ).fetch_all(pool).await?;
-        let stale: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(|(id, status)| serde_json::json!({"changeset_id": id, "status": status}))
-            .collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::json!({"stale_dryruns": stale, "count": stale.len()}),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // ── Cleanup ───────────────────────────────────────────────────────
@@ -196,6 +202,28 @@ impl CustomOperation for MaintenanceCleanupOp {
     fn rationale(&self) -> &'static str {
         "Archives old rejected/failed changesets per retention policy"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let archived = sqlx::query_scalar::<_, i64>(
+            "WITH moved AS (INSERT INTO sem_reg_authoring.change_sets_archive SELECT * FROM sem_reg.changesets WHERE status IN ('rejected', 'dry_run_failed') AND updated_at < NOW() - INTERVAL '90 days' ON CONFLICT DO NOTHING RETURNING 1) SELECT COUNT(*) FROM moved",
+        ).fetch_one(pool).await.unwrap_or(0);
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::json!({"archived_count": archived, "status": "cleanup_complete"}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl MaintenanceCleanupOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -233,25 +261,6 @@ impl CustomOperation for MaintenanceCleanupOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("maintenance.cleanup requires database"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let archived = sqlx::query_scalar::<_, i64>(
-            "WITH moved AS (INSERT INTO sem_reg_authoring.change_sets_archive SELECT * FROM sem_reg.changesets WHERE status IN ('rejected', 'dry_run_failed') AND updated_at < NOW() - INTERVAL '90 days' ON CONFLICT DO NOTHING RETURNING 1) SELECT COUNT(*) FROM moved",
-        ).fetch_one(pool).await.unwrap_or(0);
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::json!({"archived_count": archived, "status": "cleanup_complete"}),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // ── Bootstrap Seeds ───────────────────────────────────────────────
@@ -271,6 +280,25 @@ impl CustomOperation for MaintenanceBootstrapSeedsOp {
     fn rationale(&self) -> &'static str {
         "Triggers seed bundle bootstrap via CoreService"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::json!({"status": "bootstrap_seeds must be triggered via server startup or CLI", "hint": "Use: cargo x sem-reg scan"}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl MaintenanceBootstrapSeedsOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -296,22 +324,6 @@ impl CustomOperation for MaintenanceBootstrapSeedsOp {
             "maintenance.bootstrap-seeds requires database"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::json!({"status": "bootstrap_seeds must be triggered via server startup or CLI", "hint": "Use: cargo x sem-reg scan"}),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // ── Outbox Drain ──────────────────────────────────────────────────
@@ -331,6 +343,31 @@ impl CustomOperation for MaintenanceDrainOutboxOp {
     fn rationale(&self) -> &'static str {
         "Checks outbox event queue status"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let pending: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sem_reg.outbox_events WHERE processed_at IS NULL",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::json!({"pending_outbox_events": pending, "status": if pending == 0 { "drained" } else { "has_pending" }}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl MaintenanceDrainOutboxOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -361,28 +398,6 @@ impl CustomOperation for MaintenanceDrainOutboxOp {
         Err(anyhow::anyhow!(
             "maintenance.drain-outbox requires database"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let pending: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM sem_reg.outbox_events WHERE processed_at IS NULL",
-        )
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::json!({"pending_outbox_events": pending, "status": if pending == 0 { "drained" } else { "has_pending" }}),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -419,6 +434,35 @@ impl CustomOperation for MaintenanceReindexEmbeddingsOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_bool_opt;
+        let force = json_extract_bool_opt(args, "force").unwrap_or(false);
+        let (outbox_id, idempotency_key) = enqueue_reindex_embeddings(pool, force).await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "status": "queued",
+                "force": force,
+                "outbox_id": outbox_id.to_string(),
+                "idempotency_key": idempotency_key,
+                "drainer": "Phase 5e outbox drainer will spawn the populate_embeddings subprocess post-commit.",
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl MaintenanceReindexEmbeddingsOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -448,32 +492,6 @@ impl CustomOperation for MaintenanceReindexEmbeddingsOp {
         Err(anyhow::anyhow!(
             "maintenance.reindex-embeddings requires database"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_bool_opt;
-        let force = json_extract_bool_opt(args, "force").unwrap_or(false);
-        let (outbox_id, idempotency_key) = enqueue_reindex_embeddings(pool, force).await?;
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::json!({
-                "status": "queued",
-                "force": force,
-                "outbox_id": outbox_id.to_string(),
-                "idempotency_key": idempotency_key,
-                "drainer": "Phase 5e outbox drainer will spawn the populate_embeddings subprocess post-commit.",
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -574,6 +592,32 @@ impl CustomOperation for MaintenanceValidateSchemaSyncOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let rows: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT object_type, COUNT(*)::bigint FROM sem_reg.snapshots WHERE status = 'active' GROUP BY object_type ORDER BY object_type",
+        ).fetch_all(pool).await?;
+        let counts: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(ot, c)| serde_json::json!({"object_type": ot, "active_count": c}))
+            .collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::json!({"active_snapshot_counts": counts, "hint": "Run 'cargo x sem-reg scan --dry-run' for full drift detection"}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl MaintenanceValidateSchemaSyncOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         _verb_call: &VerbCall,
@@ -609,28 +653,5 @@ impl CustomOperation for MaintenanceValidateSchemaSyncOp {
         Err(anyhow::anyhow!(
             "maintenance.validate-schema-sync requires database"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let rows: Vec<(String, i64)> = sqlx::query_as(
-            "SELECT object_type, COUNT(*)::bigint FROM sem_reg.snapshots WHERE status = 'active' GROUP BY object_type ORDER BY object_type",
-        ).fetch_all(pool).await?;
-        let counts: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(|(ot, c)| serde_json::json!({"object_type": ot, "active_count": c}))
-            .collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::json!({"active_snapshot_counts": counts, "hint": "Run 'cargo x sem-reg scan --dry-run' for full drift detection"}),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

@@ -34,6 +34,79 @@ impl CustomOperation for ScreeningPepOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use uuid::Uuid;
+
+        let entity_id: Uuid = json_extract_uuid(args, ctx, "entity-id")?;
+
+        let workstream = sqlx::query!(
+            r#"SELECT w.workstream_id FROM "ob-poc".entity_workstreams w
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
+               WHERE w.entity_id = $1 AND w.status NOT IN ('COMPLETE', 'BLOCKED')
+               ORDER BY w.created_at DESC
+               LIMIT 1"#,
+            entity_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        let workstream_id = match workstream {
+            Some(row) => row.workstream_id,
+            None => {
+                return Err(anyhow::anyhow!(
+                    "No active workstream for entity. Use case-screening.initiate instead."
+                ));
+            }
+        };
+
+        let existing = sqlx::query!(
+            r#"SELECT screening_id FROM "ob-poc".screenings
+               WHERE workstream_id = $1 AND screening_type = 'PEP' AND status = 'PENDING'
+               LIMIT 1"#,
+            workstream_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(row) = existing {
+            ctx.bind("screening", row.screening_id);
+            return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+                row.screening_id,
+            ));
+        }
+
+        let screening_id = Uuid::new_v4();
+
+        sqlx::query!(
+            r#"INSERT INTO "ob-poc".screenings
+               (screening_id, workstream_id, screening_type, status)
+               VALUES ($1, $2, 'PEP', 'PENDING')"#,
+            screening_id,
+            workstream_id
+        )
+        .execute(pool)
+        .await?;
+
+        ctx.bind("screening", screening_id);
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            screening_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ScreeningPepOp {
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -121,6 +194,26 @@ impl CustomOperation for ScreeningPepOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
+}
+
+/// Sanctions screening (Idempotent)
+///
+/// Rationale: Requires external sanctions database API call and result processing.
+/// Idempotency: Returns existing pending sanctions screening for same entity if exists.
+#[register_custom_op]
+pub struct ScreeningSanctionsOp;
+
+#[async_trait]
+impl CustomOperation for ScreeningSanctionsOp {
+    fn domain(&self) -> &'static str {
+        "screening"
+    }
+    fn verb(&self) -> &'static str {
+        "sanctions"
+    }
+    fn rationale(&self) -> &'static str {
+        "Requires external sanctions screening service API call"
+    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -156,7 +249,7 @@ impl CustomOperation for ScreeningPepOp {
 
         let existing = sqlx::query!(
             r#"SELECT screening_id FROM "ob-poc".screenings
-               WHERE workstream_id = $1 AND screening_type = 'PEP' AND status = 'PENDING'
+               WHERE workstream_id = $1 AND screening_type = 'SANCTIONS' AND status = 'PENDING'
                LIMIT 1"#,
             workstream_id
         )
@@ -175,7 +268,7 @@ impl CustomOperation for ScreeningPepOp {
         sqlx::query!(
             r#"INSERT INTO "ob-poc".screenings
                (screening_id, workstream_id, screening_type, status)
-               VALUES ($1, $2, 'PEP', 'PENDING')"#,
+               VALUES ($1, $2, 'SANCTIONS', 'PENDING')"#,
             screening_id,
             workstream_id
         )
@@ -194,25 +287,7 @@ impl CustomOperation for ScreeningPepOp {
     }
 }
 
-/// Sanctions screening (Idempotent)
-///
-/// Rationale: Requires external sanctions database API call and result processing.
-/// Idempotency: Returns existing pending sanctions screening for same entity if exists.
-#[register_custom_op]
-pub struct ScreeningSanctionsOp;
-
-#[async_trait]
-impl CustomOperation for ScreeningSanctionsOp {
-    fn domain(&self) -> &'static str {
-        "screening"
-    }
-    fn verb(&self) -> &'static str {
-        "sanctions"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires external sanctions screening service API call"
-    }
-
+impl ScreeningSanctionsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -298,77 +373,6 @@ impl CustomOperation for ScreeningSanctionsOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use uuid::Uuid;
-
-        let entity_id: Uuid = json_extract_uuid(args, ctx, "entity-id")?;
-
-        let workstream = sqlx::query!(
-            r#"SELECT w.workstream_id FROM "ob-poc".entity_workstreams w
-               JOIN "ob-poc".cases c ON c.case_id = w.case_id
-               WHERE w.entity_id = $1 AND w.status NOT IN ('COMPLETE', 'BLOCKED')
-               ORDER BY w.created_at DESC
-               LIMIT 1"#,
-            entity_id
-        )
-        .fetch_optional(pool)
-        .await?;
-
-        let workstream_id = match workstream {
-            Some(row) => row.workstream_id,
-            None => {
-                return Err(anyhow::anyhow!(
-                    "No active workstream for entity. Use case-screening.initiate instead."
-                ));
-            }
-        };
-
-        let existing = sqlx::query!(
-            r#"SELECT screening_id FROM "ob-poc".screenings
-               WHERE workstream_id = $1 AND screening_type = 'SANCTIONS' AND status = 'PENDING'
-               LIMIT 1"#,
-            workstream_id
-        )
-        .fetch_optional(pool)
-        .await?;
-
-        if let Some(row) = existing {
-            ctx.bind("screening", row.screening_id);
-            return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-                row.screening_id,
-            ));
-        }
-
-        let screening_id = Uuid::new_v4();
-
-        sqlx::query!(
-            r#"INSERT INTO "ob-poc".screenings
-               (screening_id, workstream_id, screening_type, status)
-               VALUES ($1, $2, 'SANCTIONS', 'PENDING')"#,
-            screening_id,
-            workstream_id
-        )
-        .execute(pool)
-        .await?;
-
-        ctx.bind("screening", screening_id);
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            screening_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Adverse media screening (Not Implemented)
@@ -391,6 +395,24 @@ impl CustomOperation for ScreeningAdverseMediaOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        Err(anyhow::anyhow!(
+            "screening.adverse-media is not yet implemented"
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ScreeningAdverseMediaOp {
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         _verb_call: &VerbCall,
@@ -412,22 +434,6 @@ impl CustomOperation for ScreeningAdverseMediaOp {
             "screening.adverse-media is not yet implemented"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        Err(anyhow::anyhow!(
-            "screening.adverse-media is not yet implemented"
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Refresh screening coverage for all workstreams in a case.
@@ -448,6 +454,75 @@ impl CustomOperation for ScreeningBulkRefreshOp {
         "Ensures required pending screenings exist for every workstream in a case"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+        use uuid::Uuid;
+
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let screening_type = json_extract_string_opt(args, "screening-type");
+
+        let target_types: Vec<String> = match screening_type.as_deref() {
+            Some(kind) => vec![kind.to_string()],
+            None => vec![
+                "SANCTIONS".to_string(),
+                "PEP".to_string(),
+                "ADVERSE_MEDIA".to_string(),
+            ],
+        };
+
+        let workstream_ids: Vec<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT workstream_id
+            FROM "ob-poc".entity_workstreams
+            WHERE case_id = $1
+            "#,
+        )
+        .bind(case_id)
+        .fetch_all(pool)
+        .await?;
+
+        let mut inserted = 0_u64;
+        for workstream_id in workstream_ids {
+            for st in &target_types {
+                let screening_id = Uuid::new_v4();
+                let result = sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".screenings
+                        (screening_id, workstream_id, screening_type, status)
+                    SELECT $1, $2, $3, 'PENDING'
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM "ob-poc".screenings
+                        WHERE workstream_id = $2 AND screening_type = $3
+                    )
+                    "#,
+                )
+                .bind(screening_id)
+                .bind(workstream_id)
+                .bind(st)
+                .execute(pool)
+                .await?;
+                inserted += result.rows_affected();
+            }
+        }
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
+            inserted,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ScreeningBulkRefreshOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -532,72 +607,5 @@ impl CustomOperation for ScreeningBulkRefreshOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-        use uuid::Uuid;
-
-        let case_id = json_extract_uuid(args, ctx, "case-id")?;
-        let screening_type = json_extract_string_opt(args, "screening-type");
-
-        let target_types: Vec<String> = match screening_type.as_deref() {
-            Some(kind) => vec![kind.to_string()],
-            None => vec![
-                "SANCTIONS".to_string(),
-                "PEP".to_string(),
-                "ADVERSE_MEDIA".to_string(),
-            ],
-        };
-
-        let workstream_ids: Vec<Uuid> = sqlx::query_scalar(
-            r#"
-            SELECT workstream_id
-            FROM "ob-poc".entity_workstreams
-            WHERE case_id = $1
-            "#,
-        )
-        .bind(case_id)
-        .fetch_all(pool)
-        .await?;
-
-        let mut inserted = 0_u64;
-        for workstream_id in workstream_ids {
-            for st in &target_types {
-                let screening_id = Uuid::new_v4();
-                let result = sqlx::query(
-                    r#"
-                    INSERT INTO "ob-poc".screenings
-                        (screening_id, workstream_id, screening_type, status)
-                    SELECT $1, $2, $3, 'PENDING'
-                    WHERE NOT EXISTS (
-                        SELECT 1
-                        FROM "ob-poc".screenings
-                        WHERE workstream_id = $2 AND screening_type = $3
-                    )
-                    "#,
-                )
-                .bind(screening_id)
-                .bind(workstream_id)
-                .bind(st)
-                .execute(pool)
-                .await?;
-                inserted += result.rows_affected();
-            }
-        }
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
-            inserted,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

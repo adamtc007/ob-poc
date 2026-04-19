@@ -100,42 +100,6 @@ impl CustomOperation for BpmnCompileOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let bpmn_xml = get_required_string(verb_call, "bpmn-xml")?;
-        let client = get_bpmn_client()?;
-        let result = client.compile(&bpmn_xml).await?;
-
-        let typed = BpmnCompileResult {
-            bytecode_version_hex: hex::encode(&result.bytecode_version),
-            diagnostic_count: result.diagnostics.len(),
-            diagnostics: result
-                .diagnostics
-                .into_iter()
-                .map(|d| BpmnDiagnosticResult {
-                    severity: d.severity,
-                    message: d.message,
-                    element_id: d.element_id,
-                })
-                .collect(),
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(typed)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("bpmn.compile requires database feature"))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -169,6 +133,43 @@ impl CustomOperation for BpmnCompileOp {
     }
 }
 
+impl BpmnCompileOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let bpmn_xml = get_required_string(verb_call, "bpmn-xml")?;
+        let client = get_bpmn_client()?;
+        let result = client.compile(&bpmn_xml).await?;
+
+        let typed = BpmnCompileResult {
+            bytecode_version_hex: hex::encode(&result.bytecode_version),
+            diagnostic_count: result.diagnostics.len(),
+            diagnostics: result
+                .diagnostics
+                .into_iter()
+                .map(|d| BpmnDiagnosticResult {
+                    severity: d.severity,
+                    message: d.message,
+                    element_id: d.element_id,
+                })
+                .collect(),
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(typed)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("bpmn.compile requires database feature"))
+    }
+}
+
 // =============================================================================
 // bpmn.start
 // =============================================================================
@@ -186,48 +187,6 @@ impl CustomOperation for BpmnStartOp {
     }
     fn rationale(&self) -> &'static str {
         "Calls bpmn-lite gRPC StartProcess RPC"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let process_key = get_required_string(verb_call, "process-key")?;
-        let payload = get_optional_string(verb_call, "payload").unwrap_or_else(|| "{}".to_string());
-
-        let (canonical, hash) = crate::bpmn_integration::canonical::canonical_json_with_hash(
-            &serde_json::from_str(&payload)
-                .unwrap_or(serde_json::Value::Object(Default::default())),
-        );
-
-        let client = get_bpmn_client()?;
-        let instance_id = client
-            .start_process(crate::bpmn_integration::client::StartProcessRequest {
-                process_key,
-                bytecode_version: Vec::new(), // Service resolves by process_key
-                domain_payload: canonical,
-                domain_payload_hash: hash,
-                session_stack: SessionStackState::default(),
-                orch_flags: std::collections::HashMap::new(),
-                correlation_id: Uuid::now_v7(),
-                entry_id: Uuid::nil(),
-                runbook_id: Uuid::nil(),
-            })
-            .await?;
-
-        Ok(ExecutionResult::Uuid(instance_id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("bpmn.start requires database feature"))
     }
 
     #[cfg(feature = "database")]
@@ -270,6 +229,49 @@ impl CustomOperation for BpmnStartOp {
     }
 }
 
+impl BpmnStartOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let process_key = get_required_string(verb_call, "process-key")?;
+        let payload = get_optional_string(verb_call, "payload").unwrap_or_else(|| "{}".to_string());
+
+        let (canonical, hash) = crate::bpmn_integration::canonical::canonical_json_with_hash(
+            &serde_json::from_str(&payload)
+                .unwrap_or(serde_json::Value::Object(Default::default())),
+        );
+
+        let client = get_bpmn_client()?;
+        let instance_id = client
+            .start_process(crate::bpmn_integration::client::StartProcessRequest {
+                process_key,
+                bytecode_version: Vec::new(), // Service resolves by process_key
+                domain_payload: canonical,
+                domain_payload_hash: hash,
+                session_stack: SessionStackState::default(),
+                orch_flags: std::collections::HashMap::new(),
+                correlation_id: Uuid::now_v7(),
+                entry_id: Uuid::nil(),
+                runbook_id: Uuid::nil(),
+            })
+            .await?;
+
+        Ok(ExecutionResult::Uuid(instance_id))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("bpmn.start requires database feature"))
+    }
+}
+
 // =============================================================================
 // bpmn.signal
 // =============================================================================
@@ -287,38 +289,6 @@ impl CustomOperation for BpmnSignalOp {
     }
     fn rationale(&self) -> &'static str {
         "Calls bpmn-lite gRPC Signal RPC"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let instance_id = get_required_uuid(verb_call, "instance-id")?;
-        let message_name = get_required_string(verb_call, "message-name")?;
-        let payload = get_optional_string(verb_call, "payload");
-
-        let client = get_bpmn_client()?;
-        client
-            .signal(
-                instance_id,
-                &message_name,
-                payload.as_ref().map(|p| p.as_bytes()),
-            )
-            .await?;
-
-        Ok(ExecutionResult::Void)
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("bpmn.signal requires database feature"))
     }
 
     #[cfg(feature = "database")]
@@ -349,6 +319,39 @@ impl CustomOperation for BpmnSignalOp {
     }
 }
 
+impl BpmnSignalOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let instance_id = get_required_uuid(verb_call, "instance-id")?;
+        let message_name = get_required_string(verb_call, "message-name")?;
+        let payload = get_optional_string(verb_call, "payload");
+
+        let client = get_bpmn_client()?;
+        client
+            .signal(
+                instance_id,
+                &message_name,
+                payload.as_ref().map(|p| p.as_bytes()),
+            )
+            .await?;
+
+        Ok(ExecutionResult::Void)
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("bpmn.signal requires database feature"))
+    }
+}
+
 // =============================================================================
 // bpmn.cancel
 // =============================================================================
@@ -366,32 +369,6 @@ impl CustomOperation for BpmnCancelOp {
     }
     fn rationale(&self) -> &'static str {
         "Calls bpmn-lite gRPC Cancel RPC"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let instance_id = get_required_uuid(verb_call, "instance-id")?;
-        let reason = get_optional_string(verb_call, "reason")
-            .unwrap_or_else(|| "Cancelled by operator".to_string());
-
-        let client = get_bpmn_client()?;
-        client.cancel(instance_id, &reason).await?;
-
-        Ok(ExecutionResult::Void)
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("bpmn.cancel requires database feature"))
     }
 
     #[cfg(feature = "database")]
@@ -416,6 +393,33 @@ impl CustomOperation for BpmnCancelOp {
     }
 }
 
+impl BpmnCancelOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let instance_id = get_required_uuid(verb_call, "instance-id")?;
+        let reason = get_optional_string(verb_call, "reason")
+            .unwrap_or_else(|| "Cancelled by operator".to_string());
+
+        let client = get_bpmn_client()?;
+        client.cancel(instance_id, &reason).await?;
+
+        Ok(ExecutionResult::Void)
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("bpmn.cancel requires database feature"))
+    }
+}
+
 // =============================================================================
 // bpmn.inspect
 // =============================================================================
@@ -433,37 +437,6 @@ impl CustomOperation for BpmnInspectOp {
     }
     fn rationale(&self) -> &'static str {
         "Calls bpmn-lite gRPC Inspect RPC"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let instance_id = get_required_uuid(verb_call, "instance-id")?;
-
-        let client = get_bpmn_client()?;
-        let inspection = client.inspect(instance_id).await?;
-
-        let typed = BpmnInspectResult {
-            state: inspection.state,
-            fiber_count: inspection.fibers.len(),
-            wait_count: inspection.waits.len(),
-            bytecode_version_hex: hex::encode(&inspection.bytecode_version),
-            domain_payload_hash: inspection.domain_payload_hash,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(typed)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("bpmn.inspect requires database feature"))
     }
 
     #[cfg(feature = "database")]
@@ -492,5 +465,37 @@ impl CustomOperation for BpmnInspectOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl BpmnInspectOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let instance_id = get_required_uuid(verb_call, "instance-id")?;
+
+        let client = get_bpmn_client()?;
+        let inspection = client.inspect(instance_id).await?;
+
+        let typed = BpmnInspectResult {
+            state: inspection.state,
+            fiber_count: inspection.fibers.len(),
+            wait_count: inspection.waits.len(),
+            bytecode_version_hex: hex::encode(&inspection.bytecode_version),
+            domain_payload_hash: inspection.domain_payload_hash,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(typed)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!("bpmn.inspect requires database feature"))
     }
 }

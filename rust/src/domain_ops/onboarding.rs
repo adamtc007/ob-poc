@@ -338,48 +338,7 @@ impl CustomOperation for OnboardingAutoCompleteOp {
         "Requires semantic state derivation, DSL generation, and iterative execution"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
-        let max_steps: i32 = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "max-steps")
-            .and_then(|a| a.value.as_integer())
-            .map(|v| v.min(1000) as i32)
-            .unwrap_or(20);
-        let dry_run: bool = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "dry-run")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(false);
-        let target_stage: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "target-stage")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-        let result =
-            onboarding_auto_complete_impl(cbu_id, max_steps, dry_run, target_stage, ctx, pool)
-                .await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!(
-            "onboarding.auto-complete requires database feature"
-        ))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -421,5 +380,49 @@ impl CustomOperation for OnboardingAutoCompleteOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl OnboardingAutoCompleteOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
+        let max_steps: i32 = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "max-steps")
+            .and_then(|a| a.value.as_integer())
+            .map(|v| v.min(1000) as i32)
+            .unwrap_or(20);
+        let dry_run: bool = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "dry-run")
+            .and_then(|a| a.value.as_boolean())
+            .unwrap_or(false);
+        let target_stage: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "target-stage")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+        let result =
+            onboarding_auto_complete_impl(cbu_id, max_steps, dry_run, target_stage, ctx, pool)
+                .await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!(
+            "onboarding.auto-complete requires database feature"
+        ))
     }
 }

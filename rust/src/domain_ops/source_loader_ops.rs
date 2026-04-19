@@ -30,24 +30,6 @@ use {
     std::sync::Arc,
 };
 
-#[cfg(feature = "database")]
-async fn execute_json_via_legacy<T: CustomOperation + Sync>(
-    op: &T,
-    args: &serde_json::Value,
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-    pool: &PgPool,
-) -> Result<dsl_runtime::VerbExecutionOutcome> {
-    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
-        op.domain(),
-        op.verb(),
-        args,
-    );
-    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
-    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
-    crate::sem_os_runtime::verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
-}
-
 // =============================================================================
 // Generic Source Operations (research.sources domain)
 // =============================================================================
@@ -67,7 +49,26 @@ impl CustomOperation for SourceListOp {
     fn rationale(&self) -> &'static str {
         "Lists all available research sources from the SourceRegistry"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SourceListOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -106,21 +107,8 @@ impl CustomOperation for SourceListOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Get information about a specific research source
 #[register_custom_op]
@@ -137,7 +125,26 @@ impl CustomOperation for SourceInfoOp {
     fn rationale(&self) -> &'static str {
         "Returns detailed information about a specific research source"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SourceInfoOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -177,21 +184,8 @@ impl CustomOperation for SourceInfoOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Search a specific source for entities
 #[register_custom_op]
@@ -208,7 +202,26 @@ impl CustomOperation for SourceSearchOp {
     fn rationale(&self) -> &'static str {
         "Searches a specific source for entities by name - requires external API call"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SourceSearchOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -272,21 +285,8 @@ impl CustomOperation for SourceSearchOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Fetch entity data from a source by key
 #[register_custom_op]
@@ -303,7 +303,26 @@ impl CustomOperation for SourceFetchOp {
     fn rationale(&self) -> &'static str {
         "Fetches entity data from a source by key - requires external API call"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SourceFetchOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -366,21 +385,8 @@ impl CustomOperation for SourceFetchOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Find the best source for a jurisdiction and data type
 #[register_custom_op]
@@ -397,7 +403,26 @@ impl CustomOperation for SourceFindForJurisdictionOp {
     fn rationale(&self) -> &'static str {
         "Finds the best available source for a given jurisdiction and data type"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SourceFindForJurisdictionOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -451,21 +476,8 @@ impl CustomOperation for SourceFindForJurisdictionOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // Companies House Operations (research.companies-house domain)
@@ -486,7 +498,26 @@ impl CustomOperation for ChSearchOp {
     fn rationale(&self) -> &'static str {
         "Searches UK Companies House API for companies by name"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ChSearchOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -539,21 +570,8 @@ impl CustomOperation for ChSearchOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Fetch company profile from Companies House
 #[register_custom_op]
@@ -570,7 +588,26 @@ impl CustomOperation for ChFetchCompanyOp {
     fn rationale(&self) -> &'static str {
         "Fetches company profile from UK Companies House API"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ChFetchCompanyOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -613,21 +650,8 @@ impl CustomOperation for ChFetchCompanyOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Fetch PSC (Persons with Significant Control) from Companies House
 #[register_custom_op]
@@ -644,7 +668,26 @@ impl CustomOperation for ChFetchPscOp {
     fn rationale(&self) -> &'static str {
         "Fetches PSC (beneficial owners) from UK Companies House API"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ChFetchPscOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -717,21 +760,8 @@ impl CustomOperation for ChFetchPscOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Fetch officers (directors, secretaries) from Companies House
 #[register_custom_op]
@@ -748,7 +778,26 @@ impl CustomOperation for ChFetchOfficersOp {
     fn rationale(&self) -> &'static str {
         "Fetches officers from UK Companies House API"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ChFetchOfficersOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -801,21 +850,8 @@ impl CustomOperation for ChFetchOfficersOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Import company (and optionally PSC/officers) from Companies House to database
 #[register_custom_op]
@@ -832,7 +868,26 @@ impl CustomOperation for ChImportCompanyOp {
     fn rationale(&self) -> &'static str {
         "Imports company from Companies House and creates entity in database"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ChImportCompanyOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -919,21 +974,8 @@ impl CustomOperation for ChImportCompanyOp {
             "entity_id": uuid::Uuid::new_v4(),
         })))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // SEC EDGAR Operations (research.sec-edgar domain)
@@ -954,7 +996,26 @@ impl CustomOperation for SecSearchOp {
     fn rationale(&self) -> &'static str {
         "Searches SEC EDGAR API for companies by name"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SecSearchOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1002,21 +1063,8 @@ impl CustomOperation for SecSearchOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Fetch company from SEC EDGAR
 #[register_custom_op]
@@ -1033,7 +1081,26 @@ impl CustomOperation for SecFetchCompanyOp {
     fn rationale(&self) -> &'static str {
         "Fetches company information from SEC EDGAR API"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SecFetchCompanyOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1075,21 +1142,8 @@ impl CustomOperation for SecFetchCompanyOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({})))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Fetch 13D/13G beneficial ownership filings from SEC EDGAR
 #[register_custom_op]
@@ -1106,7 +1160,26 @@ impl CustomOperation for SecFetchBeneficialOwnersOp {
     fn rationale(&self) -> &'static str {
         "Fetches 13D/13G beneficial ownership filings from SEC EDGAR API"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SecFetchBeneficialOwnersOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1171,21 +1244,8 @@ impl CustomOperation for SecFetchBeneficialOwnersOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::RecordSet(vec![]))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Fetch recent SEC filings
 #[register_custom_op]
@@ -1202,7 +1262,26 @@ impl CustomOperation for SecFetchFilingsOp {
     fn rationale(&self) -> &'static str {
         "Fetches recent SEC filings from EDGAR API"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SecFetchFilingsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1247,21 +1326,8 @@ impl CustomOperation for SecFetchFilingsOp {
             serde_json::json!({ "filings": [] }),
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Import SEC company to database
 #[register_custom_op]
@@ -1278,7 +1344,26 @@ impl CustomOperation for SecImportCompanyOp {
     fn rationale(&self) -> &'static str {
         "Imports SEC company and creates entity in database"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SecImportCompanyOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1343,21 +1428,8 @@ impl CustomOperation for SecImportCompanyOp {
             "entity_id": uuid::Uuid::new_v4(),
         })))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // Helper Functions

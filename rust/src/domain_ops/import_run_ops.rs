@@ -182,36 +182,6 @@ impl CustomOperation for ImportRunBeginOp {
         "Creates import run with optional case linkage — multi-table insert"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let scope_root = extract_uuid(verb_call, ctx, "scope-root-entity-id")?;
-        let source = extract_string(verb_call, "source")?;
-        let run_kind = extract_string_opt(verb_call, "run-kind")
-            .unwrap_or_else(|| "SKELETON_BUILD".to_string());
-        let source_ref = extract_string_opt(verb_call, "source-ref");
-        let source_query = extract_string_opt(verb_call, "source-query");
-        let as_of = extract_string_opt(verb_call, "as-of");
-        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
-        let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
-        let result = import_run_begin_impl(
-            scope_root,
-            source,
-            run_kind,
-            source_ref,
-            source_query,
-            as_of,
-            case_id,
-            decision_id,
-            pool,
-        )
-        .await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -253,6 +223,39 @@ impl CustomOperation for ImportRunBeginOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl ImportRunBeginOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let scope_root = extract_uuid(verb_call, ctx, "scope-root-entity-id")?;
+        let source = extract_string(verb_call, "source")?;
+        let run_kind = extract_string_opt(verb_call, "run-kind")
+            .unwrap_or_else(|| "SKELETON_BUILD".to_string());
+        let source_ref = extract_string_opt(verb_call, "source-ref");
+        let source_query = extract_string_opt(verb_call, "source-query");
+        let as_of = extract_string_opt(verb_call, "as-of");
+        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
+        let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
+        let result = import_run_begin_impl(
+            scope_root,
+            source,
+            run_kind,
+            source_ref,
+            source_query,
+            as_of,
+            case_id,
+            decision_id,
+            pool,
+        )
+        .await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -311,19 +314,6 @@ impl CustomOperation for ImportRunCompleteOp {
         "Updates import run status and counts after import completes"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let run_id = extract_uuid(verb_call, ctx, "run-id")?;
-        let status =
-            extract_string_opt(verb_call, "status").unwrap_or_else(|| "ACTIVE".to_string());
-        let result = import_run_complete_impl(run_id, status, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -345,6 +335,22 @@ impl CustomOperation for ImportRunCompleteOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl ImportRunCompleteOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let run_id = extract_uuid(verb_call, ctx, "run-id")?;
+        let status =
+            extract_string_opt(verb_call, "status").unwrap_or_else(|| "ACTIVE".to_string());
+        let result = import_run_complete_impl(run_id, status, pool).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -526,27 +532,6 @@ impl CustomOperation for ImportRunSupersedeOp {
         "Supersedes an import run: soft-ends edges, logs corrections, triggers re-derivation cascade"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let run_id = extract_uuid(verb_call, ctx, "run-id")?;
-        let reason = extract_string(verb_call, "reason")?;
-        let superseded_by = extract_uuid_opt(verb_call, ctx, "superseded-by");
-
-        // Resolve audit user for corrected_by (falls back to a system UUID)
-        let corrected_by: Uuid = ctx
-            .audit_user
-            .as_ref()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or_else(Uuid::nil);
-        let result =
-            import_run_supersede_impl(run_id, reason, superseded_by, corrected_by, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -577,5 +562,29 @@ impl CustomOperation for ImportRunSupersedeOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl ImportRunSupersedeOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let run_id = extract_uuid(verb_call, ctx, "run-id")?;
+        let reason = extract_string(verb_call, "reason")?;
+        let superseded_by = extract_uuid_opt(verb_call, ctx, "superseded-by");
+
+        // Resolve audit user for corrected_by (falls back to a system UUID)
+        let corrected_by: Uuid = ctx
+            .audit_user
+            .as_ref()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(Uuid::nil);
+        let result =
+            import_run_supersede_impl(run_id, reason, superseded_by, corrected_by, pool).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }

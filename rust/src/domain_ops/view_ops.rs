@@ -31,24 +31,6 @@ use crate::taxonomy::{Filter, Metaphor, Status, TaxonomyBuilder, TaxonomyContext
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-#[cfg(feature = "database")]
-async fn execute_json_via_legacy<T: CustomOperation + Sync>(
-    op: &T,
-    args: &serde_json::Value,
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-    pool: &PgPool,
-) -> Result<dsl_runtime::VerbExecutionOutcome> {
-    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
-        op.domain(),
-        op.verb(),
-        args,
-    );
-    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
-    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
-    crate::sem_os_runtime::verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
-}
-
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
@@ -261,7 +243,26 @@ impl CustomOperation for ViewUniverseOp {
     fn rationale(&self) -> &'static str {
         "Requires taxonomy building from database and session state management"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewUniverseOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -334,21 +335,8 @@ impl CustomOperation for ViewUniverseOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.universe requires database feature"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.BOOK - View all CBUs for a commercial client
@@ -371,7 +359,26 @@ impl CustomOperation for ViewBookOp {
     fn rationale(&self) -> &'static str {
         "Requires taxonomy building scoped to a client entity"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewBookOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -407,21 +414,8 @@ impl CustomOperation for ViewBookOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.book requires database feature"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.CBU - Focus on a single CBU
@@ -444,7 +438,26 @@ impl CustomOperation for ViewCbuOp {
     fn rationale(&self) -> &'static str {
         "Requires CBU-specific taxonomy building with trading or UBO view modes"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewCbuOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -486,21 +499,8 @@ impl CustomOperation for ViewCbuOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.cbu requires database feature"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.ENTITY-FOREST - View entities by type/ownership filters
@@ -523,7 +523,26 @@ impl CustomOperation for ViewEntityForestOp {
     fn rationale(&self) -> &'static str {
         "Requires entity forest taxonomy building with multiple filter types"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewEntityForestOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -569,21 +588,8 @@ impl CustomOperation for ViewEntityForestOp {
             "view.entity-forest requires database feature"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.REFINE - Refine current view with additional filter
@@ -606,7 +612,26 @@ impl CustomOperation for ViewRefineOp {
     fn rationale(&self) -> &'static str {
         "Modifies session view state with refinements"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewRefineOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -669,21 +694,8 @@ impl CustomOperation for ViewRefineOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.refine requires database feature"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.CLEAR - Clear refinements
@@ -706,7 +718,26 @@ impl CustomOperation for ViewClearOp {
     fn rationale(&self) -> &'static str {
         "Clears refinements from session view state"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewClearOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -732,21 +763,8 @@ impl CustomOperation for ViewClearOp {
             "view.clear-refinements requires database feature"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// view.clear handler - Legacy alias for clearing refinements
 #[register_custom_op]
@@ -765,7 +783,26 @@ impl CustomOperation for ViewClearAliasOp {
     fn rationale(&self) -> &'static str {
         "Provides backward-compatible access to clearing view refinements"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewClearAliasOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -788,21 +825,8 @@ impl CustomOperation for ViewClearAliasOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.clear requires database feature"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.SELECT - Explicitly set selection
@@ -825,7 +849,26 @@ impl CustomOperation for ViewSelectOp {
     fn rationale(&self) -> &'static str {
         "Directly manipulates selection state"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewSelectOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -876,21 +919,8 @@ impl CustomOperation for ViewSelectOp {
             "view.set-selection requires database feature"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.LAYOUT - Change layout strategy
@@ -913,7 +943,45 @@ impl CustomOperation for ViewLayoutOp {
     fn rationale(&self) -> &'static str {
         "Configures layout algorithm for visualization"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_string_opt;
 
+        let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "auto".to_string());
+        let primary_axis = json_extract_string_opt(args, "primary-axis");
+        let size_by = json_extract_string_opt(args, "size-by");
+        let color_by = json_extract_string_opt(args, "color-by");
+
+        let metaphor = match mode.as_str() {
+            "galaxy" => Metaphor::Galaxy,
+            "grid" => Metaphor::Tree,
+            "tree" => Metaphor::Tree,
+            "network" => Metaphor::Network,
+            "pyramid" => Metaphor::Pyramid,
+            _ => Metaphor::Tree,
+        };
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "layout_mode": mode,
+                "metaphor": format!("{:?}", metaphor),
+                "primary_axis": primary_axis,
+                "size_by": size_by,
+                "color_by": color_by,
+                "message": "Layout configuration updated"
+            }),
+        ))
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewLayoutOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -954,45 +1022,8 @@ impl CustomOperation for ViewLayoutOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.set-layout requires database feature"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_string_opt;
-
-        let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "auto".to_string());
-        let primary_axis = json_extract_string_opt(args, "primary-axis");
-        let size_by = json_extract_string_opt(args, "size-by");
-        let color_by = json_extract_string_opt(args, "color-by");
-
-        let metaphor = match mode.as_str() {
-            "galaxy" => Metaphor::Galaxy,
-            "grid" => Metaphor::Tree,
-            "tree" => Metaphor::Tree,
-            "network" => Metaphor::Network,
-            "pyramid" => Metaphor::Pyramid,
-            _ => Metaphor::Tree,
-        };
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "layout_mode": mode,
-                "metaphor": format!("{:?}", metaphor),
-                "primary_axis": primary_axis,
-                "size_by": size_by,
-                "color_by": color_by,
-                "message": "Layout configuration updated"
-            }),
-        ))
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.STATUS - Get current view state summary
@@ -1015,7 +1046,26 @@ impl CustomOperation for ViewStatusOp {
     fn rationale(&self) -> &'static str {
         "Reports on current session view state"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewStatusOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1049,21 +1099,8 @@ impl CustomOperation for ViewStatusOp {
             "view.read-status requires database feature"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.SELECTION-INFO - Get detailed info about current selection
@@ -1086,7 +1123,26 @@ impl CustomOperation for ViewSelectionInfoOp {
     fn rationale(&self) -> &'static str {
         "Provides detailed information about selected items"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewSelectionInfoOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1124,21 +1180,8 @@ impl CustomOperation for ViewSelectionInfoOp {
             "view.read-selection-info requires database feature"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.ZOOM-IN - Zoom into a node, expanding it into its child taxonomy
@@ -1161,7 +1204,28 @@ impl CustomOperation for ViewZoomInOp {
     fn rationale(&self) -> &'static str {
         "Navigates into a node's child taxonomy using its expansion rule"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        let node_id = json_extract_uuid(args, ctx, "node-id")?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "action": "zoom-in",
+                "node_id": node_id.to_string(),
+                "message": format!("Zoom into node {}. Use session.zoom_in() to execute.", node_id)
+            }),
+        ))
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewZoomInOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1192,28 +1256,8 @@ impl CustomOperation for ViewZoomInOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.zoom-in requires database feature"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        let node_id = json_extract_uuid(args, ctx, "node-id")?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "action": "zoom-in",
-                "node_id": node_id.to_string(),
-                "message": format!("Zoom into node {}. Use session.zoom_in() to execute.", node_id)
-            }),
-        ))
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.ZOOM-OUT - Zoom out to the parent taxonomy
@@ -1236,7 +1280,25 @@ impl CustomOperation for ViewZoomOutOp {
     fn rationale(&self) -> &'static str {
         "Navigates back to the parent taxonomy by popping the current frame"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "action": "zoom-out",
+                "message": "Zoom out to parent taxonomy. Use session.zoom_out() to execute."
+            }),
+        ))
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewZoomOutOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1262,25 +1324,8 @@ impl CustomOperation for ViewZoomOutOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("view.zoom-out requires database feature"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "action": "zoom-out",
-                "message": "Zoom out to parent taxonomy. Use session.zoom_out() to execute."
-            }),
-        ))
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.BACK-TO - Jump back to a specific breadcrumb level
@@ -1303,7 +1348,30 @@ impl CustomOperation for ViewBackToOp {
     fn rationale(&self) -> &'static str {
         "Navigates to a specific breadcrumb level by popping frames"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_int_opt, json_extract_uuid_opt};
+        let depth = json_extract_int_opt(args, "depth").map(|i| i as usize);
+        let frame_id = json_extract_uuid_opt(args, ctx, "frame-id");
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "action": "navigate-back-to",
+                "depth": depth,
+                "frame_id": frame_id.map(|id| id.to_string()),
+                "message": "Navigate to breadcrumb level. Use session.back_to() to execute."
+            }),
+        ))
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewBackToOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1341,30 +1409,8 @@ impl CustomOperation for ViewBackToOp {
             "view.navigate-back-to requires database feature"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_int_opt, json_extract_uuid_opt};
-        let depth = json_extract_int_opt(args, "depth").map(|i| i as usize);
-        let frame_id = json_extract_uuid_opt(args, ctx, "frame-id");
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "action": "navigate-back-to",
-                "depth": depth,
-                "frame_id": frame_id.map(|id| id.to_string()),
-                "message": "Navigate to breadcrumb level. Use session.back_to() to execute."
-            }),
-        ))
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // VIEW.BREADCRUMBS - Get current navigation breadcrumbs
@@ -1387,7 +1433,25 @@ impl CustomOperation for ViewBreadcrumbsOp {
     fn rationale(&self) -> &'static str {
         "Reports on the current navigation stack for breadcrumb display"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "action": "read-breadcrumbs",
+                "message": "Get breadcrumbs from session.breadcrumbs() or session.breadcrumbs_with_ids()"
+            }),
+        ))
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl ViewBreadcrumbsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1414,25 +1478,8 @@ impl CustomOperation for ViewBreadcrumbsOp {
             "view.read-breadcrumbs requires database feature"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "action": "read-breadcrumbs",
-                "message": "Get breadcrumbs from session.breadcrumbs() or session.breadcrumbs_with_ids()"
-            }),
-        ))
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // TESTS

@@ -42,25 +42,6 @@ impl CustomOperation for SharedAtomRegisterOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let input = RegisterSharedAtomInput {
-            atom_path: extract_string(verb_call, "atom-path")?,
-            display_name: extract_string(verb_call, "display-name")?,
-            owner_workspace: extract_string(verb_call, "owner-workspace")?,
-            owner_constellation_family: extract_string(verb_call, "owner-constellation-family")?,
-            validation_rule: None,
-        };
-
-        let def = repository::insert_shared_atom(pool, &input).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(def)?))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -81,6 +62,32 @@ impl CustomOperation for SharedAtomRegisterOp {
         ))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SharedAtomRegisterOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let input = RegisterSharedAtomInput {
+            atom_path: extract_string(verb_call, "atom-path")?,
+            display_name: extract_string(verb_call, "display-name")?,
+            owner_workspace: extract_string(verb_call, "owner-workspace")?,
+            owner_constellation_family: extract_string(verb_call, "owner-constellation-family")?,
+            validation_rule: None,
+        };
+
+        let def = repository::insert_shared_atom(pool, &input).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(def)?))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -88,10 +95,6 @@ impl CustomOperation for SharedAtomRegisterOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.register requires database"))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -115,23 +118,6 @@ impl CustomOperation for SharedAtomActivateOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let atom_path = extract_string(verb_call, "atom-path")?;
-        let atom = repository::get_by_path(pool, &atom_path)
-            .await?
-            .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
-
-        let result =
-            repository::transition_lifecycle(pool, atom.id, SharedAtomLifecycle::Active).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -150,6 +136,30 @@ impl CustomOperation for SharedAtomActivateOp {
         ))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SharedAtomActivateOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let atom_path = extract_string(verb_call, "atom-path")?;
+        let atom = repository::get_by_path(pool, &atom_path)
+            .await?
+            .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
+
+        let result =
+            repository::transition_lifecycle(pool, atom.id, SharedAtomLifecycle::Active).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -157,10 +167,6 @@ impl CustomOperation for SharedAtomActivateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.activate requires database"))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -184,24 +190,6 @@ impl CustomOperation for SharedAtomDeprecateOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let atom_path = extract_string(verb_call, "atom-path")?;
-        let atom = repository::get_by_path(pool, &atom_path)
-            .await?
-            .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
-
-        let result =
-            repository::transition_lifecycle(pool, atom.id, SharedAtomLifecycle::Deprecated)
-                .await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -221,6 +209,31 @@ impl CustomOperation for SharedAtomDeprecateOp {
         ))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SharedAtomDeprecateOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let atom_path = extract_string(verb_call, "atom-path")?;
+        let atom = repository::get_by_path(pool, &atom_path)
+            .await?
+            .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
+
+        let result =
+            repository::transition_lifecycle(pool, atom.id, SharedAtomLifecycle::Deprecated)
+                .await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -228,10 +241,6 @@ impl CustomOperation for SharedAtomDeprecateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.deprecate requires database"))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -255,23 +264,6 @@ impl CustomOperation for SharedAtomRetireOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let atom_path = extract_string(verb_call, "atom-path")?;
-        let atom = repository::get_by_path(pool, &atom_path)
-            .await?
-            .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
-
-        let result =
-            repository::transition_lifecycle(pool, atom.id, SharedAtomLifecycle::Retired).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -290,6 +282,30 @@ impl CustomOperation for SharedAtomRetireOp {
         ))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SharedAtomRetireOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let atom_path = extract_string(verb_call, "atom-path")?;
+        let atom = repository::get_by_path(pool, &atom_path)
+            .await?
+            .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
+
+        let result =
+            repository::transition_lifecycle(pool, atom.id, SharedAtomLifecycle::Retired).await?;
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -297,10 +313,6 @@ impl CustomOperation for SharedAtomRetireOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.retire requires database"))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -321,31 +333,6 @@ impl CustomOperation for SharedAtomListOp {
 
     fn rationale(&self) -> &'static str {
         "Registry query with optional status filter"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let status_filter = extract_string_opt(verb_call, "status")
-            .map(|s| match s.as_str() {
-                "draft" => Ok(SharedAtomLifecycle::Draft),
-                "active" => Ok(SharedAtomLifecycle::Active),
-                "deprecated" => Ok(SharedAtomLifecycle::Deprecated),
-                "retired" => Ok(SharedAtomLifecycle::Retired),
-                other => Err(anyhow!("Unknown status filter: {other}")),
-            })
-            .transpose()?;
-
-        let atoms = repository::list_shared_atoms(pool, status_filter).await?;
-        let records: Vec<serde_json::Value> = atoms
-            .into_iter()
-            .map(serde_json::to_value)
-            .collect::<Result<_, _>>()?;
-        Ok(ExecutionResult::RecordSet(records))
     }
 
     #[cfg(feature = "database")]
@@ -375,6 +362,38 @@ impl CustomOperation for SharedAtomListOp {
         ))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SharedAtomListOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let status_filter = extract_string_opt(verb_call, "status")
+            .map(|s| match s.as_str() {
+                "draft" => Ok(SharedAtomLifecycle::Draft),
+                "active" => Ok(SharedAtomLifecycle::Active),
+                "deprecated" => Ok(SharedAtomLifecycle::Deprecated),
+                "retired" => Ok(SharedAtomLifecycle::Retired),
+                other => Err(anyhow!("Unknown status filter: {other}")),
+            })
+            .transpose()?;
+
+        let atoms = repository::list_shared_atoms(pool, status_filter).await?;
+        let records: Vec<serde_json::Value> = atoms
+            .into_iter()
+            .map(serde_json::to_value)
+            .collect::<Result<_, _>>()?;
+        Ok(ExecutionResult::RecordSet(records))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -382,10 +401,6 @@ impl CustomOperation for SharedAtomListOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.list requires database"))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -409,19 +424,6 @@ impl CustomOperation for SharedAtomListConsumersOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let _atom_path = extract_string(verb_call, "atom-path")?;
-        // Phase 10 will implement the Level 0 DAG derivation.
-        // For now, return an empty consumer list.
-        Ok(ExecutionResult::RecordSet(Vec::new()))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -434,6 +436,26 @@ impl CustomOperation for SharedAtomListConsumersOp {
         ))
     }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SharedAtomListConsumersOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let _atom_path = extract_string(verb_call, "atom-path")?;
+        // Phase 10 will implement the Level 0 DAG derivation.
+        // For now, return an empty consumer list.
+        Ok(ExecutionResult::RecordSet(Vec::new()))
+    }
+
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -441,10 +463,6 @@ impl CustomOperation for SharedAtomListConsumersOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("shared-atom.list-consumers requires database"))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -467,6 +485,83 @@ impl CustomOperation for SharedAtomReplayConstellationOp {
         "Constellation replay builds a RebuildContext, loads the constellation map, \
          and re-executes verbs through the standard runbook pipeline with upsert semantics"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::cross_workspace::{
+            fact_refs, fact_versions,
+            replay::{RebuildContext, ReplayOutcome, ReplayResult, ReplayTrigger},
+        };
+        use chrono::Utc;
+
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let constellation_family = json_extract_string(args, "constellation-family")?;
+        let atom_path = json_extract_string(args, "atom-path")?;
+
+        let atom = repository::get_by_path(pool, &atom_path)
+            .await?
+            .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
+
+        let current_version =
+            fact_versions::current_version_number(pool, atom.id, entity_id).await?;
+        let stale_refs =
+            fact_refs::check_staleness_for_entity(pool, &constellation_family, entity_id).await?;
+
+        let held_version = stale_refs
+            .iter()
+            .find(|r| r.atom_id == atom.id)
+            .map(|r| r.held_version)
+            .unwrap_or(current_version);
+
+        let rebuild_ctx = RebuildContext {
+            trigger: ReplayTrigger::SharedFactSupersession,
+            source_atom_path: atom_path.clone(),
+            source_atom_id: atom.id,
+            prior_version: held_version,
+            new_version: current_version,
+            source_workspace: atom.owner_workspace.clone(),
+            target_workspace: crate::repl::types_v2::WorkspaceKind::OnBoarding,
+            target_constellation_family: constellation_family.clone(),
+            entity_id,
+            initiated_at: Utc::now(),
+            remediation_id: None,
+        };
+
+        fact_refs::advance_to_current(
+            pool,
+            atom.id,
+            entity_id,
+            &constellation_family,
+            current_version,
+        )
+        .await?;
+
+        let result = ReplayResult {
+            context: rebuild_ctx,
+            outcome: ReplayOutcome::Resolved {
+                steps_executed: 0,
+                steps_unchanged: 0,
+            },
+            started_at: Utc::now(),
+            completed_at: Utc::now(),
+        };
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SharedAtomReplayConstellationOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -552,76 +647,6 @@ impl CustomOperation for SharedAtomReplayConstellationOp {
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::cross_workspace::{
-            fact_refs, fact_versions,
-            replay::{RebuildContext, ReplayOutcome, ReplayResult, ReplayTrigger},
-        };
-        use chrono::Utc;
-
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let constellation_family = json_extract_string(args, "constellation-family")?;
-        let atom_path = json_extract_string(args, "atom-path")?;
-
-        let atom = repository::get_by_path(pool, &atom_path)
-            .await?
-            .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
-
-        let current_version =
-            fact_versions::current_version_number(pool, atom.id, entity_id).await?;
-        let stale_refs =
-            fact_refs::check_staleness_for_entity(pool, &constellation_family, entity_id).await?;
-
-        let held_version = stale_refs
-            .iter()
-            .find(|r| r.atom_id == atom.id)
-            .map(|r| r.held_version)
-            .unwrap_or(current_version);
-
-        let rebuild_ctx = RebuildContext {
-            trigger: ReplayTrigger::SharedFactSupersession,
-            source_atom_path: atom_path.clone(),
-            source_atom_id: atom.id,
-            prior_version: held_version,
-            new_version: current_version,
-            source_workspace: atom.owner_workspace.clone(),
-            target_workspace: crate::repl::types_v2::WorkspaceKind::OnBoarding,
-            target_constellation_family: constellation_family.clone(),
-            entity_id,
-            initiated_at: Utc::now(),
-            remediation_id: None,
-        };
-
-        fact_refs::advance_to_current(
-            pool,
-            atom.id,
-            entity_id,
-            &constellation_family,
-            current_version,
-        )
-        .await?;
-
-        let result = ReplayResult {
-            context: rebuild_ctx,
-            outcome: ReplayOutcome::Resolved {
-                steps_executed: 0,
-                steps_unchanged: 0,
-            },
-            started_at: Utc::now(),
-            completed_at: Utc::now(),
-        };
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -631,10 +656,6 @@ impl CustomOperation for SharedAtomReplayConstellationOp {
         Err(anyhow!(
             "shared-atom.replay-constellation requires database"
         ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -656,6 +677,79 @@ impl CustomOperation for SharedAtomAcknowledgeOp {
     fn rationale(&self) -> &'static str {
         "Advances the consumer ref to the current shared fact version for in-flight entities"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::cross_workspace::fact_versions;
+
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let atom_path = json_extract_string(args, "atom-path")?;
+
+        let atom = repository::get_by_path(pool, &atom_path)
+            .await?
+            .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
+
+        let current_version =
+            fact_versions::current_version_number(pool, atom.id, entity_id).await?;
+
+        if current_version == 0 {
+            return Err(anyhow!(
+                "No shared fact versions exist for atom '{}' and entity {}",
+                atom_path,
+                entity_id
+            ));
+        }
+
+        let stale_count = sqlx::query_scalar::<_, i64>(
+            r#"
+            UPDATE "ob-poc".workspace_fact_refs
+            SET held_version = $1,
+                status = 'current',
+                stale_since = NULL
+            WHERE atom_id = $2
+              AND entity_id = $3
+              AND status = 'stale'
+            RETURNING 1
+            "#,
+        )
+        .bind(current_version)
+        .bind(atom.id)
+        .bind(entity_id)
+        .fetch_all(pool)
+        .await?
+        .len() as i64;
+
+        #[derive(serde::Serialize)]
+        struct AcknowledgeResult {
+            atom_path: String,
+            entity_id: uuid::Uuid,
+            advanced_to_version: i32,
+            consumers_updated: i64,
+        }
+
+        let result = AcknowledgeResult {
+            atom_path,
+            entity_id,
+            advanced_to_version: current_version,
+            consumers_updated: stale_count,
+        };
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SharedAtomAcknowledgeOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -725,72 +819,6 @@ impl CustomOperation for SharedAtomAcknowledgeOp {
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::cross_workspace::fact_versions;
-
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let atom_path = json_extract_string(args, "atom-path")?;
-
-        let atom = repository::get_by_path(pool, &atom_path)
-            .await?
-            .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
-
-        let current_version =
-            fact_versions::current_version_number(pool, atom.id, entity_id).await?;
-
-        if current_version == 0 {
-            return Err(anyhow!(
-                "No shared fact versions exist for atom '{}' and entity {}",
-                atom_path,
-                entity_id
-            ));
-        }
-
-        let stale_count = sqlx::query_scalar::<_, i64>(
-            r#"
-            UPDATE "ob-poc".workspace_fact_refs
-            SET held_version = $1,
-                status = 'current',
-                stale_since = NULL
-            WHERE atom_id = $2
-              AND entity_id = $3
-              AND status = 'stale'
-            RETURNING 1
-            "#,
-        )
-        .bind(current_version)
-        .bind(atom.id)
-        .bind(entity_id)
-        .fetch_all(pool)
-        .await?
-        .len() as i64;
-
-        #[derive(serde::Serialize)]
-        struct AcknowledgeResult {
-            atom_path: String,
-            entity_id: uuid::Uuid,
-            advanced_to_version: i32,
-            consumers_updated: i64,
-        }
-
-        let result = AcknowledgeResult {
-            atom_path,
-            entity_id,
-            advanced_to_version: current_version,
-            consumers_updated: stale_count,
-        };
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -800,9 +828,5 @@ impl CustomOperation for SharedAtomAcknowledgeOp {
         Err(anyhow!(
             "shared-atom.acknowledge-shared-update requires database"
         ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

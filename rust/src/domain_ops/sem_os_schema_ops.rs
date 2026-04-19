@@ -19,24 +19,6 @@ use crate::ontology::{ontology, SearchKeyDef};
 use sqlx::PgPool;
 
 #[cfg(feature = "database")]
-async fn execute_json_via_legacy<T: CustomOperation + Sync>(
-    op: &T,
-    args: &serde_json::Value,
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-    pool: &PgPool,
-) -> Result<dsl_runtime::VerbExecutionOutcome> {
-    let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
-        op.domain(),
-        op.verb(),
-        args,
-    );
-    let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
-    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
-    crate::sem_os_runtime::verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-    Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
-}
-
-#[cfg(feature = "database")]
 use {
     crate::domain_ops::affinity_graph_cache::load_affinity_graph_cached,
     crate::sem_reg::{entity_type_def::EntityTypeDefBody, store::SnapshotStore, types::ObjectType},
@@ -321,6 +303,27 @@ impl CustomOperation for SchemaDomainDescribeOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SchemaDomainDescribeOp {
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -347,20 +350,6 @@ impl CustomOperation for SchemaDomainDescribeOp {
         Ok(ExecutionResult::Record(describe_entity_structure(
             &entity_type,
         )))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -381,6 +370,27 @@ impl CustomOperation for SchemaEntityDescribeOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SchemaEntityDescribeOp {
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -406,20 +416,6 @@ impl CustomOperation for SchemaEntityDescribeOp {
             &entity_type,
         )))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// List fields for an entity type.
@@ -439,6 +435,27 @@ impl CustomOperation for SchemaEntityListFieldsOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl SchemaEntityListFieldsOp {
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -471,20 +488,6 @@ impl CustomOperation for SchemaEntityListFieldsOp {
             "field_count": record["field_count"].clone(),
             "source": record["source"].clone(),
         })))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -503,7 +506,26 @@ impl CustomOperation for SchemaEntityListRelationshipsOp {
     fn rationale(&self) -> &'static str {
         "Lists ontology-backed relationships relevant to an entity type"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SchemaEntityListRelationshipsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -540,21 +562,8 @@ impl CustomOperation for SchemaEntityListRelationshipsOp {
             "source": record["source"].clone(),
         })))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// List verbs for an entity type's domain.
 #[register_custom_op]
@@ -571,7 +580,26 @@ impl CustomOperation for SchemaEntityListVerbsOp {
     fn rationale(&self) -> &'static str {
         "Lists runtime verb contracts for the entity type's DSL domain"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SchemaEntityListVerbsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -606,21 +634,8 @@ impl CustomOperation for SchemaEntityListVerbsOp {
             "source": record["source"].clone(),
         })))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ── Schema Introspection ──────────────────────────────────────────
 
@@ -639,7 +654,20 @@ impl CustomOperation for SchemaIntrospectOp {
     fn rationale(&self) -> &'static str {
         "Delegates to db_introspect MCP tool"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SchemaIntrospectOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -658,20 +686,8 @@ impl CustomOperation for SchemaIntrospectOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("schema.introspect requires database"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ── Schema Extraction ─────────────────────────────────────────────
 
@@ -690,7 +706,20 @@ impl CustomOperation for SchemaExtractAttributesOp {
     fn rationale(&self) -> &'static str {
         "Scanner-based attribute extraction from schema columns"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SchemaExtractAttributesOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -712,20 +741,8 @@ impl CustomOperation for SchemaExtractAttributesOp {
             "schema.extract-attributes requires database"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Extract verb contracts from YAML configuration.
 #[register_custom_op]
@@ -742,7 +759,20 @@ impl CustomOperation for SchemaExtractVerbsOp {
     fn rationale(&self) -> &'static str {
         "Scanner-based verb extraction from YAML config"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SchemaExtractVerbsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -761,20 +791,8 @@ impl CustomOperation for SchemaExtractVerbsOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("schema.extract-verbs requires database"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Extract entity type definitions from schema.
 #[register_custom_op]
@@ -791,7 +809,20 @@ impl CustomOperation for SchemaExtractEntitiesOp {
     fn rationale(&self) -> &'static str {
         "Scanner-based entity type extraction from schema tables"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SchemaExtractEntitiesOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -810,20 +841,8 @@ impl CustomOperation for SchemaExtractEntitiesOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("schema.extract-entities requires database"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Cross-reference schema against registry snapshots for drift detection.
 #[register_custom_op]
@@ -840,7 +859,20 @@ impl CustomOperation for SchemaCrossReferenceOp {
     fn rationale(&self) -> &'static str {
         "Scanner drift detection: compare schema vs registry snapshots"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
+    }
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SchemaCrossReferenceOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -859,20 +891,8 @@ impl CustomOperation for SchemaCrossReferenceOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("schema.cross-reference requires database"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
-    }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // ── Diagram generation ops ────────────────────────────────────────────────────
 
@@ -1068,7 +1088,26 @@ impl CustomOperation for SchemaGenerateErdOp {
     fn rationale(&self) -> &'static str {
         "ERD generation requires physical schema extraction + AffinityGraph build"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SchemaGenerateErdOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1138,21 +1177,8 @@ impl CustomOperation for SchemaGenerateErdOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("schema.generate-erd requires database"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Generate a verb-flow diagram showing what data a verb touches.
 #[register_custom_op]
@@ -1169,7 +1195,26 @@ impl CustomOperation for SchemaGenerateVerbFlowOp {
     fn rationale(&self) -> &'static str {
         "Verb-flow diagram requires AffinityGraph for verb→data edge traversal"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SchemaGenerateVerbFlowOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1230,21 +1275,8 @@ impl CustomOperation for SchemaGenerateVerbFlowOp {
             "schema.generate-verb-flow requires database"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 /// Generate a domain discovery map.
 #[register_custom_op]
@@ -1261,7 +1293,26 @@ impl CustomOperation for SchemaGenerateDiscoveryMapOp {
     fn rationale(&self) -> &'static str {
         "Generate utterance -> intent -> verb -> data map from AffinityGraph and verb phrases"
     }
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl SchemaGenerateDiscoveryMapOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1351,18 +1402,5 @@ impl CustomOperation for SchemaGenerateDiscoveryMapOp {
             "schema.generate-discovery-map requires database"
         ))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+

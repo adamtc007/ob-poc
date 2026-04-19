@@ -152,34 +152,6 @@ impl CustomOperation for TemplateInvokeOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let template_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "id")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("Missing :id argument for template.invoke"))?;
-        let explicit_params = extract_params_map(verb_call, ctx)?;
-        let result =
-            template_invoke_impl(template_id.to_string(), explicit_params, ctx, pool).await?;
-        Ok(ExecutionResult::TemplateInvoked(result))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("template.invoke requires database feature"))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -205,6 +177,37 @@ impl CustomOperation for TemplateInvokeOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl TemplateInvokeOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let template_id = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "id")
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow!("Missing :id argument for template.invoke"))?;
+        let explicit_params = extract_params_map(verb_call, ctx)?;
+        let result =
+            template_invoke_impl(template_id.to_string(), explicit_params, ctx, pool).await?;
+        Ok(ExecutionResult::TemplateInvoked(result))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("template.invoke requires database feature"))
     }
 }
 
@@ -496,6 +499,56 @@ impl CustomOperation for TemplateBatchOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_int_opt, json_extract_string, json_extract_string_opt};
+
+        let template_id = json_extract_string(args, "id")?;
+        let source_symbol = json_extract_string(args, "source")?
+            .trim_start_matches('@')
+            .to_string();
+        let bind_param =
+            json_extract_string_opt(args, "bind-as").unwrap_or_else(|| "entity".to_string());
+        let shared_params = extract_json_string_map(args, ctx, "shared")?;
+        let on_error_str =
+            json_extract_string_opt(args, "on-error").unwrap_or_else(|| "continue".to_string());
+        let on_error: OnErrorMode = on_error_str.parse().unwrap_or_default();
+        let limit = json_extract_int_opt(args, "limit").map(|i| i as usize);
+
+        let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
+        let result = template_batch_impl(
+            template_id,
+            source_symbol,
+            bind_param,
+            shared_params,
+            on_error,
+            limit,
+            &mut exec_ctx,
+            pool,
+        )
+        .await?;
+
+        for (name, uuid) in &exec_ctx.symbols {
+            ctx.bind(name, *uuid);
+        }
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::json!({"_type": "template_batch", "_debug": format!("{result:?}")}),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl TemplateBatchOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -562,53 +615,6 @@ impl CustomOperation for TemplateBatchOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("template.batch requires database feature"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_int_opt, json_extract_string, json_extract_string_opt};
-
-        let template_id = json_extract_string(args, "id")?;
-        let source_symbol = json_extract_string(args, "source")?
-            .trim_start_matches('@')
-            .to_string();
-        let bind_param =
-            json_extract_string_opt(args, "bind-as").unwrap_or_else(|| "entity".to_string());
-        let shared_params = extract_json_string_map(args, ctx, "shared")?;
-        let on_error_str =
-            json_extract_string_opt(args, "on-error").unwrap_or_else(|| "continue".to_string());
-        let on_error: OnErrorMode = on_error_str.parse().unwrap_or_default();
-        let limit = json_extract_int_opt(args, "limit").map(|i| i as usize);
-
-        let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
-        let result = template_batch_impl(
-            template_id,
-            source_symbol,
-            bind_param,
-            shared_params,
-            on_error,
-            limit,
-            &mut exec_ctx,
-            pool,
-        )
-        .await?;
-
-        for (name, uuid) in &exec_ctx.symbols {
-            ctx.bind(name, *uuid);
-        }
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::json!({"_type": "template_batch", "_debug": format!("{result:?}")}),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 

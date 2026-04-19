@@ -330,68 +330,59 @@ pub struct CustomOpFactory {
 // Tell inventory to collect these
 inventory::collect!(CustomOpFactory);
 
-/// Trait for custom operations that cannot be expressed as data-driven verbs
+/// Trait for custom operations that cannot be expressed as data-driven verbs.
+///
+/// # Phase 2.5 Slice D-quick
+///
+/// Single execution method: `execute_json`. The legacy
+/// `execute(&VerbCall, &mut ExecutionContext, &PgPool) -> Result<ExecutionResult>`
+/// moved out of the trait into per-op inherent impls (for the 14 files that
+/// still thunk through it); native ops never needed it on the trait.
+///
+/// `execute_in_tx` remains on the trait — one remaining caller in
+/// `DslExecutor::execute_verb_in_tx`. Slice F replaces its legacy-typed
+/// signature alongside dissolving `ExecutionContext`/`ExecutionResult`.
+///
+/// Direction of travel: Slice F/C-native deletes the inherent `execute`
+/// bodies as every op's `execute_json` body becomes native.
 #[async_trait]
 pub trait CustomOperation: Send + Sync {
-    /// Domain this operation belongs to
+    /// Domain this operation belongs to.
     fn domain(&self) -> &'static str;
 
-    /// Verb name for this operation
+    /// Verb name for this operation.
     fn verb(&self) -> &'static str;
 
-    /// Why this operation requires custom code (documentation)
+    /// Why this operation requires custom code (documentation).
     fn rationale(&self) -> &'static str;
 
-    /// Execute the custom operation
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult>;
-
-    /// Execute without database (for testing)
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult>;
-
-    /// Execute with JSON args and SemOS context (Phase 2 migration target).
+    /// Execute the op against JSON args and a `VerbExecutionContext`.
     ///
-    /// Override this method to migrate an op to the SemOS execution contract.
-    /// The default implementation converts JSON→VerbCall and delegates to `execute()`.
-    ///
-    /// When an op overrides this, the adapter calls it directly without building
-    /// a VerbCall — args arrive as the JSON that the LLM extracted.
+    /// The single execution contract on this trait. `DslExecutor` dispatches
+    /// through this via `dispatch_plugin_via_execute_json`.
     #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        // Default: convert to legacy types and delegate
-        use crate::sem_os_runtime::verb_executor_adapter;
-        let vc = verb_executor_adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
-    }
+    ) -> Result<dsl_runtime::VerbExecutionOutcome>;
 
-    /// Returns true if this op has been migrated to execute_json (overrides the default).
-    /// Used for telemetry — tracks migration progress.
+    /// Returns true if this op's `execute_json` body is native (does not thunk
+    /// through a legacy inherent `execute` method). Retained for telemetry
+    /// during the migration — removed in Slice F once all ops are native.
     fn is_migrated(&self) -> bool {
         false
     }
 
-    /// Execute within an existing transaction
+    /// Execute within an existing transaction (legacy typed).
     ///
-    /// Default implementation logs a warning and falls back to pool-based execution
-    /// which does NOT participate in the transaction (auto-commit semantics).
-    /// Override this method for true transactional behavior.
+    /// Default returns an error; ops that need transactional semantics
+    /// override. Slice F replaces this signature with a `VerbExecutionContext`
+    /// + JSON args version alongside dissolving `ExecutionContext` /
+    /// `ExecutionResult`; for now the legacy signature is preserved for the
+    /// single remaining caller (`DslExecutor::execute_verb_in_tx` at
+    /// `dsl_v2/executor.rs:1716`).
     #[cfg(feature = "database")]
     async fn execute_in_tx(
         &self,
@@ -399,9 +390,6 @@ pub trait CustomOperation: Send + Sync {
         _ctx: &mut ExecutionContext,
         _tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     ) -> Result<ExecutionResult> {
-        // WARNING: Default implementation does not participate in the caller's transaction.
-        // This means if the batch fails, this operation will NOT be rolled back.
-        // Implementors should override this method for transactional operations.
         tracing::warn!(
             "CustomOperation {}.{} does not implement execute_in_tx, using pool (non-transactional)",
             self.domain(),

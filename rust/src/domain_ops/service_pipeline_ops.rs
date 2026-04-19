@@ -36,6 +36,40 @@ impl CustomOperation for ServiceIntentCreateOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use crate::service_resources::{NewServiceIntent, ServiceResourcePipelineService};
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let product_id = json_extract_uuid(args, ctx, "product-id")?;
+        let service_id = json_extract_uuid(args, ctx, "service-id")?;
+        let options = args.get("options").cloned();
+        let service = ServiceResourcePipelineService::new(pool.clone());
+        let input = NewServiceIntent {
+            cbu_id,
+            product_id,
+            service_id,
+            options,
+            created_by: None,
+        };
+        let intent_id = service.create_service_intent(&input).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            intent_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ServiceIntentCreateOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -126,37 +160,6 @@ impl CustomOperation for ServiceIntentCreateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use crate::service_resources::{NewServiceIntent, ServiceResourcePipelineService};
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let product_id = json_extract_uuid(args, ctx, "product-id")?;
-        let service_id = json_extract_uuid(args, ctx, "service-id")?;
-        let options = args.get("options").cloned();
-        let service = ServiceResourcePipelineService::new(pool.clone());
-        let input = NewServiceIntent {
-            cbu_id,
-            product_id,
-            service_id,
-            options,
-            created_by: None,
-        };
-        let intent_id = service.create_service_intent(&input).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            intent_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// List service intents for a CBU
@@ -174,6 +177,40 @@ impl CustomOperation for ServiceIntentListOp {
     fn rationale(&self) -> &'static str {
         "Lists all service intents for a CBU with enrichment"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use crate::service_resources::ServiceResourcePipelineService;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let service = ServiceResourcePipelineService::new(pool.clone());
+        let intents = service.get_service_intents(cbu_id).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            intents
+                .iter()
+                .map(|i| {
+                    json!({
+                        "intent_id": i.intent_id, "cbu_id": i.cbu_id,
+                        "product_id": i.product_id, "service_id": i.service_id,
+                        "options": i.options, "status": i.status,
+                        "created_at": i.created_at.map(|dt| dt.to_rfc3339())
+                    })
+                })
+                .collect(),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ServiceIntentListOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -227,37 +264,6 @@ impl CustomOperation for ServiceIntentListOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use crate::service_resources::ServiceResourcePipelineService;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let service = ServiceResourcePipelineService::new(pool.clone());
-        let intents = service.get_service_intents(cbu_id).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            intents
-                .iter()
-                .map(|i| {
-                    json!({
-                        "intent_id": i.intent_id, "cbu_id": i.cbu_id,
-                        "product_id": i.product_id, "service_id": i.service_id,
-                        "options": i.options, "status": i.status,
-                        "created_at": i.created_at.map(|dt| dt.to_rfc3339())
-                    })
-                })
-                .collect(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Supersede an existing service intent
@@ -275,6 +281,50 @@ impl CustomOperation for ServiceIntentSupersedeOp {
     fn rationale(&self) -> &'static str {
         "Creates new intent version, marks old as superseded"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_get_required_uuid;
+        use uuid::Uuid;
+        let intent_id = json_get_required_uuid(args, "intent-id")?;
+        let options = args
+            .get("options")
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Missing options argument"))?;
+        let existing: (Uuid, Uuid, Uuid) = sqlx::query_as(
+            r#"SELECT cbu_id, product_id, service_id FROM "ob-poc".service_intents WHERE intent_id = $1"#,
+        ).bind(intent_id).fetch_optional(pool).await?
+        .ok_or_else(|| anyhow::anyhow!("Intent not found: {}", intent_id))?;
+        sqlx::query(
+            r#"UPDATE "ob-poc".service_intents SET status = 'superseded' WHERE intent_id = $1"#,
+        )
+        .bind(intent_id)
+        .execute(pool)
+        .await?;
+        let new_id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".service_intents (cbu_id, product_id, service_id, options)
+            VALUES ($1, $2, $3, $4) RETURNING intent_id"#,
+        )
+        .bind(existing.0)
+        .bind(existing.1)
+        .bind(existing.2)
+        .bind(&options)
+        .fetch_one(pool)
+        .await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(new_id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ServiceIntentSupersedeOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -356,47 +406,6 @@ impl CustomOperation for ServiceIntentSupersedeOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_get_required_uuid;
-        use uuid::Uuid;
-        let intent_id = json_get_required_uuid(args, "intent-id")?;
-        let options = args
-            .get("options")
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("Missing options argument"))?;
-        let existing: (Uuid, Uuid, Uuid) = sqlx::query_as(
-            r#"SELECT cbu_id, product_id, service_id FROM "ob-poc".service_intents WHERE intent_id = $1"#,
-        ).bind(intent_id).fetch_optional(pool).await?
-        .ok_or_else(|| anyhow::anyhow!("Intent not found: {}", intent_id))?;
-        sqlx::query(
-            r#"UPDATE "ob-poc".service_intents SET status = 'superseded' WHERE intent_id = $1"#,
-        )
-        .bind(intent_id)
-        .execute(pool)
-        .await?;
-        let new_id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO "ob-poc".service_intents (cbu_id, product_id, service_id, options)
-            VALUES ($1, $2, $3, $4) RETURNING intent_id"#,
-        )
-        .bind(existing.0)
-        .bind(existing.1)
-        .bind(existing.2)
-        .bind(&options)
-        .fetch_one(pool)
-        .await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(new_id))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
@@ -418,6 +427,36 @@ impl CustomOperation for DiscoveryRunOp {
     fn rationale(&self) -> &'static str {
         "Orchestrates SRDEF discovery from service intents"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use crate::service_resources::{load_srdefs_from_config, run_discovery_pipeline};
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let registry = load_srdefs_from_config().unwrap_or_default();
+        let result = run_discovery_pipeline(pool, &registry, cbu_id).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "cbu_id": result.cbu_id,
+                "srdefs_discovered": result.srdefs_discovered,
+                "attrs_rolled_up": result.attrs_rolled_up,
+                "attrs_populated": result.attrs_populated,
+                "attrs_missing": result.attrs_missing
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DiscoveryRunOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -462,33 +501,6 @@ impl CustomOperation for DiscoveryRunOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use crate::service_resources::{load_srdefs_from_config, run_discovery_pipeline};
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let registry = load_srdefs_from_config().unwrap_or_default();
-        let result = run_discovery_pipeline(pool, &registry, cbu_id).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "cbu_id": result.cbu_id,
-                "srdefs_discovered": result.srdefs_discovered,
-                "attrs_rolled_up": result.attrs_rolled_up,
-                "attrs_populated": result.attrs_populated,
-                "attrs_missing": result.attrs_missing
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Explain why SRDEFs were discovered
@@ -506,6 +518,50 @@ impl CustomOperation for DiscoveryExplainOp {
     fn rationale(&self) -> &'static str {
         "Returns discovery reasons for audit/debugging"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let srdef_filter = json_extract_string_opt(args, "srdef-id");
+        let reasons: Vec<DiscoveryReasonRow> = if let Some(srdef_id) = srdef_filter {
+            sqlx::query_as(
+                r#"SELECT srdef_id, service_id, trigger_type, reason_detail, discovered_at as created_at
+                FROM "ob-poc".srdef_discovery_reasons
+                WHERE cbu_id = $1 AND srdef_id = $2 ORDER BY discovered_at DESC"#,
+            ).bind(cbu_id).bind(srdef_id).fetch_all(pool).await?
+        } else {
+            sqlx::query_as(
+                r#"SELECT srdef_id, service_id, trigger_type, reason_detail, discovered_at as created_at
+                FROM "ob-poc".srdef_discovery_reasons
+                WHERE cbu_id = $1 ORDER BY srdef_id, discovered_at DESC"#,
+            ).bind(cbu_id).fetch_all(pool).await?
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            reasons
+                .iter()
+                .map(|r| {
+                    json!({
+                        "srdef_id": r.srdef_id, "service_id": r.service_id,
+                        "trigger_type": r.trigger_type, "reason_detail": r.reason_detail,
+                        "created_at": r.created_at.to_rfc3339()
+                    })
+                })
+                .collect(),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DiscoveryExplainOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -586,47 +642,6 @@ impl CustomOperation for DiscoveryExplainOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let srdef_filter = json_extract_string_opt(args, "srdef-id");
-        let reasons: Vec<DiscoveryReasonRow> = if let Some(srdef_id) = srdef_filter {
-            sqlx::query_as(
-                r#"SELECT srdef_id, service_id, trigger_type, reason_detail, discovered_at as created_at
-                FROM "ob-poc".srdef_discovery_reasons
-                WHERE cbu_id = $1 AND srdef_id = $2 ORDER BY discovered_at DESC"#,
-            ).bind(cbu_id).bind(srdef_id).fetch_all(pool).await?
-        } else {
-            sqlx::query_as(
-                r#"SELECT srdef_id, service_id, trigger_type, reason_detail, discovered_at as created_at
-                FROM "ob-poc".srdef_discovery_reasons
-                WHERE cbu_id = $1 ORDER BY srdef_id, discovered_at DESC"#,
-            ).bind(cbu_id).fetch_all(pool).await?
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            reasons
-                .iter()
-                .map(|r| {
-                    json!({
-                        "srdef_id": r.srdef_id, "service_id": r.service_id,
-                        "trigger_type": r.trigger_type, "reason_detail": r.reason_detail,
-                        "created_at": r.created_at.to_rfc3339()
-                    })
-                })
-                .collect(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 #[derive(sqlx::FromRow)]
@@ -657,6 +672,35 @@ impl CustomOperation for AttributeRollupOp {
     fn rationale(&self) -> &'static str {
         "Merges attribute requirements from multiple SRDEFs"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use crate::service_resources::AttributeRollupEngine;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let engine = AttributeRollupEngine::new(pool);
+        let result = engine.rollup_for_cbu(cbu_id).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "total_attributes": result.total_attributes,
+                "required_count": result.required_count,
+                "optional_count": result.optional_count,
+                "conflict_count": result.conflict_count
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl AttributeRollupOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -700,32 +744,6 @@ impl CustomOperation for AttributeRollupOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use crate::service_resources::AttributeRollupEngine;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let engine = AttributeRollupEngine::new(pool);
-        let result = engine.rollup_for_cbu(cbu_id).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "total_attributes": result.total_attributes,
-                "required_count": result.required_count,
-                "optional_count": result.optional_count,
-                "conflict_count": result.conflict_count
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Auto-populate attribute values from available sources
@@ -743,6 +761,34 @@ impl CustomOperation for AttributePopulateOp {
     fn rationale(&self) -> &'static str {
         "Pulls values from entity, CBU, document sources"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use crate::service_resources::PopulationEngine;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let engine = PopulationEngine::new(pool);
+        let result = engine.populate_for_cbu(cbu_id).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "populated": result.populated,
+                "already_populated": result.already_populated,
+                "still_missing": result.still_missing
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl AttributePopulateOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -785,31 +831,6 @@ impl CustomOperation for AttributePopulateOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use crate::service_resources::PopulationEngine;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let engine = PopulationEngine::new(pool);
-        let result = engine.populate_for_cbu(cbu_id).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "populated": result.populated,
-                "already_populated": result.already_populated,
-                "still_missing": result.still_missing
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Show attribute gaps for a CBU
@@ -827,6 +848,43 @@ impl CustomOperation for AttributeGapsOp {
     fn rationale(&self) -> &'static str {
         "Queries gap view for missing required attributes"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let gaps: Vec<AttrGapRow> = sqlx::query_as(
+            r#"SELECT attr_id, attr_code, attr_name, attr_category, has_value
+            FROM "ob-poc".v_cbu_attr_gaps
+            WHERE cbu_id = $1 AND NOT has_value
+            ORDER BY attr_category, attr_name"#,
+        )
+        .bind(cbu_id)
+        .fetch_all(pool)
+        .await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            gaps.iter()
+                .map(|g| {
+                    json!({
+                        "attr_id": g.attr_id, "attr_code": g.attr_code,
+                        "attr_name": g.attr_name, "attr_category": g.attr_category
+                    })
+                })
+                .collect(),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl AttributeGapsOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -884,40 +942,6 @@ impl CustomOperation for AttributeGapsOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let gaps: Vec<AttrGapRow> = sqlx::query_as(
-            r#"SELECT attr_id, attr_code, attr_name, attr_category, has_value
-            FROM "ob-poc".v_cbu_attr_gaps
-            WHERE cbu_id = $1 AND NOT has_value
-            ORDER BY attr_category, attr_name"#,
-        )
-        .bind(cbu_id)
-        .fetch_all(pool)
-        .await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            gaps.iter()
-                .map(|g| {
-                    json!({
-                        "attr_id": g.attr_id, "attr_code": g.attr_code,
-                        "attr_name": g.attr_name, "attr_category": g.attr_category
-                    })
-                })
-                .collect(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 #[derive(sqlx::FromRow)]
@@ -945,6 +969,40 @@ impl CustomOperation for AttributeSetOp {
     fn rationale(&self) -> &'static str {
         "Sets attribute value with evidence tracking"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_uuid, json_get_required_uuid};
+        use crate::service_resources::{
+            AttributeSource, ServiceResourcePipelineService, SetCbuAttrValue,
+        };
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let attr_id = json_get_required_uuid(args, "attr-id")?;
+        let value = json_extract_string(args, "value")?;
+        let service = ServiceResourcePipelineService::new(pool.clone());
+        let input = SetCbuAttrValue {
+            cbu_id,
+            attr_id,
+            value: serde_json::Value::String(value),
+            source: AttributeSource::Manual,
+            evidence_refs: None,
+            explain_refs: None,
+        };
+        service.set_cbu_attr_value(&input).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl AttributeSetOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -1009,37 +1067,6 @@ impl CustomOperation for AttributeSetOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_uuid, json_get_required_uuid};
-        use crate::service_resources::{
-            AttributeSource, ServiceResourcePipelineService, SetCbuAttrValue,
-        };
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let attr_id = json_get_required_uuid(args, "attr-id")?;
-        let value = json_extract_string(args, "value")?;
-        let service = ServiceResourcePipelineService::new(pool.clone());
-        let input = SetCbuAttrValue {
-            cbu_id,
-            attr_id,
-            value: serde_json::Value::String(value),
-            source: AttributeSource::Manual,
-            evidence_refs: None,
-            explain_refs: None,
-        };
-        service.set_cbu_attr_value(&input).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
@@ -1061,6 +1088,38 @@ impl CustomOperation for ProvisioningRunOp {
     fn rationale(&self) -> &'static str {
         "Orchestrates resource provisioning with dependency ordering"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use crate::service_resources::{load_srdefs_from_config, run_provisioning_pipeline};
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let registry = load_srdefs_from_config().unwrap_or_default();
+        let result = run_provisioning_pipeline(pool, &registry, cbu_id).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "cbu_id": result.cbu_id,
+                "requests_created": result.requests_created,
+                "already_active": result.already_active,
+                "not_ready": result.not_ready,
+                "services_ready": result.services_ready,
+                "services_partial": result.services_partial,
+                "services_blocked": result.services_blocked
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ProvisioningRunOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -1107,35 +1166,6 @@ impl CustomOperation for ProvisioningRunOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use crate::service_resources::{load_srdefs_from_config, run_provisioning_pipeline};
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let registry = load_srdefs_from_config().unwrap_or_default();
-        let result = run_provisioning_pipeline(pool, &registry, cbu_id).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "cbu_id": result.cbu_id,
-                "requests_created": result.requests_created,
-                "already_active": result.already_active,
-                "not_ready": result.not_ready,
-                "services_ready": result.services_ready,
-                "services_partial": result.services_partial,
-                "services_blocked": result.services_blocked
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Check provisioning request status
@@ -1153,6 +1183,48 @@ impl CustomOperation for ProvisioningStatusOp {
     fn rationale(&self) -> &'static str {
         "Queries provisioning request with latest event"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_get_required_uuid;
+        let request_id = json_get_required_uuid(args, "request-id")?;
+        let row = sqlx::query(
+            r#"SELECT pr.request_id, pr.cbu_id, pr.srdef_id, pr.status, pr.requested_at,
+                   pe.kind as event_kind, pe.occurred_at as event_at
+            FROM "ob-poc".provisioning_requests pr
+            LEFT JOIN "ob-poc".provisioning_events pe ON pr.request_id = pe.request_id
+            WHERE pr.request_id = $1
+            ORDER BY pe.occurred_at DESC NULLS LAST LIMIT 1"#,
+        )
+        .bind(request_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Request not found: {}", request_id))?;
+        use sqlx::Row;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "request_id": row.get::<uuid::Uuid, _>("request_id"),
+                "cbu_id": row.get::<uuid::Uuid, _>("cbu_id"),
+                "srdef_id": row.get::<String, _>("srdef_id"),
+                "status": row.get::<String, _>("status"),
+                "requested_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("requested_at"),
+                "latest_event": row.get::<Option<String>, _>("event_kind"),
+                "event_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("event_at")
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ProvisioningStatusOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -1205,45 +1277,6 @@ impl CustomOperation for ProvisioningStatusOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_get_required_uuid;
-        let request_id = json_get_required_uuid(args, "request-id")?;
-        let row = sqlx::query(
-            r#"SELECT pr.request_id, pr.cbu_id, pr.srdef_id, pr.status, pr.requested_at,
-                   pe.kind as event_kind, pe.occurred_at as event_at
-            FROM "ob-poc".provisioning_requests pr
-            LEFT JOIN "ob-poc".provisioning_events pe ON pr.request_id = pe.request_id
-            WHERE pr.request_id = $1
-            ORDER BY pe.occurred_at DESC NULLS LAST LIMIT 1"#,
-        )
-        .bind(request_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Request not found: {}", request_id))?;
-        use sqlx::Row;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "request_id": row.get::<uuid::Uuid, _>("request_id"),
-                "cbu_id": row.get::<uuid::Uuid, _>("cbu_id"),
-                "srdef_id": row.get::<String, _>("srdef_id"),
-                "status": row.get::<String, _>("status"),
-                "requested_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("requested_at"),
-                "latest_event": row.get::<Option<String>, _>("event_kind"),
-                "event_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("event_at")
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
@@ -1265,6 +1298,36 @@ impl CustomOperation for ReadinessComputeOp {
     fn rationale(&self) -> &'static str {
         "Computes 'good to transact' status per service"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use crate::service_resources::{load_srdefs_from_config, ReadinessEngine};
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let registry = load_srdefs_from_config().unwrap_or_default();
+        let engine = ReadinessEngine::new(pool, &registry);
+        let result = engine.compute_for_cbu(cbu_id).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "total_services": result.total_services,
+                "ready": result.ready,
+                "partial": result.partial,
+                "blocked": result.blocked
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ReadinessComputeOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -1309,33 +1372,6 @@ impl CustomOperation for ReadinessComputeOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use crate::service_resources::{load_srdefs_from_config, ReadinessEngine};
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let registry = load_srdefs_from_config().unwrap_or_default();
-        let engine = ReadinessEngine::new(pool, &registry);
-        let result = engine.compute_for_cbu(cbu_id).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "total_services": result.total_services,
-                "ready": result.ready,
-                "partial": result.partial,
-                "blocked": result.blocked
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Explain blocking reasons for services
@@ -1353,6 +1389,42 @@ impl CustomOperation for ReadinessExplainOp {
     fn rationale(&self) -> &'static str {
         "Returns blocking reasons for debugging/remediation"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_uuid, json_extract_uuid_opt};
+        use crate::service_resources::ServiceResourcePipelineService;
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let service_filter = json_extract_uuid_opt(args, ctx, "service-id");
+        let service = ServiceResourcePipelineService::new(pool.clone());
+        let readiness = service.get_service_readiness(cbu_id).await?;
+        let blocking: Vec<_> = readiness
+            .into_iter()
+            .filter(|r| service_filter.is_none_or(|sid| r.service_id == sid))
+            .filter(|r| r.status != "ready")
+            .map(|r| {
+                json!({
+                    "service_id": r.service_id, "product_id": r.product_id,
+                    "status": r.status, "blocking_reasons": r.blocking_reasons
+                })
+            })
+            .collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            blocking,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ReadinessExplainOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -1417,39 +1489,6 @@ impl CustomOperation for ReadinessExplainOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_uuid, json_extract_uuid_opt};
-        use crate::service_resources::ServiceResourcePipelineService;
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let service_filter = json_extract_uuid_opt(args, ctx, "service-id");
-        let service = ServiceResourcePipelineService::new(pool.clone());
-        let readiness = service.get_service_readiness(cbu_id).await?;
-        let blocking: Vec<_> = readiness
-            .into_iter()
-            .filter(|r| service_filter.is_none_or(|sid| r.service_id == sid))
-            .filter(|r| r.status != "ready")
-            .map(|r| {
-                json!({
-                    "service_id": r.service_id, "product_id": r.product_id,
-                    "status": r.status, "blocking_reasons": r.blocking_reasons
-                })
-            })
-            .collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            blocking,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
@@ -1471,6 +1510,51 @@ impl CustomOperation for PipelineFullOp {
     fn rationale(&self) -> &'static str {
         "Orchestrates complete pipeline: discovery → provision → readiness"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::json_extract_uuid;
+        use crate::service_resources::{
+            load_srdefs_from_config, run_discovery_pipeline, run_provisioning_pipeline,
+        };
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let registry = load_srdefs_from_config().unwrap_or_default();
+        let discovery = run_discovery_pipeline(pool, &registry, cbu_id).await?;
+        let provisioning = run_provisioning_pipeline(pool, &registry, cbu_id).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "cbu_id": cbu_id,
+                "discovery": {
+                    "srdefs_discovered": discovery.srdefs_discovered,
+                    "attrs_rolled_up": discovery.attrs_rolled_up,
+                    "attrs_populated": discovery.attrs_populated,
+                    "attrs_missing": discovery.attrs_missing
+                },
+                "provisioning": {
+                    "requests_created": provisioning.requests_created,
+                    "already_active": provisioning.already_active,
+                    "not_ready": provisioning.not_ready
+                },
+                "readiness": {
+                    "services_ready": provisioning.services_ready,
+                    "services_partial": provisioning.services_partial,
+                    "services_blocked": provisioning.services_blocked
+                }
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl PipelineFullOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -1534,48 +1618,6 @@ impl CustomOperation for PipelineFullOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-        use crate::service_resources::{
-            load_srdefs_from_config, run_discovery_pipeline, run_provisioning_pipeline,
-        };
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let registry = load_srdefs_from_config().unwrap_or_default();
-        let discovery = run_discovery_pipeline(pool, &registry, cbu_id).await?;
-        let provisioning = run_provisioning_pipeline(pool, &registry, cbu_id).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "cbu_id": cbu_id,
-                "discovery": {
-                    "srdefs_discovered": discovery.srdefs_discovered,
-                    "attrs_rolled_up": discovery.attrs_rolled_up,
-                    "attrs_populated": discovery.attrs_populated,
-                    "attrs_missing": discovery.attrs_missing
-                },
-                "provisioning": {
-                    "requests_created": provisioning.requests_created,
-                    "already_active": provisioning.already_active,
-                    "not_ready": provisioning.not_ready
-                },
-                "readiness": {
-                    "services_ready": provisioning.services_ready,
-                    "services_partial": provisioning.services_partial,
-                    "services_blocked": provisioning.services_blocked
-                }
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
@@ -1597,6 +1639,48 @@ impl CustomOperation for ServiceResourceCheckAttributeGapsOp {
     fn rationale(&self) -> &'static str {
         "Cross-references SRDEF attribute requirements against SemOS and attribute registry"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::service_resources::load_srdefs_from_config;
+        let registry = load_srdefs_from_config().unwrap_or_default();
+        let mut gap_rows: Vec<serde_json::Value> = Vec::new();
+        for (srdef_id, srdef) in &registry.srdefs {
+            for attr in &srdef.attributes {
+                let in_registry: bool = sqlx::query_scalar(
+                    r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".attribute_registry WHERE id = $1)"#,
+                )
+                .bind(&attr.attr_id)
+                .fetch_one(pool)
+                .await
+                .unwrap_or(false);
+                let in_semos: bool = sqlx::query_scalar(
+                    r#"SELECT EXISTS(SELECT 1 FROM sem_reg.v_active_attribute_defs WHERE semantic_id = $1)"#,
+                ).bind(&attr.attr_id).fetch_one(pool).await.unwrap_or(false);
+                let status = match (in_registry, in_semos) {
+                    (true, true) => "ok",
+                    (true, false) => "ungoverned",
+                    (false, _) => "missing",
+                };
+                gap_rows.push(json!({ "srdef_id": srdef_id, "attribute_fqn": attr.attr_id, "status": status }));
+            }
+        }
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            gap_rows,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ServiceResourceCheckAttributeGapsOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -1658,45 +1742,6 @@ impl CustomOperation for ServiceResourceCheckAttributeGapsOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::service_resources::load_srdefs_from_config;
-        let registry = load_srdefs_from_config().unwrap_or_default();
-        let mut gap_rows: Vec<serde_json::Value> = Vec::new();
-        for (srdef_id, srdef) in &registry.srdefs {
-            for attr in &srdef.attributes {
-                let in_registry: bool = sqlx::query_scalar(
-                    r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".attribute_registry WHERE id = $1)"#,
-                )
-                .bind(&attr.attr_id)
-                .fetch_one(pool)
-                .await
-                .unwrap_or(false);
-                let in_semos: bool = sqlx::query_scalar(
-                    r#"SELECT EXISTS(SELECT 1 FROM sem_reg.v_active_attribute_defs WHERE semantic_id = $1)"#,
-                ).bind(&attr.attr_id).fetch_one(pool).await.unwrap_or(false);
-                let status = match (in_registry, in_semos) {
-                    (true, true) => "ok",
-                    (true, false) => "ungoverned",
-                    (false, _) => "missing",
-                };
-                gap_rows.push(json!({ "srdef_id": srdef_id, "attribute_fqn": attr.attr_id, "status": status }));
-            }
-        }
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            gap_rows,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Sync SRDEF definitions from config files to the database.
@@ -1714,6 +1759,31 @@ impl CustomOperation for ServiceResourceSyncDefinitionsOp {
     fn rationale(&self) -> &'static str {
         "Loads SRDEF configs from disk and syncs them to the database"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::service_resources::load_and_sync_srdefs;
+        let (_registry, sync_result) = load_and_sync_srdefs(pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({
+                "inserted": sync_result.inserted,
+                "updated": sync_result.updated,
+                "errors": sync_result.errors
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ServiceResourceSyncDefinitionsOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -1740,27 +1810,5 @@ impl CustomOperation for ServiceResourceSyncDefinitionsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("Database feature required"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::service_resources::load_and_sync_srdefs;
-        let (_registry, sync_result) = load_and_sync_srdefs(pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({
-                "inserted": sync_result.inserted,
-                "updated": sync_result.updated,
-                "errors": sync_result.errors
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

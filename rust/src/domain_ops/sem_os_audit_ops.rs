@@ -34,25 +34,6 @@ macro_rules! audit_op {
             }
 
             #[cfg(feature = "database")]
-            async fn execute(
-                &self,
-                verb_call: &VerbCall,
-                ctx: &mut ExecutionContext,
-                pool: &PgPool,
-            ) -> Result<ExecutionResult> {
-                delegate_to_tool(pool, ctx, verb_call, $tool).await
-            }
-
-            #[cfg(not(feature = "database"))]
-            async fn execute(
-                &self,
-                _verb_call: &VerbCall,
-                _ctx: &mut ExecutionContext,
-            ) -> Result<ExecutionResult> {
-                Err(anyhow::anyhow!("audit.{} requires database", $verb))
-            }
-
-            #[cfg(feature = "database")]
             async fn execute_json(
                 &self,
                 args: &serde_json::Value,
@@ -64,6 +45,29 @@ macro_rules! audit_op {
 
             fn is_migrated(&self) -> bool {
                 true
+            }
+        }
+
+        impl $struct_name {
+            #[cfg(feature = "database")]
+            #[allow(dead_code)]
+            async fn execute(
+                &self,
+                verb_call: &VerbCall,
+                ctx: &mut ExecutionContext,
+                pool: &PgPool,
+            ) -> Result<ExecutionResult> {
+                delegate_to_tool(pool, ctx, verb_call, $tool).await
+            }
+
+            #[cfg(not(feature = "database"))]
+            #[allow(dead_code)]
+            async fn execute(
+                &self,
+                _verb_call: &VerbCall,
+                _ctx: &mut ExecutionContext,
+            ) -> Result<ExecutionResult> {
+                Err(anyhow::anyhow!("audit.{} requires database", $verb))
             }
         }
     };

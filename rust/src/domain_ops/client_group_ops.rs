@@ -229,51 +229,6 @@ impl CustomOperation for ClientGroupEntityManageOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let action = super::helpers::extract_string_opt(verb_call, "action")
-            .ok_or_else(|| anyhow::anyhow!(":action required (add|remove|confirm|reject)"))?;
-
-        match action.as_str() {
-            "add" => ClientGroupEntityAddOp.execute(verb_call, ctx, pool).await,
-            "remove" => {
-                ClientGroupEntityRemoveOp
-                    .execute(verb_call, ctx, pool)
-                    .await
-            }
-            "confirm" => {
-                ClientGroupConfirmEntityOp
-                    .execute(verb_call, ctx, pool)
-                    .await
-            }
-            "reject" => {
-                ClientGroupRejectEntityOp
-                    .execute(verb_call, ctx, pool)
-                    .await
-            }
-            other => Err(anyhow::anyhow!(
-                "Unknown entity-manage action '{}'. Valid: add, remove, confirm, reject",
-                other
-            )),
-        }
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -314,6 +269,52 @@ impl CustomOperation for ClientGroupEntityManageOp {
     }
 }
 
+impl ClientGroupEntityManageOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let action = super::helpers::extract_string_opt(verb_call, "action")
+            .ok_or_else(|| anyhow::anyhow!(":action required (add|remove|confirm|reject)"))?;
+
+        match action.as_str() {
+            "add" => ClientGroupEntityAddOp.execute(verb_call, ctx, pool).await,
+            "remove" => {
+                ClientGroupEntityRemoveOp
+                    .execute(verb_call, ctx, pool)
+                    .await
+            }
+            "confirm" => {
+                ClientGroupConfirmEntityOp
+                    .execute(verb_call, ctx, pool)
+                    .await
+            }
+            "reject" => {
+                ClientGroupRejectEntityOp
+                    .execute(verb_call, ctx, pool)
+                    .await
+            }
+            other => Err(anyhow::anyhow!(
+                "Unknown entity-manage action '{}'. Valid: add, remove, confirm, reject",
+                other
+            )),
+        }
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 #[register_custom_op]
 pub struct ClientGroupEntityAddOp;
 
@@ -329,52 +330,6 @@ impl CustomOperation for ClientGroupEntityAddOp {
 
     fn rationale(&self) -> &'static str {
         "Add an entity to a client group's membership universe"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
-        let entity_id = get_required_uuid(verb_call, "entity-id", ctx)?;
-        let membership_type = get_optional_string(verb_call, "membership-type")
-            .unwrap_or_else(|| "confirmed".to_string());
-        let notes = get_optional_string(verb_call, "notes");
-
-        let result = sqlx::query!(
-            r#"
-            INSERT INTO "ob-poc".client_group_entity
-                (group_id, entity_id, membership_type, added_by, notes)
-            VALUES ($1, $2, $3, 'manual', $4)
-            ON CONFLICT (group_id, entity_id) DO UPDATE SET
-                membership_type = EXCLUDED.membership_type,
-                notes = COALESCE(EXCLUDED.notes, client_group_entity.notes),
-                updated_at = now()
-            RETURNING id
-            "#,
-            group_id,
-            entity_id,
-            membership_type,
-            notes
-        )
-        .fetch_one(pool)
-        .await?;
-
-        Ok(ExecutionResult::Uuid(result.id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -414,6 +369,53 @@ impl CustomOperation for ClientGroupEntityAddOp {
     }
 }
 
+impl ClientGroupEntityAddOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
+        let entity_id = get_required_uuid(verb_call, "entity-id", ctx)?;
+        let membership_type = get_optional_string(verb_call, "membership-type")
+            .unwrap_or_else(|| "confirmed".to_string());
+        let notes = get_optional_string(verb_call, "notes");
+
+        let result = sqlx::query!(
+            r#"
+            INSERT INTO "ob-poc".client_group_entity
+                (group_id, entity_id, membership_type, added_by, notes)
+            VALUES ($1, $2, $3, 'manual', $4)
+            ON CONFLICT (group_id, entity_id) DO UPDATE SET
+                membership_type = EXCLUDED.membership_type,
+                notes = COALESCE(EXCLUDED.notes, client_group_entity.notes),
+                updated_at = now()
+            RETURNING id
+            "#,
+            group_id,
+            entity_id,
+            membership_type,
+            notes
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(ExecutionResult::Uuid(result.id))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 // =============================================================================
 // ENTITY-REMOVE
 // =============================================================================
@@ -433,61 +435,6 @@ impl CustomOperation for ClientGroupEntityRemoveOp {
 
     fn rationale(&self) -> &'static str {
         "Remove an entity from a client group (or mark as historical)"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
-        let entity_id = get_required_uuid(verb_call, "entity-id", ctx)?;
-        let mark_historical = get_optional_bool(verb_call, "mark-historical").unwrap_or(false);
-
-        let affected = if mark_historical {
-            sqlx::query!(
-                r#"
-                UPDATE "ob-poc".client_group_entity
-                SET membership_type = 'historical', updated_at = now()
-                WHERE group_id = $1 AND entity_id = $2
-                "#,
-                group_id,
-                entity_id
-            )
-            .execute(pool)
-            .await?
-            .rows_affected()
-        } else {
-            sqlx::query!(
-                r#"
-                DELETE FROM "ob-poc".client_group_entity
-                WHERE group_id = $1 AND entity_id = $2
-                "#,
-                group_id,
-                entity_id
-            )
-            .execute(pool)
-            .await?
-            .rows_affected()
-        };
-
-        Ok(ExecutionResult::Record(json!({
-            "removed": affected > 0,
-            "mark_historical": mark_historical
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -536,6 +483,62 @@ impl CustomOperation for ClientGroupEntityRemoveOp {
     }
 }
 
+impl ClientGroupEntityRemoveOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
+        let entity_id = get_required_uuid(verb_call, "entity-id", ctx)?;
+        let mark_historical = get_optional_bool(verb_call, "mark-historical").unwrap_or(false);
+
+        let affected = if mark_historical {
+            sqlx::query!(
+                r#"
+                UPDATE "ob-poc".client_group_entity
+                SET membership_type = 'historical', updated_at = now()
+                WHERE group_id = $1 AND entity_id = $2
+                "#,
+                group_id,
+                entity_id
+            )
+            .execute(pool)
+            .await?
+            .rows_affected()
+        } else {
+            sqlx::query!(
+                r#"
+                DELETE FROM "ob-poc".client_group_entity
+                WHERE group_id = $1 AND entity_id = $2
+                "#,
+                group_id,
+                entity_id
+            )
+            .execute(pool)
+            .await?
+            .rows_affected()
+        };
+
+        Ok(ExecutionResult::Record(json!({
+            "removed": affected > 0,
+            "mark_historical": mark_historical
+        })))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 // =============================================================================
 // LIST-ENTITIES
 // =============================================================================
@@ -555,76 +558,6 @@ impl CustomOperation for ClientGroupEntityListOp {
 
     fn rationale(&self) -> &'static str {
         "List all entities in a client group with their tags"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
-        let membership_type = get_optional_string(verb_call, "membership-type");
-        let limit = get_optional_integer(verb_call, "limit").unwrap_or(100);
-
-        let rows = sqlx::query!(
-            r#"
-            SELECT
-                cge.entity_id,
-                e.name as "entity_name!",
-                cge.membership_type as "membership_type!",
-                cge.added_by as "added_by!",
-                cge.created_at as "created_at!",
-                COALESCE(
-                    (SELECT array_agg(cget.tag) FROM "ob-poc".client_group_entity_tag cget
-                     WHERE cget.group_id = cge.group_id AND cget.entity_id = cge.entity_id),
-                    ARRAY[]::TEXT[]
-                ) as "tags!"
-            FROM "ob-poc".client_group_entity cge
-            JOIN "ob-poc".entities e ON e.entity_id = cge.entity_id
-            WHERE cge.group_id = $1
-              AND e.deleted_at IS NULL
-              AND ($2::TEXT IS NULL OR cge.membership_type = $2)
-            ORDER BY e.name
-            LIMIT $3
-            "#,
-            group_id,
-            membership_type,
-            limit
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let items: Vec<EntityMembershipListItem> = rows
-            .into_iter()
-            .map(|r| EntityMembershipListItem {
-                entity_id: r.entity_id,
-                entity_name: r.entity_name,
-                membership_type: r.membership_type,
-                added_by: r.added_by,
-                tags: r.tags,
-                created_at: r.created_at.to_rfc3339(),
-            })
-            .collect();
-
-        Ok(ExecutionResult::RecordSet(
-            items
-                .iter()
-                .map(serde_json::to_value)
-                .collect::<Result<Vec<_>, _>>()?,
-        ))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -693,6 +626,77 @@ impl CustomOperation for ClientGroupEntityListOp {
     }
 }
 
+impl ClientGroupEntityListOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
+        let membership_type = get_optional_string(verb_call, "membership-type");
+        let limit = get_optional_integer(verb_call, "limit").unwrap_or(100);
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                cge.entity_id,
+                e.name as "entity_name!",
+                cge.membership_type as "membership_type!",
+                cge.added_by as "added_by!",
+                cge.created_at as "created_at!",
+                COALESCE(
+                    (SELECT array_agg(cget.tag) FROM "ob-poc".client_group_entity_tag cget
+                     WHERE cget.group_id = cge.group_id AND cget.entity_id = cge.entity_id),
+                    ARRAY[]::TEXT[]
+                ) as "tags!"
+            FROM "ob-poc".client_group_entity cge
+            JOIN "ob-poc".entities e ON e.entity_id = cge.entity_id
+            WHERE cge.group_id = $1
+              AND e.deleted_at IS NULL
+              AND ($2::TEXT IS NULL OR cge.membership_type = $2)
+            ORDER BY e.name
+            LIMIT $3
+            "#,
+            group_id,
+            membership_type,
+            limit
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let items: Vec<EntityMembershipListItem> = rows
+            .into_iter()
+            .map(|r| EntityMembershipListItem {
+                entity_id: r.entity_id,
+                entity_name: r.entity_name,
+                membership_type: r.membership_type,
+                added_by: r.added_by,
+                tags: r.tags,
+                created_at: r.created_at.to_rfc3339(),
+            })
+            .collect();
+
+        Ok(ExecutionResult::RecordSet(
+            items
+                .iter()
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 // =============================================================================
 // TAG-ADD
 // =============================================================================
@@ -714,6 +718,58 @@ impl CustomOperation for ClientGroupTagAddOp {
         "Add a shorthand tag to an entity for semantic search"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let tag = json_extract_string(args, "tag")?;
+        let persona = json_extract_string_opt(args, "persona");
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".client_group_entity
+                (group_id, entity_id, membership_type, added_by)
+            VALUES ($1, $2, 'confirmed', 'tag_add')
+            ON CONFLICT (group_id, entity_id) DO NOTHING"#,
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .execute(pool)
+        .await?;
+        let tag_norm: String = sqlx::query_scalar(r#"SELECT "ob-poc".normalize_tag($1)"#)
+            .bind(&tag)
+            .fetch_one(pool)
+            .await?;
+        let id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".client_group_entity_tag
+                (group_id, entity_id, tag, tag_norm, persona, source, confidence)
+            VALUES ($1, $2, $3, $4, $5, 'manual', 1.0)
+            ON CONFLICT (group_id, entity_id, tag_norm, COALESCE(persona, ''))
+            DO UPDATE SET
+                confidence = GREATEST(client_group_entity_tag.confidence, 0.95),
+                source = 'user_confirmed'
+            RETURNING id"#,
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .bind(&tag)
+        .bind(&tag_norm)
+        .bind(&persona)
+        .fetch_one(pool)
+        .await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupTagAddOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -772,7 +828,6 @@ impl CustomOperation for ClientGroupTagAddOp {
 
         Ok(ExecutionResult::Uuid(result.id))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -782,56 +837,6 @@ impl CustomOperation for ClientGroupTagAddOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let tag = json_extract_string(args, "tag")?;
-        let persona = json_extract_string_opt(args, "persona");
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".client_group_entity
-                (group_id, entity_id, membership_type, added_by)
-            VALUES ($1, $2, 'confirmed', 'tag_add')
-            ON CONFLICT (group_id, entity_id) DO NOTHING"#,
-        )
-        .bind(group_id)
-        .bind(entity_id)
-        .execute(pool)
-        .await?;
-        let tag_norm: String = sqlx::query_scalar(r#"SELECT "ob-poc".normalize_tag($1)"#)
-            .bind(&tag)
-            .fetch_one(pool)
-            .await?;
-        let id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO "ob-poc".client_group_entity_tag
-                (group_id, entity_id, tag, tag_norm, persona, source, confidence)
-            VALUES ($1, $2, $3, $4, $5, 'manual', 1.0)
-            ON CONFLICT (group_id, entity_id, tag_norm, COALESCE(persona, ''))
-            DO UPDATE SET
-                confidence = GREATEST(client_group_entity_tag.confidence, 0.95),
-                source = 'user_confirmed'
-            RETURNING id"#,
-        )
-        .bind(group_id)
-        .bind(entity_id)
-        .bind(&tag)
-        .bind(&tag_norm)
-        .bind(&persona)
-        .fetch_one(pool)
-        .await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -854,39 +859,6 @@ impl CustomOperation for ClientGroupTagRemoveOp {
 
     fn rationale(&self) -> &'static str {
         "Remove a shorthand tag"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let tag_id = get_required_uuid(verb_call, "tag-id", ctx)?;
-
-        let affected = sqlx::query!(
-            r#"DELETE FROM "ob-poc".client_group_entity_tag WHERE id = $1"#,
-            tag_id
-        )
-        .execute(pool)
-        .await?
-        .rows_affected();
-
-        Ok(ExecutionResult::Record(json!({
-            "removed": affected > 0
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -913,6 +885,40 @@ impl CustomOperation for ClientGroupTagRemoveOp {
     }
 }
 
+impl ClientGroupTagRemoveOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let tag_id = get_required_uuid(verb_call, "tag-id", ctx)?;
+
+        let affected = sqlx::query!(
+            r#"DELETE FROM "ob-poc".client_group_entity_tag WHERE id = $1"#,
+            tag_id
+        )
+        .execute(pool)
+        .await?
+        .rows_affected();
+
+        Ok(ExecutionResult::Record(json!({
+            "removed": affected > 0
+        })))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 // =============================================================================
 // LIST-TAGS
 // =============================================================================
@@ -932,74 +938,6 @@ impl CustomOperation for ClientGroupTagListOp {
 
     fn rationale(&self) -> &'static str {
         "List shorthand tags for entities in a client group"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
-        let entity_id = get_optional_uuid(verb_call, "entity-id", ctx);
-        let persona = get_optional_string(verb_call, "persona");
-
-        let rows = sqlx::query!(
-            r#"
-            SELECT
-                cget.id as tag_id,
-                cget.entity_id,
-                e.name as "entity_name!",
-                cget.tag,
-                cget.persona,
-                cget.source,
-                cget.confidence
-            FROM "ob-poc".client_group_entity_tag cget
-            JOIN "ob-poc".entities e ON e.entity_id = cget.entity_id
-            WHERE cget.group_id = $1
-              AND e.deleted_at IS NULL
-              AND ($2::UUID IS NULL OR cget.entity_id = $2)
-              AND ($3::TEXT IS NULL OR cget.persona IS NULL OR cget.persona = $3)
-            ORDER BY e.name, cget.tag
-            "#,
-            group_id,
-            entity_id,
-            persona
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let items: Vec<TagResult> = rows
-            .into_iter()
-            .map(|r| TagResult {
-                tag_id: r.tag_id,
-                entity_id: r.entity_id,
-                entity_name: r.entity_name,
-                tag: r.tag,
-                persona: r.persona,
-                source: r.source,
-                confidence: r.confidence.unwrap_or(1.0),
-            })
-            .collect();
-
-        Ok(ExecutionResult::RecordSet(
-            items
-                .iter()
-                .map(serde_json::to_value)
-                .collect::<Result<Vec<_>, _>>()?,
-        ))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -1058,6 +996,75 @@ impl CustomOperation for ClientGroupTagListOp {
     }
 }
 
+impl ClientGroupTagListOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
+        let entity_id = get_optional_uuid(verb_call, "entity-id", ctx);
+        let persona = get_optional_string(verb_call, "persona");
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                cget.id as tag_id,
+                cget.entity_id,
+                e.name as "entity_name!",
+                cget.tag,
+                cget.persona,
+                cget.source,
+                cget.confidence
+            FROM "ob-poc".client_group_entity_tag cget
+            JOIN "ob-poc".entities e ON e.entity_id = cget.entity_id
+            WHERE cget.group_id = $1
+              AND e.deleted_at IS NULL
+              AND ($2::UUID IS NULL OR cget.entity_id = $2)
+              AND ($3::TEXT IS NULL OR cget.persona IS NULL OR cget.persona = $3)
+            ORDER BY e.name, cget.tag
+            "#,
+            group_id,
+            entity_id,
+            persona
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let items: Vec<TagResult> = rows
+            .into_iter()
+            .map(|r| TagResult {
+                tag_id: r.tag_id,
+                entity_id: r.entity_id,
+                entity_name: r.entity_name,
+                tag: r.tag,
+                persona: r.persona,
+                source: r.source,
+                confidence: r.confidence.unwrap_or(1.0),
+            })
+            .collect();
+
+        Ok(ExecutionResult::RecordSet(
+            items
+                .iter()
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 // =============================================================================
 // SEARCH-ENTITIES (Candle-assisted semantic search)
 // =============================================================================
@@ -1079,6 +1086,48 @@ impl CustomOperation for ClientGroupSearchOp {
         "Semantic search for entities by shorthand tags (Candle-assisted)"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{
+            json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
+        };
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let query = json_extract_string(args, "query")?;
+        let persona = json_extract_string_opt(args, "persona");
+        let limit = json_extract_int_opt(args, "limit").unwrap_or(10) as i32;
+        let rows: Vec<(Uuid, String, String, f64, String)> = sqlx::query_as(
+            r#"SELECT entity_id, entity_name, tag, confidence, match_type
+            FROM "ob-poc".search_entity_tags($1, $2, $3, $4, FALSE)"#,
+        )
+        .bind(group_id)
+        .bind(&query)
+        .bind(&persona)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+        let items: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(eid, name, tag, conf, mt)| {
+                json!({ "entity_id": eid, "entity_name": name, "matched_tag": tag,
+                     "confidence": conf, "match_type": mt })
+            })
+            .collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupSearchOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1131,7 +1180,6 @@ impl CustomOperation for ClientGroupSearchOp {
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1141,46 +1189,6 @@ impl CustomOperation for ClientGroupSearchOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
-        };
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let query = json_extract_string(args, "query")?;
-        let persona = json_extract_string_opt(args, "persona");
-        let limit = json_extract_int_opt(args, "limit").unwrap_or(10) as i32;
-        let rows: Vec<(Uuid, String, String, f64, String)> = sqlx::query_as(
-            r#"SELECT entity_id, entity_name, tag, confidence, match_type
-            FROM "ob-poc".search_entity_tags($1, $2, $3, $4, FALSE)"#,
-        )
-        .bind(group_id)
-        .bind(&query)
-        .bind(&persona)
-        .bind(limit)
-        .fetch_all(pool)
-        .await?;
-        let items: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(|(eid, name, tag, conf, mt)| {
-                json!({ "entity_id": eid, "entity_name": name, "matched_tag": tag,
-                     "confidence": conf, "match_type": mt })
-            })
-            .collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            items,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1205,6 +1213,90 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
         "Discover entities that might belong to this client group (onboarding)"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{
+            json_extract_bool_opt, json_extract_string_list_opt, json_extract_string_opt,
+            json_extract_uuid,
+        };
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let search_terms = json_extract_string_list_opt(args, "search-terms");
+        let jurisdiction = json_extract_string_opt(args, "jurisdiction");
+        let auto_add = json_extract_bool_opt(args, "auto-add").unwrap_or(false);
+        let group_name: String =
+            sqlx::query_scalar(r#"SELECT canonical_name FROM "ob-poc".client_group WHERE id = $1"#)
+                .bind(group_id)
+                .fetch_one(pool)
+                .await?;
+        let mut patterns = vec![format!("%{}%", group_name.to_lowercase())];
+        if let Some(terms) = search_terms {
+            for term in terms {
+                patterns.push(format!("%{}%", term.to_lowercase()));
+            }
+        }
+        if jurisdiction.is_some() {
+            tracing::debug!(
+                "Jurisdiction filter requested but not yet implemented for discover-entities"
+            );
+        }
+        let rows: Vec<(Uuid, String, Option<String>, String, bool)> = sqlx::query_as(
+            r#"WITH already_members AS (
+                SELECT entity_id FROM "ob-poc".client_group_entity WHERE group_id = $1
+            )
+            SELECT
+                e.entity_id, e.name,
+                et.name as entity_type,
+                'name_match'::TEXT,
+                EXISTS (SELECT 1 FROM already_members am WHERE am.entity_id = e.entity_id)
+            FROM "ob-poc".entities e
+            LEFT JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
+            WHERE LOWER(e.name) LIKE ANY($2::TEXT[])
+              AND e.deleted_at IS NULL
+            ORDER BY e.name LIMIT 100"#,
+        )
+        .bind(group_id)
+        .bind(&patterns)
+        .fetch_all(pool)
+        .await?;
+        if auto_add {
+            for (eid, _, _, _, already) in &rows {
+                if !already {
+                    sqlx::query(
+                        r#"INSERT INTO "ob-poc".client_group_entity
+                            (group_id, entity_id, membership_type, added_by, notes)
+                        VALUES ($1, $2, 'suspected', 'discovery', 'Auto-added by discover-entities')
+                        ON CONFLICT (group_id, entity_id) DO NOTHING"#,
+                    )
+                    .bind(group_id)
+                    .bind(eid)
+                    .execute(pool)
+                    .await?;
+                }
+            }
+        }
+        let items: Vec<serde_json::Value> = rows
+            .into_iter()
+            .map(|(eid, name, etype, reason, already)| {
+                json!({ "entity_id": eid, "entity_name": name, "entity_type": etype,
+                     "match_reason": reason, "already_member": already })
+            })
+            .collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupDiscoverEntitiesOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1305,7 +1397,6 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1315,88 +1406,6 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_bool_opt, json_extract_string_list_opt, json_extract_string_opt,
-            json_extract_uuid,
-        };
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let search_terms = json_extract_string_list_opt(args, "search-terms");
-        let jurisdiction = json_extract_string_opt(args, "jurisdiction");
-        let auto_add = json_extract_bool_opt(args, "auto-add").unwrap_or(false);
-        let group_name: String =
-            sqlx::query_scalar(r#"SELECT canonical_name FROM "ob-poc".client_group WHERE id = $1"#)
-                .bind(group_id)
-                .fetch_one(pool)
-                .await?;
-        let mut patterns = vec![format!("%{}%", group_name.to_lowercase())];
-        if let Some(terms) = search_terms {
-            for term in terms {
-                patterns.push(format!("%{}%", term.to_lowercase()));
-            }
-        }
-        if jurisdiction.is_some() {
-            tracing::debug!(
-                "Jurisdiction filter requested but not yet implemented for discover-entities"
-            );
-        }
-        let rows: Vec<(Uuid, String, Option<String>, String, bool)> = sqlx::query_as(
-            r#"WITH already_members AS (
-                SELECT entity_id FROM "ob-poc".client_group_entity WHERE group_id = $1
-            )
-            SELECT
-                e.entity_id, e.name,
-                et.name as entity_type,
-                'name_match'::TEXT,
-                EXISTS (SELECT 1 FROM already_members am WHERE am.entity_id = e.entity_id)
-            FROM "ob-poc".entities e
-            LEFT JOIN "ob-poc".entity_types et ON et.entity_type_id = e.entity_type_id
-            WHERE LOWER(e.name) LIKE ANY($2::TEXT[])
-              AND e.deleted_at IS NULL
-            ORDER BY e.name LIMIT 100"#,
-        )
-        .bind(group_id)
-        .bind(&patterns)
-        .fetch_all(pool)
-        .await?;
-        if auto_add {
-            for (eid, _, _, _, already) in &rows {
-                if !already {
-                    sqlx::query(
-                        r#"INSERT INTO "ob-poc".client_group_entity
-                            (group_id, entity_id, membership_type, added_by, notes)
-                        VALUES ($1, $2, 'suspected', 'discovery', 'Auto-added by discover-entities')
-                        ON CONFLICT (group_id, entity_id) DO NOTHING"#,
-                    )
-                    .bind(group_id)
-                    .bind(eid)
-                    .execute(pool)
-                    .await?;
-                }
-            }
-        }
-        let items: Vec<serde_json::Value> = rows
-            .into_iter()
-            .map(|(eid, name, etype, reason, already)| {
-                json!({ "entity_id": eid, "entity_name": name, "entity_type": etype,
-                     "match_reason": reason, "already_member": already })
-            })
-            .collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            items,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1421,6 +1430,69 @@ impl CustomOperation for ClientGroupConfirmEntityOp {
         "Confirm a suspected entity as belonging to the client group"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_list_opt, json_extract_uuid};
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let tags = json_extract_string_list_opt(args, "tags");
+        let affected = sqlx::query(
+            r#"UPDATE "ob-poc".client_group_entity
+            SET membership_type = 'confirmed', added_by = 'user_confirmed', updated_at = now()
+            WHERE group_id = $1 AND entity_id = $2"#,
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+        if affected == 0 {
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".client_group_entity
+                    (group_id, entity_id, membership_type, added_by)
+                VALUES ($1, $2, 'confirmed', 'user_confirmed')"#,
+            )
+            .bind(group_id)
+            .bind(entity_id)
+            .execute(pool)
+            .await?;
+        }
+        if let Some(tag_list) = tags {
+            for tag in tag_list {
+                let tag_norm: String = sqlx::query_scalar(r#"SELECT "ob-poc".normalize_tag($1)"#)
+                    .bind(&tag)
+                    .fetch_one(pool)
+                    .await?;
+                sqlx::query(
+                    r#"INSERT INTO "ob-poc".client_group_entity_tag
+                        (group_id, entity_id, tag, tag_norm, source, confidence)
+                    VALUES ($1, $2, $3, $4, 'user_confirmed', 1.0)
+                    ON CONFLICT DO NOTHING"#,
+                )
+                .bind(group_id)
+                .bind(entity_id)
+                .bind(&tag)
+                .bind(&tag_norm)
+                .execute(pool)
+                .await?;
+            }
+        }
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({ "confirmed": true, "entity_id": entity_id }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupConfirmEntityOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1493,7 +1565,6 @@ impl CustomOperation for ClientGroupConfirmEntityOp {
             "entity_id": entity_id
         })))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1503,67 +1574,6 @@ impl CustomOperation for ClientGroupConfirmEntityOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_list_opt, json_extract_uuid};
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let tags = json_extract_string_list_opt(args, "tags");
-        let affected = sqlx::query(
-            r#"UPDATE "ob-poc".client_group_entity
-            SET membership_type = 'confirmed', added_by = 'user_confirmed', updated_at = now()
-            WHERE group_id = $1 AND entity_id = $2"#,
-        )
-        .bind(group_id)
-        .bind(entity_id)
-        .execute(pool)
-        .await?
-        .rows_affected();
-        if affected == 0 {
-            sqlx::query(
-                r#"INSERT INTO "ob-poc".client_group_entity
-                    (group_id, entity_id, membership_type, added_by)
-                VALUES ($1, $2, 'confirmed', 'user_confirmed')"#,
-            )
-            .bind(group_id)
-            .bind(entity_id)
-            .execute(pool)
-            .await?;
-        }
-        if let Some(tag_list) = tags {
-            for tag in tag_list {
-                let tag_norm: String = sqlx::query_scalar(r#"SELECT "ob-poc".normalize_tag($1)"#)
-                    .bind(&tag)
-                    .fetch_one(pool)
-                    .await?;
-                sqlx::query(
-                    r#"INSERT INTO "ob-poc".client_group_entity_tag
-                        (group_id, entity_id, tag, tag_norm, source, confidence)
-                    VALUES ($1, $2, $3, $4, 'user_confirmed', 1.0)
-                    ON CONFLICT DO NOTHING"#,
-                )
-                .bind(group_id)
-                .bind(entity_id)
-                .bind(&tag)
-                .bind(&tag_norm)
-                .execute(pool)
-                .await?;
-            }
-        }
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({ "confirmed": true, "entity_id": entity_id }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1588,6 +1598,39 @@ impl CustomOperation for ClientGroupRejectEntityOp {
         "Reject a suspected entity as not belonging to the client group"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let reason = json_extract_string_opt(args, "reason");
+        let affected = sqlx::query(
+            r#"DELETE FROM "ob-poc".client_group_entity WHERE group_id = $1 AND entity_id = $2"#,
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+        sqlx::query(
+            r#"DELETE FROM "ob-poc".client_group_entity_tag WHERE group_id = $1 AND entity_id = $2"#,
+        ).bind(group_id).bind(entity_id).execute(pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            json!({ "rejected": affected > 0, "reason": reason }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupRejectEntityOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1629,7 +1672,6 @@ impl CustomOperation for ClientGroupRejectEntityOp {
             "reason": reason
         })))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1639,37 +1681,6 @@ impl CustomOperation for ClientGroupRejectEntityOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let reason = json_extract_string_opt(args, "reason");
-        let affected = sqlx::query(
-            r#"DELETE FROM "ob-poc".client_group_entity WHERE group_id = $1 AND entity_id = $2"#,
-        )
-        .bind(group_id)
-        .bind(entity_id)
-        .execute(pool)
-        .await?
-        .rows_affected();
-        sqlx::query(
-            r#"DELETE FROM "ob-poc".client_group_entity_tag WHERE group_id = $1 AND entity_id = $2"#,
-        ).bind(group_id).bind(entity_id).execute(pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            json!({ "rejected": affected > 0, "reason": reason }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1758,6 +1769,65 @@ impl CustomOperation for ClientGroupAssignRoleOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let role_id = json_extract_uuid(args, ctx, "role-id")?;
+        let target_entity_id = json_extract_uuid_opt(args, ctx, "target-entity-id");
+        let effective_from = json_extract_string_opt(args, "effective-from");
+        let source =
+            json_extract_string_opt(args, "source").unwrap_or_else(|| "manual".to_string());
+        let cge_id: Uuid = match sqlx::query_scalar::<_, Uuid>(
+            r#"SELECT id FROM "ob-poc".client_group_entity WHERE group_id = $1 AND entity_id = $2"#,
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .fetch_optional(pool)
+        .await?
+        {
+            Some(id) => id,
+            None => {
+                sqlx::query_scalar(
+                    r#"INSERT INTO "ob-poc".client_group_entity
+                    (group_id, entity_id, membership_type, added_by)
+                VALUES ($1, $2, 'in_group', 'role_assignment') RETURNING id"#,
+                )
+                .bind(group_id)
+                .bind(entity_id)
+                .fetch_one(pool)
+                .await?
+            }
+        };
+        let eff_from: Option<chrono::NaiveDate> = effective_from
+            .as_ref()
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        let id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".client_group_entity_roles
+                (cge_id, role_id, target_entity_id, effective_from, assigned_by)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (cge_id, role_id, COALESCE(target_entity_id, '00000000-0000-0000-0000-000000000000'))
+            DO UPDATE SET
+                effective_from = COALESCE(EXCLUDED.effective_from, client_group_entity_roles.effective_from),
+                assigned_by = EXCLUDED.assigned_by, updated_at = NOW()
+            RETURNING id"#,
+        ).bind(cge_id).bind(role_id).bind(target_entity_id).bind(eff_from).bind(&source)
+        .fetch_one(pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupAssignRoleOp {
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -1833,7 +1903,6 @@ impl CustomOperation for ClientGroupAssignRoleOp {
 
         Ok(ExecutionResult::Uuid(result.id))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1843,63 +1912,6 @@ impl CustomOperation for ClientGroupAssignRoleOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let role_id = json_extract_uuid(args, ctx, "role-id")?;
-        let target_entity_id = json_extract_uuid_opt(args, ctx, "target-entity-id");
-        let effective_from = json_extract_string_opt(args, "effective-from");
-        let source =
-            json_extract_string_opt(args, "source").unwrap_or_else(|| "manual".to_string());
-        let cge_id: Uuid = match sqlx::query_scalar::<_, Uuid>(
-            r#"SELECT id FROM "ob-poc".client_group_entity WHERE group_id = $1 AND entity_id = $2"#,
-        )
-        .bind(group_id)
-        .bind(entity_id)
-        .fetch_optional(pool)
-        .await?
-        {
-            Some(id) => id,
-            None => {
-                sqlx::query_scalar(
-                    r#"INSERT INTO "ob-poc".client_group_entity
-                    (group_id, entity_id, membership_type, added_by)
-                VALUES ($1, $2, 'in_group', 'role_assignment') RETURNING id"#,
-                )
-                .bind(group_id)
-                .bind(entity_id)
-                .fetch_one(pool)
-                .await?
-            }
-        };
-        let eff_from: Option<chrono::NaiveDate> = effective_from
-            .as_ref()
-            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO "ob-poc".client_group_entity_roles
-                (cge_id, role_id, target_entity_id, effective_from, assigned_by)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (cge_id, role_id, COALESCE(target_entity_id, '00000000-0000-0000-0000-000000000000'))
-            DO UPDATE SET
-                effective_from = COALESCE(EXCLUDED.effective_from, client_group_entity_roles.effective_from),
-                assigned_by = EXCLUDED.assigned_by, updated_at = NOW()
-            RETURNING id"#,
-        ).bind(cge_id).bind(role_id).bind(target_entity_id).bind(eff_from).bind(&source)
-        .fetch_one(pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -1922,42 +1934,6 @@ impl CustomOperation for ClientGroupRemoveRoleOp {
 
     fn rationale(&self) -> &'static str {
         "Remove a role assignment from an entity"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let role_assignment_id = get_required_uuid(verb_call, "role-assignment-id", ctx)?;
-
-        // Soft delete by setting effective_to
-        let affected = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".client_group_entity_roles
-            SET effective_to = CURRENT_DATE, updated_at = NOW()
-            WHERE id = $1 AND effective_to IS NULL
-            "#,
-            role_assignment_id
-        )
-        .execute(pool)
-        .await?
-        .rows_affected();
-
-        Ok(ExecutionResult::Affected(affected))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -1988,6 +1964,43 @@ impl CustomOperation for ClientGroupRemoveRoleOp {
     }
 }
 
+impl ClientGroupRemoveRoleOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let role_assignment_id = get_required_uuid(verb_call, "role-assignment-id", ctx)?;
+
+        // Soft delete by setting effective_to
+        let affected = sqlx::query!(
+            r#"
+            UPDATE "ob-poc".client_group_entity_roles
+            SET effective_to = CURRENT_DATE, updated_at = NOW()
+            WHERE id = $1 AND effective_to IS NULL
+            "#,
+            role_assignment_id
+        )
+        .execute(pool)
+        .await?
+        .rows_affected();
+
+        Ok(ExecutionResult::Affected(affected))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 // =============================================================================
 // LIST-ROLES
 // =============================================================================
@@ -2009,6 +2022,67 @@ impl CustomOperation for ClientGroupListRolesOp {
         "List role assignments for entities in a client group"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_uuid, json_extract_uuid_opt};
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
+        let role_id = json_extract_uuid_opt(args, ctx, "role-id");
+        let rows = sqlx::query(
+            r#"SELECT
+                cer.id, cge.entity_id, e.name as entity_name,
+                cer.role_id, r.name as role_name,
+                cer.target_entity_id, te.name as target_entity_name,
+                cer.effective_from, cer.effective_to, cer.assigned_by as source
+            FROM "ob-poc".client_group_entity_roles cer
+            JOIN "ob-poc".client_group_entity cge ON cge.id = cer.cge_id
+            JOIN "ob-poc".entities e ON e.entity_id = cge.entity_id
+            JOIN "ob-poc".roles r ON r.role_id = cer.role_id
+            LEFT JOIN "ob-poc".entities te ON te.entity_id = cer.target_entity_id
+            WHERE cge.group_id = $1
+              AND e.deleted_at IS NULL
+              AND (te.entity_id IS NULL OR te.deleted_at IS NULL)
+              AND ($2::UUID IS NULL OR cge.entity_id = $2)
+              AND ($3::UUID IS NULL OR cer.role_id = $3)
+              AND (cer.effective_to IS NULL OR cer.effective_to > CURRENT_DATE)
+            ORDER BY e.name, r.name"#,
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .bind(role_id)
+        .fetch_all(pool)
+        .await?;
+        use sqlx::Row;
+        let items: Vec<serde_json::Value> = rows.iter().map(|r| {
+            json!({
+                "id": r.get::<Uuid, _>("id"),
+                "entity_id": r.get::<Uuid, _>("entity_id"),
+                "entity_name": r.get::<String, _>("entity_name"),
+                "role_id": r.get::<Uuid, _>("role_id"),
+                "role_name": r.get::<String, _>("role_name"),
+                "target_entity_id": r.get::<Option<Uuid>, _>("target_entity_id"),
+                "target_entity_name": r.get::<Option<String>, _>("target_entity_name"),
+                "effective_from": r.get::<Option<chrono::NaiveDate>, _>("effective_from").map(|d| d.to_string()),
+                "effective_to": r.get::<Option<chrono::NaiveDate>, _>("effective_to").map(|d| d.to_string()),
+                "source": r.get::<String, _>("source"),
+            })
+        }).collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupListRolesOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2076,7 +2150,6 @@ impl CustomOperation for ClientGroupListRolesOp {
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2086,65 +2159,6 @@ impl CustomOperation for ClientGroupListRolesOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_uuid, json_extract_uuid_opt};
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
-        let role_id = json_extract_uuid_opt(args, ctx, "role-id");
-        let rows = sqlx::query(
-            r#"SELECT
-                cer.id, cge.entity_id, e.name as entity_name,
-                cer.role_id, r.name as role_name,
-                cer.target_entity_id, te.name as target_entity_name,
-                cer.effective_from, cer.effective_to, cer.assigned_by as source
-            FROM "ob-poc".client_group_entity_roles cer
-            JOIN "ob-poc".client_group_entity cge ON cge.id = cer.cge_id
-            JOIN "ob-poc".entities e ON e.entity_id = cge.entity_id
-            JOIN "ob-poc".roles r ON r.role_id = cer.role_id
-            LEFT JOIN "ob-poc".entities te ON te.entity_id = cer.target_entity_id
-            WHERE cge.group_id = $1
-              AND e.deleted_at IS NULL
-              AND (te.entity_id IS NULL OR te.deleted_at IS NULL)
-              AND ($2::UUID IS NULL OR cge.entity_id = $2)
-              AND ($3::UUID IS NULL OR cer.role_id = $3)
-              AND (cer.effective_to IS NULL OR cer.effective_to > CURRENT_DATE)
-            ORDER BY e.name, r.name"#,
-        )
-        .bind(group_id)
-        .bind(entity_id)
-        .bind(role_id)
-        .fetch_all(pool)
-        .await?;
-        use sqlx::Row;
-        let items: Vec<serde_json::Value> = rows.iter().map(|r| {
-            json!({
-                "id": r.get::<Uuid, _>("id"),
-                "entity_id": r.get::<Uuid, _>("entity_id"),
-                "entity_name": r.get::<String, _>("entity_name"),
-                "role_id": r.get::<Uuid, _>("role_id"),
-                "role_name": r.get::<String, _>("role_name"),
-                "target_entity_id": r.get::<Option<Uuid>, _>("target_entity_id"),
-                "target_entity_name": r.get::<Option<String>, _>("target_entity_name"),
-                "effective_from": r.get::<Option<chrono::NaiveDate>, _>("effective_from").map(|d| d.to_string()),
-                "effective_to": r.get::<Option<chrono::NaiveDate>, _>("effective_to").map(|d| d.to_string()),
-                "source": r.get::<String, _>("source"),
-            })
-        }).collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            items,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -2169,6 +2183,69 @@ impl CustomOperation for ClientGroupPartiesOp {
         "List all parties (entities with roles) in a client group"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_bool_opt, json_extract_string_opt, json_extract_uuid};
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let role_category = json_extract_string_opt(args, "role-category");
+        let include_external = json_extract_bool_opt(args, "include-external").unwrap_or(true);
+        let rows = sqlx::query(
+            r#"SELECT
+                cge.entity_id, e.name as entity_name,
+                cge.membership_type,
+                COALESCE(
+                    array_agg(DISTINCT r.name ORDER BY r.name) FILTER (WHERE r.name IS NOT NULL),
+                    ARRAY[]::TEXT[]
+                ) as roles,
+                COALESCE(
+                    array_agg(DISTINCT r.role_category ORDER BY r.role_category) FILTER (WHERE r.role_category IS NOT NULL),
+                    ARRAY[]::TEXT[]
+                ) as role_categories
+            FROM "ob-poc".client_group_entity cge
+            JOIN "ob-poc".entities e ON e.entity_id = cge.entity_id
+            LEFT JOIN "ob-poc".client_group_entity_roles cer ON cer.cge_id = cge.id
+                AND (cer.effective_to IS NULL OR cer.effective_to > CURRENT_DATE)
+            LEFT JOIN "ob-poc".roles r ON r.role_id = cer.role_id
+            WHERE cge.group_id = $1
+              AND e.deleted_at IS NULL
+              AND cge.membership_type != 'historical'
+              AND ($2 OR cge.membership_type = 'in_group')
+              AND ($3::TEXT IS NULL OR r.role_category = $3)
+            GROUP BY cge.entity_id, e.name, cge.membership_type
+            HAVING COUNT(cer.id) > 0 OR $3::TEXT IS NULL
+            ORDER BY
+                CASE cge.membership_type WHEN 'in_group' THEN 0 ELSE 1 END, e.name"#,
+        ).bind(group_id).bind(include_external).bind(&role_category)
+        .fetch_all(pool).await?;
+        use sqlx::Row;
+        let items: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|r| {
+                json!({
+                    "entity_id": r.get::<Uuid, _>("entity_id"),
+                    "entity_name": r.get::<String, _>("entity_name"),
+                    "membership_type": r.get::<String, _>("membership_type"),
+                    "roles": r.get::<Vec<String>, _>("roles"),
+                    "role_categories": r.get::<Vec<String>, _>("role_categories"),
+                })
+            })
+            .collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupPartiesOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2235,7 +2312,6 @@ impl CustomOperation for ClientGroupPartiesOp {
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2245,67 +2321,6 @@ impl CustomOperation for ClientGroupPartiesOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_bool_opt, json_extract_string_opt, json_extract_uuid};
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let role_category = json_extract_string_opt(args, "role-category");
-        let include_external = json_extract_bool_opt(args, "include-external").unwrap_or(true);
-        let rows = sqlx::query(
-            r#"SELECT
-                cge.entity_id, e.name as entity_name,
-                cge.membership_type,
-                COALESCE(
-                    array_agg(DISTINCT r.name ORDER BY r.name) FILTER (WHERE r.name IS NOT NULL),
-                    ARRAY[]::TEXT[]
-                ) as roles,
-                COALESCE(
-                    array_agg(DISTINCT r.role_category ORDER BY r.role_category) FILTER (WHERE r.role_category IS NOT NULL),
-                    ARRAY[]::TEXT[]
-                ) as role_categories
-            FROM "ob-poc".client_group_entity cge
-            JOIN "ob-poc".entities e ON e.entity_id = cge.entity_id
-            LEFT JOIN "ob-poc".client_group_entity_roles cer ON cer.cge_id = cge.id
-                AND (cer.effective_to IS NULL OR cer.effective_to > CURRENT_DATE)
-            LEFT JOIN "ob-poc".roles r ON r.role_id = cer.role_id
-            WHERE cge.group_id = $1
-              AND e.deleted_at IS NULL
-              AND cge.membership_type != 'historical'
-              AND ($2 OR cge.membership_type = 'in_group')
-              AND ($3::TEXT IS NULL OR r.role_category = $3)
-            GROUP BY cge.entity_id, e.name, cge.membership_type
-            HAVING COUNT(cer.id) > 0 OR $3::TEXT IS NULL
-            ORDER BY
-                CASE cge.membership_type WHEN 'in_group' THEN 0 ELSE 1 END, e.name"#,
-        ).bind(group_id).bind(include_external).bind(&role_category)
-        .fetch_all(pool).await?;
-        use sqlx::Row;
-        let items: Vec<serde_json::Value> = rows
-            .iter()
-            .map(|r| {
-                json!({
-                    "entity_id": r.get::<Uuid, _>("entity_id"),
-                    "entity_name": r.get::<String, _>("entity_name"),
-                    "membership_type": r.get::<String, _>("membership_type"),
-                    "roles": r.get::<Vec<String>, _>("roles"),
-                    "role_categories": r.get::<Vec<String>, _>("role_categories"),
-                })
-            })
-            .collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            items,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -2330,6 +2345,43 @@ impl CustomOperation for ClientGroupAddRelationshipOp {
         "Add a provisional ownership/control edge between entities"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let parent_entity_id = json_extract_uuid(args, ctx, "parent-entity-id")?;
+        let child_entity_id = json_extract_uuid(args, ctx, "child-entity-id")?;
+        let relationship_kind = json_extract_string_opt(args, "relationship-kind")
+            .unwrap_or_else(|| "ownership".to_string());
+        let effective_from = json_extract_string_opt(args, "effective-from");
+        let eff_from: Option<chrono::NaiveDate> = effective_from
+            .as_ref()
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        let id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".client_group_relationship
+                (group_id, parent_entity_id, child_entity_id, relationship_kind, effective_from)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (group_id, parent_entity_id, child_entity_id, relationship_kind)
+            DO UPDATE SET
+                effective_from = COALESCE(EXCLUDED.effective_from, client_group_relationship.effective_from),
+                updated_at = NOW()
+            RETURNING id"#,
+        ).bind(group_id).bind(parent_entity_id).bind(child_entity_id).bind(&relationship_kind).bind(eff_from)
+        .fetch_one(pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupAddRelationshipOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2370,7 +2422,6 @@ impl CustomOperation for ClientGroupAddRelationshipOp {
 
         Ok(ExecutionResult::Uuid(result.id))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2380,41 +2431,6 @@ impl CustomOperation for ClientGroupAddRelationshipOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let parent_entity_id = json_extract_uuid(args, ctx, "parent-entity-id")?;
-        let child_entity_id = json_extract_uuid(args, ctx, "child-entity-id")?;
-        let relationship_kind = json_extract_string_opt(args, "relationship-kind")
-            .unwrap_or_else(|| "ownership".to_string());
-        let effective_from = json_extract_string_opt(args, "effective-from");
-        let eff_from: Option<chrono::NaiveDate> = effective_from
-            .as_ref()
-            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let id: Uuid = sqlx::query_scalar(
-            r#"INSERT INTO "ob-poc".client_group_relationship
-                (group_id, parent_entity_id, child_entity_id, relationship_kind, effective_from)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (group_id, parent_entity_id, child_entity_id, relationship_kind)
-            DO UPDATE SET
-                effective_from = COALESCE(EXCLUDED.effective_from, client_group_relationship.effective_from),
-                updated_at = NOW()
-            RETURNING id"#,
-        ).bind(group_id).bind(parent_entity_id).bind(child_entity_id).bind(&relationship_kind).bind(eff_from)
-        .fetch_one(pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -2439,6 +2455,68 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
         "List ownership/control relationships in a client group"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
+        let relationship_kind = json_extract_string_opt(args, "relationship-kind");
+        let rows = sqlx::query(
+            r#"SELECT
+                r.id, r.parent_entity_id, pe.name as parent_name,
+                r.child_entity_id, ce.name as child_name,
+                r.relationship_kind, r.review_status,
+                (SELECT s.ownership_pct FROM "ob-poc".client_group_relationship_sources s
+                 WHERE s.relationship_id = r.id
+                 ORDER BY s.is_canonical DESC, s.confidence_score DESC NULLS LAST
+                 LIMIT 1) as canonical_ownership_pct,
+                (SELECT COUNT(*) FROM "ob-poc".client_group_relationship_sources s
+                 WHERE s.relationship_id = r.id) as source_count
+            FROM "ob-poc".client_group_relationship r
+            JOIN "ob-poc".entities pe ON pe.entity_id = r.parent_entity_id
+            JOIN "ob-poc".entities ce ON ce.entity_id = r.child_entity_id
+            WHERE r.group_id = $1
+              AND pe.deleted_at IS NULL AND ce.deleted_at IS NULL
+              AND ($2::UUID IS NULL OR r.parent_entity_id = $2 OR r.child_entity_id = $2)
+              AND ($3::TEXT IS NULL OR r.relationship_kind = $3)
+            ORDER BY pe.name, ce.name"#,
+        )
+        .bind(group_id)
+        .bind(entity_id)
+        .bind(&relationship_kind)
+        .fetch_all(pool)
+        .await?;
+        use sqlx::Row;
+        let items: Vec<serde_json::Value> = rows.iter().map(|r| {
+            let pct: Option<bigdecimal::BigDecimal> = r.get("canonical_ownership_pct");
+            json!({
+                "id": r.get::<Uuid, _>("id"),
+                "parent_entity_id": r.get::<Uuid, _>("parent_entity_id"),
+                "parent_name": r.get::<String, _>("parent_name"),
+                "child_entity_id": r.get::<Uuid, _>("child_entity_id"),
+                "child_name": r.get::<String, _>("child_name"),
+                "relationship_kind": r.get::<String, _>("relationship_kind"),
+                "canonical_ownership_pct": pct.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
+                "source_count": r.get::<i64, _>("source_count"),
+                "review_status": r.get::<String, _>("review_status"),
+            })
+        }).collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupListRelationshipsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2507,7 +2585,6 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2517,66 +2594,6 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
-        let relationship_kind = json_extract_string_opt(args, "relationship-kind");
-        let rows = sqlx::query(
-            r#"SELECT
-                r.id, r.parent_entity_id, pe.name as parent_name,
-                r.child_entity_id, ce.name as child_name,
-                r.relationship_kind, r.review_status,
-                (SELECT s.ownership_pct FROM "ob-poc".client_group_relationship_sources s
-                 WHERE s.relationship_id = r.id
-                 ORDER BY s.is_canonical DESC, s.confidence_score DESC NULLS LAST
-                 LIMIT 1) as canonical_ownership_pct,
-                (SELECT COUNT(*) FROM "ob-poc".client_group_relationship_sources s
-                 WHERE s.relationship_id = r.id) as source_count
-            FROM "ob-poc".client_group_relationship r
-            JOIN "ob-poc".entities pe ON pe.entity_id = r.parent_entity_id
-            JOIN "ob-poc".entities ce ON ce.entity_id = r.child_entity_id
-            WHERE r.group_id = $1
-              AND pe.deleted_at IS NULL AND ce.deleted_at IS NULL
-              AND ($2::UUID IS NULL OR r.parent_entity_id = $2 OR r.child_entity_id = $2)
-              AND ($3::TEXT IS NULL OR r.relationship_kind = $3)
-            ORDER BY pe.name, ce.name"#,
-        )
-        .bind(group_id)
-        .bind(entity_id)
-        .bind(&relationship_kind)
-        .fetch_all(pool)
-        .await?;
-        use sqlx::Row;
-        let items: Vec<serde_json::Value> = rows.iter().map(|r| {
-            let pct: Option<bigdecimal::BigDecimal> = r.get("canonical_ownership_pct");
-            json!({
-                "id": r.get::<Uuid, _>("id"),
-                "parent_entity_id": r.get::<Uuid, _>("parent_entity_id"),
-                "parent_name": r.get::<String, _>("parent_name"),
-                "child_entity_id": r.get::<Uuid, _>("child_entity_id"),
-                "child_name": r.get::<String, _>("child_name"),
-                "relationship_kind": r.get::<String, _>("relationship_kind"),
-                "canonical_ownership_pct": pct.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
-                "source_count": r.get::<i64, _>("source_count"),
-                "review_status": r.get::<String, _>("review_status"),
-            })
-        }).collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            items,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -2617,71 +2634,6 @@ impl CustomOperation for ClientGroupAddOwnershipSourceOp {
 
     fn rationale(&self) -> &'static str {
         "Add an ownership source/allegation for a relationship"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let relationship_id = get_required_uuid(verb_call, "relationship-id", ctx)?;
-        let source = get_required_string(verb_call, "source")?;
-        let source_type = get_optional_string(verb_call, "source-type")
-            .unwrap_or_else(|| "discovery".to_string());
-        let ownership_pct = get_optional_bigdecimal(verb_call, "ownership-pct");
-        let voting_pct = get_optional_bigdecimal(verb_call, "voting-pct");
-        let control_pct = get_optional_bigdecimal(verb_call, "control-pct");
-        let source_document_ref = get_optional_string(verb_call, "source-document-ref");
-        let source_document_date = get_optional_string(verb_call, "source-document-date");
-        let verifies_source_id = get_optional_uuid(verb_call, "verifies-source-id", ctx);
-
-        let doc_date: Option<chrono::NaiveDate> = source_document_date
-            .as_ref()
-            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-
-        // Get confidence score based on source
-        let confidence_bd: bigdecimal::BigDecimal = sqlx::query_scalar!(
-            r#"SELECT "ob-poc".get_source_confidence($1) as "conf!""#,
-            source
-        )
-        .fetch_one(pool)
-        .await?;
-        let result = sqlx::query!(
-            r#"
-            INSERT INTO "ob-poc".client_group_relationship_sources
-                (relationship_id, source, source_type, ownership_pct, voting_pct, control_pct,
-                 source_document_ref, source_document_date, verifies_source_id, confidence_score)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING id
-            "#,
-            relationship_id,
-            source,
-            source_type,
-            ownership_pct,
-            voting_pct,
-            control_pct,
-            source_document_ref,
-            doc_date,
-            verifies_source_id,
-            confidence_bd
-        )
-        .fetch_one(pool)
-        .await?;
-
-        Ok(ExecutionResult::Uuid(result.id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -2743,6 +2695,72 @@ impl CustomOperation for ClientGroupAddOwnershipSourceOp {
     }
 }
 
+impl ClientGroupAddOwnershipSourceOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let relationship_id = get_required_uuid(verb_call, "relationship-id", ctx)?;
+        let source = get_required_string(verb_call, "source")?;
+        let source_type = get_optional_string(verb_call, "source-type")
+            .unwrap_or_else(|| "discovery".to_string());
+        let ownership_pct = get_optional_bigdecimal(verb_call, "ownership-pct");
+        let voting_pct = get_optional_bigdecimal(verb_call, "voting-pct");
+        let control_pct = get_optional_bigdecimal(verb_call, "control-pct");
+        let source_document_ref = get_optional_string(verb_call, "source-document-ref");
+        let source_document_date = get_optional_string(verb_call, "source-document-date");
+        let verifies_source_id = get_optional_uuid(verb_call, "verifies-source-id", ctx);
+
+        let doc_date: Option<chrono::NaiveDate> = source_document_date
+            .as_ref()
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+
+        // Get confidence score based on source
+        let confidence_bd: bigdecimal::BigDecimal = sqlx::query_scalar!(
+            r#"SELECT "ob-poc".get_source_confidence($1) as "conf!""#,
+            source
+        )
+        .fetch_one(pool)
+        .await?;
+        let result = sqlx::query!(
+            r#"
+            INSERT INTO "ob-poc".client_group_relationship_sources
+                (relationship_id, source, source_type, ownership_pct, voting_pct, control_pct,
+                 source_document_ref, source_document_date, verifies_source_id, confidence_score)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id
+            "#,
+            relationship_id,
+            source,
+            source_type,
+            ownership_pct,
+            voting_pct,
+            control_pct,
+            source_document_ref,
+            doc_date,
+            verifies_source_id,
+            confidence_bd
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(ExecutionResult::Uuid(result.id))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 // =============================================================================
 // VERIFY-OWNERSHIP
 // =============================================================================
@@ -2762,49 +2780,6 @@ impl CustomOperation for ClientGroupVerifyOwnershipOp {
 
     fn rationale(&self) -> &'static str {
         "Mark an ownership source as verified"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let source_id = get_required_uuid(verb_call, "source-id", ctx)?;
-        let verified_by = get_optional_string(verb_call, "verified-by");
-        let notes = get_optional_string(verb_call, "notes");
-
-        let affected = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".client_group_relationship_sources
-            SET verification_status = 'verified',
-                verified_by = $2,
-                verified_at = NOW(),
-                verification_notes = $3,
-                updated_at = NOW()
-            WHERE id = $1
-            "#,
-            source_id,
-            verified_by,
-            notes
-        )
-        .execute(pool)
-        .await?
-        .rows_affected();
-
-        Ok(ExecutionResult::Affected(affected))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -2840,6 +2815,50 @@ impl CustomOperation for ClientGroupVerifyOwnershipOp {
     }
 }
 
+impl ClientGroupVerifyOwnershipOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let source_id = get_required_uuid(verb_call, "source-id", ctx)?;
+        let verified_by = get_optional_string(verb_call, "verified-by");
+        let notes = get_optional_string(verb_call, "notes");
+
+        let affected = sqlx::query!(
+            r#"
+            UPDATE "ob-poc".client_group_relationship_sources
+            SET verification_status = 'verified',
+                verified_by = $2,
+                verified_at = NOW(),
+                verification_notes = $3,
+                updated_at = NOW()
+            WHERE id = $1
+            "#,
+            source_id,
+            verified_by,
+            notes
+        )
+        .execute(pool)
+        .await?
+        .rows_affected();
+
+        Ok(ExecutionResult::Affected(affected))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 // =============================================================================
 // SET-CANONICAL
 // =============================================================================
@@ -2861,6 +2880,42 @@ impl CustomOperation for ClientGroupSetCanonicalOp {
         "Designate a source as the canonical value for a relationship"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+        let source_id = json_extract_uuid(args, ctx, "source-id")?;
+        let notes = json_extract_string_opt(args, "notes");
+        sqlx::query(
+            r#"UPDATE "ob-poc".client_group_relationship_sources
+            SET is_canonical = false, updated_at = NOW()
+            WHERE relationship_id = (
+                SELECT relationship_id FROM "ob-poc".client_group_relationship_sources WHERE id = $1
+            ) AND is_canonical = true"#,
+        )
+        .bind(source_id)
+        .execute(pool)
+        .await?;
+        let affected = sqlx::query(
+            r#"UPDATE "ob-poc".client_group_relationship_sources
+            SET is_canonical = true, canonical_set_at = NOW(), canonical_notes = $2, updated_at = NOW()
+            WHERE id = $1"#,
+        ).bind(source_id).bind(&notes).execute(pool).await?.rows_affected();
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
+            affected,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupSetCanonicalOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -2904,7 +2959,6 @@ impl CustomOperation for ClientGroupSetCanonicalOp {
 
         Ok(ExecutionResult::Affected(affected))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -2914,40 +2968,6 @@ impl CustomOperation for ClientGroupSetCanonicalOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-        let source_id = json_extract_uuid(args, ctx, "source-id")?;
-        let notes = json_extract_string_opt(args, "notes");
-        sqlx::query(
-            r#"UPDATE "ob-poc".client_group_relationship_sources
-            SET is_canonical = false, updated_at = NOW()
-            WHERE relationship_id = (
-                SELECT relationship_id FROM "ob-poc".client_group_relationship_sources WHERE id = $1
-            ) AND is_canonical = true"#,
-        )
-        .bind(source_id)
-        .execute(pool)
-        .await?;
-        let affected = sqlx::query(
-            r#"UPDATE "ob-poc".client_group_relationship_sources
-            SET is_canonical = true, canonical_set_at = NOW(), canonical_notes = $2, updated_at = NOW()
-            WHERE id = $1"#,
-        ).bind(source_id).bind(&notes).execute(pool).await?.rows_affected();
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
-            affected,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -2972,6 +2992,50 @@ impl CustomOperation for ClientGroupListUnverifiedOp {
         "List unverified ownership allegations needing review"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_int_opt, json_extract_uuid};
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let limit = json_extract_int_opt(args, "limit").unwrap_or(50);
+        let rows = sqlx::query(
+            r#"SELECT relationship_id, parent_name, child_name,
+                   alleged_pct, source_document_ref, source_document_date, verification_count
+            FROM "ob-poc".v_cgr_unverified_allegations
+            WHERE group_id = $1 LIMIT $2"#,
+        )
+        .bind(group_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+        use sqlx::Row;
+        let items: Vec<serde_json::Value> = rows.iter().map(|r| {
+            let pct: Option<bigdecimal::BigDecimal> = r.get("alleged_pct");
+            json!({
+                "relationship_id": r.get::<Uuid, _>("relationship_id"),
+                "parent_name": r.get::<String, _>("parent_name"),
+                "child_name": r.get::<String, _>("child_name"),
+                "alleged_pct": pct.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
+                "source_document_ref": r.get::<Option<String>, _>("source_document_ref"),
+                "source_document_date": r.get::<Option<chrono::NaiveDate>, _>("source_document_date").map(|d| d.to_string()),
+                "verification_count": r.get::<i64, _>("verification_count"),
+            })
+        }).collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupListUnverifiedOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -3022,7 +3086,6 @@ impl CustomOperation for ClientGroupListUnverifiedOp {
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -3032,48 +3095,6 @@ impl CustomOperation for ClientGroupListUnverifiedOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_int_opt, json_extract_uuid};
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let limit = json_extract_int_opt(args, "limit").unwrap_or(50);
-        let rows = sqlx::query(
-            r#"SELECT relationship_id, parent_name, child_name,
-                   alleged_pct, source_document_ref, source_document_date, verification_count
-            FROM "ob-poc".v_cgr_unverified_allegations
-            WHERE group_id = $1 LIMIT $2"#,
-        )
-        .bind(group_id)
-        .bind(limit)
-        .fetch_all(pool)
-        .await?;
-        use sqlx::Row;
-        let items: Vec<serde_json::Value> = rows.iter().map(|r| {
-            let pct: Option<bigdecimal::BigDecimal> = r.get("alleged_pct");
-            json!({
-                "relationship_id": r.get::<Uuid, _>("relationship_id"),
-                "parent_name": r.get::<String, _>("parent_name"),
-                "child_name": r.get::<String, _>("child_name"),
-                "alleged_pct": pct.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
-                "source_document_ref": r.get::<Option<String>, _>("source_document_ref"),
-                "source_document_date": r.get::<Option<chrono::NaiveDate>, _>("source_document_date").map(|d| d.to_string()),
-                "verification_count": r.get::<i64, _>("verification_count"),
-            })
-        }).collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            items,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -3098,6 +3119,65 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
         "List ownership relationships with conflicting source values"
     }
 
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+        use std::str::FromStr;
+        let group_id = json_extract_uuid(args, ctx, "group-id")?;
+        let min_spread = json_extract_string_opt(args, "min-spread")
+            .and_then(|s| bigdecimal::BigDecimal::from_str(&s).ok())
+            .unwrap_or_else(|| bigdecimal::BigDecimal::from(1));
+        let rows = sqlx::query(
+            r#"SELECT
+                r.id as relationship_id, pe.name as parent_name, ce.name as child_name,
+                d.sources, d.ownership_values, d.ownership_spread,
+                d.alleged_pct, d.verified_pct
+            FROM "ob-poc".v_cgr_discrepancies d
+            JOIN "ob-poc".client_group_relationship r ON r.parent_entity_id = d.parent_entity_id
+                AND r.child_entity_id = d.child_entity_id AND r.group_id = d.group_id
+            JOIN "ob-poc".entities pe ON pe.entity_id = d.parent_entity_id
+            JOIN "ob-poc".entities ce ON ce.entity_id = d.child_entity_id
+            WHERE d.group_id = $1 AND pe.deleted_at IS NULL AND ce.deleted_at IS NULL
+              AND d.ownership_spread >= $2
+            ORDER BY d.ownership_spread DESC"#,
+        )
+        .bind(group_id)
+        .bind(&min_spread)
+        .fetch_all(pool)
+        .await?;
+        use sqlx::Row;
+        let items: Vec<serde_json::Value> = rows.iter().map(|r| {
+            let spread: bigdecimal::BigDecimal = r.get("ownership_spread");
+            let vals: Vec<bigdecimal::BigDecimal> = r.get("ownership_values");
+            let alleged: Option<bigdecimal::BigDecimal> = r.get("alleged_pct");
+            let verified: Option<bigdecimal::BigDecimal> = r.get("verified_pct");
+            json!({
+                "relationship_id": r.get::<Uuid, _>("relationship_id"),
+                "parent_name": r.get::<String, _>("parent_name"),
+                "child_name": r.get::<String, _>("child_name"),
+                "sources": r.get::<Vec<String>, _>("sources"),
+                "ownership_values": vals.iter().map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)).collect::<Vec<f64>>(),
+                "ownership_spread": spread.to_string().parse::<f64>().unwrap_or(0.0),
+                "alleged_pct": alleged.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
+                "verified_pct": verified.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
+            })
+        }).collect();
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+            items,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ClientGroupListDiscrepanciesOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -3162,7 +3242,6 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -3172,63 +3251,6 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
         Err(anyhow::anyhow!(
             "Database feature required for client-group operations"
         ))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-        use std::str::FromStr;
-        let group_id = json_extract_uuid(args, ctx, "group-id")?;
-        let min_spread = json_extract_string_opt(args, "min-spread")
-            .and_then(|s| bigdecimal::BigDecimal::from_str(&s).ok())
-            .unwrap_or_else(|| bigdecimal::BigDecimal::from(1));
-        let rows = sqlx::query(
-            r#"SELECT
-                r.id as relationship_id, pe.name as parent_name, ce.name as child_name,
-                d.sources, d.ownership_values, d.ownership_spread,
-                d.alleged_pct, d.verified_pct
-            FROM "ob-poc".v_cgr_discrepancies d
-            JOIN "ob-poc".client_group_relationship r ON r.parent_entity_id = d.parent_entity_id
-                AND r.child_entity_id = d.child_entity_id AND r.group_id = d.group_id
-            JOIN "ob-poc".entities pe ON pe.entity_id = d.parent_entity_id
-            JOIN "ob-poc".entities ce ON ce.entity_id = d.child_entity_id
-            WHERE d.group_id = $1 AND pe.deleted_at IS NULL AND ce.deleted_at IS NULL
-              AND d.ownership_spread >= $2
-            ORDER BY d.ownership_spread DESC"#,
-        )
-        .bind(group_id)
-        .bind(&min_spread)
-        .fetch_all(pool)
-        .await?;
-        use sqlx::Row;
-        let items: Vec<serde_json::Value> = rows.iter().map(|r| {
-            let spread: bigdecimal::BigDecimal = r.get("ownership_spread");
-            let vals: Vec<bigdecimal::BigDecimal> = r.get("ownership_values");
-            let alleged: Option<bigdecimal::BigDecimal> = r.get("alleged_pct");
-            let verified: Option<bigdecimal::BigDecimal> = r.get("verified_pct");
-            json!({
-                "relationship_id": r.get::<Uuid, _>("relationship_id"),
-                "parent_name": r.get::<String, _>("parent_name"),
-                "child_name": r.get::<String, _>("child_name"),
-                "sources": r.get::<Vec<String>, _>("sources"),
-                "ownership_values": vals.iter().map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)).collect::<Vec<f64>>(),
-                "ownership_spread": spread.to_string().parse::<f64>().unwrap_or(0.0),
-                "alleged_pct": alleged.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
-                "verified_pct": verified.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
-            })
-        }).collect();
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            items,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -3251,50 +3273,6 @@ impl CustomOperation for ClientGroupStartDiscoveryOp {
 
     fn rationale(&self) -> &'static str {
         "Start discovery process for a client group"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
-        let source =
-            get_optional_string(verb_call, "source").unwrap_or_else(|| "manual".to_string());
-        let root_lei = get_optional_string(verb_call, "root-lei");
-
-        let affected = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".client_group
-            SET discovery_status = 'in_progress',
-                discovery_started_at = NOW(),
-                discovery_source = $2,
-                discovery_root_lei = $3,
-                updated_at = NOW()
-            WHERE id = $1
-            "#,
-            group_id,
-            source,
-            root_lei
-        )
-        .execute(pool)
-        .await?
-        .rows_affected();
-
-        Ok(ExecutionResult::Affected(affected))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -3331,6 +3309,51 @@ impl CustomOperation for ClientGroupStartDiscoveryOp {
     }
 }
 
+impl ClientGroupStartDiscoveryOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
+        let source =
+            get_optional_string(verb_call, "source").unwrap_or_else(|| "manual".to_string());
+        let root_lei = get_optional_string(verb_call, "root-lei");
+
+        let affected = sqlx::query!(
+            r#"
+            UPDATE "ob-poc".client_group
+            SET discovery_status = 'in_progress',
+                discovery_started_at = NOW(),
+                discovery_source = $2,
+                discovery_root_lei = $3,
+                updated_at = NOW()
+            WHERE id = $1
+            "#,
+            group_id,
+            source,
+            root_lei
+        )
+        .execute(pool)
+        .await?
+        .rows_affected();
+
+        Ok(ExecutionResult::Affected(affected))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
+    }
+}
+
 // =============================================================================
 // COMPLETE-DISCOVERY
 // =============================================================================
@@ -3350,44 +3373,6 @@ impl CustomOperation for ClientGroupCompleteDiscoveryOp {
 
     fn rationale(&self) -> &'static str {
         "Mark discovery process as complete"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
-        let _notes = get_optional_string(verb_call, "notes");
-
-        let affected = sqlx::query!(
-            r#"
-            UPDATE "ob-poc".client_group
-            SET discovery_status = 'complete',
-                discovery_completed_at = NOW(),
-                updated_at = NOW()
-            WHERE id = $1
-            "#,
-            group_id
-        )
-        .execute(pool)
-        .await?
-        .rows_affected();
-
-        Ok(ExecutionResult::Affected(affected))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for client-group operations"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -3416,5 +3401,44 @@ impl CustomOperation for ClientGroupCompleteDiscoveryOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl ClientGroupCompleteDiscoveryOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let group_id = get_required_uuid(verb_call, "group-id", ctx)?;
+        let _notes = get_optional_string(verb_call, "notes");
+
+        let affected = sqlx::query!(
+            r#"
+            UPDATE "ob-poc".client_group
+            SET discovery_status = 'complete',
+                discovery_completed_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $1
+            "#,
+            group_id
+        )
+        .execute(pool)
+        .await?
+        .rows_affected();
+
+        Ok(ExecutionResult::Affected(affected))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for client-group operations"
+        ))
     }
 }

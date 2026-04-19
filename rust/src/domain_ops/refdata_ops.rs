@@ -924,16 +924,6 @@ impl CustomOperation for RefdataEnsureOp {
          reference tables"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let spec = resolve_domain_spec(verb_call)?;
-        ensure_refdata(verb_call, spec, pool).await
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -948,6 +938,19 @@ impl CustomOperation for RefdataEnsureOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl RefdataEnsureOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let spec = resolve_domain_spec(verb_call)?;
+        ensure_refdata(verb_call, spec, pool).await
     }
 }
 
@@ -969,16 +972,6 @@ impl CustomOperation for RefdataReadOp {
          reference tables"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let spec = resolve_domain_spec(verb_call)?;
-        read_refdata(verb_call, spec, pool).await
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -993,6 +986,19 @@ impl CustomOperation for RefdataReadOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl RefdataReadOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let spec = resolve_domain_spec(verb_call)?;
+        read_refdata(verb_call, spec, pool).await
     }
 }
 
@@ -1013,16 +1019,6 @@ impl CustomOperation for RefdataListOp {
         "Unified refdata list needs domain-driven table routing and per-domain filter handling"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let spec = resolve_domain_spec(verb_call)?;
-        list_refdata(verb_call, spec, pool).await
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -1037,6 +1033,19 @@ impl CustomOperation for RefdataListOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl RefdataListOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let spec = resolve_domain_spec(verb_call)?;
+        list_refdata(verb_call, spec, pool).await
     }
 }
 
@@ -1057,16 +1066,6 @@ impl CustomOperation for RefdataDeactivateOp {
         "Unified refdata deactivate needs domain-driven update or delete semantics"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let spec = resolve_domain_spec(verb_call)?;
-        deactivate_refdata(verb_call, spec, pool).await
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -1081,6 +1080,19 @@ impl CustomOperation for RefdataDeactivateOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl RefdataDeactivateOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let spec = resolve_domain_spec(verb_call)?;
+        deactivate_refdata(verb_call, spec, pool).await
     }
 }
 

@@ -218,6 +218,35 @@ impl CustomOperation for EntityQueryOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use super::helpers::{json_extract_int_opt, json_extract_string_opt};
+
+        let entity_type = json_extract_string_opt(args, "type");
+        let name_like = json_extract_string_opt(args, "name-like");
+        let jurisdiction = json_extract_string_opt(args, "jurisdiction");
+        let limit = json_extract_int_opt(args, "limit").unwrap_or(1000);
+        let result = entity_query_impl(entity_type, name_like, jurisdiction, limit, pool).await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "_type": "entity_query",
+                "_debug": format!("{result:?}")
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl EntityQueryOp {
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -252,7 +281,6 @@ impl CustomOperation for EntityQueryOp {
         let result = entity_query_impl(entity_type, name_like, jurisdiction, limit, pool).await?;
         Ok(ExecutionResult::EntityQuery(result))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -260,33 +288,6 @@ impl CustomOperation for EntityQueryOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::EntityQuery(EntityQueryResult::default()))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_int_opt, json_extract_string_opt};
-
-        let entity_type = json_extract_string_opt(args, "type");
-        let name_like = json_extract_string_opt(args, "name-like");
-        let jurisdiction = json_extract_string_opt(args, "jurisdiction");
-        let limit = json_extract_int_opt(args, "limit").unwrap_or(1000);
-        let result = entity_query_impl(entity_type, name_like, jurisdiction, limit, pool).await?;
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::json!({
-                "_type": "entity_query",
-                "_debug": format!("{result:?}")
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 

@@ -213,6 +213,31 @@ impl CustomOperation for TollgateEvaluateOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let case_id = json_extract_uuid(args, _ctx, "case-id")?;
+        let evaluation_type = json_extract_string(args, "evaluation-type")?;
+        let evaluated_by = super::helpers::json_extract_string_opt(args, "evaluated-by");
+        match tollgate_evaluate_impl(case_id, evaluation_type, evaluated_by, pool).await? {
+            ExecutionResult::Record(value) => {
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(value))
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl TollgateEvaluateOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -243,28 +268,6 @@ impl CustomOperation for TollgateEvaluateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let case_id = json_extract_uuid(args, _ctx, "case-id")?;
-        let evaluation_type = json_extract_string(args, "evaluation-type")?;
-        let evaluated_by = super::helpers::json_extract_string_opt(args, "evaluated-by");
-        match tollgate_evaluate_impl(case_id, evaluation_type, evaluated_by, pool).await? {
-            ExecutionResult::Record(value) => {
-                Ok(dsl_runtime::VerbExecutionOutcome::Record(value))
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -306,6 +309,26 @@ impl CustomOperation for TollgateGetMetricsOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            tollgate_get_metrics_impl(cbu_id, pool).await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl TollgateGetMetricsOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -325,23 +348,6 @@ impl CustomOperation for TollgateGetMetricsOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            tollgate_get_metrics_impl(cbu_id, pool).await?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -406,6 +412,40 @@ impl CustomOperation for TollgateOverrideOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
+        let override_reason = json_extract_string(args, "override-reason")?;
+        let approved_by = json_extract_string(args, "approved-by")?;
+        let approval_authority = json_extract_string(args, "approval-authority")?;
+        let conditions = super::helpers::json_extract_string_opt(args, "conditions");
+        let expiry_date = super::helpers::json_extract_string_opt(args, "expiry-date");
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            tollgate_override_impl(
+                evaluation_id,
+                override_reason,
+                approved_by,
+                approval_authority,
+                conditions,
+                expiry_date,
+                pool,
+            )
+            .await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl TollgateOverrideOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -452,37 +492,6 @@ impl CustomOperation for TollgateOverrideOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
-        let override_reason = json_extract_string(args, "override-reason")?;
-        let approved_by = json_extract_string(args, "approved-by")?;
-        let approval_authority = json_extract_string(args, "approval-authority")?;
-        let conditions = super::helpers::json_extract_string_opt(args, "conditions");
-        let expiry_date = super::helpers::json_extract_string_opt(args, "expiry-date");
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            tollgate_override_impl(
-                evaluation_id,
-                override_reason,
-                approved_by,
-                approval_authority,
-                conditions,
-                expiry_date,
-                pool,
-            )
-            .await?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -597,6 +606,26 @@ impl CustomOperation for TollgateDecisionReadinessOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            tollgate_decision_readiness_impl(case_id, pool).await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl TollgateDecisionReadinessOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -616,23 +645,6 @@ impl CustomOperation for TollgateDecisionReadinessOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let case_id = json_extract_uuid(args, ctx, "case-id")?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            tollgate_decision_readiness_impl(case_id, pool).await?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 

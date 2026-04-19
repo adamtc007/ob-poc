@@ -144,32 +144,6 @@ impl CustomOperation for SkeletonBuildOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let source =
-            extract_string_opt(verb_call, "source").unwrap_or_else(|| "MANUAL".to_string());
-        let threshold: f64 = extract_string_opt(verb_call, "threshold")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(5.0);
-        let max_outreach_items: usize = extract_string_opt(verb_call, "max-outreach-items")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(8)
-            .clamp(1, 50);
-        let result =
-            skeleton_build_impl(case_id, source, threshold, max_outreach_items, pool).await?;
-
-        // Bind the result UUID so downstream can reference @skeleton
-        ctx.bind("run", result.import_run_id);
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -200,6 +174,35 @@ impl CustomOperation for SkeletonBuildOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl SkeletonBuildOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
+        let source =
+            extract_string_opt(verb_call, "source").unwrap_or_else(|| "MANUAL".to_string());
+        let threshold: f64 = extract_string_opt(verb_call, "threshold")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(5.0);
+        let max_outreach_items: usize = extract_string_opt(verb_call, "max-outreach-items")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(8)
+            .clamp(1, 50);
+        let result =
+            skeleton_build_impl(case_id, source, threshold, max_outreach_items, pool).await?;
+
+        // Bind the result UUID so downstream can reference @skeleton
+        ctx.bind("run", result.import_run_id);
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 

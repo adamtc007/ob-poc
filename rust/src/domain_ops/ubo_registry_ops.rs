@@ -157,6 +157,57 @@ impl CustomOperation for UboRegistryPromoteOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
+        let notes = json_extract_string_opt(args, "notes");
+
+        let current_status = fetch_current_status(pool, registry_id).await?;
+
+        if current_status != "CANDIDATE" {
+            return Err(anyhow!(
+                "Cannot promote: entry is in status '{}', expected 'CANDIDATE'",
+                current_status
+            ));
+        }
+
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".kyc_ubo_registry
+            SET status = 'IDENTIFIED',
+                identified_at = NOW(),
+                notes = COALESCE($2, notes),
+                updated_at = NOW()
+            WHERE registry_id = $1
+            "#,
+        )
+        .bind(registry_id)
+        .bind(&notes)
+        .execute(pool)
+        .await?;
+
+        let result = UboRegistryPromoteResult {
+            registry_id,
+            previous_status: current_status,
+            new_status: "IDENTIFIED".to_string(),
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl UboRegistryPromoteOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -206,54 +257,6 @@ impl CustomOperation for UboRegistryPromoteOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
-        let notes = json_extract_string_opt(args, "notes");
-
-        let current_status = fetch_current_status(pool, registry_id).await?;
-
-        if current_status != "CANDIDATE" {
-            return Err(anyhow!(
-                "Cannot promote: entry is in status '{}', expected 'CANDIDATE'",
-                current_status
-            ));
-        }
-
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".kyc_ubo_registry
-            SET status = 'IDENTIFIED',
-                identified_at = NOW(),
-                notes = COALESCE($2, notes),
-                updated_at = NOW()
-            WHERE registry_id = $1
-            "#,
-        )
-        .bind(registry_id)
-        .bind(&notes)
-        .execute(pool)
-        .await?;
-
-        let result = UboRegistryPromoteResult {
-            registry_id,
-            previous_status: current_status,
-            new_status: "IDENTIFIED".to_string(),
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
@@ -286,6 +289,56 @@ impl CustomOperation for UboRegistryAdvanceOp {
     fn rationale(&self) -> &'static str {
         "Validates state machine transitions and sets the appropriate timestamp column per target status"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
+        let new_status = json_extract_string(args, "new-status")?;
+        let notes = json_extract_string_opt(args, "notes");
+
+        let current_status = fetch_current_status(pool, registry_id).await?;
+        let timestamp_col = validate_advance_transition(&current_status, &new_status)?;
+
+        let sql = format!(
+            r#"
+            UPDATE "ob-poc".kyc_ubo_registry
+            SET status = $2,
+                {} = NOW(),
+                notes = COALESCE($3, notes),
+                updated_at = NOW()
+            WHERE registry_id = $1
+            "#,
+            timestamp_col
+        );
+
+        sqlx::query(&sql)
+            .bind(registry_id)
+            .bind(&new_status)
+            .bind(&notes)
+            .execute(pool)
+            .await?;
+
+        let result = UboRegistryAdvanceResult {
+            registry_id,
+            previous_status: current_status,
+            new_status,
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl UboRegistryAdvanceOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -338,53 +391,6 @@ impl CustomOperation for UboRegistryAdvanceOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
-        let new_status = json_extract_string(args, "new-status")?;
-        let notes = json_extract_string_opt(args, "notes");
-
-        let current_status = fetch_current_status(pool, registry_id).await?;
-        let timestamp_col = validate_advance_transition(&current_status, &new_status)?;
-
-        let sql = format!(
-            r#"
-            UPDATE "ob-poc".kyc_ubo_registry
-            SET status = $2,
-                {} = NOW(),
-                notes = COALESCE($3, notes),
-                updated_at = NOW()
-            WHERE registry_id = $1
-            "#,
-            timestamp_col
-        );
-
-        sqlx::query(&sql)
-            .bind(registry_id)
-            .bind(&new_status)
-            .bind(&notes)
-            .execute(pool)
-            .await?;
-
-        let result = UboRegistryAdvanceResult {
-            registry_id,
-            previous_status: current_status,
-            new_status,
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
@@ -410,63 +416,6 @@ impl CustomOperation for UboRegistryWaiveOp {
 
     fn rationale(&self) -> &'static str {
         "Waiver requires authority and reason tracking with audit trail, validates non-terminal source status"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let registry_id = extract_uuid(verb_call, ctx, "registry-id")?;
-        let reason = extract_string(verb_call, "reason")?;
-        let authority = extract_string(verb_call, "authority")?;
-
-        let current_status = fetch_current_status(pool, registry_id).await?;
-
-        if is_terminal(&current_status) {
-            return Err(anyhow!(
-                "Cannot waive: entry is in terminal status '{}'. \
-                 Only non-terminal statuses (CANDIDATE, IDENTIFIED, PROVABLE, PROVED, REVIEWED) can be waived.",
-                current_status
-            ));
-        }
-
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".kyc_ubo_registry
-            SET status = 'WAIVED',
-                waived_at = NOW(),
-                waived_by = $2,
-                waiver_reason = $3,
-                updated_at = NOW()
-            WHERE registry_id = $1
-            "#,
-        )
-        .bind(registry_id)
-        .bind(&authority)
-        .bind(&reason)
-        .execute(pool)
-        .await?;
-
-        let result = UboRegistryWaiveResult {
-            registry_id,
-            previous_status: current_status,
-            new_status: "WAIVED".to_string(),
-            waived_by: authority,
-            waiver_reason: reason,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 
     #[cfg(feature = "database")]
@@ -524,6 +473,66 @@ impl CustomOperation for UboRegistryWaiveOp {
     }
 }
 
+impl UboRegistryWaiveOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let registry_id = extract_uuid(verb_call, ctx, "registry-id")?;
+        let reason = extract_string(verb_call, "reason")?;
+        let authority = extract_string(verb_call, "authority")?;
+
+        let current_status = fetch_current_status(pool, registry_id).await?;
+
+        if is_terminal(&current_status) {
+            return Err(anyhow!(
+                "Cannot waive: entry is in terminal status '{}'. \
+                 Only non-terminal statuses (CANDIDATE, IDENTIFIED, PROVABLE, PROVED, REVIEWED) can be waived.",
+                current_status
+            ));
+        }
+
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".kyc_ubo_registry
+            SET status = 'WAIVED',
+                waived_at = NOW(),
+                waived_by = $2,
+                waiver_reason = $3,
+                updated_at = NOW()
+            WHERE registry_id = $1
+            "#,
+        )
+        .bind(registry_id)
+        .bind(&authority)
+        .bind(&reason)
+        .execute(pool)
+        .await?;
+
+        let result = UboRegistryWaiveResult {
+            registry_id,
+            previous_status: current_status,
+            new_status: "WAIVED".to_string(),
+            waived_by: authority,
+            waiver_reason: reason,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
+    }
+}
+
 // =============================================================================
 // UboRegistryRejectOp — Any non-terminal → REJECTED
 // =============================================================================
@@ -546,59 +555,6 @@ impl CustomOperation for UboRegistryRejectOp {
 
     fn rationale(&self) -> &'static str {
         "Rejection validates non-terminal source status and records reason with timestamp"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let registry_id = extract_uuid(verb_call, ctx, "registry-id")?;
-        let reason = extract_string(verb_call, "reason")?;
-
-        let current_status = fetch_current_status(pool, registry_id).await?;
-
-        if is_terminal(&current_status) {
-            return Err(anyhow!(
-                "Cannot reject: entry is in terminal status '{}'. \
-                 Only non-terminal statuses (CANDIDATE, IDENTIFIED, PROVABLE, PROVED, REVIEWED) can be rejected.",
-                current_status
-            ));
-        }
-
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".kyc_ubo_registry
-            SET status = 'REJECTED',
-                rejected_at = NOW(),
-                notes = $2,
-                updated_at = NOW()
-            WHERE registry_id = $1
-            "#,
-        )
-        .bind(registry_id)
-        .bind(&reason)
-        .execute(pool)
-        .await?;
-
-        let result = UboRegistryRejectResult {
-            registry_id,
-            previous_status: current_status,
-            new_status: "REJECTED".to_string(),
-            reason,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 
     #[cfg(feature = "database")]
@@ -652,6 +608,62 @@ impl CustomOperation for UboRegistryRejectOp {
     }
 }
 
+impl UboRegistryRejectOp {
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let registry_id = extract_uuid(verb_call, ctx, "registry-id")?;
+        let reason = extract_string(verb_call, "reason")?;
+
+        let current_status = fetch_current_status(pool, registry_id).await?;
+
+        if is_terminal(&current_status) {
+            return Err(anyhow!(
+                "Cannot reject: entry is in terminal status '{}'. \
+                 Only non-terminal statuses (CANDIDATE, IDENTIFIED, PROVABLE, PROVED, REVIEWED) can be rejected.",
+                current_status
+            ));
+        }
+
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".kyc_ubo_registry
+            SET status = 'REJECTED',
+                rejected_at = NOW(),
+                notes = $2,
+                updated_at = NOW()
+            WHERE registry_id = $1
+            "#,
+        )
+        .bind(registry_id)
+        .bind(&reason)
+        .execute(pool)
+        .await?;
+
+        let result = UboRegistryRejectResult {
+            registry_id,
+            previous_status: current_status,
+            new_status: "REJECTED".to_string(),
+            reason,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow!("Database feature required"))
+    }
+}
+
 // =============================================================================
 // UboRegistryExpireOp — Any non-terminal → EXPIRED
 // =============================================================================
@@ -676,6 +688,58 @@ impl CustomOperation for UboRegistryExpireOp {
     fn rationale(&self) -> &'static str {
         "Expiry validates non-terminal source status and sets expired_at timestamp"
     }
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
+        let reason = json_extract_string_opt(args, "reason");
+
+        let current_status = fetch_current_status(pool, registry_id).await?;
+
+        if is_terminal(&current_status) {
+            return Err(anyhow!(
+                "Cannot expire: entry is in terminal status '{}'. \
+                 Only non-terminal statuses (CANDIDATE, IDENTIFIED, PROVABLE, PROVED, REVIEWED) can be expired.",
+                current_status
+            ));
+        }
+
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".kyc_ubo_registry
+            SET status = 'EXPIRED',
+                expired_at = NOW(),
+                notes = COALESCE($2, notes),
+                updated_at = NOW()
+            WHERE registry_id = $1
+            "#,
+        )
+        .bind(registry_id)
+        .bind(&reason)
+        .execute(pool)
+        .await?;
+
+        let result = UboRegistryExpireResult {
+            registry_id,
+            previous_status: current_status,
+            new_status: "EXPIRED".to_string(),
+        };
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl UboRegistryExpireOp {
 
     #[cfg(feature = "database")]
     async fn execute(
@@ -727,54 +791,5 @@ impl CustomOperation for UboRegistryExpireOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
-        let reason = json_extract_string_opt(args, "reason");
-
-        let current_status = fetch_current_status(pool, registry_id).await?;
-
-        if is_terminal(&current_status) {
-            return Err(anyhow!(
-                "Cannot expire: entry is in terminal status '{}'. \
-                 Only non-terminal statuses (CANDIDATE, IDENTIFIED, PROVABLE, PROVED, REVIEWED) can be expired.",
-                current_status
-            ));
-        }
-
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".kyc_ubo_registry
-            SET status = 'EXPIRED',
-                expired_at = NOW(),
-                notes = COALESCE($2, notes),
-                updated_at = NOW()
-            WHERE registry_id = $1
-            "#,
-        )
-        .bind(registry_id)
-        .bind(&reason)
-        .execute(pool)
-        .await?;
-
-        let result = UboRegistryExpireResult {
-            registry_id,
-            previous_status: current_status,
-            new_status: "EXPIRED".to_string(),
-        };
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

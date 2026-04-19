@@ -300,6 +300,83 @@ impl CustomOperation for ObservationFromDocumentOp {
         "Requires document lookup, attribute lookup, and automatic confidence/authoritative flags"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use uuid::Uuid;
+
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let document_id = json_extract_uuid(args, ctx, "document-id")?;
+
+        let attr_name = json_extract_string(args, "attribute")?;
+        let attribute_id = AttributeIdentityService::new(pool.clone())
+            .resolve_runtime_uuid(&attr_name)
+            .await?;
+        let attribute_id =
+            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+        let value = json_extract_string(args, "value")?;
+        let extraction_method = json_extract_string_opt(args, "extraction-method");
+
+        let confidence_str = json_extract_string_opt(args, "confidence");
+        let confidence: f64 = confidence_str
+            .as_deref()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0.80);
+
+        let is_authoritative: bool = sqlx::query_scalar(
+            r#"SELECT COALESCE(dal.is_authoritative, FALSE)
+               FROM "ob-poc".document_catalog dc
+               LEFT JOIN "ob-poc".document_attribute_links dal
+                 ON dal.document_type_id = dc.document_type_id
+                 AND dal.attribute_id = $2
+                 AND dal.direction IN ('SOURCE', 'BOTH')
+               WHERE dc.doc_id = $1
+               LIMIT 1"#,
+        )
+        .bind(document_id)
+        .bind(attribute_id)
+        .fetch_optional(pool)
+        .await?
+        .unwrap_or(false);
+
+        let observation_id = Uuid::new_v4();
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".attribute_observations
+               (observation_id, entity_id, attribute_id, value_text, source_type,
+                source_document_id, confidence, is_authoritative, extraction_method,
+                observed_at, status)
+               VALUES ($1, $2, $3, $4, 'DOCUMENT', $5, $6, $7, $8, NOW(), 'ACTIVE')"#,
+        )
+        .bind(observation_id)
+        .bind(entity_id)
+        .bind(attribute_id)
+        .bind(&value)
+        .bind(document_id)
+        .bind(confidence)
+        .bind(is_authoritative)
+        .bind(extraction_method.as_deref())
+        .execute(pool)
+        .await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            observation_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ObservationFromDocumentOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -409,7 +486,6 @@ impl CustomOperation for ObservationFromDocumentOp {
         ctx.bind("observation", observation_id);
         Ok(ExecutionResult::Uuid(observation_id))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -417,79 +493,6 @@ impl CustomOperation for ObservationFromDocumentOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use uuid::Uuid;
-
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let document_id = json_extract_uuid(args, ctx, "document-id")?;
-
-        let attr_name = json_extract_string(args, "attribute")?;
-        let attribute_id = AttributeIdentityService::new(pool.clone())
-            .resolve_runtime_uuid(&attr_name)
-            .await?;
-        let attribute_id =
-            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
-
-        let value = json_extract_string(args, "value")?;
-        let extraction_method = json_extract_string_opt(args, "extraction-method");
-
-        let confidence_str = json_extract_string_opt(args, "confidence");
-        let confidence: f64 = confidence_str
-            .as_deref()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0.80);
-
-        let is_authoritative: bool = sqlx::query_scalar(
-            r#"SELECT COALESCE(dal.is_authoritative, FALSE)
-               FROM "ob-poc".document_catalog dc
-               LEFT JOIN "ob-poc".document_attribute_links dal
-                 ON dal.document_type_id = dc.document_type_id
-                 AND dal.attribute_id = $2
-                 AND dal.direction IN ('SOURCE', 'BOTH')
-               WHERE dc.doc_id = $1
-               LIMIT 1"#,
-        )
-        .bind(document_id)
-        .bind(attribute_id)
-        .fetch_optional(pool)
-        .await?
-        .unwrap_or(false);
-
-        let observation_id = Uuid::new_v4();
-
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".attribute_observations
-               (observation_id, entity_id, attribute_id, value_text, source_type,
-                source_document_id, confidence, is_authoritative, extraction_method,
-                observed_at, status)
-               VALUES ($1, $2, $3, $4, 'DOCUMENT', $5, $6, $7, $8, NOW(), 'ACTIVE')"#,
-        )
-        .bind(observation_id)
-        .bind(entity_id)
-        .bind(attribute_id)
-        .bind(&value)
-        .bind(document_id)
-        .bind(confidence)
-        .bind(is_authoritative)
-        .bind(extraction_method.as_deref())
-        .execute(pool)
-        .await?;
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            observation_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -509,6 +512,83 @@ impl CustomOperation for ObservationGetCurrentOp {
         "Requires priority-based selection (authoritative > confidence > recency)"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use uuid::Uuid;
+
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+
+        let attr_name = json_extract_string(args, "attribute")?;
+        let attribute_id = AttributeIdentityService::new(pool.clone())
+            .resolve_runtime_uuid(&attr_name)
+            .await?;
+        let attribute_id =
+            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+        let result: Option<(
+            Uuid,
+            Option<String>,
+            Option<rust_decimal::Decimal>,
+            Option<bool>,
+            Option<chrono::NaiveDate>,
+            String,
+            Option<rust_decimal::Decimal>,
+            bool,
+        )> = sqlx::query_as(
+            r#"SELECT observation_id, value_text, value_number, value_boolean, value_date,
+                      source_type, confidence, is_authoritative
+               FROM "ob-poc".v_attribute_current
+               WHERE entity_id = $1 AND attribute_id = $2"#,
+        )
+        .bind(entity_id)
+        .bind(attribute_id)
+        .fetch_optional(pool)
+        .await?;
+
+        match result {
+            Some((
+                obs_id,
+                value_text,
+                value_number,
+                value_boolean,
+                value_date,
+                source_type,
+                confidence,
+                is_authoritative,
+            )) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                serde_json::json!({
+                    "observation_id": obs_id,
+                    "value_text": value_text,
+                    "value_number": value_number,
+                    "value_boolean": value_boolean,
+                    "value_date": value_date,
+                    "source_type": source_type,
+                    "confidence": confidence,
+                    "is_authoritative": is_authoritative
+                }),
+            )),
+            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                serde_json::json!({
+                    "found": false,
+                    "message": "No active observation found for this attribute"
+                }),
+            )),
+        }
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ObservationGetCurrentOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -591,7 +671,6 @@ impl CustomOperation for ObservationGetCurrentOp {
             }))),
         }
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -602,79 +681,6 @@ impl CustomOperation for ObservationGetCurrentOp {
             "found": false,
             "message": "No database available"
         })))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use uuid::Uuid;
-
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-
-        let attr_name = json_extract_string(args, "attribute")?;
-        let attribute_id = AttributeIdentityService::new(pool.clone())
-            .resolve_runtime_uuid(&attr_name)
-            .await?;
-        let attribute_id =
-            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
-
-        let result: Option<(
-            Uuid,
-            Option<String>,
-            Option<rust_decimal::Decimal>,
-            Option<bool>,
-            Option<chrono::NaiveDate>,
-            String,
-            Option<rust_decimal::Decimal>,
-            bool,
-        )> = sqlx::query_as(
-            r#"SELECT observation_id, value_text, value_number, value_boolean, value_date,
-                      source_type, confidence, is_authoritative
-               FROM "ob-poc".v_attribute_current
-               WHERE entity_id = $1 AND attribute_id = $2"#,
-        )
-        .bind(entity_id)
-        .bind(attribute_id)
-        .fetch_optional(pool)
-        .await?;
-
-        match result {
-            Some((
-                obs_id,
-                value_text,
-                value_number,
-                value_boolean,
-                value_date,
-                source_type,
-                confidence,
-                is_authoritative,
-            )) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                serde_json::json!({
-                    "observation_id": obs_id,
-                    "value_text": value_text,
-                    "value_number": value_number,
-                    "value_boolean": value_boolean,
-                    "value_date": value_date,
-                    "source_type": source_type,
-                    "confidence": confidence,
-                    "is_authoritative": is_authoritative
-                }),
-            )),
-            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                serde_json::json!({
-                    "found": false,
-                    "message": "No active observation found for this attribute"
-                }),
-            )),
-        }
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -697,6 +703,38 @@ impl CustomOperation for ObservationReconcileOp {
         "Requires comparing multiple observations and detecting value conflicts"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+
+        let attr_name = json_extract_string(args, "attribute")?;
+        let attribute_id = AttributeIdentityService::new(pool.clone())
+            .resolve_runtime_uuid(&attr_name)
+            .await?;
+        let attribute_id =
+            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+        let auto_create = json_extract_bool_opt(args, "auto-create-discrepancies").unwrap_or(true);
+
+        let result =
+            observation_reconcile_impl(entity_id, attribute_id, case_id, auto_create, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ObservationReconcileOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -755,7 +793,6 @@ impl CustomOperation for ObservationReconcileOp {
             observation_reconcile_impl(entity_id, attribute_id, case_id, auto_create, pool).await?;
         Ok(ExecutionResult::Record(result))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -766,34 +803,6 @@ impl CustomOperation for ObservationReconcileOp {
             "status": "no_database",
             "discrepancies_created": 0
         })))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-
-        let attr_name = json_extract_string(args, "attribute")?;
-        let attribute_id = AttributeIdentityService::new(pool.clone())
-            .resolve_runtime_uuid(&attr_name)
-            .await?;
-        let attribute_id =
-            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
-
-        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
-        let auto_create = json_extract_bool_opt(args, "auto-create-discrepancies").unwrap_or(true);
-
-        let result =
-            observation_reconcile_impl(entity_id, attribute_id, case_id, auto_create, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -816,6 +825,28 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
         "Requires joining allegations with observations and comparing values"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+
+        let result = observation_verify_allegations_impl(cbu_id, entity_id, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ObservationVerifyAllegationsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -854,7 +885,6 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
         let result = observation_verify_allegations_impl(cbu_id, entity_id, pool).await?;
         Ok(ExecutionResult::Record(result))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -866,24 +896,6 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
             "contradicted": 0,
             "no_observation": 0
         })))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-
-        let result = observation_verify_allegations_impl(cbu_id, entity_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -906,6 +918,30 @@ impl CustomOperation for DocumentExtractObservationsOp {
         "Requires joining document with attribute links and creating observations"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let document_id = json_extract_uuid(args, ctx, "document-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let auto_verify = json_extract_bool_opt(args, "auto-verify-allegations").unwrap_or(true);
+
+        let result =
+            document_extract_observations_impl(document_id, entity_id, auto_verify, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl DocumentExtractObservationsOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -952,7 +988,6 @@ impl CustomOperation for DocumentExtractObservationsOp {
             document_extract_observations_impl(document_id, entity_id, auto_verify, pool).await?;
         Ok(ExecutionResult::Record(result))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -964,25 +999,5 @@ impl CustomOperation for DocumentExtractObservationsOp {
             "attributes_extractable": 0,
             "allegations_verified": 0
         })))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let document_id = json_extract_uuid(args, ctx, "document-id")?;
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let auto_verify = json_extract_bool_opt(args, "auto-verify-allegations").unwrap_or(true);
-
-        let result =
-            document_extract_observations_impl(document_id, entity_id, auto_verify, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

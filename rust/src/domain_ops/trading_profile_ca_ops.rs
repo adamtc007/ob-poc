@@ -22,22 +22,6 @@ use ob_poc_types::trading_matrix::{
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-#[cfg(feature = "database")]
-async fn execute_json_via_legacy<T: CustomOperation + Sync>(
-    op: &T,
-    args: &serde_json::Value,
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-    pool: &PgPool,
-) -> Result<dsl_runtime::VerbExecutionOutcome> {
-    use crate::sem_os_runtime::verb_executor_adapter;
-
-    let vc = verb_executor_adapter::build_verb_call_pub(op.domain(), op.verb(), args);
-    let mut exec_ctx = verb_executor_adapter::to_dsl_context_pub(ctx);
-    let result = op.execute(&vc, &mut exec_ctx, pool).await?;
-    verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-    Ok(verb_executor_adapter::to_verb_outcome_pub(&result))
-}
-
 // =============================================================================
 // HELPER: Load and save CA section
 // =============================================================================
@@ -86,7 +70,25 @@ impl CustomOperation for TradingProfileCaEnableEventTypesOp {
     fn rationale(&self) -> &'static str {
         "Modifies matrix JSONB to enable CA event types"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaEnableEventTypesOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -138,16 +140,6 @@ impl CustomOperation for TradingProfileCaEnableEventTypesOp {
         })))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -156,11 +148,8 @@ impl CustomOperation for TradingProfileCaEnableEventTypesOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"enabled_count": 0})))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CA.DISABLE-EVENT-TYPES
@@ -181,7 +170,25 @@ impl CustomOperation for TradingProfileCaDisableEventTypesOp {
     fn rationale(&self) -> &'static str {
         "Modifies matrix JSONB to disable CA event types"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaDisableEventTypesOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -226,16 +233,6 @@ impl CustomOperation for TradingProfileCaDisableEventTypesOp {
         Ok(ExecutionResult::Affected(event_types.len() as u64))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -244,11 +241,8 @@ impl CustomOperation for TradingProfileCaDisableEventTypesOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(0))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CA.SET-NOTIFICATION-POLICY
@@ -269,7 +263,25 @@ impl CustomOperation for TradingProfileCaSetNotificationOp {
     fn rationale(&self) -> &'static str {
         "Modifies matrix JSONB to set CA notification policy"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaSetNotificationOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -330,16 +342,6 @@ impl CustomOperation for TradingProfileCaSetNotificationOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -348,11 +350,8 @@ impl CustomOperation for TradingProfileCaSetNotificationOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CA.SET-ELECTION-POLICY
@@ -373,7 +372,25 @@ impl CustomOperation for TradingProfileCaSetElectionOp {
     fn rationale(&self) -> &'static str {
         "Modifies matrix JSONB to set CA election policy"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaSetElectionOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -434,16 +451,6 @@ impl CustomOperation for TradingProfileCaSetElectionOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -452,11 +459,8 @@ impl CustomOperation for TradingProfileCaSetElectionOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CA.SET-DEFAULT-OPTION
@@ -477,7 +481,25 @@ impl CustomOperation for TradingProfileCaSetDefaultOp {
     fn rationale(&self) -> &'static str {
         "Modifies matrix JSONB to set default CA election"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaSetDefaultOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -535,16 +557,6 @@ impl CustomOperation for TradingProfileCaSetDefaultOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -553,11 +565,8 @@ impl CustomOperation for TradingProfileCaSetDefaultOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CA.REMOVE-DEFAULT-OPTION
@@ -578,7 +587,25 @@ impl CustomOperation for TradingProfileCaRemoveDefaultOp {
     fn rationale(&self) -> &'static str {
         "Modifies matrix JSONB to remove default CA election"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaRemoveDefaultOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -615,16 +642,6 @@ impl CustomOperation for TradingProfileCaRemoveDefaultOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -633,11 +650,8 @@ impl CustomOperation for TradingProfileCaRemoveDefaultOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CA.ADD-CUTOFF-RULE
@@ -658,7 +672,25 @@ impl CustomOperation for TradingProfileCaAddCutoffOp {
     fn rationale(&self) -> &'static str {
         "Modifies matrix JSONB to add CA cutoff rule"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaAddCutoffOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -740,16 +772,6 @@ impl CustomOperation for TradingProfileCaAddCutoffOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -758,11 +780,8 @@ impl CustomOperation for TradingProfileCaAddCutoffOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CA.REMOVE-CUTOFF-RULE
@@ -783,7 +802,25 @@ impl CustomOperation for TradingProfileCaRemoveCutoffOp {
     fn rationale(&self) -> &'static str {
         "Modifies matrix JSONB to remove CA cutoff rule"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaRemoveCutoffOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -828,16 +865,6 @@ impl CustomOperation for TradingProfileCaRemoveCutoffOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -846,11 +873,8 @@ impl CustomOperation for TradingProfileCaRemoveCutoffOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CA.LINK-PROCEEDS-SSI
@@ -871,7 +895,25 @@ impl CustomOperation for TradingProfileCaLinkSsiOp {
     fn rationale(&self) -> &'static str {
         "Modifies matrix JSONB to link CA proceeds to SSI"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaLinkSsiOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -946,16 +988,6 @@ impl CustomOperation for TradingProfileCaLinkSsiOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -964,11 +996,8 @@ impl CustomOperation for TradingProfileCaLinkSsiOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CA.REMOVE-PROCEEDS-SSI
@@ -989,7 +1018,25 @@ impl CustomOperation for TradingProfileCaRemoveSsiOp {
     fn rationale(&self) -> &'static str {
         "Modifies matrix JSONB to remove CA proceeds SSI mapping"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaRemoveSsiOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1046,16 +1093,6 @@ impl CustomOperation for TradingProfileCaRemoveSsiOp {
         Ok(ExecutionResult::Affected(1))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1064,11 +1101,8 @@ impl CustomOperation for TradingProfileCaRemoveSsiOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+
 
 // =============================================================================
 // CA.GET-POLICY
@@ -1089,7 +1123,25 @@ impl CustomOperation for TradingProfileCaGetPolicyOp {
     fn rationale(&self) -> &'static str {
         "Reads CA policy from matrix JSONB"
     }
-
+#[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        use crate::sem_os_runtime::verb_executor_adapter as adapter;
+        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
+        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
+        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
+        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
+        Ok(adapter::to_verb_outcome_pub(&result))
+    }
+fn is_migrated(&self) -> bool {
+        true
+    }
+}
+impl TradingProfileCaGetPolicyOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -1115,16 +1167,6 @@ impl CustomOperation for TradingProfileCaGetPolicyOp {
         Ok(ExecutionResult::Record(serde_json::to_value(&ca)?))
     }
 
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        execute_json_via_legacy(self, args, ctx, pool).await
-    }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -1133,8 +1175,5 @@ impl CustomOperation for TradingProfileCaGetPolicyOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({})))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
+

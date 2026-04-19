@@ -160,6 +160,37 @@ impl CustomOperation for WorkflowConfirmDecisionOp {
         "Updates decision status, records user selection, and links verification"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let decision_id = json_extract_uuid(args, ctx, "decision-id")?;
+        let selected_key = json_extract_string(args, "selected-key")?;
+        let selected_key_type = json_extract_string(args, "selected-key-type")?;
+        let verified_by: Option<Uuid> = ctx.principal.actor_id.parse().ok();
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            workflow_confirm_decision_impl(
+                decision_id,
+                selected_key,
+                selected_key_type,
+                verified_by,
+                pool,
+            )
+            .await?,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl WorkflowConfirmDecisionOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -188,7 +219,6 @@ impl CustomOperation for WorkflowConfirmDecisionOp {
             .await?,
         ))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -196,33 +226,6 @@ impl CustomOperation for WorkflowConfirmDecisionOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"status": "confirmed"})))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let decision_id = json_extract_uuid(args, ctx, "decision-id")?;
-        let selected_key = json_extract_string(args, "selected-key")?;
-        let selected_key_type = json_extract_string(args, "selected-key-type")?;
-        let verified_by: Option<Uuid> = ctx.principal.actor_id.parse().ok();
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            workflow_confirm_decision_impl(
-                decision_id,
-                selected_key,
-                selected_key_type,
-                verified_by,
-                pool,
-            )
-            .await?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -283,32 +286,7 @@ impl CustomOperation for WorkflowRejectDecisionOp {
         "Marks decision as rejected and records rejection reason"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let decision_id = extract_uuid(verb_call, ctx, "decision-id")?;
-        let rejection_reason = json_extract_string(
-            &super::sem_os_helpers::extract_args_as_json(verb_call, ctx),
-            "rejection-reason",
-        )?;
-        let verified_by: Option<Uuid> = ctx.audit_user.as_ref().and_then(|s| s.parse().ok());
-        Ok(ExecutionResult::Record(
-            workflow_reject_decision_impl(decision_id, rejection_reason, verified_by, pool).await?,
-        ))
-    }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"status": "rejected"})))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -327,6 +305,34 @@ impl CustomOperation for WorkflowRejectDecisionOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl WorkflowRejectDecisionOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let decision_id = extract_uuid(verb_call, ctx, "decision-id")?;
+        let rejection_reason = json_extract_string(
+            &super::sem_os_helpers::extract_args_as_json(verb_call, ctx),
+            "rejection-reason",
+        )?;
+        let verified_by: Option<Uuid> = ctx.audit_user.as_ref().and_then(|s| s.parse().ok());
+        Ok(ExecutionResult::Record(
+            workflow_reject_decision_impl(decision_id, rejection_reason, verified_by, pool).await?,
+        ))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({"status": "rejected"})))
     }
 }
 
@@ -630,51 +636,7 @@ impl CustomOperation for WorkflowAuditTrailOp {
         "Aggregates research history across multiple tables for compliance reporting"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_id = extract_uuid(verb_call, ctx, "entity-id")?;
-        let args = super::sem_os_helpers::extract_args_as_json(verb_call, ctx);
-        let include_decisions = json_extract_bool_opt(&args, "include-decisions").unwrap_or(true);
-        let include_actions = json_extract_bool_opt(&args, "include-actions").unwrap_or(true);
-        let include_corrections =
-            json_extract_bool_opt(&args, "include-corrections").unwrap_or(true);
-        let include_anomalies = json_extract_bool_opt(&args, "include-anomalies").unwrap_or(true);
-        let include_import_runs =
-            extract_bool_opt(verb_call, "include-import-runs").unwrap_or(true);
 
-        Ok(ExecutionResult::Record(
-            workflow_audit_trail_impl(
-                entity_id,
-                include_decisions,
-                include_actions,
-                include_corrections,
-                include_anomalies,
-                include_import_runs,
-                pool,
-            )
-            .await?,
-        ))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({
-            "decisions": [],
-            "actions": [],
-            "corrections": [],
-            "anomalies": [],
-            "import_runs": []
-        })))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -708,6 +670,53 @@ impl CustomOperation for WorkflowAuditTrailOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl WorkflowAuditTrailOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let entity_id = extract_uuid(verb_call, ctx, "entity-id")?;
+        let args = super::sem_os_helpers::extract_args_as_json(verb_call, ctx);
+        let include_decisions = json_extract_bool_opt(&args, "include-decisions").unwrap_or(true);
+        let include_actions = json_extract_bool_opt(&args, "include-actions").unwrap_or(true);
+        let include_corrections =
+            json_extract_bool_opt(&args, "include-corrections").unwrap_or(true);
+        let include_anomalies = json_extract_bool_opt(&args, "include-anomalies").unwrap_or(true);
+        let include_import_runs =
+            extract_bool_opt(verb_call, "include-import-runs").unwrap_or(true);
+
+        Ok(ExecutionResult::Record(
+            workflow_audit_trail_impl(
+                entity_id,
+                include_decisions,
+                include_actions,
+                include_corrections,
+                include_anomalies,
+                include_import_runs,
+                pool,
+            )
+            .await?,
+        ))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({
+            "decisions": [],
+            "actions": [],
+            "corrections": [],
+            "anomalies": [],
+            "import_runs": []
+        })))
     }
 }
 
@@ -955,18 +964,6 @@ impl CustomOperation for WorkflowSupersessionTrailOp {
         "Aggregates the full supersession chain for a case: import runs, corrections, stale UBO runs, reset outreach, stale tollgates"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        Ok(ExecutionResult::Record(serde_json::to_value(
-            workflow_supersession_trail_impl(case_id, pool).await?,
-        )?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -983,6 +980,21 @@ impl CustomOperation for WorkflowSupersessionTrailOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl WorkflowSupersessionTrailOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
+        Ok(ExecutionResult::Record(serde_json::to_value(
+            workflow_supersession_trail_impl(case_id, pool).await?,
+        )?))
     }
 }
 

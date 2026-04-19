@@ -128,69 +128,6 @@ impl CustomOperation for EconomicExposureComputeOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Required arguments
-        let root_entity_id = get_required_uuid(verb_call, "root-entity-id", ctx)?;
-
-        // Optional arguments with defaults
-        let as_of_date = get_optional_date(verb_call, "as-of-date")
-            .unwrap_or_else(|| chrono::Utc::now().date_naive());
-        let max_depth = get_optional_int(verb_call, "max-depth").unwrap_or(6);
-        let min_pct = get_optional_decimal(verb_call, "min-pct")
-            .unwrap_or_else(|| rust_decimal::Decimal::new(1, 4)); // 0.0001
-        let max_rows = get_optional_int(verb_call, "max-rows").unwrap_or(200);
-        let stop_on_no_bo_data = get_optional_bool(verb_call, "stop-on-no-bo-data").unwrap_or(true);
-        let stop_on_policy_none =
-            get_optional_bool(verb_call, "stop-on-policy-none").unwrap_or(true);
-
-        // Call the SQL function
-        let rows = sqlx::query_as::<_, ExposureRow>(
-            r#"
-            SELECT
-                root_entity_id,
-                leaf_entity_id,
-                leaf_name,
-                cumulative_pct,
-                depth,
-                path_entities,
-                path_names,
-                stopped_reason
-            FROM "ob-poc".fn_compute_economic_exposure($1, $2, $3, $4, $5, $6, $7)
-            "#,
-        )
-        .bind(root_entity_id)
-        .bind(as_of_date)
-        .bind(max_depth)
-        .bind(min_pct)
-        .bind(max_rows)
-        .bind(stop_on_no_bo_data)
-        .bind(stop_on_policy_none)
-        .fetch_all(pool)
-        .await?;
-
-        // Convert to JSON array
-        let results: Vec<serde_json::Value> = rows.into_iter().map(|r| r.into()).collect();
-
-        Ok(ExecutionResult::RecordSet(results))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "economic-exposure.compute requires database feature"
-        ))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -267,6 +204,70 @@ impl CustomOperation for EconomicExposureComputeOp {
     }
 }
 
+impl EconomicExposureComputeOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Required arguments
+        let root_entity_id = get_required_uuid(verb_call, "root-entity-id", ctx)?;
+
+        // Optional arguments with defaults
+        let as_of_date = get_optional_date(verb_call, "as-of-date")
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+        let max_depth = get_optional_int(verb_call, "max-depth").unwrap_or(6);
+        let min_pct = get_optional_decimal(verb_call, "min-pct")
+            .unwrap_or_else(|| rust_decimal::Decimal::new(1, 4)); // 0.0001
+        let max_rows = get_optional_int(verb_call, "max-rows").unwrap_or(200);
+        let stop_on_no_bo_data = get_optional_bool(verb_call, "stop-on-no-bo-data").unwrap_or(true);
+        let stop_on_policy_none =
+            get_optional_bool(verb_call, "stop-on-policy-none").unwrap_or(true);
+
+        // Call the SQL function
+        let rows = sqlx::query_as::<_, ExposureRow>(
+            r#"
+            SELECT
+                root_entity_id,
+                leaf_entity_id,
+                leaf_name,
+                cumulative_pct,
+                depth,
+                path_entities,
+                path_names,
+                stopped_reason
+            FROM "ob-poc".fn_compute_economic_exposure($1, $2, $3, $4, $5, $6, $7)
+            "#,
+        )
+        .bind(root_entity_id)
+        .bind(as_of_date)
+        .bind(max_depth)
+        .bind(min_pct)
+        .bind(max_rows)
+        .bind(stop_on_no_bo_data)
+        .bind(stop_on_policy_none)
+        .fetch_all(pool)
+        .await?;
+
+        // Convert to JSON array
+        let results: Vec<serde_json::Value> = rows.into_iter().map(|r| r.into()).collect();
+
+        Ok(ExecutionResult::RecordSet(results))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "economic-exposure.compute requires database feature"
+        ))
+    }
+}
+
 // ============================================================================
 // EconomicExposureSummaryOp - Aggregated exposure summary for an issuer
 // ============================================================================
@@ -288,60 +289,6 @@ impl CustomOperation for EconomicExposureSummaryOp {
 
     fn rationale(&self) -> &'static str {
         "Complex aggregation query combining direct holdings with look-through computation"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Required arguments
-        let issuer_entity_id = get_required_uuid(verb_call, "issuer-entity-id", ctx)?;
-
-        // Optional arguments with defaults
-        let as_of_date = get_optional_date(verb_call, "as-of-date")
-            .unwrap_or_else(|| chrono::Utc::now().date_naive());
-        let threshold_pct = get_optional_decimal(verb_call, "threshold-pct")
-            .unwrap_or_else(|| rust_decimal::Decimal::new(5, 0)); // 5.0
-
-        // Call the SQL function
-        let rows = sqlx::query_as::<_, ExposureSummaryRow>(
-            r#"
-            SELECT
-                investor_entity_id,
-                investor_name,
-                direct_pct,
-                lookthrough_pct,
-                is_above_threshold,
-                role_type,
-                depth,
-                stop_reason
-            FROM "ob-poc".fn_economic_exposure_summary($1, $2, $3)
-            "#,
-        )
-        .bind(issuer_entity_id)
-        .bind(as_of_date)
-        .bind(threshold_pct)
-        .fetch_all(pool)
-        .await?;
-
-        // Convert to JSON array
-        let results: Vec<serde_json::Value> = rows.into_iter().map(|r| r.into()).collect();
-
-        Ok(ExecutionResult::RecordSet(results))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "economic-exposure.summary requires database feature"
-        ))
     }
 
     #[cfg(feature = "database")]
@@ -393,6 +340,61 @@ impl CustomOperation for EconomicExposureSummaryOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl EconomicExposureSummaryOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Required arguments
+        let issuer_entity_id = get_required_uuid(verb_call, "issuer-entity-id", ctx)?;
+
+        // Optional arguments with defaults
+        let as_of_date = get_optional_date(verb_call, "as-of-date")
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+        let threshold_pct = get_optional_decimal(verb_call, "threshold-pct")
+            .unwrap_or_else(|| rust_decimal::Decimal::new(5, 0)); // 5.0
+
+        // Call the SQL function
+        let rows = sqlx::query_as::<_, ExposureSummaryRow>(
+            r#"
+            SELECT
+                investor_entity_id,
+                investor_name,
+                direct_pct,
+                lookthrough_pct,
+                is_above_threshold,
+                role_type,
+                depth,
+                stop_reason
+            FROM "ob-poc".fn_economic_exposure_summary($1, $2, $3)
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(as_of_date)
+        .bind(threshold_pct)
+        .fetch_all(pool)
+        .await?;
+
+        // Convert to JSON array
+        let results: Vec<serde_json::Value> = rows.into_iter().map(|r| r.into()).collect();
+
+        Ok(ExecutionResult::RecordSet(results))
+    }
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "economic-exposure.summary requires database feature"
+        ))
     }
 }
 

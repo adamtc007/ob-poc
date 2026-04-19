@@ -184,6 +184,45 @@ impl CustomOperation for RegistrationVerifyOp {
         "Updates multiple columns atomically and validates registration exists"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let regulator = json_extract_string(args, "regulator")?;
+        let method = json_extract_string(args, "method")?;
+        let reference = json_extract_string_opt(args, "reference");
+        let expires_str = json_extract_string_opt(args, "expires");
+        let expires = expires_str
+            .as_deref()
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+
+        let registration_id = registration_verify_impl(
+            entity_id,
+            &regulator,
+            &method,
+            reference.as_deref(),
+            expires,
+            pool,
+        )
+        .await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+            registration_id,
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl RegistrationVerifyOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -254,7 +293,6 @@ impl CustomOperation for RegistrationVerifyOp {
 
         Ok(ExecutionResult::Uuid(registration_id))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -262,41 +300,6 @@ impl CustomOperation for RegistrationVerifyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let regulator = json_extract_string(args, "regulator")?;
-        let method = json_extract_string(args, "method")?;
-        let reference = json_extract_string_opt(args, "reference");
-        let expires_str = json_extract_string_opt(args, "expires");
-        let expires = expires_str
-            .as_deref()
-            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-
-        let registration_id = registration_verify_impl(
-            entity_id,
-            &regulator,
-            &method,
-            reference.as_deref(),
-            expires,
-            pool,
-        )
-        .await?;
-
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            registration_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -321,6 +324,26 @@ impl CustomOperation for RegulatoryStatusCheckOp {
         "Aggregates multiple registrations and computes derived properties"
     }
 
+
+
+    #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let result = regulatory_status_check_impl(entity_id, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl RegulatoryStatusCheckOp {
     #[cfg(feature = "database")]
     async fn execute(
         &self,
@@ -351,7 +374,6 @@ impl CustomOperation for RegulatoryStatusCheckOp {
         let result = regulatory_status_check_impl(entity_id, pool).await?;
         Ok(ExecutionResult::Record(result))
     }
-
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -359,22 +381,6 @@ impl CustomOperation for RegulatoryStatusCheckOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow!("Database feature required"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let result = regulatory_status_check_impl(entity_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 

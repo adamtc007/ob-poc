@@ -217,43 +217,6 @@ impl CustomOperation for AffinityVerbsForTableOp {
     }
 
     #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let schema_name = get_string_arg(verb_call, "schema-name")
-            .ok_or_else(|| anyhow::anyhow!("registry.verbs-for-table: schema-name is required"))?;
-        let table_name = get_string_arg(verb_call, "table-name")
-            .ok_or_else(|| anyhow::anyhow!("registry.verbs-for-table: table-name is required"))?;
-        let include_lookups = get_bool_arg(verb_call, "include-lookups").unwrap_or(true);
-
-        let graph = load_affinity_graph(ctx, pool).await?;
-        let verb_affinities = graph.verbs_for_table(&schema_name, &table_name);
-
-        let verbs: Vec<VerbAffinityRow> = verb_affinities
-            .into_iter()
-            .filter(|va| {
-                include_lookups || !matches!(va.affinity_kind, AffinityKind::ArgLookup { .. })
-            })
-            .map(|va| VerbAffinityRow {
-                verb_fqn: va.verb_fqn,
-                affinity_kind: format!("{:?}", va.affinity_kind),
-                provenance: format!("{:?}", va.provenance),
-            })
-            .collect();
-
-        let result = VerbsForTableResult {
-            schema_name,
-            table_name,
-            verbs,
-        };
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -292,6 +255,45 @@ impl CustomOperation for AffinityVerbsForTableOp {
         true
     }
 
+}
+
+impl AffinityVerbsForTableOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let schema_name = get_string_arg(verb_call, "schema-name")
+            .ok_or_else(|| anyhow::anyhow!("registry.verbs-for-table: schema-name is required"))?;
+        let table_name = get_string_arg(verb_call, "table-name")
+            .ok_or_else(|| anyhow::anyhow!("registry.verbs-for-table: table-name is required"))?;
+        let include_lookups = get_bool_arg(verb_call, "include-lookups").unwrap_or(true);
+
+        let graph = load_affinity_graph(ctx, pool).await?;
+        let verb_affinities = graph.verbs_for_table(&schema_name, &table_name);
+
+        let verbs: Vec<VerbAffinityRow> = verb_affinities
+            .into_iter()
+            .filter(|va| {
+                include_lookups || !matches!(va.affinity_kind, AffinityKind::ArgLookup { .. })
+            })
+            .map(|va| VerbAffinityRow {
+                verb_fqn: va.verb_fqn,
+                affinity_kind: format!("{:?}", va.affinity_kind),
+                provenance: format!("{:?}", va.provenance),
+            })
+            .collect();
+
+        let result = VerbsForTableResult {
+            schema_name,
+            table_name,
+            verbs,
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -320,44 +322,6 @@ impl CustomOperation for AffinityVerbsForAttributeOp {
     }
     fn rationale(&self) -> &'static str {
         "Queries the AffinityGraph for all verbs producing or consuming a given attribute"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let attr_fqn = get_string_arg(verb_call, "attribute-fqn")
-            .or_else(|| get_string_arg(verb_call, "attr-fqn"))
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "registry.verbs-for-attribute: attribute-fqn (or legacy attr-fqn) is required"
-                )
-            })?;
-        let direction = AttributeDirection::from_arg(get_string_arg(verb_call, "direction"))?;
-
-        let graph = load_affinity_graph(ctx, pool).await?;
-        let verb_affinities = graph
-            .verbs_for_attribute(&attr_fqn)
-            .into_iter()
-            .filter(|va| direction.include(&va.affinity_kind));
-
-        let verbs: Vec<VerbAffinityRow> = verb_affinities
-            .map(|va| VerbAffinityRow {
-                verb_fqn: va.verb_fqn,
-                affinity_kind: format!("{:?}", va.affinity_kind),
-                provenance: format!("{:?}", va.provenance),
-            })
-            .collect();
-
-        let result = VerbsForAttributeResult {
-            attribute_fqn: attr_fqn,
-            verbs,
-        };
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(feature = "database")]
@@ -396,6 +360,46 @@ impl CustomOperation for AffinityVerbsForAttributeOp {
         true
     }
 
+}
+
+impl AffinityVerbsForAttributeOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let attr_fqn = get_string_arg(verb_call, "attribute-fqn")
+            .or_else(|| get_string_arg(verb_call, "attr-fqn"))
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "registry.verbs-for-attribute: attribute-fqn (or legacy attr-fqn) is required"
+                )
+            })?;
+        let direction = AttributeDirection::from_arg(get_string_arg(verb_call, "direction"))?;
+
+        let graph = load_affinity_graph(ctx, pool).await?;
+        let verb_affinities = graph
+            .verbs_for_attribute(&attr_fqn)
+            .into_iter()
+            .filter(|va| direction.include(&va.affinity_kind));
+
+        let verbs: Vec<VerbAffinityRow> = verb_affinities
+            .map(|va| VerbAffinityRow {
+                verb_fqn: va.verb_fqn,
+                affinity_kind: format!("{:?}", va.affinity_kind),
+                provenance: format!("{:?}", va.provenance),
+            })
+            .collect();
+
+        let result = VerbsForAttributeResult {
+            attribute_fqn: attr_fqn,
+            verbs,
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -425,63 +429,6 @@ impl CustomOperation for AffinityDataForVerbOp {
     }
     fn rationale(&self) -> &'static str {
         "Queries the AffinityGraph for all data assets touched by a verb, with optional transitive footprint"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let verb_fqn = get_string_arg(verb_call, "verb-fqn")
-            .ok_or_else(|| anyhow::anyhow!("registry.data-for-verb: verb-fqn is required"))?;
-        let depth = get_int_arg(verb_call, "depth")
-            .map(|d| d as u32)
-            .unwrap_or(1);
-
-        let graph = load_affinity_graph(ctx, pool).await?;
-        let data_assets = graph.data_for_verb(&verb_fqn);
-
-        let asset_rows: Vec<DataAffinityRow> = data_assets
-            .into_iter()
-            .map(|da| {
-                let data_ref_kind = match &da.data_ref {
-                    DataRef::Table(_) => "table",
-                    DataRef::Column(_) => "column",
-                    DataRef::EntityType { .. } => "entity_type",
-                    DataRef::Attribute { .. } => "attribute",
-                }
-                .to_owned();
-                DataAffinityRow {
-                    data_ref_kind,
-                    data_ref_key: da.data_ref.index_key(),
-                    affinity_kind: format!("{:?}", da.affinity_kind),
-                    provenance: format!("{:?}", da.provenance),
-                }
-            })
-            .collect();
-
-        let footprint = if depth > 1 {
-            let fp = graph.data_footprint(&verb_fqn, depth);
-            Some(DataFootprintSummary {
-                tables: fp.tables.values().map(|t| t.key()).collect(),
-                columns: fp.columns.keys().cloned().collect(),
-                attributes: fp.attributes.into_iter().collect(),
-                entity_types: fp.entity_types.into_iter().collect(),
-            })
-        } else {
-            None
-        };
-
-        let result = DataForVerbResult {
-            verb_fqn,
-            depth,
-            data_assets: asset_rows,
-            footprint,
-        };
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(feature = "database")]
@@ -543,6 +490,65 @@ impl CustomOperation for AffinityDataForVerbOp {
         true
     }
 
+}
+
+impl AffinityDataForVerbOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let verb_fqn = get_string_arg(verb_call, "verb-fqn")
+            .ok_or_else(|| anyhow::anyhow!("registry.data-for-verb: verb-fqn is required"))?;
+        let depth = get_int_arg(verb_call, "depth")
+            .map(|d| d as u32)
+            .unwrap_or(1);
+
+        let graph = load_affinity_graph(ctx, pool).await?;
+        let data_assets = graph.data_for_verb(&verb_fqn);
+
+        let asset_rows: Vec<DataAffinityRow> = data_assets
+            .into_iter()
+            .map(|da| {
+                let data_ref_kind = match &da.data_ref {
+                    DataRef::Table(_) => "table",
+                    DataRef::Column(_) => "column",
+                    DataRef::EntityType { .. } => "entity_type",
+                    DataRef::Attribute { .. } => "attribute",
+                }
+                .to_owned();
+                DataAffinityRow {
+                    data_ref_kind,
+                    data_ref_key: da.data_ref.index_key(),
+                    affinity_kind: format!("{:?}", da.affinity_kind),
+                    provenance: format!("{:?}", da.provenance),
+                }
+            })
+            .collect();
+
+        let footprint = if depth > 1 {
+            let fp = graph.data_footprint(&verb_fqn, depth);
+            Some(DataFootprintSummary {
+                tables: fp.tables.values().map(|t| t.key()).collect(),
+                columns: fp.columns.keys().cloned().collect(),
+                attributes: fp.attributes.into_iter().collect(),
+                entity_types: fp.entity_types.into_iter().collect(),
+            })
+        } else {
+            None
+        };
+
+        let result = DataForVerbResult {
+            verb_fqn,
+            depth,
+            data_assets: asset_rows,
+            footprint,
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -571,37 +577,6 @@ impl CustomOperation for AffinityAdjacentVerbsOp {
     }
     fn rationale(&self) -> &'static str {
         "Queries the AffinityGraph for verbs sharing data dependencies with a given verb"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let verb_fqn = get_string_arg(verb_call, "verb-fqn")
-            .ok_or_else(|| anyhow::anyhow!("registry.adjacent-verbs: verb-fqn is required"))?;
-        let min_overlap = get_int_arg(verb_call, "min-overlap").unwrap_or(1).max(1) as usize;
-
-        let graph = load_affinity_graph(ctx, pool).await?;
-        let adjacent = graph.adjacent_verbs(&verb_fqn);
-
-        let entries: Vec<AdjacentVerbEntry> = adjacent
-            .into_iter()
-            .map(|(adj_fqn, shared_refs)| AdjacentVerbEntry {
-                verb_fqn: adj_fqn,
-                shared_data: shared_refs.into_iter().map(|r| r.index_key()).collect(),
-            })
-            .filter(|row| row.shared_data.len() >= min_overlap)
-            .collect();
-
-        let result = AdjacentVerbsResult {
-            verb_fqn,
-            adjacent: entries,
-        };
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(feature = "database")]
@@ -640,6 +615,39 @@ impl CustomOperation for AffinityAdjacentVerbsOp {
         true
     }
 
+}
+
+impl AffinityAdjacentVerbsOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let verb_fqn = get_string_arg(verb_call, "verb-fqn")
+            .ok_or_else(|| anyhow::anyhow!("registry.adjacent-verbs: verb-fqn is required"))?;
+        let min_overlap = get_int_arg(verb_call, "min-overlap").unwrap_or(1).max(1) as usize;
+
+        let graph = load_affinity_graph(ctx, pool).await?;
+        let adjacent = graph.adjacent_verbs(&verb_fqn);
+
+        let entries: Vec<AdjacentVerbEntry> = adjacent
+            .into_iter()
+            .map(|(adj_fqn, shared_refs)| AdjacentVerbEntry {
+                verb_fqn: adj_fqn,
+                shared_data: shared_refs.into_iter().map(|r| r.index_key()).collect(),
+            })
+            .filter(|row| row.shared_data.len() >= min_overlap)
+            .collect();
+
+        let result = AdjacentVerbsResult {
+            verb_fqn,
+            adjacent: entries,
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -669,85 +677,6 @@ impl CustomOperation for AffinityGovernanceGapsOp {
     }
     fn rationale(&self) -> &'static str {
         "Identifies ungoverned tables, disconnected verbs, and attribute flow anomalies via the AffinityGraph"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let schema_filter = get_string_arg(verb_call, "schema-name");
-        let gap_type = GapType::from_arg(get_string_arg(verb_call, "gap-type"))?;
-
-        // Build the affinity graph
-        let graph = load_affinity_graph(ctx, pool).await?;
-
-        // Load physical table list from information_schema
-        let known_tables = if let Some(ref schema) = schema_filter {
-            sqlx::query_as::<_, (String, String)>(
-                "SELECT table_schema, table_name \
-                 FROM information_schema.tables \
-                 WHERE table_type = 'BASE TABLE' AND table_schema = $1 \
-                 ORDER BY table_schema, table_name",
-            )
-            .bind(schema)
-            .fetch_all(pool)
-            .await?
-        } else {
-            sqlx::query_as::<_, (String, String)>(
-                "SELECT table_schema, table_name \
-                 FROM information_schema.tables \
-                 WHERE table_type = 'BASE TABLE' \
-                   AND table_schema NOT IN ('pg_catalog','information_schema','pg_toast') \
-                 ORDER BY table_schema, table_name",
-            )
-            .fetch_all(pool)
-            .await?
-        };
-
-        let known_table_refs: Vec<TableRef> = known_tables
-            .into_iter()
-            .map(|(s, t)| TableRef::new(s, t))
-            .collect();
-
-        let orphan_tables_all: Vec<String> = graph
-            .orphan_tables(&known_table_refs)
-            .into_iter()
-            .map(|t| t.key())
-            .collect();
-        let orphan_verbs_all = graph.orphan_verbs();
-        let write_only_all = graph.write_only_attributes();
-        let read_before_write_all = graph.read_before_write_attributes();
-
-        let result = GovernanceGapsResult {
-            orphan_tables: if matches!(gap_type, GapType::All | GapType::OrphanTables) {
-                orphan_tables_all
-            } else {
-                Vec::new()
-            },
-            orphan_verbs: if matches!(gap_type, GapType::All | GapType::OrphanVerbs) {
-                orphan_verbs_all
-            } else {
-                Vec::new()
-            },
-            write_only_attributes: if matches!(gap_type, GapType::All | GapType::WriteOnly) {
-                write_only_all
-            } else {
-                Vec::new()
-            },
-            read_before_write_attributes: if matches!(
-                gap_type,
-                GapType::All | GapType::ReadBeforeWrite
-            ) {
-                read_before_write_all
-            } else {
-                Vec::new()
-            },
-        };
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(feature = "database")]
@@ -829,6 +758,87 @@ impl CustomOperation for AffinityGovernanceGapsOp {
         true
     }
 
+}
+
+impl AffinityGovernanceGapsOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let schema_filter = get_string_arg(verb_call, "schema-name");
+        let gap_type = GapType::from_arg(get_string_arg(verb_call, "gap-type"))?;
+
+        // Build the affinity graph
+        let graph = load_affinity_graph(ctx, pool).await?;
+
+        // Load physical table list from information_schema
+        let known_tables = if let Some(ref schema) = schema_filter {
+            sqlx::query_as::<_, (String, String)>(
+                "SELECT table_schema, table_name \
+                 FROM information_schema.tables \
+                 WHERE table_type = 'BASE TABLE' AND table_schema = $1 \
+                 ORDER BY table_schema, table_name",
+            )
+            .bind(schema)
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, (String, String)>(
+                "SELECT table_schema, table_name \
+                 FROM information_schema.tables \
+                 WHERE table_type = 'BASE TABLE' \
+                   AND table_schema NOT IN ('pg_catalog','information_schema','pg_toast') \
+                 ORDER BY table_schema, table_name",
+            )
+            .fetch_all(pool)
+            .await?
+        };
+
+        let known_table_refs: Vec<TableRef> = known_tables
+            .into_iter()
+            .map(|(s, t)| TableRef::new(s, t))
+            .collect();
+
+        let orphan_tables_all: Vec<String> = graph
+            .orphan_tables(&known_table_refs)
+            .into_iter()
+            .map(|t| t.key())
+            .collect();
+        let orphan_verbs_all = graph.orphan_verbs();
+        let write_only_all = graph.write_only_attributes();
+        let read_before_write_all = graph.read_before_write_attributes();
+
+        let result = GovernanceGapsResult {
+            orphan_tables: if matches!(gap_type, GapType::All | GapType::OrphanTables) {
+                orphan_tables_all
+            } else {
+                Vec::new()
+            },
+            orphan_verbs: if matches!(gap_type, GapType::All | GapType::OrphanVerbs) {
+                orphan_verbs_all
+            } else {
+                Vec::new()
+            },
+            write_only_attributes: if matches!(gap_type, GapType::All | GapType::WriteOnly) {
+                write_only_all
+            } else {
+                Vec::new()
+            },
+            read_before_write_attributes: if matches!(
+                gap_type,
+                GapType::All | GapType::ReadBeforeWrite
+            ) {
+                read_before_write_all
+            } else {
+                Vec::new()
+            },
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,
@@ -857,86 +867,6 @@ impl CustomOperation for AffinityDiscoverDslOp {
     }
     fn rationale(&self) -> &'static str {
         "Utterance -> intent -> DSL chain synthesis via AffinityGraph with CCIR-aware filtering"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let utterance = get_string_arg(verb_call, "utterance")
-            .or_else(|| get_string_arg(verb_call, "intent"))
-            .ok_or_else(|| anyhow::anyhow!("registry.discover-dsl: utterance is required"))?;
-        let subject_id = get_string_arg(verb_call, "subject-id");
-        let max_chain_length = get_int_arg(verb_call, "max-chain-length")
-            .map(|v| v.max(1) as usize)
-            .unwrap_or(5);
-
-        let subject_uuid = subject_id
-            .as_deref()
-            .map(Uuid::parse_str)
-            .transpose()
-            .map_err(|e| anyhow::anyhow!("registry.discover-dsl: invalid subject-id: {e}"))?;
-
-        let graph = load_affinity_graph(ctx, pool).await?;
-        let verb_contracts = load_active_verb_contracts(pool).await?;
-
-        let mut allowed_verbs: Option<HashSet<String>> = None;
-        let mut policy_check = None;
-
-        if let Some(subject_uuid) = subject_uuid {
-            let actor = ActorContext {
-                actor_id: ctx
-                    .audit_user
-                    .clone()
-                    .unwrap_or_else(|| "sem-os-discovery".to_owned()),
-                roles: vec!["analyst".to_owned()],
-                department: Some("registry".to_owned()),
-                clearance: Some(Classification::Internal),
-                jurisdictions: vec![],
-            };
-            let request = ContextResolutionRequest {
-                subject: SubjectRef::EntityId(subject_uuid),
-                intent_summary: None,
-                raw_utterance: Some(utterance.clone()),
-                actor: to_sem_os_actor(&actor),
-                goals: vec!["dsl_discovery".to_owned()],
-                constraints: Default::default(),
-                evidence_mode: EvidenceMode::Normal,
-                point_in_time: None,
-                entity_kind: None,
-                entity_confidence: None,
-                discovery: DiscoveryContext::default(),
-            };
-            match resolve_context_via_sem_os(pool, &actor, request).await {
-                Ok(resp) => {
-                    let allowed: HashSet<String> =
-                        resp.candidate_verbs.into_iter().map(|v| v.fqn).collect();
-                    policy_check = Some(format!(
-                        "ccir_applied:candidates={},confidence={:.2}",
-                        allowed.len(),
-                        resp.confidence
-                    ));
-                    allowed_verbs = Some(allowed);
-                }
-                Err(err) => {
-                    policy_check = Some(format!("ccir_failed:{err}"));
-                }
-            }
-        }
-
-        let result = discover_dsl(
-            &utterance,
-            &graph,
-            &verb_contracts,
-            subject_uuid,
-            max_chain_length,
-            allowed_verbs.as_ref(),
-            policy_check,
-        );
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(feature = "database")]
@@ -1023,6 +953,88 @@ impl CustomOperation for AffinityDiscoverDslOp {
         true
     }
 
+}
+
+impl AffinityDiscoverDslOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let utterance = get_string_arg(verb_call, "utterance")
+            .or_else(|| get_string_arg(verb_call, "intent"))
+            .ok_or_else(|| anyhow::anyhow!("registry.discover-dsl: utterance is required"))?;
+        let subject_id = get_string_arg(verb_call, "subject-id");
+        let max_chain_length = get_int_arg(verb_call, "max-chain-length")
+            .map(|v| v.max(1) as usize)
+            .unwrap_or(5);
+
+        let subject_uuid = subject_id
+            .as_deref()
+            .map(Uuid::parse_str)
+            .transpose()
+            .map_err(|e| anyhow::anyhow!("registry.discover-dsl: invalid subject-id: {e}"))?;
+
+        let graph = load_affinity_graph(ctx, pool).await?;
+        let verb_contracts = load_active_verb_contracts(pool).await?;
+
+        let mut allowed_verbs: Option<HashSet<String>> = None;
+        let mut policy_check = None;
+
+        if let Some(subject_uuid) = subject_uuid {
+            let actor = ActorContext {
+                actor_id: ctx
+                    .audit_user
+                    .clone()
+                    .unwrap_or_else(|| "sem-os-discovery".to_owned()),
+                roles: vec!["analyst".to_owned()],
+                department: Some("registry".to_owned()),
+                clearance: Some(Classification::Internal),
+                jurisdictions: vec![],
+            };
+            let request = ContextResolutionRequest {
+                subject: SubjectRef::EntityId(subject_uuid),
+                intent_summary: None,
+                raw_utterance: Some(utterance.clone()),
+                actor: to_sem_os_actor(&actor),
+                goals: vec!["dsl_discovery".to_owned()],
+                constraints: Default::default(),
+                evidence_mode: EvidenceMode::Normal,
+                point_in_time: None,
+                entity_kind: None,
+                entity_confidence: None,
+                discovery: DiscoveryContext::default(),
+            };
+            match resolve_context_via_sem_os(pool, &actor, request).await {
+                Ok(resp) => {
+                    let allowed: HashSet<String> =
+                        resp.candidate_verbs.into_iter().map(|v| v.fqn).collect();
+                    policy_check = Some(format!(
+                        "ccir_applied:candidates={},confidence={:.2}",
+                        allowed.len(),
+                        resp.confidence
+                    ));
+                    allowed_verbs = Some(allowed);
+                }
+                Err(err) => {
+                    policy_check = Some(format!("ccir_failed:{err}"));
+                }
+            }
+        }
+
+        let result = discover_dsl(
+            &utterance,
+            &graph,
+            &verb_contracts,
+            subject_uuid,
+            max_chain_length,
+            allowed_verbs.as_ref(),
+            policy_check,
+        );
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
     #[cfg(not(feature = "database"))]
     async fn execute(
         &self,

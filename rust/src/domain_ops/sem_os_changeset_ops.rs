@@ -34,25 +34,6 @@ macro_rules! changeset_op {
             }
 
             #[cfg(feature = "database")]
-            async fn execute(
-                &self,
-                verb_call: &VerbCall,
-                ctx: &mut ExecutionContext,
-                pool: &PgPool,
-            ) -> Result<ExecutionResult> {
-                delegate_to_stew_tool(pool, ctx, verb_call, $tool).await
-            }
-
-            #[cfg(not(feature = "database"))]
-            async fn execute(
-                &self,
-                _verb_call: &VerbCall,
-                _ctx: &mut ExecutionContext,
-            ) -> Result<ExecutionResult> {
-                Err(anyhow::anyhow!("changeset.{} requires database", $verb))
-            }
-
-            #[cfg(feature = "database")]
             async fn execute_json(
                 &self,
                 args: &serde_json::Value,
@@ -64,6 +45,29 @@ macro_rules! changeset_op {
 
             fn is_migrated(&self) -> bool {
                 true
+            }
+        }
+
+        impl $struct_name {
+            #[cfg(feature = "database")]
+            #[allow(dead_code)]
+            async fn execute(
+                &self,
+                verb_call: &VerbCall,
+                ctx: &mut ExecutionContext,
+                pool: &PgPool,
+            ) -> Result<ExecutionResult> {
+                delegate_to_stew_tool(pool, ctx, verb_call, $tool).await
+            }
+
+            #[cfg(not(feature = "database"))]
+            #[allow(dead_code)]
+            async fn execute(
+                &self,
+                _verb_call: &VerbCall,
+                _ctx: &mut ExecutionContext,
+            ) -> Result<ExecutionResult> {
+                Err(anyhow::anyhow!("changeset.{} requires database", $verb))
             }
         }
     };
@@ -206,6 +210,44 @@ impl CustomOperation for ChangesetListOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        if let Ok(outcome) = super::sem_os_helpers::delegate_to_stew_tool_json(
+            pool,
+            ctx,
+            args,
+            "stew_describe_object",
+        )
+        .await
+        {
+            return Ok(outcome);
+        }
+
+        match changeset_list_impl(
+            super::helpers::json_extract_string_opt(args, "status"),
+            pool,
+        )
+        .await?
+        {
+            ExecutionResult::RecordSet(rows) => Ok(
+                dsl_runtime::VerbExecutionOutcome::RecordSet(rows),
+            ),
+            _ => unreachable!(),
+        }
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ChangesetListOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -250,41 +292,6 @@ impl CustomOperation for ChangesetListOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("changeset.list requires database"))
     }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        if let Ok(outcome) = super::sem_os_helpers::delegate_to_stew_tool_json(
-            pool,
-            ctx,
-            args,
-            "stew_describe_object",
-        )
-        .await
-        {
-            return Ok(outcome);
-        }
-
-        match changeset_list_impl(
-            super::helpers::json_extract_string_opt(args, "status"),
-            pool,
-        )
-        .await?
-        {
-            ExecutionResult::RecordSet(rows) => Ok(
-                dsl_runtime::VerbExecutionOutcome::RecordSet(rows),
-            ),
-            _ => unreachable!(),
-        }
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 /// Get detailed changeset information.
@@ -304,6 +311,24 @@ impl CustomOperation for ChangesetGetOp {
     }
 
     #[cfg(feature = "database")]
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_describe_object")
+            .await
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+impl ChangesetGetOp {
+
+    #[cfg(feature = "database")]
     async fn execute(
         &self,
         verb_call: &VerbCall,
@@ -320,21 +345,6 @@ impl CustomOperation for ChangesetGetOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Err(anyhow::anyhow!("changeset.get requires database"))
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_describe_object")
-            .await
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 

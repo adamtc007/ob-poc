@@ -58,26 +58,6 @@ impl crate::domain_ops::CustomOperation for NavDrillOp {
         "Semantic drill into a focused object — opens deeper level"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &sqlx::PgPool,
-    ) -> Result<ExecutionResult> {
-        let target_id = find_arg(verb_call, "target_id");
-        let _target_level = find_arg(verb_call, "target_level");
-
-        let result = NavResult {
-            success: true,
-            message: format!("Drilled to {}", target_id.as_deref().unwrap_or("target")),
-            target_level: None,
-            target_slot: target_id,
-            crossed_boundary: false,
-            history_direction: None,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -102,6 +82,29 @@ impl crate::domain_ops::CustomOperation for NavDrillOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl NavDrillOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<ExecutionResult> {
+        let target_id = find_arg(verb_call, "target_id");
+        let _target_level = find_arg(verb_call, "target_level");
+
+        let result = NavResult {
+            success: true,
+            message: format!("Drilled to {}", target_id.as_deref().unwrap_or("target")),
+            target_level: None,
+            target_slot: target_id,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -135,24 +138,6 @@ impl crate::domain_ops::CustomOperation for NavZoomOutOp {
         "Semantic zoom out — go up one level (not visual zoom)"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &sqlx::PgPool,
-    ) -> Result<ExecutionResult> {
-        // Orchestrator reads target_level=None + no target_slot and decrements level
-        let result = NavResult {
-            success: true,
-            message: "Zoomed out one level".into(),
-            target_level: None, // Orchestrator computes parent level
-            target_slot: None,  // Clear focus on zoom out
-            crossed_boundary: false,
-            history_direction: None,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -179,6 +164,27 @@ impl crate::domain_ops::CustomOperation for NavZoomOutOp {
     }
 }
 
+impl NavZoomOutOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<ExecutionResult> {
+        // Orchestrator reads target_level=None + no target_slot and decrements level
+        let result = NavResult {
+            success: true,
+            message: "Zoomed out one level".into(),
+            target_level: None, // Orchestrator computes parent level
+            target_slot: None,  // Clear focus on zoom out
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+}
+
 /// nav.select — set semantic focus to a specific entity.
 #[register_custom_op]
 pub struct NavSelectOp;
@@ -195,24 +201,6 @@ impl crate::domain_ops::CustomOperation for NavSelectOp {
         "Set semantic focus to a specific entity or object"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &sqlx::PgPool,
-    ) -> Result<ExecutionResult> {
-        let target_id = find_arg(verb_call, "target_id");
-        let result = NavResult {
-            success: true,
-            message: format!("Focus set to {}", target_id.as_deref().unwrap_or("target")),
-            target_level: None,
-            target_slot: target_id,
-            crossed_boundary: false,
-            history_direction: None,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -240,6 +228,27 @@ impl crate::domain_ops::CustomOperation for NavSelectOp {
     }
 }
 
+impl NavSelectOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<ExecutionResult> {
+        let target_id = find_arg(verb_call, "target_id");
+        let result = NavResult {
+            success: true,
+            message: format!("Focus set to {}", target_id.as_deref().unwrap_or("target")),
+            target_level: None,
+            target_slot: target_id,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+}
+
 /// nav.set-cluster-type — change cluster grouping mode.
 #[register_custom_op]
 pub struct NavSetClusterTypeOp;
@@ -256,24 +265,6 @@ impl crate::domain_ops::CustomOperation for NavSetClusterTypeOp {
         "Change cluster grouping mode"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &sqlx::PgPool,
-    ) -> Result<ExecutionResult> {
-        // Cluster mode is a lens parameter — orchestrator stores on session
-        let result = NavResult {
-            success: true,
-            message: "Cluster mode updated".into(),
-            target_level: None,
-            target_slot: None,
-            crossed_boundary: false,
-            history_direction: None,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -297,6 +288,27 @@ impl crate::domain_ops::CustomOperation for NavSetClusterTypeOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl NavSetClusterTypeOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<ExecutionResult> {
+        // Cluster mode is a lens parameter — orchestrator stores on session
+        let result = NavResult {
+            success: true,
+            message: "Cluster mode updated".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -316,24 +328,6 @@ impl crate::domain_ops::CustomOperation for NavSetLensOp {
         "Change observation lens (overlay, depth probe, filters)"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &sqlx::PgPool,
-    ) -> Result<ExecutionResult> {
-        // Lens state is a viewport parameter — orchestrator stores on session
-        let result = NavResult {
-            success: true,
-            message: "Lens updated".into(),
-            target_level: None,
-            target_slot: None,
-            crossed_boundary: false,
-            history_direction: None,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -357,6 +351,27 @@ impl crate::domain_ops::CustomOperation for NavSetLensOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl NavSetLensOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<ExecutionResult> {
+        // Lens state is a viewport parameter — orchestrator stores on session
+        let result = NavResult {
+            success: true,
+            message: "Lens updated".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: None,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -376,23 +391,6 @@ impl crate::domain_ops::CustomOperation for NavHistoryBackOp {
         "Navigate back in history"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &sqlx::PgPool,
-    ) -> Result<ExecutionResult> {
-        let result = NavResult {
-            success: true,
-            message: "Navigated back".into(),
-            target_level: None,
-            target_slot: None,
-            crossed_boundary: false,
-            history_direction: Some("back".into()),
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -419,6 +417,26 @@ impl crate::domain_ops::CustomOperation for NavHistoryBackOp {
     }
 }
 
+impl NavHistoryBackOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<ExecutionResult> {
+        let result = NavResult {
+            success: true,
+            message: "Navigated back".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: Some("back".into()),
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+}
+
 /// nav.history-forward — navigate forward in viewport history.
 #[register_custom_op]
 pub struct NavHistoryForwardOp;
@@ -435,23 +453,6 @@ impl crate::domain_ops::CustomOperation for NavHistoryForwardOp {
         "Navigate forward in history"
     }
 
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &sqlx::PgPool,
-    ) -> Result<ExecutionResult> {
-        let result = NavResult {
-            success: true,
-            message: "Navigated forward".into(),
-            target_level: None,
-            target_slot: None,
-            crossed_boundary: false,
-            history_direction: Some("forward".into()),
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
 
     #[cfg(feature = "database")]
     async fn execute_json(
@@ -475,5 +476,25 @@ impl crate::domain_ops::CustomOperation for NavHistoryForwardOp {
 
     fn is_migrated(&self) -> bool {
         true
+    }
+}
+
+impl NavHistoryForwardOp {
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<ExecutionResult> {
+        let result = NavResult {
+            success: true,
+            message: "Navigated forward".into(),
+            target_level: None,
+            target_slot: None,
+            crossed_boundary: false,
+            history_direction: Some("forward".into()),
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
