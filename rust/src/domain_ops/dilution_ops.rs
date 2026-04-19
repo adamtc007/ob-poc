@@ -13,7 +13,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -149,9 +149,9 @@ impl CustomOperation for DilutionGrantOptionsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
         let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
         let units: rust_decimal::Decimal = json_extract_string_opt(args, "units")
@@ -202,7 +202,7 @@ impl CustomOperation for DilutionGrantOptionsOp {
         .fetch_one(pool)
         .await?;
         ctx.bind("dilution_instrument", instrument_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             instrument_id,
         ))
     }
@@ -321,9 +321,9 @@ impl CustomOperation for DilutionIssueWarrantOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
         let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
         let units: rust_decimal::Decimal = json_extract_string_opt(args, "units")
@@ -365,7 +365,7 @@ impl CustomOperation for DilutionIssueWarrantOp {
         .fetch_one(pool)
         .await?;
         ctx.bind("dilution_instrument", instrument_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             instrument_id,
         ))
     }
@@ -476,9 +476,9 @@ impl CustomOperation for DilutionCreateSafeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
         let principal: rust_decimal::Decimal = json_extract_string_opt(args, "principal")
@@ -513,7 +513,7 @@ impl CustomOperation for DilutionCreateSafeOp {
         .fetch_one(pool)
         .await?;
         ctx.bind("dilution_instrument", instrument_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             instrument_id,
         ))
     }
@@ -631,9 +631,9 @@ impl CustomOperation for DilutionCreateConvertibleNoteOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
         let principal: rust_decimal::Decimal = json_extract_string_opt(args, "principal")
@@ -672,7 +672,7 @@ impl CustomOperation for DilutionCreateConvertibleNoteOp {
         .fetch_one(pool)
         .await?;
         ctx.bind("dilution_instrument", instrument_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             instrument_id,
         ))
     }
@@ -860,9 +860,9 @@ impl CustomOperation for DilutionExerciseOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let instrument_id = json_extract_uuid(args, ctx, "instrument-id")?;
         let units_to_exercise: rust_decimal::Decimal = json_extract_string_opt(args, "units")
             .and_then(|s| s.parse().ok())
@@ -886,7 +886,7 @@ impl CustomOperation for DilutionExerciseOp {
         .await?;
         if let Some(exercise_id) = existing {
             ctx.bind("dilution_exercise", exercise_id);
-            return Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
                 exercise_id,
             ));
         }
@@ -903,7 +903,7 @@ impl CustomOperation for DilutionExerciseOp {
             match self.try_exercise(pool, &params).await {
                 Ok((exercise_id, _shares_issued)) => {
                     ctx.bind("dilution_exercise", exercise_id);
-                    return Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+                    return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
                         exercise_id,
                     ));
                 }
@@ -1275,9 +1275,9 @@ impl CustomOperation for DilutionForfeitOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let instrument_id = json_extract_uuid(args, ctx, "instrument-id")?;
         let units: Option<rust_decimal::Decimal> =
             json_extract_string_opt(args, "units").and_then(|s| s.parse().ok());
@@ -1338,7 +1338,7 @@ impl CustomOperation for DilutionForfeitOp {
         .await?;
         tx.commit().await?;
         ctx.bind("dilution_exercise", event_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(event_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(event_id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1498,9 +1498,9 @@ impl CustomOperation for DilutionListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let instrument_type = json_extract_string_opt(args, "instrument-type");
         let status =
@@ -1602,7 +1602,7 @@ impl CustomOperation for DilutionListOp {
                 }))
             }))
             .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             instrument_data,
         ))
     }
@@ -1735,9 +1735,9 @@ impl CustomOperation for DilutionGetSummaryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = dilution_date_arg_json(args, "as-of");
         let basis =
@@ -1798,7 +1798,7 @@ impl CustomOperation for DilutionGetSummaryOp {
         } else {
             rust_decimal::Decimal::ZERO
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "issuer_entity_id": issuer_entity_id,
                 "as_of_date": as_of.to_string(),

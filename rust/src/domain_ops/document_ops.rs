@@ -17,7 +17,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -266,7 +266,7 @@ async fn derive_doc_types(
 #[cfg(feature = "database")]
 async fn derive_subject_entity_id_json(
     args: &serde_json::Value,
-    ctx: &sem_os_core::execution::VerbExecutionContext,
+    ctx: &dsl_runtime::VerbExecutionContext,
     pool: &PgPool,
 ) -> Result<Uuid> {
     if let Some(subject_entity_id) = json_extract_uuid_opt(args, ctx, "subject-entity-id")
@@ -1016,9 +1016,9 @@ impl CustomOperation for DocumentCatalogOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let doc_type = json_extract_string(args, "doc-type")
             .or_else(|_| json_extract_string(args, "document-type"))?;
         let document_name = args
@@ -1031,7 +1031,7 @@ impl CustomOperation for DocumentCatalogOp {
         let doc_id =
             document_catalog_impl(&doc_type, document_name, cbu_id, entity_id, pool).await?;
         ctx.bind("document", doc_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(doc_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(doc_id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1094,13 +1094,13 @@ impl CustomOperation for DocumentExtractOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let doc_id = json_extract_uuid(args, ctx, "document-id")
             .or_else(|_| json_extract_uuid(args, ctx, "doc-id"))?;
         document_extract_impl(doc_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
+        Ok(dsl_runtime::VerbExecutionOutcome::Void)
     }
 
     #[cfg(not(feature = "database"))]
@@ -1196,9 +1196,9 @@ impl CustomOperation for DocumentSolicitOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let subject_entity_id = derive_subject_entity_id_json(args, ctx, pool).await?;
         let doc_type = json_extract_string(args, "doc-type")?;
         let workflow_instance_id = json_extract_uuid_opt(args, ctx, "workflow-instance-id");
@@ -1220,7 +1220,7 @@ impl CustomOperation for DocumentSolicitOp {
         if workflow_instance_id.is_some() {
             ctx.bind("task", result.request_id);
         }
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -1296,9 +1296,9 @@ impl CustomOperation for DocumentSolicitSetOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let subject_entity_id = derive_subject_entity_id_json(args, ctx, pool).await?;
         let doc_types = derive_doc_types_json(args, subject_entity_id, pool).await?;
         let workflow_instance_id = json_extract_uuid_opt(args, ctx, "workflow-instance-id");
@@ -1319,7 +1319,7 @@ impl CustomOperation for DocumentSolicitSetOp {
         if workflow_instance_id.is_some() {
             ctx.bind("task", result.request_id);
         }
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -1441,9 +1441,9 @@ impl CustomOperation for DocumentUploadVersionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
         let content_type = json_extract_string(args, "content-type")?;
         let blob_ref = args
@@ -1470,7 +1470,7 @@ impl CustomOperation for DocumentUploadVersionOp {
         )
         .await?;
         ctx.bind("version", result.version_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -1535,12 +1535,12 @@ impl CustomOperation for DocumentVerifyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let version_id = json_extract_uuid(args, ctx, "version-id")?;
         let verified_by = json_extract_string(args, "verified-by")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             document_verify_impl(version_id, &verified_by, pool).await?,
         ))
     }
@@ -1626,9 +1626,9 @@ impl CustomOperation for DocumentRejectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let version_id = json_extract_uuid(args, ctx, "version-id")?;
         let rejection_code = json_extract_string(args, "rejection-code")?;
         let verified_by = json_extract_string(args, "verified-by")?;
@@ -1636,7 +1636,7 @@ impl CustomOperation for DocumentRejectOp {
             .get("rejection-reason")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             document_reject_impl(
                 version_id,
                 &rejection_code,
@@ -1707,12 +1707,12 @@ impl CustomOperation for DocumentMissingForEntityOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let workflow_instance_id = json_extract_uuid_opt(args, ctx, "workflow-instance-id");
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             document_missing_for_entity_impl(entity_id, workflow_instance_id, pool).await?,
         ))
     }
@@ -1770,11 +1770,11 @@ impl CustomOperation for DocumentComputeRequirementsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(document_compute_requirements_impl(entity_id, pool).await?)?,
         ))
     }

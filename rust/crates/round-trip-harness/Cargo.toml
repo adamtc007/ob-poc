@@ -1,0 +1,16 @@
+[package]
+name = "round-trip-harness"
+version = "0.1.0"
+edition = "2021"
+description = "Effect-equivalence comparison for Phase 6 metadata-CRUD dissolution (v0.3 §14)."
+
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+blake3 = { version = "1", default-features = false }
+
+[dev-dependencies]
+uuid = { version = "1", features = ["v4"] }
+# Fixture DB orchestration comes in Phase 5e.

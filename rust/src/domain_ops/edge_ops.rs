@@ -10,7 +10,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -306,9 +306,9 @@ impl CustomOperation for EdgeUpsertOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         // 1. Extract arguments
         let from_entity_id = json_extract_uuid(args, ctx, "from-entity-id")?;
         let to_entity_id = json_extract_uuid(args, ctx, "to-entity-id")?;
@@ -425,7 +425,7 @@ impl CustomOperation for EdgeUpsertOp {
                     relationship_type,
                     superseded_id: None,
                 };
-                return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                return Ok(dsl_runtime::VerbExecutionOutcome::Record(
                     serde_json::to_value(result)?,
                 ));
             }
@@ -474,7 +474,7 @@ impl CustomOperation for EdgeUpsertOp {
                 relationship_type,
                 superseded_id: Some(existing_id),
             };
-            return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 serde_json::to_value(result)?,
             ));
         }
@@ -516,7 +516,7 @@ impl CustomOperation for EdgeUpsertOp {
             relationship_type,
             superseded_id: None,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }

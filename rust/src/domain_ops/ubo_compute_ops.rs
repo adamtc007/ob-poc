@@ -16,7 +16,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -446,9 +446,9 @@ impl CustomOperation for UboComputeChainsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
         let threshold_pct = json_extract_string_opt(args, "threshold")
             .as_deref()
@@ -467,7 +467,7 @@ impl CustomOperation for UboComputeChainsOp {
         )
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -663,14 +663,14 @@ impl CustomOperation for UboSnapshotCaptureOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
         let determination_run_id = json_extract_uuid(args, ctx, "determination-run-id")?;
         let result = ubo_snapshot_capture_impl(case_id, determination_run_id, pool).await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -856,14 +856,14 @@ impl CustomOperation for UboSnapshotDiffOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let run_id_a = json_extract_uuid(args, ctx, "run-id-a")?;
         let run_id_b = json_extract_uuid(args, ctx, "run-id-b")?;
         let result = ubo_snapshot_diff_impl(run_id_a, run_id_b, pool).await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }

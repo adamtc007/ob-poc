@@ -10,7 +10,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 
 use super::helpers::{json_extract_string, json_extract_string_opt};
@@ -619,9 +619,9 @@ impl CustomOperation for PhraseObserveMissesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let limit = json_extract_string_opt(args, "limit")
             .and_then(|s| s.parse().ok())
             .unwrap_or(100);
@@ -723,7 +723,7 @@ impl CustomOperation for PhraseObserveMissesOp {
             top_wrong_match_patterns,
             watermark_advanced_to: advanced_to,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -817,9 +817,9 @@ impl CustomOperation for PhraseCoverageReportOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let rows: Vec<(String, i64, i64)> = sqlx::query_as(
             r#"
             SELECT
@@ -857,7 +857,7 @@ impl CustomOperation for PhraseCoverageReportOp {
                 serde_json::to_value(coverage).unwrap_or_default()
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             entries,
         ))
     }
@@ -922,15 +922,15 @@ impl CustomOperation for PhraseCheckCollisionsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let phrase = json_extract_string(args, "phrase")?;
         let target_verb = json_extract_string(args, "target-verb")?;
         let workspace = json_extract_string_opt(args, "workspace");
         let (report, _max_similarity) =
             run_collision_check(pool, &phrase, &target_verb, workspace.as_deref()).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(report)?,
         ))
     }
@@ -1040,9 +1040,9 @@ impl CustomOperation for PhraseProposeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let phrase = json_extract_string(args, "phrase")?;
         let target_verb = json_extract_string(args, "target-verb")?;
         let workspace = json_extract_string_opt(args, "workspace");
@@ -1085,7 +1085,7 @@ impl CustomOperation for PhraseProposeOp {
             collision_safe: collision_report.safe_to_propose,
             state: "proposed".to_string(),
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -1331,9 +1331,9 @@ impl CustomOperation for PhraseBatchProposeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let limit = json_extract_string_opt(args, "limit")
             .and_then(|s| s.parse().ok())
             .unwrap_or(50) as usize;
@@ -1351,7 +1351,7 @@ impl CustomOperation for PhraseBatchProposeOp {
                     message: "No phrase observation state found. Run phrase.observe-misses first."
                         .to_string(),
                 };
-                return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                return Ok(dsl_runtime::VerbExecutionOutcome::Record(
                     serde_json::to_value(result)?,
                 ));
             }
@@ -1380,7 +1380,7 @@ impl CustomOperation for PhraseBatchProposeOp {
                 skipped_duplicates: 0,
                 message: "No session trace data available for observation".to_string(),
             };
-            return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 serde_json::to_value(result)?,
             ));
         }
@@ -1505,7 +1505,7 @@ impl CustomOperation for PhraseBatchProposeOp {
         };
         result_set.push(serde_json::to_value(summary)?);
         result_set.extend(proposals);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             result_set,
         ))
     }
@@ -1622,9 +1622,9 @@ impl CustomOperation for PhraseReviewProposalsOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let rows: Vec<(Uuid, serde_json::Value, String, i32, i32)> = sqlx::query_as(
             r#"
             SELECT
@@ -1683,7 +1683,7 @@ impl CustomOperation for PhraseReviewProposalsOp {
                 },
             )
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             proposals,
         ))
     }
@@ -1799,9 +1799,9 @@ impl CustomOperation for PhraseApproveOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let proposal_id_str = json_extract_string(args, "proposal-id")?;
         let proposal_id: Uuid = proposal_id_str
             .parse()
@@ -1850,7 +1850,7 @@ impl CustomOperation for PhraseApproveOp {
             verb_fqn,
             status: "published".to_string(),
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -1946,9 +1946,9 @@ impl CustomOperation for PhraseRejectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let proposal_id_str = json_extract_string(args, "proposal-id")?;
         let proposal_id: Uuid = proposal_id_str
             .parse()
@@ -1984,7 +1984,7 @@ impl CustomOperation for PhraseRejectOp {
             state: "rejected".to_string(),
             reason: Some(reason),
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -2082,9 +2082,9 @@ impl CustomOperation for PhraseDeferOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let proposal_id_str = json_extract_string(args, "proposal-id")?;
         let proposal_id: Uuid = proposal_id_str
             .parse()
@@ -2122,7 +2122,7 @@ impl CustomOperation for PhraseDeferOp {
             state: "deferred".to_string(),
             reason,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }

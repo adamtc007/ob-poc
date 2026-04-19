@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 
 use super::helpers::{
@@ -171,9 +171,9 @@ impl CustomOperation for AccessReviewPopulateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
         let campaign = sqlx::query!(
             r#"
@@ -266,7 +266,7 @@ impl CustomOperation for AccessReviewPopulateOp {
         )
         .execute(pool)
         .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "campaign_id": campaign_id,
                 "total_items": total_items,
@@ -346,9 +346,9 @@ impl CustomOperation for AccessReviewLaunchOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
         let result = sqlx::query!(
             r#"
@@ -362,7 +362,7 @@ impl CustomOperation for AccessReviewLaunchOp {
         .fetch_optional(pool)
         .await?;
         match result {
-            Some(row) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            Some(row) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 json!({
                     "campaign_id": campaign_id,
                     "name": row.name,
@@ -497,9 +497,9 @@ impl CustomOperation for AccessReviewRevokeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let item_id = json_extract_uuid(args, ctx, "item")?;
         let reason = json_extract_string(args, "reason")?;
         let mut tx = pool.begin().await?;
@@ -548,7 +548,7 @@ impl CustomOperation for AccessReviewRevokeOp {
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "item_id": item_id,
                 "membership_id": item.membership_id,
@@ -674,15 +674,15 @@ impl CustomOperation for AccessReviewBulkConfirmOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let item_ids: Vec<uuid::Uuid> = json_extract_string_list(args, "items")?
             .into_iter()
             .map(|s| s.parse())
             .collect::<std::result::Result<Vec<_>, _>>()?;
         if item_ids.is_empty() {
-            return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 json!({"confirmed": 0}),
             ));
         }
@@ -717,7 +717,7 @@ impl CustomOperation for AccessReviewBulkConfirmOp {
             .await?;
         }
         tx.commit().await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({"confirmed": confirmed_count}),
         ))
     }
@@ -821,9 +821,9 @@ impl CustomOperation for AccessReviewConfirmCleanOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
         let mut tx = pool.begin().await?;
         let result = sqlx::query!(
@@ -864,7 +864,7 @@ impl CustomOperation for AccessReviewConfirmCleanOp {
         .fetch_one(&mut *tx)
         .await?;
         tx.commit().await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "confirmed": confirmed,
                 "remaining": remaining
@@ -990,9 +990,9 @@ impl CustomOperation for AccessReviewAttestOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use chrono::Utc;
         use std::hash::{Hash, Hasher};
 
@@ -1036,7 +1036,7 @@ impl CustomOperation for AccessReviewAttestOp {
         )
         .fetch_one(pool)
         .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             attestation_id,
         ))
     }
@@ -1182,9 +1182,9 @@ impl CustomOperation for AccessReviewProcessDeadlineOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
         let action = json_extract_string(args, "action")?;
         let mut tx = pool.begin().await?;
@@ -1254,7 +1254,7 @@ impl CustomOperation for AccessReviewProcessDeadlineOp {
             .await?;
         }
         tx.commit().await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "action": action,
                 "affected": affected
@@ -1325,9 +1325,9 @@ impl CustomOperation for AccessReviewSendRemindersOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let campaign_id = json_extract_uuid(args, ctx, "campaign")?;
         let pending_count: i64 = sqlx::query_scalar!(
             r#"
@@ -1339,7 +1339,7 @@ impl CustomOperation for AccessReviewSendRemindersOp {
         )
         .fetch_one(pool)
         .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "campaign_id": campaign_id,
                 "reviewers_to_notify": pending_count

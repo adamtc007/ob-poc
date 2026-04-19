@@ -14,7 +14,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -37,9 +37,9 @@ use sqlx::{PgPool, Row};
 async fn execute_json_via_legacy<T: CustomOperation + Sync>(
     op: &T,
     args: &serde_json::Value,
-    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    ctx: &mut dsl_runtime::VerbExecutionContext,
     pool: &PgPool,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
         op.domain(),
         op.verb(),
@@ -47,6 +47,7 @@ async fn execute_json_via_legacy<T: CustomOperation + Sync>(
     );
     let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
     let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    crate::sem_os_runtime::verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
     Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
 }
 
@@ -240,9 +241,9 @@ impl CustomOperation for TradingProfileImportOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -329,9 +330,9 @@ impl CustomOperation for TradingProfileGetActiveOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -440,9 +441,9 @@ impl CustomOperation for TradingProfileActivateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -752,9 +753,9 @@ impl CustomOperation for TradingProfileMaterializeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -1538,9 +1539,9 @@ impl CustomOperation for TradingProfileCreateDraftOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -1693,9 +1694,9 @@ impl CustomOperation for TradingProfileAddComponentOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -1830,9 +1831,9 @@ impl CustomOperation for TradingProfileRemoveComponentOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -1936,9 +1937,9 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -2022,9 +2023,9 @@ impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -2160,9 +2161,9 @@ impl CustomOperation for TradingProfileAddMarketOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -2257,9 +2258,9 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -2405,9 +2406,9 @@ impl CustomOperation for TradingProfileAddSsiOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -2491,9 +2492,9 @@ impl CustomOperation for TradingProfileRemoveSsiOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -2643,9 +2644,9 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -2740,9 +2741,9 @@ impl CustomOperation for TradingProfileRemoveBookingRuleOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -2871,9 +2872,9 @@ impl CustomOperation for TradingProfileAddIsdaConfigOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -2988,9 +2989,9 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -3123,9 +3124,9 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -3287,9 +3288,9 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -3397,9 +3398,9 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -3487,9 +3488,9 @@ impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -3586,9 +3587,9 @@ impl CustomOperation for TradingProfileRemoveCsaConfigOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -3786,9 +3787,9 @@ impl CustomOperation for TradingProfileAddImMandateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -3908,9 +3909,9 @@ impl CustomOperation for TradingProfileUpdateImScopeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -3994,9 +3995,9 @@ impl CustomOperation for TradingProfileRemoveImMandateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4088,9 +4089,9 @@ impl CustomOperation for TradingProfileSetBaseCurrencyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4177,9 +4178,9 @@ impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4251,9 +4252,9 @@ impl CustomOperation for TradingProfileDiffOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4321,9 +4322,9 @@ impl CustomOperation for TradingProfileValidateCoverageOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4386,9 +4387,9 @@ impl CustomOperation for TradingProfileValidateGoLiveReadyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4470,9 +4471,9 @@ impl CustomOperation for TradingProfileSubmitOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4607,9 +4608,9 @@ impl CustomOperation for TradingProfileApproveOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4689,9 +4690,9 @@ impl CustomOperation for TradingProfileRejectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4769,9 +4770,9 @@ impl CustomOperation for TradingProfileArchiveOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4885,9 +4886,9 @@ impl CustomOperation for TradingProfileCloneToOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -4976,9 +4977,9 @@ impl CustomOperation for TradingProfileCreateNewVersionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 

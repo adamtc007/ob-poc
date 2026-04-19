@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use uuid::Uuid;
 
 #[cfg(feature = "database")]
@@ -266,9 +266,9 @@ impl CustomOperation for EntityQueryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_int_opt, json_extract_string_opt};
 
         let entity_type = json_extract_string_opt(args, "type");
@@ -277,7 +277,7 @@ impl CustomOperation for EntityQueryOp {
         let limit = json_extract_int_opt(args, "limit").unwrap_or(1000);
         let result = entity_query_impl(entity_type, name_like, jurisdiction, limit, pool).await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "_type": "entity_query",
                 "_debug": format!("{result:?}")

@@ -22,13 +22,11 @@ use ob_poc::session::unified::{ClientRef, StructureType, UnifiedSession};
 // =============================================================================
 
 fn fixture_dir() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/macros")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/macros")
 }
 
 fn load_fixture_registry() -> MacroRegistry {
-    load_macro_registry_from_dir(&fixture_dir())
-        .expect("fixture macros must load")
+    load_macro_registry_from_dir(&fixture_dir()).expect("fixture macros must load")
 }
 
 fn test_session() -> UnifiedSession {
@@ -71,9 +69,13 @@ struct FailOnVerb(String);
 impl StepExecutor for FailOnVerb {
     async fn execute_step(&self, step: &CompiledStep) -> StepOutcome {
         if step.verb == self.0 {
-            StepOutcome::Failed { error: format!("{} failed", step.verb) }
+            StepOutcome::Failed {
+                error: format!("{} failed", step.verb),
+            }
         } else {
-            StepOutcome::Completed { result: serde_json::json!({"ok": true}) }
+            StepOutcome::Completed {
+                result: serde_json::json!({"ok": true}),
+            }
         }
     }
 }
@@ -88,7 +90,9 @@ impl StepExecutor for ParkOnVerb {
                 message: "Waiting for approval".into(),
             }
         } else {
-            StepOutcome::Completed { result: serde_json::json!({"ok": true}) }
+            StepOutcome::Completed {
+                result: serde_json::json!({"ok": true}),
+            }
         }
     }
 }
@@ -97,14 +101,22 @@ struct RecordingExecutor {
     executed: std::sync::Mutex<Vec<String>>,
 }
 impl RecordingExecutor {
-    fn new() -> Self { Self { executed: std::sync::Mutex::new(Vec::new()) } }
-    fn executed_verbs(&self) -> Vec<String> { self.executed.lock().unwrap().clone() }
+    fn new() -> Self {
+        Self {
+            executed: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+    fn executed_verbs(&self) -> Vec<String> {
+        self.executed.lock().unwrap().clone()
+    }
 }
 #[async_trait::async_trait]
 impl StepExecutor for RecordingExecutor {
     async fn execute_step(&self, step: &CompiledStep) -> StepOutcome {
         self.executed.lock().unwrap().push(step.verb.clone());
-        StepOutcome::Completed { result: serde_json::json!({"ok": true}) }
+        StepOutcome::Completed {
+            result: serde_json::json!({"ok": true}),
+        }
     }
 }
 
@@ -119,8 +131,15 @@ async fn compile_and_execute(
     let classification = classify_verb(macro_name, &verb_index, registry);
 
     let resp = compile_verb(
-        Uuid::new_v4(), &classification, &args, &session, registry,
-        1, constraints, None, None,
+        Uuid::new_v4(),
+        &classification,
+        &args,
+        &session,
+        registry,
+        1,
+        constraints,
+        None,
+        None,
     );
 
     if let OrchestratorResponse::Compiled(ref summary) = resp {
@@ -129,7 +148,9 @@ async fn compile_and_execute(
         let id = rb.id;
         let store = RunbookStore::new();
         store.insert(&rb).await.unwrap();
-        let result = execute_runbook(&store, id, None, &SuccessExecutor).await.unwrap();
+        let result = execute_runbook(&store, id, None, &SuccessExecutor)
+            .await
+            .unwrap();
         (resp, Some(result))
     } else {
         (resp, None)
@@ -160,7 +181,10 @@ async fn macro_end_to_end() {
     assert_eq!(summary.preview[0].verb, "cbu.create");
 
     let result = exec_result.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Completed { .. }));
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
     assert_eq!(result.step_results.len(), 1);
 }
 
@@ -231,21 +255,30 @@ async fn pack_completion_widening() {
     manager.activate_pack("kyc-case").unwrap();
 
     let before = manager.effective_constraints();
-    assert!(!before.allowed_verbs.as_ref().unwrap().contains("cbu.create"));
+    assert!(!before
+        .allowed_verbs
+        .as_ref()
+        .unwrap()
+        .contains("cbu.create"));
 
     manager.complete_pack("kyc-case").unwrap();
     let after = manager.effective_constraints();
-    assert!(after.allowed_verbs.is_none(), "After completion, unconstrained");
+    assert!(
+        after.allowed_verbs.is_none(),
+        "After completion, unconstrained"
+    );
 
     let registry = load_fixture_registry();
     let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Widened Fund".to_string());
 
-    let (resp, exec_result) =
-        compile_and_execute("structure.setup", args, &registry, &after).await;
+    let (resp, exec_result) = compile_and_execute("structure.setup", args, &registry, &after).await;
 
     assert!(resp.is_compiled());
-    assert!(matches!(exec_result.unwrap().final_status, CompiledRunbookStatus::Completed { .. }));
+    assert!(matches!(
+        exec_result.unwrap().final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
 }
 
 // =============================================================================
@@ -264,11 +297,37 @@ async fn replay_determinism() {
 
     let classification = classify_verb("structure.full-setup", &verb_index, &registry);
 
-    let resp1 = compile_verb(Uuid::new_v4(), &classification, &args, &session, &registry, 1, &constraints, None, None);
-    let resp2 = compile_verb(Uuid::new_v4(), &classification, &args, &session, &registry, 1, &constraints, None, None);
+    let resp1 = compile_verb(
+        Uuid::new_v4(),
+        &classification,
+        &args,
+        &session,
+        &registry,
+        1,
+        &constraints,
+        None,
+        None,
+    );
+    let resp2 = compile_verb(
+        Uuid::new_v4(),
+        &classification,
+        &args,
+        &session,
+        &registry,
+        1,
+        &constraints,
+        None,
+        None,
+    );
 
-    let s1 = match resp1 { OrchestratorResponse::Compiled(s) => s, _ => panic!("compile 1 failed") };
-    let s2 = match resp2 { OrchestratorResponse::Compiled(s) => s, _ => panic!("compile 2 failed") };
+    let s1 = match resp1 {
+        OrchestratorResponse::Compiled(s) => s,
+        _ => panic!("compile 1 failed"),
+    };
+    let s2 = match resp2 {
+        OrchestratorResponse::Compiled(s) => s,
+        _ => panic!("compile 2 failed"),
+    };
 
     assert_eq!(s1.step_count, s2.step_count);
     for (a, b) in s1.preview.iter().zip(s2.preview.iter()) {
@@ -304,10 +363,14 @@ async fn locking_no_deadlock() {
     let id_b = Uuid::parse_str("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb").unwrap();
     let id_c = Uuid::parse_str("cccccccc-cccc-cccc-cccc-cccccccccccc").unwrap();
 
-    let mut s1 = make_step("cbu.create"); s1.write_set = vec![id_c, id_a];
-    let mut s2 = make_step("entity.create"); s2.write_set = vec![id_b, id_a];
-    let mut s3 = make_step("cbu.rename"); s3.write_set = vec![id_b, id_c];
-    let mut s4 = make_step("entity.update"); s4.write_set = vec![id_a];
+    let mut s1 = make_step("cbu.create");
+    s1.write_set = vec![id_c, id_a];
+    let mut s2 = make_step("entity.create");
+    s2.write_set = vec![id_b, id_a];
+    let mut s3 = make_step("cbu.rename");
+    s3.write_set = vec![id_b, id_c];
+    let mut s4 = make_step("entity.update");
+    s4.write_set = vec![id_a];
 
     let ws1 = compute_write_set(&[s1, s2], None);
     let ws2 = compute_write_set(&[s3, s4], None);
@@ -327,22 +390,51 @@ async fn execution_gate_rejects_raw() {
 
     let fake_rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![], ReplayEnvelope::empty());
     let fake_id = fake_rb.id;
-    assert!(matches!(execute_runbook(&store, fake_id, None, &SuccessExecutor).await, Err(ExecutionError::NotFound(_))));
+    assert!(matches!(
+        execute_runbook(&store, fake_id, None, &SuccessExecutor).await,
+        Err(ExecutionError::NotFound(_))
+    ));
 
-    let rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![make_step("cbu.create")], ReplayEnvelope::empty());
+    let rb = CompiledRunbook::new(
+        Uuid::new_v4(),
+        1,
+        vec![make_step("cbu.create")],
+        ReplayEnvelope::empty(),
+    );
     let id = rb.id;
     store.insert(&rb).await.unwrap();
-    let result = execute_runbook(&store, id, None, &SuccessExecutor).await.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Completed { .. }));
+    let result = execute_runbook(&store, id, None, &SuccessExecutor)
+        .await
+        .unwrap();
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
 
-    assert!(matches!(execute_runbook(&store, id, None, &SuccessExecutor).await, Err(ExecutionError::NotExecutable(_, _))));
+    assert!(matches!(
+        execute_runbook(&store, id, None, &SuccessExecutor).await,
+        Err(ExecutionError::NotExecutable(_, _))
+    ));
 
-    let rb2 = CompiledRunbook::new(Uuid::new_v4(), 2, vec![make_step("entity.create")], ReplayEnvelope::empty());
+    let rb2 = CompiledRunbook::new(
+        Uuid::new_v4(),
+        2,
+        vec![make_step("entity.create")],
+        ReplayEnvelope::empty(),
+    );
     let id2 = rb2.id;
     store.insert(&rb2).await.unwrap();
-    let result = execute_runbook(&store, id2, None, &FailOnVerb("entity.create".into())).await.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Failed { .. }));
-    assert!(matches!(execute_runbook(&store, id2, None, &SuccessExecutor).await, Err(ExecutionError::NotExecutable(_, _))));
+    let result = execute_runbook(&store, id2, None, &FailOnVerb("entity.create".into()))
+        .await
+        .unwrap();
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Failed { .. }
+    ));
+    assert!(matches!(
+        execute_runbook(&store, id2, None, &SuccessExecutor).await,
+        Err(ExecutionError::NotExecutable(_, _))
+    ));
 }
 
 // =============================================================================
@@ -373,7 +465,17 @@ async fn constraint_violation_remediation() {
     let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Blocked Fund".to_string());
 
-    let resp = compile_verb(Uuid::new_v4(), &classification, &args, &session, &registry, 1, &constraints, None, None);
+    let resp = compile_verb(
+        Uuid::new_v4(),
+        &classification,
+        &args,
+        &session,
+        &registry,
+        1,
+        &constraints,
+        None,
+        None,
+    );
 
     let detail = match resp {
         OrchestratorResponse::ConstraintViolation(d) => d,
@@ -398,7 +500,12 @@ async fn runbook_immutability() {
     let step3 = make_step("trading-profile.create");
     let original_ids: Vec<Uuid> = vec![step1.step_id, step2.step_id, step3.step_id];
 
-    let rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![step1, step2, step3], ReplayEnvelope::empty());
+    let rb = CompiledRunbook::new(
+        Uuid::new_v4(),
+        1,
+        vec![step1, step2, step3],
+        ReplayEnvelope::empty(),
+    );
     let id = rb.id;
     let version = rb.version;
     let session_id = rb.session_id;
@@ -407,8 +514,13 @@ async fn runbook_immutability() {
     let before = store.get(&id).await.unwrap().unwrap();
     assert_eq!(before.steps.len(), 3);
 
-    let result = execute_runbook(&store, id, None, &SuccessExecutor).await.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Completed { .. }));
+    let result = execute_runbook(&store, id, None, &SuccessExecutor)
+        .await
+        .unwrap();
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
 
     let after = store.get(&id).await.unwrap().unwrap();
     assert_eq!(after.steps.len(), 3);
@@ -435,10 +547,16 @@ async fn multi_step_macro_pipeline() {
         compile_and_execute("structure.full-setup", args, &registry, &constraints).await;
 
     assert!(resp.is_compiled());
-    let summary = match &resp { OrchestratorResponse::Compiled(s) => s, _ => unreachable!() };
+    let summary = match &resp {
+        OrchestratorResponse::Compiled(s) => s,
+        _ => unreachable!(),
+    };
     assert_eq!(summary.step_count, 2);
 
-    assert!(matches!(exec_result.unwrap().final_status, CompiledRunbookStatus::Completed { .. }));
+    assert!(matches!(
+        exec_result.unwrap().final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
 }
 
 // =============================================================================
@@ -453,21 +571,51 @@ async fn park_and_resume_pipeline() {
     let step2_id = step2.step_id;
     let step3 = make_step("entity.create");
 
-    let rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![step1, step2, step3], ReplayEnvelope::empty());
+    let rb = CompiledRunbook::new(
+        Uuid::new_v4(),
+        1,
+        vec![step1, step2, step3],
+        ReplayEnvelope::empty(),
+    );
     let id = rb.id;
     store.insert(&rb).await.unwrap();
 
-    let result = execute_runbook(&store, id, None, &ParkOnVerb("doc.solicit".into())).await.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Parked { .. }));
+    let result = execute_runbook(&store, id, None, &ParkOnVerb("doc.solicit".into()))
+        .await
+        .unwrap();
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Parked { .. }
+    ));
 
-    store.update_status(&id, "Parked", CompiledRunbookStatus::Parked {
-        reason: ParkReason::AwaitingCallback { correlation_key: "callback-1".into() },
-        cursor: StepCursor { index: 1, step_id: step2_id },
-    }).await.unwrap();
+    store
+        .update_status(
+            &id,
+            "Parked",
+            CompiledRunbookStatus::Parked {
+                reason: ParkReason::AwaitingCallback {
+                    correlation_key: "callback-1".into(),
+                },
+                cursor: StepCursor {
+                    index: 1,
+                    step_id: step2_id,
+                },
+            },
+        )
+        .await
+        .unwrap();
 
-    let cursor = StepCursor { index: 1, step_id: step2_id };
-    let result = execute_runbook(&store, id, Some(cursor), &SuccessExecutor).await.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Completed { .. }));
+    let cursor = StepCursor {
+        index: 1,
+        step_id: step2_id,
+    };
+    let result = execute_runbook(&store, id, Some(cursor), &SuccessExecutor)
+        .await
+        .unwrap();
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
 }
 
 // =============================================================================
@@ -480,21 +628,41 @@ async fn primitive_verb_compile_and_execute() {
     let session = test_session();
     let constraints = EffectiveConstraints::unconstrained();
 
-    let classification = VerbClassification::Primitive { fqn: "cbu.create".to_string() };
+    let classification = VerbClassification::Primitive {
+        fqn: "cbu.create".to_string(),
+    };
     let mut args = BTreeMap::new();
     args.insert("name".to_string(), "Direct Fund".to_string());
 
-    let resp = compile_verb(Uuid::new_v4(), &classification, &args, &session, &registry, 1, &constraints, None, None);
+    let resp = compile_verb(
+        Uuid::new_v4(),
+        &classification,
+        &args,
+        &session,
+        &registry,
+        1,
+        &constraints,
+        None,
+        None,
+    );
     assert!(resp.is_compiled());
 
-    let summary = match &resp { OrchestratorResponse::Compiled(s) => s, _ => unreachable!() };
+    let summary = match &resp {
+        OrchestratorResponse::Compiled(s) => s,
+        _ => unreachable!(),
+    };
     let store = RunbookStore::new();
     let steps: Vec<_> = summary.preview.iter().map(|p| make_step(&p.verb)).collect();
     let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
     let id = rb.id;
     store.insert(&rb).await.unwrap();
-    let result = execute_runbook(&store, id, None, &SuccessExecutor).await.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Completed { .. }));
+    let result = execute_runbook(&store, id, None, &SuccessExecutor)
+        .await
+        .unwrap();
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
 }
 
 // =============================================================================
@@ -510,13 +678,25 @@ fn compile_invocation_missing_macro_args() {
     let args = BTreeMap::new();
 
     let resp = ob_poc::runbook::compile_invocation(
-        Uuid::new_v4(), "structure.setup", &args, &session, &registry,
-        &verb_index, &constraints, 1, None, None,
+        Uuid::new_v4(),
+        "structure.setup",
+        &args,
+        &session,
+        &registry,
+        &verb_index,
+        &constraints,
+        1,
+        None,
+        None,
     );
 
     assert!(matches!(resp, OrchestratorResponse::Clarification(_)));
     if let OrchestratorResponse::Clarification(c) = &resp {
-        let names: Vec<&str> = c.missing_fields.iter().map(|f| f.field_name.as_str()).collect();
+        let names: Vec<&str> = c
+            .missing_fields
+            .iter()
+            .map(|f| f.field_name.as_str())
+            .collect();
         assert!(names.contains(&"name"));
     }
 }
@@ -531,12 +711,23 @@ fn compile_invocation_end_to_end() {
     args.insert("name".to_string(), "E2E Fund".to_string());
 
     let resp = ob_poc::runbook::compile_invocation(
-        Uuid::new_v4(), "structure.setup", &args, &session, &registry,
-        &verb_index, &constraints, 1, None, None,
+        Uuid::new_v4(),
+        "structure.setup",
+        &args,
+        &session,
+        &registry,
+        &verb_index,
+        &constraints,
+        1,
+        None,
+        None,
     );
 
     assert!(resp.is_compiled());
-    let summary = match &resp { OrchestratorResponse::Compiled(s) => s, _ => unreachable!() };
+    let summary = match &resp {
+        OrchestratorResponse::Compiled(s) => s,
+        _ => unreachable!(),
+    };
     assert_eq!(summary.preview[0].verb, "cbu.create");
 }
 
@@ -561,8 +752,16 @@ fn compile_invocation_constraint_violation() {
     args.insert("name".to_string(), "Blocked Fund".to_string());
 
     let resp = ob_poc::runbook::compile_invocation(
-        Uuid::new_v4(), "structure.setup", &args, &session, &registry,
-        &verb_index, &constraints, 1, None, None,
+        Uuid::new_v4(),
+        "structure.setup",
+        &args,
+        &session,
+        &registry,
+        &verb_index,
+        &constraints,
+        1,
+        None,
+        None,
     );
 
     assert!(matches!(resp, OrchestratorResponse::ConstraintViolation(_)));

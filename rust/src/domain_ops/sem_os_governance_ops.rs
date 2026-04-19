@@ -7,7 +7,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::sem_os_helpers::{delegate_to_stew_tool, delegate_to_tool};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
@@ -58,9 +58,9 @@ impl CustomOperation for GovernanceGatePrecheckOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_gate_precheck")
             .await
     }
@@ -111,9 +111,9 @@ impl CustomOperation for GovernanceSubmitForReviewOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_submit_for_review")
             .await
     }
@@ -164,9 +164,9 @@ impl CustomOperation for GovernanceRecordReviewOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_stew_tool_json(
             pool,
             ctx,
@@ -222,9 +222,9 @@ impl CustomOperation for GovernanceValidateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan").await
     }
 
@@ -272,9 +272,9 @@ impl CustomOperation for GovernanceDryRunOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "sem_reg_validate_plan").await
     }
 
@@ -322,9 +322,9 @@ impl CustomOperation for GovernancePlanPublishOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_impact_analysis")
             .await
     }
@@ -373,9 +373,9 @@ impl CustomOperation for GovernancePublishOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_publish").await
     }
 
@@ -425,9 +425,9 @@ impl CustomOperation for GovernancePublishBatchOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_stew_tool_json(pool, ctx, args, "stew_publish").await
     }
 
@@ -444,13 +444,13 @@ pub struct GovernanceRollbackOp;
 async fn governance_rollback_impl(
     target: &str,
     pool: &PgPool,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     sqlx::query("UPDATE sem_reg_pub.active_snapshot_set SET snapshot_set_id = $1")
         .bind(target)
         .execute(pool)
         .await?;
 
-    Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+    Ok(dsl_runtime::VerbExecutionOutcome::Record(
         serde_json::json!({
             "rolled_back_to": target,
             "status": "success",
@@ -484,7 +484,7 @@ impl CustomOperation for GovernanceRollbackOp {
         })?;
 
         match governance_rollback_impl(&target, pool).await? {
-            sem_os_core::execution::VerbExecutionOutcome::Record(value) => {
+            dsl_runtime::VerbExecutionOutcome::Record(value) => {
                 Ok(ExecutionResult::Record(value))
             }
             _ => unreachable!(),
@@ -504,9 +504,9 @@ impl CustomOperation for GovernanceRollbackOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let target = super::helpers::json_extract_string(args, "target-snapshot-set-id")?;
         governance_rollback_impl(&target, pool).await
     }

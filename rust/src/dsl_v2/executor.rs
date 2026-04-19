@@ -1281,6 +1281,7 @@ impl DslExecutor {
 
     /// Inner verb execution logic (no event emission)
     #[cfg(feature = "database")]
+    #[allow(clippy::too_many_arguments)]
     async fn execute_verb_inner(
         &self,
         vc: &VerbCall,
@@ -1299,12 +1300,9 @@ impl DslExecutor {
 
         // Check if this is a plugin (custom operation)
         if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
-            tracing::debug!("execute_verb: routing to PLUGIN");
-            // Dispatch to custom operations handler
+            tracing::debug!("execute_verb: routing to PLUGIN (execute_json)");
             if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                let result = op.execute(vc, ctx, &self.pool).await;
-                tracing::debug!("execute_verb: plugin returned {:?}", result.is_ok());
-                return result;
+                return dispatch_plugin_via_execute_json(op.as_ref(), vc, ctx, &self.pool).await;
             }
             return Err(anyhow!(
                 "Plugin {}.{} has no handler implementation",
@@ -1325,12 +1323,7 @@ impl DslExecutor {
                     vc.verb
                 );
                 if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                    let result = op.execute(vc, ctx, &self.pool).await;
-                    tracing::debug!(
-                        "execute_verb: durable direct plugin returned {:?}",
-                        result.is_ok()
-                    );
-                    return result;
+                    return dispatch_plugin_via_execute_json(op.as_ref(), vc, ctx, &self.pool).await;
                 }
 
                 return Err(anyhow!(
@@ -1447,6 +1440,109 @@ impl DslExecutor {
             Literal::Uuid(u) => Ok(JsonValue::String(u.to_string())),
         }
     }
+}
+
+// ============================================================================
+// Plugin dispatch via execute_json (Phase 2c cutover)
+// ============================================================================
+
+/// Dispatch a plugin op through its `execute_json` method, bridging between
+/// the legacy `ExecutionContext` / `VerbCall` / `ExecutionResult` types and
+/// the SemOS-native `VerbExecutionContext` / JSON args / `VerbExecutionOutcome`.
+///
+/// This is the single point where legacy and SemOS-native worlds meet after
+/// the Phase 2c dispatch flip. The thunk:
+///
+/// 1. Builds a `VerbExecutionContext` from the caller's `ExecutionContext`
+///    (copies symbols + session-scoped fields into `extensions`).
+/// 2. Converts the `VerbCall` arguments to a JSON object.
+/// 3. Calls `op.execute_json(...)`.
+/// 4. Syncs `sem_ctx` mutations back: new symbol bindings + pending_* side
+///    channels unpacked from `sem_ctx.extensions` into the caller's
+///    `ExecutionContext.pending_*` fields.
+/// 5. Converts `VerbExecutionOutcome` back to `ExecutionResult`.
+///
+/// After all ops migrate their `execute_json` bodies to native (no
+/// thunking through legacy `execute()`), this bridge becomes the only live
+/// path for plugin dispatch; the legacy `CustomOperation::execute()` method
+/// is removed in a follow-up slice.
+#[cfg(feature = "database")]
+async fn dispatch_plugin_via_execute_json(
+    op: &dyn crate::domain_ops::CustomOperation,
+    vc: &VerbCall,
+    ctx: &mut ExecutionContext,
+    pool: &PgPool,
+) -> Result<ExecutionResult> {
+    use crate::sem_os_runtime::verb_executor_adapter as adapter;
+    use sem_os_core::principal::Principal;
+
+    // 1. Build sem_ctx from legacy ctx.
+    let mut sem_ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
+    sem_ctx.symbols = ctx.symbols.clone();
+    sem_ctx.symbol_types = ctx.symbol_types.clone();
+    sem_ctx.execution_id = ctx.execution_id;
+
+    let mut ext_map = serde_json::Map::new();
+    if let Some(ref audit_user) = ctx.audit_user {
+        ext_map.insert(
+            "audit_user".to_string(),
+            serde_json::Value::String(audit_user.clone()),
+        );
+    }
+    if let Some(session_id) = ctx.session_id {
+        ext_map.insert(
+            "session_id".to_string(),
+            serde_json::Value::String(session_id.to_string()),
+        );
+    }
+    if let Some(group_id) = ctx.client_group_id {
+        ext_map.insert(
+            "client_group_id".to_string(),
+            serde_json::Value::String(group_id.to_string()),
+        );
+    }
+    if let Some(ref group_name) = ctx.client_group_name {
+        ext_map.insert(
+            "client_group_name".to_string(),
+            serde_json::Value::String(group_name.clone()),
+        );
+    }
+    if let Some(ref persona) = ctx.persona {
+        ext_map.insert(
+            "persona".to_string(),
+            serde_json::Value::String(persona.clone()),
+        );
+    }
+    if !ctx.session_cbu_ids.is_empty() {
+        let ids: Vec<serde_json::Value> = ctx
+            .session_cbu_ids
+            .iter()
+            .map(|u| serde_json::Value::String(u.to_string()))
+            .collect();
+        ext_map.insert("session_cbu_ids".to_string(), serde_json::Value::Array(ids));
+    }
+    sem_ctx.extensions = serde_json::Value::Object(ext_map);
+
+    // 2. Convert VerbCall args → JSON.
+    let args = adapter::verb_call_to_json(vc);
+
+    // 3. Dispatch.
+    let outcome = op
+        .execute_json(&args, &mut sem_ctx, pool)
+        .await
+        .map_err(|e| anyhow!("execute_json({}.{}) failed: {}", op.domain(), op.verb(), e))?;
+
+    // 4. Sync sem_ctx mutations back into the caller's ExecutionContext.
+    for (name, uuid) in &sem_ctx.symbols {
+        ctx.symbols.insert(name.clone(), *uuid);
+    }
+    for (name, ty) in &sem_ctx.symbol_types {
+        ctx.symbol_types.insert(name.clone(), ty.clone());
+    }
+    adapter::apply_sem_ctx_extensions_to_exec_ctx(&sem_ctx, ctx);
+
+    // 5. Convert outcome back to legacy ExecutionResult.
+    Ok(adapter::from_verb_outcome(outcome))
 }
 
 // ============================================================================

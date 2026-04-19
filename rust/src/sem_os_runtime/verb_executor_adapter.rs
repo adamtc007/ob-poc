@@ -1,4 +1,4 @@
-//! Adapter implementing `sem_os_core::execution::VerbExecutionPort` over
+//! Adapter implementing `dsl_runtime::VerbExecutionPort` over
 //! the existing `DslExecutor` dispatch chain.
 //!
 //! This is the bridge between SemOS's execution contract and ob-poc's
@@ -15,11 +15,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use sem_os_core::execution::{
-    VerbExecutionContext, VerbExecutionOutcome, VerbExecutionPort, VerbExecutionResult,
-    VerbSideEffects,
-};
+use dsl_runtime::VerbExecutionPort;
 use sem_os_core::error::SemOsError;
+use dsl_runtime::{
+    VerbExecutionContext, VerbExecutionOutcome, VerbExecutionResult, VerbSideEffects,
+};
 
 use crate::dsl_v2::executor::{DslExecutor, ExecutionContext, ExecutionResult};
 use dsl_core::ast::{Argument, AstNode, Literal, Span, VerbCall};
@@ -35,7 +35,7 @@ pub struct ObPocVerbExecutor {
     /// Optional SemOS-native CRUD executor. When set, CRUD verbs bypass
     /// the GenericCrudExecutor and route through the SemOS contract.
     /// Set via `with_crud_port()`. None = all verbs go through DslExecutor.
-    crud_port: Option<Arc<dyn sem_os_core::execution::CrudExecutionPort>>,
+    crud_port: Option<Arc<dyn dsl_runtime::CrudExecutionPort>>,
 }
 
 impl ObPocVerbExecutor {
@@ -64,7 +64,7 @@ impl ObPocVerbExecutor {
     /// using `VerbContractBody` metadata, bypassing the legacy GenericCrudExecutor.
     pub fn with_crud_port(
         mut self,
-        port: Arc<dyn sem_os_core::execution::CrudExecutionPort>,
+        port: Arc<dyn dsl_runtime::CrudExecutionPort>,
     ) -> Self {
         self.crud_port = Some(port);
         self
@@ -79,7 +79,7 @@ impl VerbExecutionPort for ObPocVerbExecutor {
         verb_fqn: &str,
         args: serde_json::Value,
         ctx: &mut VerbExecutionContext,
-    ) -> sem_os_core::execution::Result<VerbExecutionResult> {
+    ) -> dsl_runtime::Result<VerbExecutionResult> {
         // 1. Split FQN into domain.verb
         let (domain, verb) = split_fqn(verb_fqn)?;
 
@@ -154,6 +154,7 @@ impl VerbExecutionPort for ObPocVerbExecutor {
         Ok(VerbExecutionResult {
             outcome,
             side_effects,
+            ..Default::default()
         })
     }
 }
@@ -166,7 +167,9 @@ fn runtime_verb_to_contract(
     rv: &crate::dsl_v2::runtime_registry::RuntimeVerb,
 ) -> sem_os_core::verb_contract::VerbContractBody {
     use crate::dsl_v2::runtime_registry::RuntimeBehavior;
-    use sem_os_core::verb_contract::{VerbArgDef, VerbContractBody, VerbCrudMapping, VerbReturnSpec};
+    use sem_os_core::verb_contract::{
+        VerbArgDef, VerbContractBody, VerbCrudMapping, VerbReturnSpec,
+    };
 
     let crud_mapping = if let RuntimeBehavior::Crud(ref crud) = rv.behavior {
         Some(VerbCrudMapping {
@@ -229,10 +232,18 @@ fn runtime_verb_to_contract(
         subject_kinds: rv.subject_kinds.clone(),
         phase_tags: vec![],
         harm_class: rv.harm_class.map(|h| match h {
-            dsl_core::config::types::HarmClass::ReadOnly => sem_os_core::verb_contract::HarmClass::ReadOnly,
-            dsl_core::config::types::HarmClass::Reversible => sem_os_core::verb_contract::HarmClass::Reversible,
-            dsl_core::config::types::HarmClass::Irreversible => sem_os_core::verb_contract::HarmClass::Irreversible,
-            dsl_core::config::types::HarmClass::Destructive => sem_os_core::verb_contract::HarmClass::Destructive,
+            dsl_core::config::types::HarmClass::ReadOnly => {
+                sem_os_core::verb_contract::HarmClass::ReadOnly
+            }
+            dsl_core::config::types::HarmClass::Reversible => {
+                sem_os_core::verb_contract::HarmClass::Reversible
+            }
+            dsl_core::config::types::HarmClass::Irreversible => {
+                sem_os_core::verb_contract::HarmClass::Irreversible
+            }
+            dsl_core::config::types::HarmClass::Destructive => {
+                sem_os_core::verb_contract::HarmClass::Destructive
+            }
         }),
         action_class: None,
         precondition_states: vec![],
@@ -246,7 +257,7 @@ fn runtime_verb_to_contract(
     }
 }
 
-fn split_fqn(fqn: &str) -> sem_os_core::execution::Result<(String, String)> {
+fn split_fqn(fqn: &str) -> dsl_runtime::Result<(String, String)> {
     let parts: Vec<&str> = fqn.splitn(2, '.').collect();
     if parts.len() != 2 {
         return Err(SemOsError::InvalidInput(format!(
@@ -270,6 +281,205 @@ pub fn to_dsl_context_pub(ctx: &VerbExecutionContext) -> ExecutionContext {
 /// Public wrapper for use by the compatibility shim.
 pub fn to_verb_outcome_pub(result: &ExecutionResult) -> VerbExecutionOutcome {
     to_verb_outcome(result)
+}
+
+/// Sync mutations from a thunk's fresh `ExecutionContext` back into the
+/// caller's `VerbExecutionContext` — used by the Phase 2c compatibility
+/// shim so `execute_json_via_legacy` no longer drops mutations.
+///
+/// Propagates:
+/// - new/changed `symbols` + `symbol_types` entries
+/// - `pending_*` side-channel state into `sem_ctx.extensions` under stable
+///   JSON keys (later unpacked by `apply_sem_ctx_extensions_to_exec_ctx`
+///   at the dispatch boundary)
+pub fn sync_exec_ctx_to_sem_ctx(
+    exec_ctx: &ExecutionContext,
+    sem_ctx: &mut VerbExecutionContext,
+) {
+    // 1. Symbols.
+    for (name, uuid) in &exec_ctx.symbols {
+        sem_ctx.symbols.insert(name.clone(), *uuid);
+    }
+    for (name, ty) in &exec_ctx.symbol_types {
+        sem_ctx.symbol_types.insert(name.clone(), ty.clone());
+    }
+
+    // 2. Side-channel state → sem_ctx.extensions.
+    // Ensure extensions is an object (default state is Null).
+    if !sem_ctx.extensions.is_object() {
+        sem_ctx.extensions = serde_json::Value::Object(serde_json::Map::new());
+    }
+    let ext = sem_ctx.extensions.as_object_mut().unwrap();
+
+    macro_rules! pack_opt {
+        ($field:ident) => {
+            if let Some(ref v) = exec_ctx.$field {
+                if let Ok(j) = serde_json::to_value(v) {
+                    ext.insert(stringify!($field).to_string(), j);
+                }
+            }
+        };
+    }
+    macro_rules! pack_opt_opt {
+        ($field:ident) => {
+            if let Some(ref outer) = exec_ctx.$field {
+                let inner = match outer {
+                    Some(v) => serde_json::to_value(v).unwrap_or(serde_json::Value::Null),
+                    None => serde_json::Value::Null,
+                };
+                ext.insert(
+                    stringify!($field).to_string(),
+                    serde_json::json!({ "set": true, "value": inner }),
+                );
+            }
+        };
+    }
+
+    pack_opt!(pending_view_state);
+    pack_opt!(pending_viewport_state);
+    pack_opt!(pending_scope_change);
+    pack_opt!(pending_session);
+    pack_opt!(pending_session_name);
+    pack_opt!(pending_structure_id);
+    pack_opt!(pending_structure_name);
+    pack_opt!(pending_case_id);
+    pack_opt!(pending_mandate_id);
+    pack_opt_opt!(pending_deal_id);
+    pack_opt_opt!(pending_deal_name);
+
+    if !exec_ctx.pending_dag_flags.is_empty() {
+        if let Ok(j) = serde_json::to_value(&exec_ctx.pending_dag_flags) {
+            ext.insert("pending_dag_flags".to_string(), j);
+        }
+    }
+    if exec_ctx.cbu_scope_dirty {
+        ext.insert(
+            "cbu_scope_dirty".to_string(),
+            serde_json::Value::Bool(true),
+        );
+    }
+    if !exec_ctx.session_cbu_ids.is_empty() {
+        let ids: Vec<serde_json::Value> = exec_ctx
+            .session_cbu_ids
+            .iter()
+            .map(|u| serde_json::Value::String(u.to_string()))
+            .collect();
+        ext.insert("session_cbu_ids".to_string(), serde_json::Value::Array(ids));
+    }
+
+    // Agent control: signals are stored in json_bindings["_agent_control"].
+    if let Some(agent_ctrl) = exec_ctx.json_bindings.get("_agent_control") {
+        ext.insert("pending_agent_control".to_string(), agent_ctrl.clone());
+    }
+}
+
+/// Unpack `VerbExecutionContext.extensions` side-channel keys back into an
+/// `ExecutionContext`'s `pending_*` fields. Used by the post-dispatch-flip
+/// caller to carry forward mutations that happened inside `execute_json`.
+pub fn apply_sem_ctx_extensions_to_exec_ctx(
+    sem_ctx: &VerbExecutionContext,
+    exec_ctx: &mut ExecutionContext,
+) {
+    let obj = match sem_ctx.extensions.as_object() {
+        Some(m) => m,
+        None => return,
+    };
+
+    macro_rules! unpack_opt {
+        ($field:ident) => {
+            if let Some(v) = obj.get(stringify!($field)) {
+                if !v.is_null() {
+                    if let Ok(parsed) = serde_json::from_value(v.clone()) {
+                        exec_ctx.$field = Some(parsed);
+                    }
+                }
+            }
+        };
+    }
+    macro_rules! unpack_opt_opt {
+        ($field:ident) => {
+            if let Some(v) = obj.get(stringify!($field)) {
+                if let Some(is_set) = v.get("set").and_then(|b| b.as_bool()) {
+                    if is_set {
+                        let inner = v.get("value").cloned().unwrap_or(serde_json::Value::Null);
+                        if inner.is_null() {
+                            exec_ctx.$field = Some(None);
+                        } else if let Ok(parsed) = serde_json::from_value(inner) {
+                            exec_ctx.$field = Some(Some(parsed));
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    unpack_opt!(pending_view_state);
+    unpack_opt!(pending_viewport_state);
+    unpack_opt!(pending_scope_change);
+    unpack_opt!(pending_session);
+    unpack_opt!(pending_session_name);
+    unpack_opt!(pending_structure_id);
+    unpack_opt!(pending_structure_name);
+    unpack_opt!(pending_case_id);
+    unpack_opt!(pending_mandate_id);
+    unpack_opt_opt!(pending_deal_id);
+    unpack_opt_opt!(pending_deal_name);
+
+    if let Some(flags) = obj.get("pending_dag_flags") {
+        if let Ok(parsed) = serde_json::from_value::<Vec<(String, bool)>>(flags.clone()) {
+            exec_ctx.pending_dag_flags = parsed;
+        }
+    }
+    if let Some(dirty) = obj.get("cbu_scope_dirty").and_then(|v| v.as_bool()) {
+        exec_ctx.cbu_scope_dirty = dirty;
+    }
+    if let Some(agent_ctrl) = obj.get("pending_agent_control") {
+        exec_ctx
+            .json_bindings
+            .insert("_agent_control".to_string(), agent_ctrl.clone());
+    }
+}
+
+/// Convert a `VerbCall`'s argument list back into a JSON object — inverse
+/// of [`build_verb_call`]. Used by the Phase 2c dispatch flip when
+/// `DslExecutor` receives a `VerbCall` but needs to call `execute_json`
+/// which wants JSON args.
+pub fn verb_call_to_json(vc: &VerbCall) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for arg in &vc.arguments {
+        map.insert(arg.key.clone(), ast_node_to_json_value(&arg.value));
+    }
+    serde_json::Value::Object(map)
+}
+
+fn ast_node_to_json_value(node: &AstNode) -> serde_json::Value {
+    match node {
+        AstNode::Literal(Literal::String(s), _) => serde_json::Value::String(s.clone()),
+        AstNode::Literal(Literal::Integer(i), _) => serde_json::Value::Number((*i).into()),
+        AstNode::Literal(Literal::Boolean(b), _) => serde_json::Value::Bool(*b),
+        AstNode::Literal(Literal::Uuid(u), _) => serde_json::Value::String(u.to_string()),
+        AstNode::Literal(Literal::Null, _) => serde_json::Value::Null,
+        AstNode::SymbolRef { name, .. } => {
+            // Preserve symbol reference syntax so downstream consumers can
+            // detect `@foo` by prefix.
+            serde_json::Value::String(format!("@{}", name))
+        }
+        // Anything else: stringify the Debug repr so the caller at least
+        // sees something — matches build_verb_call's lossy fallback.
+        other => serde_json::Value::String(format!("{:?}", other)),
+    }
+}
+
+/// Convert a `VerbExecutionOutcome` back into a legacy `ExecutionResult`.
+/// Inverse of [`to_verb_outcome`].
+pub fn from_verb_outcome(outcome: VerbExecutionOutcome) -> ExecutionResult {
+    match outcome {
+        VerbExecutionOutcome::Uuid(u) => ExecutionResult::Uuid(u),
+        VerbExecutionOutcome::Record(v) => ExecutionResult::Record(v),
+        VerbExecutionOutcome::RecordSet(v) => ExecutionResult::RecordSet(v),
+        VerbExecutionOutcome::Affected(n) => ExecutionResult::Affected(n),
+        VerbExecutionOutcome::Void => ExecutionResult::Void,
+    }
 }
 
 fn build_verb_call(domain: &str, verb: &str, args: &serde_json::Value) -> VerbCall {
@@ -406,7 +616,10 @@ fn collect_side_effects(
             .iter()
             .map(|(k, v)| serde_json::json!({"key": k, "value": v}))
             .collect();
-        platform.insert("pending_dag_flags".to_string(), serde_json::Value::Array(flags));
+        platform.insert(
+            "pending_dag_flags".to_string(),
+            serde_json::Value::Array(flags),
+        );
     }
 
     VerbSideEffects {
@@ -489,7 +702,9 @@ mod tests {
         let vc = build_verb_call("entity", "ghost", &args);
 
         assert_eq!(vc.arguments.len(), 1);
-        assert!(matches!(&vc.arguments[0].value, AstNode::Literal(Literal::Uuid(u), _) if *u == id));
+        assert!(
+            matches!(&vc.arguments[0].value, AstNode::Literal(Literal::Uuid(u), _) if *u == id)
+        );
     }
 
     #[test]
@@ -501,7 +716,10 @@ mod tests {
 
         let exec_ctx = to_dsl_context(&ctx);
         assert_eq!(exec_ctx.symbols.get("cbu"), Some(&id));
-        assert_eq!(exec_ctx.symbol_types.get("cbu").map(|s| s.as_str()), Some("cbu"));
+        assert_eq!(
+            exec_ctx.symbol_types.get("cbu").map(|s| s.as_str()),
+            Some("cbu")
+        );
         assert_eq!(exec_ctx.execution_id, Uuid::nil());
     }
 
@@ -526,11 +744,16 @@ mod tests {
         let mut exec_ctx = ExecutionContext::default();
         let new_id = Uuid::new_v4();
         exec_ctx.symbols.insert("cbu".to_string(), new_id);
-        exec_ctx.symbol_types.insert("cbu".to_string(), "cbu".to_string());
+        exec_ctx
+            .symbol_types
+            .insert("cbu".to_string(), "cbu".to_string());
 
         let fx = collect_side_effects(&ctx, &exec_ctx);
         assert_eq!(fx.new_bindings.get("cbu"), Some(&new_id));
-        assert_eq!(fx.new_binding_types.get("cbu").map(|s| s.as_str()), Some("cbu"));
+        assert_eq!(
+            fx.new_binding_types.get("cbu").map(|s| s.as_str()),
+            Some("cbu")
+        );
     }
 
     #[test]
@@ -549,11 +772,24 @@ mod tests {
     #[test]
     fn to_verb_outcome_all_variants() {
         let id = Uuid::new_v4();
-        assert!(matches!(to_verb_outcome(&ExecutionResult::Uuid(id)), VerbExecutionOutcome::Uuid(u) if u == id));
-        assert!(matches!(to_verb_outcome(&ExecutionResult::Record(serde_json::json!({"a":1}))), VerbExecutionOutcome::Record(_)));
-        assert!(matches!(to_verb_outcome(&ExecutionResult::RecordSet(vec![])), VerbExecutionOutcome::RecordSet(v) if v.is_empty()));
-        assert!(matches!(to_verb_outcome(&ExecutionResult::Affected(5)), VerbExecutionOutcome::Affected(5)));
-        assert!(matches!(to_verb_outcome(&ExecutionResult::Void), VerbExecutionOutcome::Void));
+        assert!(
+            matches!(to_verb_outcome(&ExecutionResult::Uuid(id)), VerbExecutionOutcome::Uuid(u) if u == id)
+        );
+        assert!(matches!(
+            to_verb_outcome(&ExecutionResult::Record(serde_json::json!({"a":1}))),
+            VerbExecutionOutcome::Record(_)
+        ));
+        assert!(
+            matches!(to_verb_outcome(&ExecutionResult::RecordSet(vec![])), VerbExecutionOutcome::RecordSet(v) if v.is_empty())
+        );
+        assert!(matches!(
+            to_verb_outcome(&ExecutionResult::Affected(5)),
+            VerbExecutionOutcome::Affected(5)
+        ));
+        assert!(matches!(
+            to_verb_outcome(&ExecutionResult::Void),
+            VerbExecutionOutcome::Void
+        ));
     }
 
     #[test]

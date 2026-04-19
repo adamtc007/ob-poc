@@ -7,9 +7,8 @@
 
 #[cfg(feature = "database")]
 mod tests {
-    use sem_os_core::execution::{
-        VerbExecutionContext, VerbExecutionOutcome, VerbExecutionPort,
-    };
+    use dsl_runtime::VerbExecutionPort;
+    use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
     use sem_os_core::principal::Principal;
     use uuid::Uuid;
 
@@ -23,8 +22,7 @@ mod tests {
     #[tokio::test]
     #[ignore] // requires DATABASE_URL
     async fn crud_select_through_port() {
-        let db_url =
-            std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for this test");
+        let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for this test");
         let pool = sqlx::PgPool::connect(&db_url).await.expect("connect");
         let executor = ObPocVerbExecutor::from_pool(pool);
 
@@ -47,13 +45,15 @@ mod tests {
     #[tokio::test]
     #[ignore] // requires DATABASE_URL
     async fn plugin_verb_through_port() {
-        let db_url =
-            std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for this test");
+        let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for this test");
         let pool = sqlx::PgPool::connect(&db_url).await.expect("connect");
         let executor = ObPocVerbExecutor::from_pool(pool);
 
         let mut ctx = VerbExecutionContext::new(test_principal());
-        let entity_name = format!("port-test-{}", Uuid::new_v4().to_string().split('-').next().unwrap());
+        let entity_name = format!(
+            "port-test-{}",
+            Uuid::new_v4().to_string().split('-').next().unwrap()
+        );
 
         let result = executor
             .execute_verb(
@@ -87,8 +87,7 @@ mod tests {
     #[tokio::test]
     #[ignore] // requires DATABASE_URL
     async fn unknown_verb_returns_error() {
-        let db_url =
-            std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for this test");
+        let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for this test");
         let pool = sqlx::PgPool::connect(&db_url).await.expect("connect");
         let executor = ObPocVerbExecutor::from_pool(pool);
 
@@ -105,8 +104,7 @@ mod tests {
     #[tokio::test]
     #[ignore] // requires DATABASE_URL
     async fn context_extensions_round_trip() {
-        let db_url =
-            std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for this test");
+        let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for this test");
         let pool = sqlx::PgPool::connect(&db_url).await.expect("connect");
         let executor = ObPocVerbExecutor::from_pool(pool);
 

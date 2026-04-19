@@ -7,7 +7,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -145,9 +145,9 @@ impl CustomOperation for BillingCreateProfileOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
         let rate_card_id = json_extract_uuid(args, ctx, "rate-card-id")?;
@@ -213,7 +213,7 @@ impl CustomOperation for BillingCreateProfileOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             profile_id,
         ))
     }
@@ -306,9 +306,9 @@ impl CustomOperation for BillingActivateProfileOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
 
         let target_count: i64 = sqlx::query_scalar(
@@ -349,7 +349,7 @@ impl CustomOperation for BillingActivateProfileOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
 
     fn is_migrated(&self) -> bool {
@@ -428,9 +428,9 @@ impl CustomOperation for BillingSuspendProfileOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
         let reason = json_extract_string(args, "reason")?;
 
@@ -460,7 +460,7 @@ impl CustomOperation for BillingSuspendProfileOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
 
     fn is_migrated(&self) -> bool {
@@ -522,9 +522,9 @@ impl CustomOperation for BillingCloseProfileOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
         let effective_to = json_extract_string(args, "effective-to")?;
 
@@ -540,7 +540,7 @@ impl CustomOperation for BillingCloseProfileOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             result.rows_affected(),
         ))
     }
@@ -651,9 +651,9 @@ impl CustomOperation for BillingAddAccountTargetOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_bool_opt;
 
         let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
@@ -710,7 +710,7 @@ impl CustomOperation for BillingAddAccountTargetOp {
         .fetch_one(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             target_id,
         ))
     }
@@ -768,9 +768,9 @@ impl CustomOperation for BillingRemoveAccountTargetOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let target_id = json_extract_uuid(args, ctx, "target-id")?;
 
         let result = sqlx::query(
@@ -780,7 +780,7 @@ impl CustomOperation for BillingRemoveAccountTargetOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             result.rows_affected(),
         ))
     }
@@ -890,9 +890,9 @@ impl CustomOperation for BillingCreatePeriodOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
         let period_start = json_extract_string(args, "period-start")?;
         let period_end = json_extract_string(args, "period-end")?;
@@ -946,7 +946,7 @@ impl CustomOperation for BillingCreatePeriodOp {
         .fetch_one(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             period_id,
         ))
     }
@@ -1110,9 +1110,9 @@ impl CustomOperation for BillingCalculatePeriodOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
 
         sqlx::query(
@@ -1212,7 +1212,7 @@ impl CustomOperation for BillingCalculatePeriodOp {
             status: "CALCULATED".to_string(),
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -1278,9 +1278,9 @@ impl CustomOperation for BillingReviewPeriodOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
         let reviewed_by = json_extract_string(args, "reviewed-by")?;
 
@@ -1296,7 +1296,7 @@ impl CustomOperation for BillingReviewPeriodOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1358,9 +1358,9 @@ impl CustomOperation for BillingApprovePeriodOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
         let approved_by = json_extract_string(args, "approved-by")?;
 
@@ -1376,7 +1376,7 @@ impl CustomOperation for BillingApprovePeriodOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1479,9 +1479,9 @@ impl CustomOperation for BillingGenerateInvoiceOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
 
         let status: String = sqlx::query_scalar(
@@ -1533,7 +1533,7 @@ impl CustomOperation for BillingGenerateInvoiceOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             invoice_id,
         ))
     }
@@ -1619,9 +1619,9 @@ impl CustomOperation for BillingDisputePeriodOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
         let dispute_reason = json_extract_string(args, "dispute-reason")?;
 
@@ -1656,7 +1656,7 @@ impl CustomOperation for BillingDisputePeriodOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1749,9 +1749,9 @@ impl CustomOperation for BillingPeriodSummaryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
 
         let period: (Uuid, String, String, String, Option<f64>, Option<f64>) = sqlx::query_as(
@@ -1796,7 +1796,7 @@ impl CustomOperation for BillingPeriodSummaryOp {
             "lines": line_values
         });
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1922,9 +1922,9 @@ impl CustomOperation for BillingRevenueSummaryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let deal_id = json_extract_uuid_opt(args, ctx, "deal-id");
         let cbu_id = json_extract_uuid_opt(args, ctx, "cbu-id");
         let from_date = json_extract_string_opt(args, "from-date");
@@ -1997,7 +1997,7 @@ impl CustomOperation for BillingRevenueSummaryOp {
             "cbu_count": cbu_count
         });
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {

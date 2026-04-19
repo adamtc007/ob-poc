@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dsl_core::config::loader::ConfigLoader;
 use dsl_core::config::types::{ArgConfig, DomainConfig, VerbConfig, VerbMetadata};
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
@@ -2059,7 +2059,7 @@ async fn sem_reg_tool(
 #[cfg(feature = "database")]
 async fn sem_reg_tool_json(
     pool: &PgPool,
-    ctx: &sem_os_core::execution::VerbExecutionContext,
+    ctx: &dsl_runtime::VerbExecutionContext,
     tool_name: &str,
     args: Value,
 ) -> Result<Value> {
@@ -2126,9 +2126,9 @@ impl CustomOperation for DiscoverySearchEntitiesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{
             json_extract_bool_opt, json_extract_int_opt, json_extract_string,
             json_extract_string_list_opt,
@@ -2138,7 +2138,7 @@ impl CustomOperation for DiscoverySearchEntitiesOp {
         let max_results = json_extract_int_opt(args, "max-results").unwrap_or(10) as i32;
         let include_inactive = json_extract_bool_opt(args, "include-inactive").unwrap_or(false);
         let results = search_entities_internal(pool, &query, &entity_types, max_results).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "query": query, "entity_types": entity_types,
                 "include_inactive": include_inactive,
@@ -2197,13 +2197,13 @@ impl CustomOperation for DiscoveryEntityContextOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_bool_opt, json_extract_uuid};
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let include_completed = json_extract_bool_opt(args, "include-completed").unwrap_or(false);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             build_entity_context_record(pool, entity_id, include_completed).await?,
         ))
     }
@@ -2260,9 +2260,9 @@ impl CustomOperation for DiscoveryEntityRelationshipsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{
             json_extract_int_opt, json_extract_string_list_opt, json_extract_uuid,
         };
@@ -2270,7 +2270,7 @@ impl CustomOperation for DiscoveryEntityRelationshipsOp {
         let relationship_types =
             json_extract_string_list_opt(args, "relationship-types").unwrap_or_default();
         let max_depth = json_extract_int_opt(args, "max-depth").unwrap_or(2) as i32;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             build_entity_relationships_record(pool, entity_id, &relationship_types, max_depth)
                 .await?,
         ))
@@ -2374,9 +2374,9 @@ impl CustomOperation for DiscoveryCascadeResearchOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_bool_opt, json_extract_int_opt, json_extract_string};
         let query = json_extract_string(args, "query")?;
         let top_n = json_extract_int_opt(args, "top-n").unwrap_or(3) as i32;
@@ -2420,7 +2420,7 @@ impl CustomOperation for DiscoveryCascadeResearchOp {
                 "likely_intents": [json!({"intent": "inspect-current-state", "confidence": "medium", "reason": "Discovery returned grounded entity context and available relationship state"})],
             }));
         }
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "query": query, "total_entity_matches": entities.len(), "entities": entities,
             }),
@@ -2530,9 +2530,9 @@ impl CustomOperation for DiscoveryAvailableActionsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_string_opt};
         let domain = json_extract_string(args, "domain")?;
         let entity_type = json_extract_string(args, "entity-type")?;
@@ -2575,7 +2575,7 @@ impl CustomOperation for DiscoveryAvailableActionsOp {
             .into_iter()
             .map(|(aspect_name, verbs)| json!({"aspect": aspect_name, "verbs": verbs}))
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "domain": domain, "entity_type": entity_type,
                 "total_verbs": groups_json.iter().map(|g| g["verbs"].as_array().map(|a| a.len()).unwrap_or(0)).sum::<usize>(),
@@ -2669,9 +2669,9 @@ impl CustomOperation for DiscoveryVerbDetailOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
         let verb_id = json_extract_string(args, "verb-id")?;
         let verbs = ConfigLoader::from_env().load_verbs()?;
@@ -2688,7 +2688,7 @@ impl CustomOperation for DiscoveryVerbDetailOp {
         .await
         .unwrap_or(Value::Null);
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "verb_id": verb_id,
                 "domain": domain_name,
@@ -2856,9 +2856,9 @@ impl CustomOperation for DiscoveryValidTransitionsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{
             json_extract_bool_opt, json_extract_string_list_opt, json_extract_uuid,
         };
@@ -2925,7 +2925,7 @@ impl CustomOperation for DiscoveryValidTransitionsOp {
             })
             .and_then(|best| best["verb_id"].as_str().map(str::to_string));
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "entity_id": entity_id, "entity_type": entity_type, "entity_name": entity_name,
                 "lanes": lanes_json, "blocked": blocked,
@@ -3051,9 +3051,9 @@ impl CustomOperation for DiscoveryGraphWalkOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_bool_opt, json_extract_uuid};
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let include_blocked = json_extract_bool_opt(args, "include-blocked").unwrap_or(true);
@@ -3105,7 +3105,7 @@ impl CustomOperation for DiscoveryGraphWalkOp {
         }
         let valid_verbs = valid.into_values().collect::<Vec<_>>();
         let blocked_verbs = blocked_map.into_values().collect::<Vec<_>>();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "entity_id": entity_id, "entity_type": entity_type,
                 "entity_name": context["name"].as_str().unwrap_or("unknown"),
@@ -3208,9 +3208,9 @@ impl CustomOperation for DiscoveryInspectDataOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let domain = json_extract_string(args, "domain")?;
@@ -3235,7 +3235,7 @@ impl CustomOperation for DiscoveryInspectDataOp {
             })
             .unwrap_or(0);
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "entity_id": entity_id, "entity_type": entity_type,
                 "domain": domain, "aspect": aspect,
@@ -3347,9 +3347,9 @@ impl CustomOperation for DiscoverySearchDataOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{
             json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
         };
@@ -3398,7 +3398,7 @@ impl CustomOperation for DiscoverySearchDataOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "entity_id": entity_id,
                 "domain": domain,

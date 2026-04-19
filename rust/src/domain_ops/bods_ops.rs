@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{
     extract_string_opt, json_extract_bool_opt, json_extract_int_opt, json_extract_string,
@@ -120,9 +120,9 @@ impl CustomOperation for BodsDiscoverUbosOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let save = json_extract_bool_opt(args, "save").unwrap_or(true);
 
@@ -152,7 +152,7 @@ impl CustomOperation for BodsDiscoverUbosOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "entity_id": entity_id,
                 "entity_lei": result.entity_lei,
@@ -234,9 +234,9 @@ impl CustomOperation for BodsImportOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let source = json_extract_string(args, "source")?;
         let _file_path = json_extract_string_opt(args, "file-path");
 
@@ -441,9 +441,9 @@ impl CustomOperation for BodsGetStatementOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let statement_id = json_extract_string(args, "statement-id")?;
         let statement_type = json_extract_string_opt(args, "statement-type");
 
@@ -571,7 +571,7 @@ impl CustomOperation for BodsGetStatementOp {
         };
 
         match result {
-            Some(r) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(r)),
+            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(r)),
             None => Err(anyhow::anyhow!("Statement not found: {}", statement_id)),
         }
     }
@@ -652,9 +652,9 @@ impl CustomOperation for BodsFindByLeiOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let lei = json_extract_string(args, "lei")?;
         let row: Option<(String, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
             r#"SELECT statement_id, legal_name, jurisdiction, entity_type
@@ -667,7 +667,7 @@ impl CustomOperation for BodsFindByLeiOp {
 
         match row {
             Some((id, name, jurisdiction, entity_type)) => Ok(
-                sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::json!({
+                dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
                     "found": true,
                     "statement_id": id,
                     "lei": lei,
@@ -676,7 +676,7 @@ impl CustomOperation for BodsFindByLeiOp {
                     "entity_type": entity_type,
                 })),
             ),
-            None => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 serde_json::json!({
                     "found": false,
                     "lei": lei,
@@ -845,9 +845,9 @@ impl CustomOperation for BodsListOwnershipOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let subject_lei = json_extract_string_opt(args, "subject-lei");
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
         let include_expired = json_extract_bool_opt(args, "include-expired").unwrap_or(false);
@@ -881,7 +881,7 @@ impl CustomOperation for BodsListOwnershipOp {
         let entity_stmt_id = match entity_stmt {
             Some(id) => id,
             None => {
-                return Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+                return Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
                     vec![],
                 ));
             }
@@ -943,7 +943,7 @@ impl CustomOperation for BodsListOwnershipOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             results,
         ))
     }
@@ -1062,9 +1062,9 @@ impl CustomOperation for BodsSyncFromGleifOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
         let limit = json_extract_int_opt(args, "limit").unwrap_or(100) as i32;
 
@@ -1073,7 +1073,7 @@ impl CustomOperation for BodsSyncFromGleifOp {
         match entity_id {
             Some(eid) => {
                 let result = service.discover_and_save(eid).await?;
-                Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(
                     serde_json::json!({
                         "synced": 1,
                         "entity_id": eid,
@@ -1109,7 +1109,7 @@ impl CustomOperation for BodsSyncFromGleifOp {
                     }
                 }
 
-                Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(
                     serde_json::json!({
                         "synced": synced,
                         "errors": errors,

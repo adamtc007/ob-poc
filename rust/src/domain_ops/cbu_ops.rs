@@ -6,7 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use governed_query_proc::governed_query;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{
     extract_bool_opt, extract_int_opt, extract_string_opt, get_required_uuid,
@@ -55,7 +55,7 @@ fn extract_string_alias(verb_call: &VerbCall, keys: &[&str]) -> Option<String> {
 #[cfg(feature = "database")]
 fn json_extract_uuid_alias(
     args: &serde_json::Value,
-    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    ctx: &mut dsl_runtime::VerbExecutionContext,
     keys: &[&str],
 ) -> Result<Option<Uuid>> {
     for key in keys {
@@ -328,9 +328,9 @@ impl CustomOperation for CbuCreateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let name = json_extract_string(args, "name")?;
         let jurisdiction = json_extract_string_opt(args, "jurisdiction");
         let fund_entity_id = json_extract_uuid_opt(args, ctx, "fund-entity-id");
@@ -361,7 +361,7 @@ impl CustomOperation for CbuCreateOp {
             .await?;
 
             if let Some((existing_cbu_id, existing_cbu_name)) = existing {
-                return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                return Ok(dsl_runtime::VerbExecutionOutcome::Record(
                     serde_json::json!({
                         "cbu_id": existing_cbu_id,
                         "name": existing_cbu_name,
@@ -456,7 +456,7 @@ impl CustomOperation for CbuCreateOp {
             Some("CBU with same name+jurisdiction already exists")
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "cbu_id": cbu_id,
                 "name": name,
@@ -682,9 +682,9 @@ impl CustomOperation for CbuLinkStructureOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let parent_cbu_id =
             json_extract_uuid_alias(args, ctx, &["parent-cbu-id", "parent_cbu_id"])?.ok_or_else(
                 || anyhow::anyhow!("cbu.link-structure: missing required argument :parent-cbu-id"),
@@ -842,7 +842,7 @@ impl CustomOperation for CbuLinkStructureOp {
 
         tx.commit().await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             child_cbu_id,
         ))
     }
@@ -1215,9 +1215,9 @@ impl CustomOperation for CbuListStructureLinksOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let parent_cbu_id =
             json_extract_uuid_alias(args, ctx, &["parent-cbu-id", "parent_cbu_id"])?;
         let child_cbu_id = json_extract_uuid_alias(args, ctx, &["child-cbu-id", "child_cbu_id"])?;
@@ -1507,7 +1507,7 @@ impl CustomOperation for CbuListStructureLinksOp {
             (None, None, _) => unreachable!(),
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             rows.into_iter()
                 .map(
                     |(
@@ -1611,9 +1611,9 @@ impl CustomOperation for CbuUnlinkStructureOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let link_id = json_extract_uuid(args, ctx, "link-id")?;
         let reason = json_extract_string(args, "reason")?;
 
@@ -1633,7 +1633,7 @@ impl CustomOperation for CbuUnlinkStructureOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             result.rows_affected(),
         ))
     }
@@ -1954,9 +1954,9 @@ impl CustomOperation for CbuAddProductOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let product_name = json_extract_string(args, "product")?;
@@ -2153,7 +2153,7 @@ impl CustomOperation for CbuAddProductOp {
             "cbu.add-product completed"
         );
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             (delivery_created + resource_created) as u64,
         ))
     }
@@ -2217,16 +2217,16 @@ impl CustomOperation for CbuInspectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let as_of_date = json_extract_string_opt(args, "as-of-date")
             .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
         let result = cbu_inspect_impl(cbu_id, as_of_date, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2634,9 +2634,9 @@ impl CustomOperation for CbuDecideOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let decision = json_extract_string(args, "decision")?;
         let decided_by = json_extract_string(args, "decided-by")?;
@@ -2744,7 +2744,7 @@ impl CustomOperation for CbuDecideOp {
 
         tx.commit().await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "cbu_id": cbu_id,
                 "cbu_name": cbu.name,
@@ -3003,9 +3003,9 @@ impl CustomOperation for CbuDeleteCascadeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let delete_entities = json_extract_bool_opt(args, "delete-entities").unwrap_or(true);
 
@@ -3146,7 +3146,7 @@ impl CustomOperation for CbuDeleteCascadeOp {
             "cbu.delete-cascade completed"
         );
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "cbu_id": cbu_id,
                 "cbu_name": cbu_name,
@@ -3357,9 +3357,9 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let gleif_category = json_extract_string_opt(args, "gleif-category");
         let role_filter = json_extract_string_opt(args, "role-filter");
@@ -3453,7 +3453,7 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
         }
 
         if dry_run {
-            return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 serde_json::json!({
                     "dry_run": true,
                     "group_id": group_id,
@@ -3469,7 +3469,7 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
 
         let combined_dsl = dsl_statements.join("\n");
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "group_id": group_id,
                 "gleif_category": gleif_category,

@@ -1,0 +1,29 @@
+[package]
+name = "dsl-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "DSL verb execution runtime — the data plane of the three-plane architecture. Owns VerbExecutionPort, CustomOperation, CustomOperationRegistry, and the metadata-CRUD interpreter."
+
+# Phase 2 note — see docs/todo/three-plane-architecture-implementation-plan-v0.1.md §3:
+#   Phase 2 moved VerbExecutionContext/Outcome/SideEffects/Result and
+#   CrudExecutionPort from sem_os_core into this crate. The sem_os_core dep
+#   is STILL present (not yet removed) because dsl-runtime references
+#   sem_os_core::Principal, sem_os_core::SemOsError, and
+#   sem_os_core::verb_contract::VerbContractBody. A future slice inverts
+#   the dep direction by either moving Principal to a shared lower crate
+#   or introducing a dsl-runtime-local error type. Phase 2 does not gate
+#   on inversion — see the v0.3 Phase 2 gate.
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+# Remaining transitional dep — sem_os_core provides Principal, SemOsError,
+# and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately
+# until a later slice resolves the cycle cleanly.
+sem_os_core = { path = "../sem_os_core" }
+async-trait = "0.1"
+anyhow = "1.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }

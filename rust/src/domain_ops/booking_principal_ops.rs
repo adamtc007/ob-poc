@@ -8,7 +8,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -33,9 +33,9 @@ use sqlx::PgPool;
 async fn execute_json_via_legacy<T: CustomOperation + Sync>(
     op: &T,
     args: &serde_json::Value,
-    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    ctx: &mut dsl_runtime::VerbExecutionContext,
     pool: &PgPool,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
         op.domain(),
         op.verb(),
@@ -43,6 +43,7 @@ async fn execute_json_via_legacy<T: CustomOperation + Sync>(
     );
     let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
     let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    crate::sem_os_runtime::verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
     Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
 }
 
@@ -183,9 +184,9 @@ impl CustomOperation for LegalEntityCreateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let name = json_extract_string(args, "name")?;
         let incorporation_jurisdiction = json_extract_string(args, "incorporation-jurisdiction")?;
         let lei = json_extract_string_opt(args, "lei");
@@ -204,7 +205,7 @@ impl CustomOperation for LegalEntityCreateOp {
             legal_entity_id: id,
             name,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -296,9 +297,9 @@ impl CustomOperation for LegalEntityUpdateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let legal_entity_id = json_extract_uuid(args, ctx, "legal-entity-id")?;
         let name = json_extract_string_opt(args, "name");
         let lei = json_extract_string_opt(args, "lei");
@@ -342,7 +343,7 @@ impl CustomOperation for LegalEntityUpdateOp {
 
         query.execute(pool).await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             legal_entity_id,
         ))
     }
@@ -396,9 +397,9 @@ impl CustomOperation for LegalEntityListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -488,9 +489,9 @@ impl CustomOperation for RuleFieldRegisterOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let field_key = json_extract_string(args, "field-key")?;
         let field_type = json_extract_string(args, "field-type")?;
         let description = json_extract_string_opt(args, "description");
@@ -521,7 +522,7 @@ impl CustomOperation for RuleFieldRegisterOp {
             description: entry.description,
             source_table: entry.source_table,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -575,9 +576,9 @@ impl CustomOperation for RuleFieldListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -656,9 +657,9 @@ impl CustomOperation for BookingLocationCreateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let country_code = json_extract_string(args, "country-code")?;
         let region_code = json_extract_string_opt(args, "region-code");
         let jurisdiction_code = json_extract_string_opt(args, "jurisdiction-code");
@@ -686,7 +687,7 @@ impl CustomOperation for BookingLocationCreateOp {
             booking_location_id: id,
             country_code,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -759,9 +760,9 @@ impl CustomOperation for BookingLocationUpdateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let id = json_extract_uuid(args, ctx, "booking-location-id")?;
         let region_code = json_extract_string_opt(args, "region-code");
         let jurisdiction_code = json_extract_string_opt(args, "jurisdiction-code");
@@ -786,7 +787,7 @@ impl CustomOperation for BookingLocationUpdateOp {
             .execute(pool)
             .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -863,9 +864,9 @@ impl CustomOperation for BookingLocationListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -935,9 +936,9 @@ impl CustomOperation for BookingPrincipalCreateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let legal_entity_id = json_extract_uuid(args, ctx, "legal-entity-id")?;
         let booking_location_id = json_extract_uuid_opt(args, ctx, "booking-location-id");
         let principal_code = json_extract_string(args, "principal-code")?;
@@ -956,7 +957,7 @@ impl CustomOperation for BookingPrincipalCreateOp {
             booking_principal_id: id,
             principal_code,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -1029,9 +1030,9 @@ impl CustomOperation for BookingPrincipalUpdateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let id = json_extract_uuid(args, ctx, "booking-principal-id")?;
         let book_code = json_extract_string_opt(args, "book-code");
         let status = json_extract_string_opt(args, "status");
@@ -1056,7 +1057,7 @@ impl CustomOperation for BookingPrincipalUpdateOp {
             .execute(pool)
             .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1119,9 +1120,9 @@ impl CustomOperation for BookingPrincipalRetireOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let id = json_extract_uuid(args, ctx, "booking-principal-id")?;
         let force = json_extract_bool_opt(args, "force").unwrap_or(false);
 
@@ -1138,7 +1139,7 @@ impl CustomOperation for BookingPrincipalRetireOp {
             booking_principal_id: id,
             active_relationships: active_count,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -1456,9 +1457,9 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
         let segment = json_extract_string(args, "segment")?;
         let domicile_country = json_extract_string(args, "domicile-country")?;
@@ -1721,7 +1722,7 @@ impl CustomOperation for BookingPrincipalEvaluateOp {
             policy_snapshot,
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(eval_result)?,
         ))
     }
@@ -1794,9 +1795,9 @@ impl CustomOperation for BookingPrincipalSelectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
         let principal_id = json_extract_uuid(args, ctx, "principal-id")?;
 
@@ -1821,7 +1822,7 @@ impl CustomOperation for BookingPrincipalSelectOp {
             override_gate: None,
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -1876,16 +1877,16 @@ impl CustomOperation for BookingPrincipalExplainOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
 
         let eval = BookingPrincipalRepository::get_evaluation(pool, evaluation_id)
             .await?
             .ok_or_else(|| anyhow!("Evaluation not found: {}", evaluation_id))?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(eval)?,
         ))
     }
@@ -1957,9 +1958,9 @@ impl CustomOperation for ClientPrincipalRelationshipRecordOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
         let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
         let product_offering_id = json_extract_uuid(args, ctx, "product-offering-id")?;
@@ -1979,7 +1980,7 @@ impl CustomOperation for ClientPrincipalRelationshipRecordOp {
             client_group_id,
             booking_principal_id,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -2033,15 +2034,15 @@ impl CustomOperation for ClientPrincipalRelationshipTerminateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let relationship_id = json_extract_uuid(args, ctx, "relationship-id")?;
 
         let affected =
             BookingPrincipalRepository::terminate_relationship(pool, relationship_id).await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             affected as u64,
         ))
     }
@@ -2105,9 +2106,9 @@ impl CustomOperation for ClientPrincipalRelationshipListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
         let status = json_extract_string_opt(args, "status");
 
@@ -2123,7 +2124,7 @@ impl CustomOperation for ClientPrincipalRelationshipListOp {
             .map(|r| serde_json::to_value(r).unwrap_or_default())
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             values,
         ))
     }
@@ -2209,9 +2210,9 @@ impl CustomOperation for ClientPrincipalRelationshipCrossSellOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let client_group_id = json_extract_uuid(args, ctx, "client-group-id")?;
 
         let active_rels =
@@ -2249,7 +2250,7 @@ impl CustomOperation for ClientPrincipalRelationshipCrossSellOp {
             existing_principals: existing_principal_ids,
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -2330,9 +2331,9 @@ impl CustomOperation for ServiceAvailabilitySetOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
         let service_id = json_extract_uuid(args, ctx, "service-id")?;
         let regulatory_status = json_extract_string(args, "regulatory-status")?;
@@ -2361,7 +2362,7 @@ impl CustomOperation for ServiceAvailabilitySetOp {
             booking_principal_id,
             service_id,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -2421,9 +2422,9 @@ impl CustomOperation for ServiceAvailabilityListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
         let records =
@@ -2435,7 +2436,7 @@ impl CustomOperation for ServiceAvailabilityListOp {
             .map(|r| serde_json::to_value(r).unwrap_or_default())
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             values,
         ))
     }
@@ -2495,9 +2496,9 @@ impl CustomOperation for ServiceAvailabilityListByPrincipalOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
         let records =
@@ -2509,7 +2510,7 @@ impl CustomOperation for ServiceAvailabilityListByPrincipalOp {
             .map(|r| serde_json::to_value(r).unwrap_or_default())
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             values,
         ))
     }
@@ -2599,9 +2600,9 @@ impl CustomOperation for RulesetCreateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let name = json_extract_string(args, "name")?;
         let owner_type = json_extract_string(args, "owner-type")?;
         let owner_id = json_extract_uuid_opt(args, ctx, "owner-id");
@@ -2639,7 +2640,7 @@ impl CustomOperation for RulesetCreateOp {
             name,
             status: "draft".to_string(),
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -2744,9 +2745,9 @@ impl CustomOperation for RulesetPublishOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let ruleset_id = json_extract_uuid(args, ctx, "ruleset-id")?;
 
         // Load field dictionary for validation
@@ -2803,7 +2804,7 @@ impl CustomOperation for RulesetPublishOp {
             ));
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             ruleset_id,
         ))
     }
@@ -2860,9 +2861,9 @@ impl CustomOperation for RulesetRetireOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let ruleset_id = json_extract_uuid(args, ctx, "ruleset-id")?;
 
         let retired = BookingPrincipalRepository::retire_ruleset(pool, ruleset_id).await?;
@@ -2871,7 +2872,7 @@ impl CustomOperation for RulesetRetireOp {
             return Err(anyhow!("Could not retire ruleset — not in active status"));
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             ruleset_id,
         ))
     }
@@ -2963,9 +2964,9 @@ impl CustomOperation for RuleAddOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let ruleset_id = json_extract_uuid(args, ctx, "ruleset-id")?;
         let name = json_extract_string(args, "name")?;
         let kind = json_extract_string(args, "kind")?;
@@ -3005,7 +3006,7 @@ impl CustomOperation for RuleAddOp {
             ruleset_id,
             name,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -3124,9 +3125,9 @@ impl CustomOperation for RuleUpdateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let rule_id = json_extract_uuid(args, ctx, "rule-id")?;
         let name = json_extract_string_opt(args, "name");
         let when_expr_str = json_extract_string_opt(args, "when-expr");
@@ -3197,7 +3198,7 @@ impl CustomOperation for RuleUpdateOp {
 
         query.execute(pool).await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(rule_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(rule_id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3257,9 +3258,9 @@ impl CustomOperation for RuleDisableOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let rule_id = json_extract_uuid(args, ctx, "rule-id")?;
 
         sqlx::query(
@@ -3273,7 +3274,7 @@ impl CustomOperation for RuleDisableOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(rule_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(rule_id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -3340,9 +3341,9 @@ impl CustomOperation for ContractPackCreateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let code = json_extract_string(args, "code")?;
         let name = json_extract_string(args, "name")?;
         let description = json_extract_string_opt(args, "description");
@@ -3359,7 +3360,7 @@ impl CustomOperation for ContractPackCreateOp {
             contract_pack_id: id,
             code,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -3424,9 +3425,9 @@ impl CustomOperation for ContractPackAddTemplateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let contract_pack_id = json_extract_uuid(args, ctx, "contract-pack-id")?;
         let template_type = json_extract_string(args, "template-type")?;
         let template_ref = json_extract_string_opt(args, "template-ref");
@@ -3443,7 +3444,7 @@ impl CustomOperation for ContractPackAddTemplateOp {
             contract_template_id: id,
             contract_pack_id,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -3541,9 +3542,9 @@ impl CustomOperation for BookingPrincipalCoverageMatrixOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -3608,9 +3609,9 @@ impl CustomOperation for BookingPrincipalGapReportOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -3713,9 +3714,9 @@ impl CustomOperation for BookingPrincipalImpactAnalysisOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
         // Find all active relationships for this principal
@@ -3771,7 +3772,7 @@ impl CustomOperation for BookingPrincipalImpactAnalysisOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             impact_entries,
         ))
     }

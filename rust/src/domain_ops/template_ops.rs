@@ -6,7 +6,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -183,9 +183,9 @@ impl CustomOperation for TemplateInvokeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
 
         let template_id = json_extract_string(args, "id")?;
@@ -198,7 +198,7 @@ impl CustomOperation for TemplateInvokeOp {
             ctx.bind(name, *uuid);
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({"_type": "template_invoked", "_debug": format!("{result:?}")}),
         ))
     }
@@ -568,9 +568,9 @@ impl CustomOperation for TemplateBatchOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_int_opt, json_extract_string, json_extract_string_opt};
 
         let template_id = json_extract_string(args, "id")?;
@@ -602,7 +602,7 @@ impl CustomOperation for TemplateBatchOp {
             ctx.bind(name, *uuid);
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({"_type": "template_batch", "_debug": format!("{result:?}")}),
         ))
     }
@@ -638,7 +638,7 @@ fn extract_shared_params(
 #[cfg(feature = "database")]
 fn extract_json_string_map(
     args: &serde_json::Value,
-    ctx: &sem_os_core::execution::VerbExecutionContext,
+    ctx: &dsl_runtime::VerbExecutionContext,
     key: &str,
 ) -> Result<HashMap<String, String>> {
     let mut params = HashMap::new();

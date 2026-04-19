@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::extract_uuid;
 use super::CustomOperation;
@@ -83,9 +83,9 @@ impl CustomOperation for TeamTransferMemberOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_uuid};
         let from_team = json_extract_uuid(args, ctx, "from-team")?;
         let to_team = json_extract_uuid(args, ctx, "to-team")?;
@@ -94,7 +94,7 @@ impl CustomOperation for TeamTransferMemberOp {
 
         let new_membership_id =
             team_transfer_member_impl(from_team, to_team, user_id, &new_role, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             new_membership_id,
         ))
     }

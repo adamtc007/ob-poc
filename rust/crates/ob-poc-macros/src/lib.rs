@@ -1,37 +1,23 @@
 //! Procedural macros for ob-poc
 //!
-//! This crate provides two macros:
-//! - `#[register_custom_op]` - Auto-register custom operations with the registry
-//! - `#[derive(IdType)]` - Generate boilerplate for UUID-backed ID newtypes
+//! This crate provides:
+//! - `#[derive(IdType)]` — UUID-backed ID newtype boilerplate.
+//!
+//! # Phase 2c note
+//!
+//! `#[register_custom_op]` moved to `dsl-runtime-macros` per the three-plane
+//! architecture plan. Import sites updated in the same slice:
+//!
+//! ```text
+//! // before
+//! use ob_poc_macros::register_custom_op;
+//! // after
+//! use dsl_runtime_macros::register_custom_op;
+//! ```
 
 use proc_macro::TokenStream;
 
 mod id_type;
-mod register_op;
-
-/// Auto-register a custom operation with the registry.
-///
-/// Apply to unit structs that implement `CustomOperation`.
-///
-/// **Important:** All ops must live in the main crate (uses `crate::domain_ops` path).
-///
-/// # Example
-///
-/// ```ignore
-/// #[register_custom_op]
-/// pub struct MyOp;
-///
-/// impl CustomOperation for MyOp {
-///     fn domain(&self) -> &'static str { "my" }
-///     fn verb(&self) -> &'static str { "op" }
-///     fn rationale(&self) -> &'static str { "Custom logic required" }
-///     // ...
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn register_custom_op(_attr: TokenStream, input: TokenStream) -> TokenStream {
-    register_op::register_custom_op_impl(input)
-}
 
 /// Derive macro for UUID-backed ID newtypes.
 ///

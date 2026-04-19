@@ -16,7 +16,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -99,9 +99,9 @@ impl CustomOperation for OwnershipComputeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = ownership_date_arg_json(args, "as-of");
         let count: i32 =
@@ -110,7 +110,7 @@ impl CustomOperation for OwnershipComputeOp {
                 .bind(as_of)
                 .fetch_one(pool)
                 .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "issuer_entity_id": issuer_entity_id,
                 "as_of_date": as_of.to_string(),
@@ -273,9 +273,9 @@ impl CustomOperation for OwnershipSnapshotListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = ownership_date_arg_json(args, "as-of");
         let derived_from =
@@ -373,7 +373,7 @@ impl CustomOperation for OwnershipSnapshotListOp {
                 }))
             }))
             .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             snapshot_data,
         ))
     }
@@ -467,9 +467,9 @@ impl CustomOperation for OwnershipControlPositionsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = ownership_date_arg_json(args, "as-of");
         let basis = json_extract_string_opt(args, "basis").unwrap_or_else(|| "VOTES".to_string());
@@ -505,7 +505,7 @@ impl CustomOperation for OwnershipControlPositionsOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             position_data,
         ))
     }
@@ -612,9 +612,9 @@ impl CustomOperation for OwnershipWhoControlsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = ownership_date_arg_json(args, "as-of");
         use sqlx::Row;
@@ -660,7 +660,7 @@ impl CustomOperation for OwnershipWhoControlsOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             controllers,
         ))
     }
@@ -909,9 +909,9 @@ impl CustomOperation for OwnershipReconcileOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = ownership_date_arg_json(args, "as-of");
         let source_a =
@@ -1068,7 +1068,7 @@ impl CustomOperation for OwnershipReconcileOp {
         .await?;
         tx.commit().await?;
         ctx.bind("ownership_reconciliation_run", run_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(run_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(run_id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1229,9 +1229,9 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let run_id = json_extract_uuid(args, ctx, "run-id")?;
         let severity =
             json_extract_string_opt(args, "severity").unwrap_or_else(|| "ALL".to_string());
@@ -1339,7 +1339,7 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
                 }))
             }))
             .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             finding_data,
         ))
     }
@@ -1427,9 +1427,9 @@ impl CustomOperation for OwnershipAnalyzeGapsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = ownership_date_arg_json(args, "as-of");
         let total_pct: rust_decimal::Decimal = sqlx::query_scalar(
@@ -1449,7 +1449,7 @@ impl CustomOperation for OwnershipAnalyzeGapsOp {
         .await?;
         let gap_pct = rust_decimal::Decimal::from(100) - total_pct;
         let is_reconciled = gap_pct.abs() < rust_decimal::Decimal::new(1, 2);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "issuer_entity_id": issuer_entity_id,
                 "as_of_date": as_of.to_string(),
@@ -1575,9 +1575,9 @@ impl CustomOperation for OwnershipTraceChainOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let from_entity_id = json_extract_uuid(args, ctx, "from-entity-id")?;
         let to_entity_id = json_extract_uuid(args, ctx, "to-entity-id")?;
         let max_depth: i32 = json_extract_int_opt(args, "max-depth")
@@ -1627,7 +1627,7 @@ impl CustomOperation for OwnershipTraceChainOp {
         .await?;
         let path_exists = !paths.is_empty();
         let best_path = paths.first();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "from_entity_id": from_entity_id,
                 "to_entity_id": to_entity_id,

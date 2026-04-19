@@ -27,13 +27,11 @@ use ob_poc::session::unified::{ClientRef, StructureType, UnifiedSession};
 // =============================================================================
 
 fn fixture_dir() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/macros")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/macros")
 }
 
 fn load_structure_registry() -> MacroRegistry {
-    load_macro_registry_from_dir(&fixture_dir())
-        .expect("fixture macros must load")
+    load_macro_registry_from_dir(&fixture_dir()).expect("fixture macros must load")
 }
 
 fn test_session() -> UnifiedSession {
@@ -147,7 +145,11 @@ async fn test_primitive_verb_round_trip() {
         None,
     );
 
-    assert!(resp.is_compiled(), "Primitive verb must compile: {:?}", resp);
+    assert!(
+        resp.is_compiled(),
+        "Primitive verb must compile: {:?}",
+        resp
+    );
     let summary = match &resp {
         OrchestratorResponse::Compiled(s) => s,
         _ => unreachable!(),
@@ -161,16 +163,28 @@ async fn test_primitive_verb_round_trip() {
     let id = rb.id;
     store.insert(&rb).await.unwrap();
 
-    let retrieved = store.get(&id).await.unwrap().expect("Must retrieve stored runbook");
+    let retrieved = store
+        .get(&id)
+        .await
+        .unwrap()
+        .expect("Must retrieve stored runbook");
     assert_eq!(retrieved.steps.len(), 1);
     assert!(matches!(retrieved.status, CompiledRunbookStatus::Compiled));
 
-    let result = execute_runbook(&store, id, None, &SuccessExecutor).await.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Completed { .. }));
+    let result = execute_runbook(&store, id, None, &SuccessExecutor)
+        .await
+        .unwrap();
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
     assert_eq!(result.step_results.len(), 1);
 
     let after = store.get(&id).await.unwrap().unwrap();
-    assert!(matches!(after.status, CompiledRunbookStatus::Completed { .. }));
+    assert!(matches!(
+        after.status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
 }
 
 // =============================================================================
@@ -213,8 +227,13 @@ async fn test_macro_compiles_and_executes() {
     let id = rb.id;
     store.insert(&rb).await.unwrap();
 
-    let result = execute_runbook(&store, id, None, &SuccessExecutor).await.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Completed { .. }));
+    let result = execute_runbook(&store, id, None, &SuccessExecutor)
+        .await
+        .unwrap();
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
 }
 
 // =============================================================================
@@ -327,7 +346,10 @@ fn test_content_addressed_id_determinism() {
         },
     ];
     let id_d = content_addressed_id(&two_steps, &env);
-    assert_ne!(id_a, id_d, "INV-13: Different step counts must produce different IDs");
+    assert_ne!(
+        id_a, id_d,
+        "INV-13: Different step counts must produce different IDs"
+    );
 
     let hash = full_sha256(std::slice::from_ref(&step_a), &env);
     assert_eq!(hash.len(), 32);
@@ -380,17 +402,31 @@ async fn test_write_set_computation() {
     assert_eq!(ws.len(), 2, "Duplicates must be removed");
 
     let sorted: Vec<Uuid> = ws.into_iter().collect();
-    assert!(sorted.windows(2).all(|w| w[0] <= w[1]), "Must be sorted for deadlock prevention");
+    assert!(
+        sorted.windows(2).all(|w| w[0] <= w[1]),
+        "Must be sorted for deadlock prevention"
+    );
 
     let store = RunbookStore::new();
-    let rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![step1, step2], ReplayEnvelope::empty());
+    let rb = CompiledRunbook::new(
+        Uuid::new_v4(),
+        1,
+        vec![step1, step2],
+        ReplayEnvelope::empty(),
+    );
     let id = rb.id;
     store.insert(&rb).await.unwrap();
 
     let recorder = RecordingExecutor::new();
     let result = execute_runbook(&store, id, None, &recorder).await.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Completed { .. }));
-    assert_eq!(recorder.executed_verbs(), vec!["cbu.rename", "entity.update"]);
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
+    assert_eq!(
+        recorder.executed_verbs(),
+        vec!["cbu.rename", "entity.update"]
+    );
 
     let mut heuristic_args = BTreeMap::new();
     heuristic_args.insert("entity-id".to_string(), entity_id_1.to_string());
@@ -417,12 +453,20 @@ async fn test_concurrent_lock_contention() {
     let ws2 = compute_write_set(std::slice::from_ref(&rb2_step1), None);
 
     let overlap: Vec<Uuid> = ws1.intersection(&ws2).copied().collect();
-    assert!(!overlap.is_empty(), "INV-10: Overlapping write_sets must be detectable");
+    assert!(
+        !overlap.is_empty(),
+        "INV-10: Overlapping write_sets must be detectable"
+    );
     assert_eq!(overlap[0], contested);
 
     // Both execute independently (no Postgres → no actual contention)
     let store1 = RunbookStore::new();
-    let rb1 = CompiledRunbook::new(Uuid::new_v4(), 1, vec![rb1_step1, rb1_step2], ReplayEnvelope::empty());
+    let rb1 = CompiledRunbook::new(
+        Uuid::new_v4(),
+        1,
+        vec![rb1_step1, rb1_step2],
+        ReplayEnvelope::empty(),
+    );
     let id1 = rb1.id;
     store1.insert(&rb1).await.unwrap();
 
@@ -431,10 +475,20 @@ async fn test_concurrent_lock_contention() {
     let id2 = rb2.id;
     store2.insert(&rb2).await.unwrap();
 
-    let r1 = execute_runbook(&store1, id1, None, &SuccessExecutor).await.unwrap();
-    let r2 = execute_runbook(&store2, id2, None, &SuccessExecutor).await.unwrap();
-    assert!(matches!(r1.final_status, CompiledRunbookStatus::Completed { .. }));
-    assert!(matches!(r2.final_status, CompiledRunbookStatus::Completed { .. }));
+    let r1 = execute_runbook(&store1, id1, None, &SuccessExecutor)
+        .await
+        .unwrap();
+    let r2 = execute_runbook(&store2, id2, None, &SuccessExecutor)
+        .await
+        .unwrap();
+    assert!(matches!(
+        r1.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
+    assert!(matches!(
+        r2.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
 }
 
 // =============================================================================
@@ -457,8 +511,13 @@ async fn test_no_execution_without_compiled_id() {
     let id = rb.id;
     store.insert(&rb).await.unwrap();
 
-    let result = execute_runbook(&store, id, None, &SuccessExecutor).await.unwrap();
-    assert!(matches!(result.final_status, CompiledRunbookStatus::Completed { .. }));
+    let result = execute_runbook(&store, id, None, &SuccessExecutor)
+        .await
+        .unwrap();
+    assert!(matches!(
+        result.final_status,
+        CompiledRunbookStatus::Completed { .. }
+    ));
 
     let retry = execute_runbook(&store, id, None, &SuccessExecutor).await;
     assert!(matches!(retry, Err(ExecutionError::NotExecutable(_, _))));

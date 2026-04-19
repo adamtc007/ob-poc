@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{
     extract_string, extract_uuid, extract_uuid_opt, json_extract_string, json_extract_uuid,
@@ -60,14 +60,14 @@ impl CustomOperation for ConstellationHydrateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let case_id = json_extract_uuid_opt(args, ctx, "case-id");
         let map_name = json_extract_string(args, "map-name")?;
         let result = handle_constellation_hydrate(pool, cbu_id, case_id, &map_name).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -121,14 +121,14 @@ impl CustomOperation for ConstellationSummaryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let case_id = json_extract_uuid_opt(args, ctx, "case-id");
         let map_name = json_extract_string(args, "map-name")?;
         let result = handle_constellation_summary(pool, cbu_id, case_id, &map_name).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }

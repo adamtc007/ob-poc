@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{
     extract_string, extract_string_opt, extract_uuid, json_extract_string, json_extract_string_opt,
@@ -64,9 +64,9 @@ impl CustomOperation for SharedAtomRegisterOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let input = RegisterSharedAtomInput {
             atom_path: json_extract_string(args, "atom-path")?,
             display_name: json_extract_string(args, "display-name")?,
@@ -76,7 +76,7 @@ impl CustomOperation for SharedAtomRegisterOp {
         };
 
         let def = repository::insert_shared_atom(pool, &input).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(def)?,
         ))
     }
@@ -135,9 +135,9 @@ impl CustomOperation for SharedAtomActivateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let atom_path = json_extract_string(args, "atom-path")?;
         let atom = repository::get_by_path(pool, &atom_path)
             .await?
@@ -145,7 +145,7 @@ impl CustomOperation for SharedAtomActivateOp {
 
         let result =
             repository::transition_lifecycle(pool, atom.id, SharedAtomLifecycle::Active).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -205,9 +205,9 @@ impl CustomOperation for SharedAtomDeprecateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let atom_path = json_extract_string(args, "atom-path")?;
         let atom = repository::get_by_path(pool, &atom_path)
             .await?
@@ -216,7 +216,7 @@ impl CustomOperation for SharedAtomDeprecateOp {
         let result =
             repository::transition_lifecycle(pool, atom.id, SharedAtomLifecycle::Deprecated)
                 .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -275,9 +275,9 @@ impl CustomOperation for SharedAtomRetireOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let atom_path = json_extract_string(args, "atom-path")?;
         let atom = repository::get_by_path(pool, &atom_path)
             .await?
@@ -285,7 +285,7 @@ impl CustomOperation for SharedAtomRetireOp {
 
         let result =
             repository::transition_lifecycle(pool, atom.id, SharedAtomLifecycle::Retired).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -352,9 +352,9 @@ impl CustomOperation for SharedAtomListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let status_filter = json_extract_string_opt(args, "status")
             .map(|s| match s.as_str() {
                 "draft" => Ok(SharedAtomLifecycle::Draft),
@@ -370,7 +370,7 @@ impl CustomOperation for SharedAtomListOp {
             .into_iter()
             .map(serde_json::to_value)
             .collect::<Result<_, _>>()?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             records,
         ))
     }
@@ -425,11 +425,11 @@ impl CustomOperation for SharedAtomListConsumersOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let _atom_path = json_extract_string(args, "atom-path")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             Vec::new(),
         ))
     }
@@ -556,9 +556,9 @@ impl CustomOperation for SharedAtomReplayConstellationOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use crate::cross_workspace::{
             fact_refs, fact_versions,
             replay::{RebuildContext, ReplayOutcome, ReplayResult, ReplayTrigger},
@@ -617,7 +617,7 @@ impl CustomOperation for SharedAtomReplayConstellationOp {
             completed_at: Utc::now(),
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -729,9 +729,9 @@ impl CustomOperation for SharedAtomAcknowledgeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use crate::cross_workspace::fact_versions;
 
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -786,7 +786,7 @@ impl CustomOperation for SharedAtomAcknowledgeOp {
             consumers_updated: stale_count,
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }

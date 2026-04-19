@@ -114,7 +114,7 @@ impl super::executor::StepExecutor for DslExecutorV2StepExecutor {
 /// call, converting the step's verb FQN and args to JSON, and mapping the
 /// `VerbExecutionOutcome` back to `StepOutcome`.
 pub struct VerbExecutionPortStepExecutor {
-    port: Arc<dyn sem_os_core::execution::VerbExecutionPort>,
+    port: Arc<dyn dsl_runtime::VerbExecutionPort>,
     /// Principal used for all executions in this runbook.
     principal: sem_os_core::principal::Principal,
     /// Session ID for correlation.
@@ -123,7 +123,7 @@ pub struct VerbExecutionPortStepExecutor {
 
 impl VerbExecutionPortStepExecutor {
     pub fn new(
-        port: Arc<dyn sem_os_core::execution::VerbExecutionPort>,
+        port: Arc<dyn dsl_runtime::VerbExecutionPort>,
         principal: sem_os_core::principal::Principal,
         session_id: Option<Uuid>,
     ) -> Self {
@@ -139,7 +139,7 @@ impl VerbExecutionPortStepExecutor {
 impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
     async fn execute_step(&self, step: &CompiledStep) -> StepOutcome {
         // Build execution context
-        let mut ctx = sem_os_core::execution::VerbExecutionContext::new(self.principal.clone());
+        let mut ctx = dsl_runtime::VerbExecutionContext::new(self.principal.clone());
         if let Some(sid) = self.session_id {
             ctx.extensions = serde_json::json!({"session_id": sid.to_string()});
         }
@@ -156,19 +156,19 @@ impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
         match self.port.execute_verb(&step.verb, args, &mut ctx).await {
             Ok(result) => {
                 let json = match &result.outcome {
-                    sem_os_core::execution::VerbExecutionOutcome::Uuid(id) => {
+                    dsl_runtime::VerbExecutionOutcome::Uuid(id) => {
                         serde_json::json!({"type": "uuid", "value": id.to_string()})
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Record(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Record(v) => {
                         serde_json::json!({"type": "record", "value": v})
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::RecordSet(v) => {
+                    dsl_runtime::VerbExecutionOutcome::RecordSet(v) => {
                         serde_json::json!({"type": "record_set", "value": v})
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Affected(n) => {
+                    dsl_runtime::VerbExecutionOutcome::Affected(n) => {
                         serde_json::json!({"type": "affected", "value": n})
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Void => {
+                    dsl_runtime::VerbExecutionOutcome::Void => {
                         serde_json::json!({"type": "void"})
                     }
                 };

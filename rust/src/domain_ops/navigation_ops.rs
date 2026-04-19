@@ -11,7 +11,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 
 use super::helpers::json_extract_string_opt;
@@ -83,9 +83,9 @@ impl crate::domain_ops::CustomOperation for NavDrillOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &sqlx::PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let target_id = json_extract_string_opt(args, "target_id");
         let result = NavResult {
             success: true,
@@ -95,7 +95,7 @@ impl crate::domain_ops::CustomOperation for NavDrillOp {
             crossed_boundary: false,
             history_direction: None,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -158,9 +158,9 @@ impl crate::domain_ops::CustomOperation for NavZoomOutOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &sqlx::PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let result = NavResult {
             success: true,
             message: "Zoomed out one level".into(),
@@ -169,7 +169,7 @@ impl crate::domain_ops::CustomOperation for NavZoomOutOp {
             crossed_boundary: false,
             history_direction: None,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -218,9 +218,9 @@ impl crate::domain_ops::CustomOperation for NavSelectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &sqlx::PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let target_id = json_extract_string_opt(args, "target_id");
         let result = NavResult {
             success: true,
@@ -230,7 +230,7 @@ impl crate::domain_ops::CustomOperation for NavSelectOp {
             crossed_boundary: false,
             history_direction: None,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -279,9 +279,9 @@ impl crate::domain_ops::CustomOperation for NavSetClusterTypeOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &sqlx::PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let result = NavResult {
             success: true,
             message: "Cluster mode updated".into(),
@@ -290,7 +290,7 @@ impl crate::domain_ops::CustomOperation for NavSetClusterTypeOp {
             crossed_boundary: false,
             history_direction: None,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -339,9 +339,9 @@ impl crate::domain_ops::CustomOperation for NavSetLensOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &sqlx::PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let result = NavResult {
             success: true,
             message: "Lens updated".into(),
@@ -350,7 +350,7 @@ impl crate::domain_ops::CustomOperation for NavSetLensOp {
             crossed_boundary: false,
             history_direction: None,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -398,9 +398,9 @@ impl crate::domain_ops::CustomOperation for NavHistoryBackOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &sqlx::PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let result = NavResult {
             success: true,
             message: "Navigated back".into(),
@@ -409,7 +409,7 @@ impl crate::domain_ops::CustomOperation for NavHistoryBackOp {
             crossed_boundary: false,
             history_direction: Some("back".into()),
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -457,9 +457,9 @@ impl crate::domain_ops::CustomOperation for NavHistoryForwardOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &sqlx::PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let result = NavResult {
             success: true,
             message: "Navigated forward".into(),
@@ -468,7 +468,7 @@ impl crate::domain_ops::CustomOperation for NavHistoryForwardOp {
             crossed_boundary: false,
             history_direction: Some("forward".into()),
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }

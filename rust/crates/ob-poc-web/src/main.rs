@@ -780,8 +780,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let verb_executor = ObPocVerbExecutor::from_pool(pool.clone())
                 .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())));
-            orchestrator =
-                orchestrator.with_verb_execution_port(Arc::new(verb_executor));
+            orchestrator = orchestrator.with_verb_execution_port(Arc::new(verb_executor));
             tracing::info!("SemOS VerbExecutionPort wired with PgCrudExecutor");
         }
 

@@ -145,11 +145,7 @@ impl WorkflowConfigIndex {
     /// routing layer so verbs don't need to appear in both `workflows.yaml`
     /// and the verb YAML.  Existing entries (from `workflows.yaml`) take
     /// precedence — this method is a no-op if the verb is already registered.
-    pub fn register_from_durable_config(
-        &mut self,
-        verb_fqn: &str,
-        durable: &DurableConfig,
-    ) {
+    pub fn register_from_durable_config(&mut self, verb_fqn: &str, durable: &DurableConfig) {
         if self.by_verb.contains_key(verb_fqn) {
             tracing::debug!(
                 "WorkflowConfigIndex: verb {} already registered, skipping durable auto-register",

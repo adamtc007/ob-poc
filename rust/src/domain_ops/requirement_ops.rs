@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -142,9 +142,9 @@ impl CustomOperation for RequirementCreateSetOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{
             json_extract_string_list, json_extract_string_opt, json_extract_uuid,
             json_extract_uuid_opt,
@@ -201,7 +201,7 @@ impl CustomOperation for RequirementCreateSetOp {
             "count": requirement_ids.len()
         });
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -289,9 +289,9 @@ impl CustomOperation for RequirementUnsatisfiedOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use sqlx::Row;
 
@@ -334,7 +334,7 @@ impl CustomOperation for RequirementUnsatisfiedOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             results,
         ))
     }

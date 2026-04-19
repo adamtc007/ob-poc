@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use crate::domain_ops::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -82,16 +82,16 @@ impl CustomOperation for SemanticStateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let registry = SemanticStageRegistry::load_default()
             .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
         let state = derive_semantic_state(pool, &registry, cbu_id).await?;
         let result = serde_json::to_value(&state)?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -159,9 +159,9 @@ impl CustomOperation for SemanticListStagesOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use serde_json::json;
         let registry = SemanticStageRegistry::load_default()
             .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
@@ -171,7 +171,7 @@ impl CustomOperation for SemanticListStagesOp {
                 "required_entities": stage.required_entities, "depends_on": stage.depends_on, "blocking": stage.blocking
             }))
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({ "stages": stages }),
         ))
     }
@@ -270,9 +270,9 @@ impl CustomOperation for SemanticStagesForProductOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
         use serde_json::json;
         let product = json_extract_string(args, "product")?;
@@ -289,7 +289,7 @@ impl CustomOperation for SemanticStagesForProductOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({"product": product, "stages": stages}),
         ))
     }
@@ -411,9 +411,9 @@ impl CustomOperation for SemanticNextActionsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use serde_json::json;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -433,7 +433,7 @@ impl CustomOperation for SemanticNextActionsOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "cbu_id": cbu_id, "cbu_name": state.cbu_name,
                 "next_actions": actions, "blocking_stages": state.blocking_stages
@@ -543,9 +543,9 @@ impl CustomOperation for SemanticMissingEntitiesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         use serde_json::json;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -567,7 +567,7 @@ impl CustomOperation for SemanticMissingEntitiesOp {
             "entity_type": e.entity_type, "stage": e.stage, "stage_name": e.stage_name,
             "semantic_purpose": e.semantic_purpose, "suggested_verb": get_creation_verb(&e.entity_type)
         })).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "cbu_id": cbu_id, "cbu_name": state.cbu_name, "missing_entities": result
             }),
@@ -646,9 +646,9 @@ impl CustomOperation for SemanticPromptContextOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use serde_json::json;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -656,7 +656,7 @@ impl CustomOperation for SemanticPromptContextOp {
             .map_err(|e| anyhow::anyhow!("Failed to load semantic stage map: {}", e))?;
         let state = derive_semantic_state(pool, &registry, cbu_id).await?;
         let prompt_context = state.to_prompt_context();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({"prompt_context": prompt_context}),
         ))
     }

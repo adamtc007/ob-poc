@@ -370,9 +370,9 @@ pub trait CustomOperation: Send + Sync {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         // Default: convert to legacy types and delegate
         use crate::sem_os_runtime::verb_executor_adapter;
         let vc = verb_executor_adapter::build_verb_call_pub(self.domain(), self.verb(), args);

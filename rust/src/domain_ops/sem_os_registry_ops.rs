@@ -6,7 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::sem_os_helpers::delegate_to_tool;
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
@@ -56,9 +56,9 @@ macro_rules! registry_op {
             async fn execute_json(
                 &self,
                 args: &serde_json::Value,
-                ctx: &mut sem_os_core::execution::VerbExecutionContext,
+                ctx: &mut dsl_runtime::VerbExecutionContext,
                 pool: &PgPool,
-            ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+            ) -> Result<dsl_runtime::VerbExecutionOutcome> {
                 super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, $tool).await
             }
 
@@ -126,9 +126,9 @@ impl CustomOperation for RegistryDescribeObjectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let object_type = args
             .get("object-type")
             .or_else(|| args.get("object_type"))
@@ -207,9 +207,9 @@ impl CustomOperation for RegistryListObjectsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let object_type = args
             .get("object-type")
             .or_else(|| args.get("object_type"))
@@ -364,7 +364,7 @@ pub struct RegistryActiveManifestOp;
 #[cfg(feature = "database")]
 async fn registry_active_manifest_impl(
     pool: &PgPool,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let row: Option<(String, i64)> = sqlx::query_as(
         "SELECT snapshot_set_id, object_count FROM sem_reg_pub.active_snapshot_set LIMIT 1",
     )
@@ -372,13 +372,13 @@ async fn registry_active_manifest_impl(
     .await?;
 
     match row {
-        Some((set_id, count)) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Some((set_id, count)) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "snapshot_set_id": set_id,
                 "object_count": count,
             }),
         )),
-        None => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "snapshot_set_id": null,
                 "object_count": 0,
@@ -408,7 +408,7 @@ impl CustomOperation for RegistryActiveManifestOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         match registry_active_manifest_impl(pool).await? {
-            sem_os_core::execution::VerbExecutionOutcome::Record(value) => {
+            dsl_runtime::VerbExecutionOutcome::Record(value) => {
                 Ok(ExecutionResult::Record(value))
             }
             _ => unreachable!(),
@@ -430,9 +430,9 @@ impl CustomOperation for RegistryActiveManifestOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         registry_active_manifest_impl(pool).await
     }
 

@@ -172,9 +172,7 @@ pub use errors::{
 };
 
 // Re-export macro expansion types (consumed externally)
-pub use macros::{
-    load_macro_registry, load_macro_registry_from_dir, MacroRegistry,
-};
+pub use macros::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
 
 /// Syntax-facing DSL seam: parse input and inspect AST/bindings.
 pub mod syntax {

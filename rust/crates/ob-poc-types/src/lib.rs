@@ -23,6 +23,7 @@ pub mod control;
 pub mod decision;
 pub mod disambiguation;
 pub mod galaxy;
+pub mod gated_envelope;
 pub mod graph_scene;
 pub mod investor_register;
 pub mod manco_group;
@@ -35,6 +36,57 @@ pub mod session_input;
 pub mod session_stack;
 pub mod trading_matrix;
 pub mod viewport;
+
+// --------------------------------------------------------------------------
+// gated_envelope — Phase 0b boundary types (three-plane refactor).
+//
+// Explicit allowlist per feedback_no_wildcard_reexports.md. Do NOT add
+// `pub use gated_envelope::*`. Every new cross-plane type gets listed here
+// deliberately so the wire surface is reviewable at a glance.
+// --------------------------------------------------------------------------
+pub use gated_envelope::{
+    // envelope + identity
+    default_envelope_version,
+    AuthorisationProof,
+    CatalogueSnapshotId,
+    ClosedLoopMarker,
+    DagNodeId,
+    DagNodeVersion,
+    DiscoverySignals,
+    EnvelopeVersion,
+    GatedVerbEnvelope,
+    LogicalClock,
+    ResolvedEntities,
+    ResolvedEntity,
+    SessionScopeRef,
+    TraceId,
+    VerbArgs,
+    VerbRef,
+    WorkspaceSnapshotId,
+    // outcome
+    CatalogueEffect,
+    ConstellationMark,
+    GatedOutcome,
+    OutcomeResult,
+    PendingStateAdvance,
+    SideEffectSummary,
+    StateTransition,
+    // outbox
+    ClaimedOutboxRow,
+    DrainerRegisterError,
+    IdempotencyKey,
+    OutboxConsumer,
+    OutboxDrainer,
+    OutboxDraft,
+    OutboxEffectKind,
+    OutboxProcessOutcome,
+    OutboxRowStatus,
+    // transaction scope
+    TransactionScope,
+    TransactionScopeId,
+    // state gate hash
+    StateGateHash,
+};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -21,7 +21,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -211,9 +211,9 @@ impl CustomOperation for UboRegistryPromoteOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
         let notes = json_extract_string_opt(args, "notes");
 
@@ -246,7 +246,7 @@ impl CustomOperation for UboRegistryPromoteOp {
             previous_status: current_status,
             new_status: "IDENTIFIED".to_string(),
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -343,9 +343,9 @@ impl CustomOperation for UboRegistryAdvanceOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
         let new_status = json_extract_string(args, "new-status")?;
         let notes = json_extract_string_opt(args, "notes");
@@ -377,7 +377,7 @@ impl CustomOperation for UboRegistryAdvanceOp {
             previous_status: current_status,
             new_status,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -473,9 +473,9 @@ impl CustomOperation for UboRegistryWaiveOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
         let reason = json_extract_string(args, "reason")?;
         let authority = json_extract_string(args, "authority")?;
@@ -514,7 +514,7 @@ impl CustomOperation for UboRegistryWaiveOp {
             waived_by: authority,
             waiver_reason: reason,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -605,9 +605,9 @@ impl CustomOperation for UboRegistryRejectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
         let reason = json_extract_string(args, "reason")?;
 
@@ -642,7 +642,7 @@ impl CustomOperation for UboRegistryRejectOp {
             new_status: "REJECTED".to_string(),
             reason,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -733,9 +733,9 @@ impl CustomOperation for UboRegistryExpireOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
         let reason = json_extract_string_opt(args, "reason");
 
@@ -769,7 +769,7 @@ impl CustomOperation for UboRegistryExpireOp {
             previous_status: current_status,
             new_status: "EXPIRED".to_string(),
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }

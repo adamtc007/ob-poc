@@ -9,7 +9,7 @@
 //! - `batch.status` - Get batch status
 
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -45,8 +45,8 @@ pub struct BatchControlResult {
 #[cfg(feature = "database")]
 fn batch_control_outcome(
     result: BatchControlResult,
-) -> sem_os_core::execution::VerbExecutionOutcome {
-    sem_os_core::execution::VerbExecutionOutcome::Record(serde_json::json!({
+) -> dsl_runtime::VerbExecutionOutcome {
+    dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
         "_type": "batch_control",
         "operation": result.operation,
         "success": result.success,
@@ -107,9 +107,9 @@ impl CustomOperation for BatchPauseOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         tracing::info!("batch.pause called");
         Ok(batch_control_outcome(BatchControlResult {
             operation: "pause".to_string(),
@@ -169,9 +169,9 @@ impl CustomOperation for BatchResumeOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         tracing::info!("batch.resume called");
         Ok(batch_control_outcome(BatchControlResult {
             operation: "resume".to_string(),
@@ -240,9 +240,9 @@ impl CustomOperation for BatchContinueOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let count = json_extract_int_opt(args, "count").unwrap_or(1) as usize;
         tracing::info!(count, "batch.continue called");
         Ok(batch_control_outcome(BatchControlResult {
@@ -311,9 +311,9 @@ impl CustomOperation for BatchSkipOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let reason = json_extract_string_opt(args, "reason");
         tracing::info!(?reason, "batch.skip called");
         Ok(batch_control_outcome(BatchControlResult {
@@ -382,9 +382,9 @@ impl CustomOperation for BatchAbortOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let reason = json_extract_string_opt(args, "reason");
         tracing::warn!(?reason, "batch.abort called");
         Ok(batch_control_outcome(BatchControlResult {
@@ -461,9 +461,9 @@ impl CustomOperation for BatchStatusOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         tracing::debug!("batch.status called");
         Ok(batch_control_outcome(BatchControlResult {
             operation: "status".to_string(),
@@ -667,9 +667,9 @@ impl CustomOperation for BatchAddProductsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_ids = args
             .get("cbu-ids")
             .and_then(|v| v.as_array())

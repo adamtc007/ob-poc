@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
 use super::CustomOperation;
@@ -268,9 +268,9 @@ impl CustomOperation for RegistrationVerifyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let regulator = json_extract_string(args, "regulator")?;
         let method = json_extract_string(args, "method")?;
@@ -290,7 +290,7 @@ impl CustomOperation for RegistrationVerifyOp {
         )
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             registration_id,
         ))
     }
@@ -365,12 +365,12 @@ impl CustomOperation for RegulatoryStatusCheckOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let result = regulatory_status_check_impl(entity_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {

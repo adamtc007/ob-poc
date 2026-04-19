@@ -17,7 +17,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::Serialize;
 use serde_json::json;
 use uuid::Uuid;
@@ -35,9 +35,9 @@ use sqlx::PgPool;
 async fn execute_json_via_legacy<T: CustomOperation + Sync>(
     op: &T,
     args: &serde_json::Value,
-    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    ctx: &mut dsl_runtime::VerbExecutionContext,
     pool: &PgPool,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
         op.domain(),
         op.verb(),
@@ -45,6 +45,7 @@ async fn execute_json_via_legacy<T: CustomOperation + Sync>(
     );
     let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
     let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    crate::sem_os_runtime::verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
     Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
 }
 
@@ -338,9 +339,9 @@ impl CustomOperation for ViewUniverseOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -411,9 +412,9 @@ impl CustomOperation for ViewBookOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -490,9 +491,9 @@ impl CustomOperation for ViewCbuOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -573,9 +574,9 @@ impl CustomOperation for ViewEntityForestOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -673,9 +674,9 @@ impl CustomOperation for ViewRefineOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -736,9 +737,9 @@ impl CustomOperation for ViewClearOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -792,9 +793,9 @@ impl CustomOperation for ViewClearAliasOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -880,9 +881,9 @@ impl CustomOperation for ViewSelectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -958,9 +959,9 @@ impl CustomOperation for ViewLayoutOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string_opt;
 
         let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "auto".to_string());
@@ -977,7 +978,7 @@ impl CustomOperation for ViewLayoutOp {
             _ => Metaphor::Tree,
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "layout_mode": mode,
                 "metaphor": format!("{:?}", metaphor),
@@ -1053,9 +1054,9 @@ impl CustomOperation for ViewStatusOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -1128,9 +1129,9 @@ impl CustomOperation for ViewSelectionInfoOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -1196,12 +1197,12 @@ impl CustomOperation for ViewZoomInOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let node_id = json_extract_uuid(args, ctx, "node-id")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "action": "zoom-in",
                 "node_id": node_id.to_string(),
@@ -1266,10 +1267,10 @@ impl CustomOperation for ViewZoomOutOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "action": "zoom-out",
                 "message": "Zoom out to parent taxonomy. Use session.zoom_out() to execute."
@@ -1345,13 +1346,13 @@ impl CustomOperation for ViewBackToOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_int_opt, json_extract_uuid_opt};
         let depth = json_extract_int_opt(args, "depth").map(|i| i as usize);
         let frame_id = json_extract_uuid_opt(args, ctx, "frame-id");
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "action": "navigate-back-to",
                 "depth": depth,
@@ -1418,10 +1419,10 @@ impl CustomOperation for ViewBreadcrumbsOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "action": "read-breadcrumbs",
                 "message": "Get breadcrumbs from session.breadcrumbs() or session.breadcrumbs_with_ids()"

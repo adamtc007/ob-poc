@@ -11,7 +11,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{json_extract_bool_opt, json_extract_string_opt, json_extract_uuid};
 use super::CustomOperation;
@@ -119,9 +119,9 @@ impl CustomOperation for DocsBundleApplyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use crate::document_bundles::{BundleContext, DocsBundleRegistry, DocsBundleService};
         use std::path::Path;
 
@@ -168,7 +168,7 @@ impl CustomOperation for DocsBundleApplyOp {
             .map(|r| serde_json::Value::String(r.requirement_id.to_string()))
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "applied_bundle_id": result.applied_bundle.applied_id.to_string(),
                 "bundle_id": result.applied_bundle.bundle_id,
@@ -251,9 +251,9 @@ impl CustomOperation for DocsBundleListAppliedOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
 
         let bundles: Vec<(
@@ -289,7 +289,7 @@ impl CustomOperation for DocsBundleListAppliedOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             records,
         ))
     }
@@ -358,9 +358,9 @@ impl CustomOperation for DocsBundleListAvailableOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use crate::document_bundles::DocsBundleRegistry;
         use std::path::Path;
 
@@ -389,7 +389,7 @@ impl CustomOperation for DocsBundleListAvailableOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             records,
         ))
     }

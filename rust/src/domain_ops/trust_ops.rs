@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
@@ -279,15 +279,15 @@ impl CustomOperation for TrustAnalyzeControlOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
 
         let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let result = trust_analyze_control_impl(trust_entity_id, cbu_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -494,9 +494,9 @@ impl CustomOperation for TrustIdentifyUbosOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
 
         let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
@@ -505,7 +505,7 @@ impl CustomOperation for TrustIdentifyUbosOp {
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(25.0);
         let result = trust_identify_ubos_impl(trust_entity_id, cbu_id, threshold, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -657,15 +657,15 @@ impl CustomOperation for TrustClassifyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
 
         let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let result = trust_classify_impl(trust_entity_id, cbu_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {

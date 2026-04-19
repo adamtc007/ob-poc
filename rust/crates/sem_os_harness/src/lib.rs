@@ -489,7 +489,7 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
 /// The scenarios use a pre-loaded MockVerbExecutor; for integration testing with
 /// a real executor, use the external harness in `tests/verb_execution_port_test.rs`.
 pub async fn run_execution_scenario_suite(
-    executor: &dyn sem_os_core::execution::VerbExecutionPort,
+    executor: &dyn dsl_runtime::VerbExecutionPort,
 ) {
     test_execution_uuid_outcome(executor).await;
     test_execution_record_outcome(executor).await;
@@ -497,18 +497,23 @@ pub async fn run_execution_scenario_suite(
     test_execution_unknown_verb_error(executor).await;
 }
 
-async fn test_execution_uuid_outcome(
-    executor: &dyn sem_os_core::execution::VerbExecutionPort,
-) {
-    let mut ctx = sem_os_core::execution::VerbExecutionContext::new(test_principal());
+async fn test_execution_uuid_outcome(executor: &dyn dsl_runtime::VerbExecutionPort) {
+    let mut ctx = dsl_runtime::VerbExecutionContext::new(test_principal());
     let result = executor
-        .execute_verb("cbu.create", serde_json::json!({"name": "Test Fund"}), &mut ctx)
+        .execute_verb(
+            "cbu.create",
+            serde_json::json!({"name": "Test Fund"}),
+            &mut ctx,
+        )
         .await;
 
     match result {
         Ok(r) => {
             assert!(
-                matches!(r.outcome, sem_os_core::execution::VerbExecutionOutcome::Uuid(_)),
+                matches!(
+                    r.outcome,
+                    dsl_runtime::VerbExecutionOutcome::Uuid(_)
+                ),
                 "Expected Uuid outcome for cbu.create, got {:?}",
                 r.outcome
             );
@@ -522,18 +527,23 @@ async fn test_execution_uuid_outcome(
     }
 }
 
-async fn test_execution_record_outcome(
-    executor: &dyn sem_os_core::execution::VerbExecutionPort,
-) {
-    let mut ctx = sem_os_core::execution::VerbExecutionContext::new(test_principal());
+async fn test_execution_record_outcome(executor: &dyn dsl_runtime::VerbExecutionPort) {
+    let mut ctx = dsl_runtime::VerbExecutionContext::new(test_principal());
     let result = executor
-        .execute_verb("cbu.show", serde_json::json!({"cbu-id": Uuid::new_v4().to_string()}), &mut ctx)
+        .execute_verb(
+            "cbu.show",
+            serde_json::json!({"cbu-id": Uuid::new_v4().to_string()}),
+            &mut ctx,
+        )
         .await;
 
     match result {
         Ok(r) => {
             assert!(
-                matches!(r.outcome, sem_os_core::execution::VerbExecutionOutcome::Record(_)),
+                matches!(
+                    r.outcome,
+                    dsl_runtime::VerbExecutionOutcome::Record(_)
+                ),
                 "Expected Record outcome for cbu.show, got {:?}",
                 r.outcome
             );
@@ -546,11 +556,15 @@ async fn test_execution_record_outcome(
 }
 
 async fn test_execution_symbol_propagation(
-    executor: &dyn sem_os_core::execution::VerbExecutionPort,
+    executor: &dyn dsl_runtime::VerbExecutionPort,
 ) {
-    let mut ctx = sem_os_core::execution::VerbExecutionContext::new(test_principal());
+    let mut ctx = dsl_runtime::VerbExecutionContext::new(test_principal());
     let result = executor
-        .execute_verb("cbu.create", serde_json::json!({"name": "Symbol Test"}), &mut ctx)
+        .execute_verb(
+            "cbu.create",
+            serde_json::json!({"name": "Symbol Test"}),
+            &mut ctx,
+        )
         .await;
 
     if let Ok(r) = result {
@@ -564,7 +578,10 @@ async fn test_execution_symbol_propagation(
                     name
                 );
             }
-            tracing::info!("test_execution_symbol_propagation: passed ({} bindings)", r.side_effects.new_bindings.len());
+            tracing::info!(
+                "test_execution_symbol_propagation: passed ({} bindings)",
+                r.side_effects.new_bindings.len()
+            );
         } else {
             tracing::info!("test_execution_symbol_propagation: passed (no bindings produced)");
         }
@@ -574,9 +591,9 @@ async fn test_execution_symbol_propagation(
 }
 
 async fn test_execution_unknown_verb_error(
-    executor: &dyn sem_os_core::execution::VerbExecutionPort,
+    executor: &dyn dsl_runtime::VerbExecutionPort,
 ) {
-    let mut ctx = sem_os_core::execution::VerbExecutionContext::new(test_principal());
+    let mut ctx = dsl_runtime::VerbExecutionContext::new(test_principal());
     let result = executor
         .execute_verb("nonexistent.verb", serde_json::json!({}), &mut ctx)
         .await;
@@ -692,9 +709,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_harness_execution_suite_with_mock() {
-        use sem_os_core::execution::{
-            VerbExecutionContext, VerbExecutionOutcome, VerbExecutionPort,
-            VerbExecutionResult, VerbSideEffects,
+        use dsl_runtime::VerbExecutionPort;
+        use dsl_runtime::{
+            VerbExecutionContext, VerbExecutionOutcome, VerbExecutionResult, VerbSideEffects,
         };
         use std::collections::HashMap;
 
@@ -711,7 +728,7 @@ mod tests {
                 verb_fqn: &str,
                 _args: serde_json::Value,
                 ctx: &mut VerbExecutionContext,
-            ) -> sem_os_core::execution::Result<VerbExecutionResult> {
+            ) -> dsl_runtime::Result<VerbExecutionResult> {
                 let result = self.results.get(verb_fqn).cloned().ok_or_else(|| {
                     sem_os_core::error::SemOsError::NotFound(format!("No mock for {verb_fqn}"))
                 })?;
@@ -738,6 +755,7 @@ mod tests {
                         .collect(),
                     platform_state: serde_json::Value::Null,
                 },
+                ..Default::default()
             },
         );
         results.insert(

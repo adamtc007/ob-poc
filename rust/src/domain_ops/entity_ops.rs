@@ -6,7 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use governed_query_proc::governed_query;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -156,9 +156,9 @@ impl CustomOperation for EntityGhostOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_string_opt};
         use uuid::Uuid;
 
@@ -185,7 +185,7 @@ impl CustomOperation for EntityGhostOp {
 
         if let Some(existing_id) = existing {
             ctx.bind("entity", existing_id);
-            return Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
                 existing_id,
             ));
         }
@@ -232,7 +232,7 @@ impl CustomOperation for EntityGhostOp {
         }
 
         ctx.bind("entity", entity_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             entity_id,
         ))
     }
@@ -377,9 +377,9 @@ impl CustomOperation for EntityIdentifyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
 
@@ -461,7 +461,7 @@ impl CustomOperation for EntityIdentifyOp {
         );
 
         ctx.bind("entity", entity_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             entity_id,
         ))
     }
@@ -547,9 +547,9 @@ impl CustomOperation for EntityEnsureOrPlaceholderOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{
             json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
         };
@@ -567,7 +567,7 @@ impl CustomOperation for EntityEnsureOrPlaceholderOp {
 
         ctx.bind("entity", entity_id);
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "entity_id": entity_id,
                 "is_placeholder": is_placeholder
@@ -649,9 +649,9 @@ impl CustomOperation for EntityResolvePlaceholderOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
 
         let placeholder_id = json_extract_uuid(args, ctx, "placeholder-id")?;
@@ -668,7 +668,7 @@ impl CustomOperation for EntityResolvePlaceholderOp {
             })
             .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "placeholder_entity_id": result.placeholder_entity_id,
                 "resolved_to_entity_id": result.resolved_to_entity_id,
@@ -748,9 +748,9 @@ impl CustomOperation for EntityListPlaceholdersOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid_opt;
 
         let cbu_id = json_extract_uuid_opt(args, ctx, "cbu-id");
@@ -779,7 +779,7 @@ impl CustomOperation for EntityListPlaceholdersOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             records,
         ))
     }
@@ -855,9 +855,9 @@ impl CustomOperation for EntityPlaceholderSummaryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -876,7 +876,7 @@ impl CustomOperation for EntityPlaceholderSummaryOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "cbu_id": summary.cbu_id,
                 "pending_count": summary.pending_count,

@@ -143,10 +143,10 @@ pub async fn delegate_to_tool(
 #[cfg(feature = "database")]
 pub async fn delegate_to_tool_json(
     pool: &PgPool,
-    ctx: &sem_os_core::execution::VerbExecutionContext,
+    ctx: &dsl_runtime::VerbExecutionContext,
     args: &serde_json::Value,
     tool_name: &str,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let actor = ActorContext {
         actor_id: ctx.principal.actor_id.clone(),
         roles: if ctx.principal.is_admin() {
@@ -202,10 +202,10 @@ pub async fn delegate_to_stew_tool(
 /// and SemOS VerbExecutionContext instead of VerbCall + ExecutionContext.
 pub async fn delegate_to_stew_tool_json(
     pool: &PgPool,
-    ctx: &sem_os_core::execution::VerbExecutionContext,
+    ctx: &dsl_runtime::VerbExecutionContext,
     args: &serde_json::Value,
     tool_name: &str,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let actor = ActorContext {
         actor_id: ctx.principal.actor_id.clone(),
         roles: if ctx.principal.is_admin() {
@@ -239,9 +239,9 @@ pub async fn delegate_to_stew_tool_json(
 
 fn convert_tool_result_json(
     result: SemRegToolResult,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     if result.success {
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             result.data,
         ))
     } else {

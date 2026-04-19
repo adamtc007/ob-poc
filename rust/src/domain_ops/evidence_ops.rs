@@ -24,7 +24,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -337,9 +337,9 @@ impl CustomOperation for EvidenceRequireOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
         let evidence_type = json_extract_string(args, "evidence-type")?;
         let description = json_extract_string_opt(args, "description");
@@ -347,7 +347,7 @@ impl CustomOperation for EvidenceRequireOp {
         let result =
             evidence_require_impl(registry_id, evidence_type, description, doc_type, pool).await?;
         ctx.bind("evidence", result.evidence_id);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -408,13 +408,13 @@ impl CustomOperation for EvidenceLinkOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
         let result = evidence_link_impl(evidence_id, document_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -476,14 +476,14 @@ impl CustomOperation for EvidenceVerifyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
         let verified_by = json_extract_string(args, "verified-by")?;
         let notes = json_extract_string_opt(args, "notes");
         let result = evidence_verify_impl(evidence_id, verified_by, notes, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -544,13 +544,13 @@ impl CustomOperation for EvidenceRejectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
         let reason = json_extract_string(args, "reason")?;
         let result = evidence_reject_impl(evidence_id, reason, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -612,14 +612,14 @@ impl CustomOperation for EvidenceWaiveOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
         let reason = json_extract_string(args, "reason")?;
         let authority = json_extract_string(args, "authority")?;
         let result = evidence_waive_impl(evidence_id, reason, authority, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -668,9 +668,9 @@ impl CustomOperation for EvidenceCreateRequirementOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         EvidenceRequireOp.execute_json(args, ctx, pool).await
     }
 
@@ -718,9 +718,9 @@ impl CustomOperation for EvidenceAttachDocumentOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         EvidenceLinkOp.execute_json(args, ctx, pool).await
     }
 
@@ -768,9 +768,9 @@ impl CustomOperation for EvidenceMarkVerifiedOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         EvidenceVerifyOp.execute_json(args, ctx, pool).await
     }
 
@@ -818,9 +818,9 @@ impl CustomOperation for EvidenceMarkRejectedOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         EvidenceRejectOp.execute_json(args, ctx, pool).await
     }
 
@@ -868,9 +868,9 @@ impl CustomOperation for EvidenceMarkWaivedOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         EvidenceWaiveOp.execute_json(args, ctx, pool).await
     }
 

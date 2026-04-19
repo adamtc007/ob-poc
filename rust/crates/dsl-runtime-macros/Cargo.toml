@@ -1,0 +1,25 @@
+[package]
+name = "dsl-runtime-macros"
+version = "0.1.0"
+edition = "2021"
+description = "Procedural macros for the DSL runtime data-plane — #[register_custom_op] auto-registration."
+
+[lib]
+proc-macro = true
+
+# Phase 2c note — see docs/todo/three-plane-architecture-implementation-plan-v0.1.md §3:
+#   Phase 2c moved `register_custom_op` here from `ob-poc-macros`. The macro
+#   expansion still references `crate::domain_ops::CustomOperation` /
+#   `crate::domain_ops::CustomOpFactory` — `crate::` resolves to the caller's
+#   crate, so ops defined in `ob-poc` continue to see the trait + factory.
+#   A future slice (aligned with dissolving legacy `execute()` per v0.3
+#   Phase 7) will relocate the trait + factory into `dsl-runtime` and
+#   rewrite the expansion to reference absolute `::dsl_runtime::*` paths.
+
+[dependencies]
+syn = { version = "2", features = ["full", "parsing", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"
+
+[dev-dependencies]
+trybuild = "1"

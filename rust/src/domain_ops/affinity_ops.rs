@@ -13,7 +13,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use uuid::Uuid;
@@ -257,9 +257,9 @@ impl CustomOperation for AffinityVerbsForTableOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_bool_opt, json_extract_string};
         let schema_name = json_extract_string(args, "schema-name")?;
         let table_name = json_extract_string(args, "table-name")?;
@@ -283,7 +283,7 @@ impl CustomOperation for AffinityVerbsForTableOp {
             table_name,
             verbs,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -364,9 +364,9 @@ impl CustomOperation for AffinityVerbsForAttributeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_string_opt};
         let attr_fqn = json_extract_string(args, "attribute-fqn")
             .or_else(|_| json_extract_string(args, "attr-fqn"))?;
@@ -387,7 +387,7 @@ impl CustomOperation for AffinityVerbsForAttributeOp {
             attribute_fqn: attr_fqn,
             verbs,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -488,9 +488,9 @@ impl CustomOperation for AffinityDataForVerbOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_int_opt, json_extract_string};
         let verb_fqn = json_extract_string(args, "verb-fqn")?;
         let depth = json_extract_int_opt(args, "depth")
@@ -534,7 +534,7 @@ impl CustomOperation for AffinityDataForVerbOp {
             data_assets: asset_rows,
             footprint,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -608,9 +608,9 @@ impl CustomOperation for AffinityAdjacentVerbsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_int_opt, json_extract_string};
         let verb_fqn = json_extract_string(args, "verb-fqn")?;
         let min_overlap = json_extract_int_opt(args, "min-overlap")
@@ -631,7 +631,7 @@ impl CustomOperation for AffinityAdjacentVerbsOp {
             verb_fqn,
             adjacent: entries,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -754,9 +754,9 @@ impl CustomOperation for AffinityGovernanceGapsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string_opt;
         let schema_filter = json_extract_string_opt(args, "schema-name");
         let gap_type = GapType::from_arg(json_extract_string_opt(args, "gap-type"))?;
@@ -820,7 +820,7 @@ impl CustomOperation for AffinityGovernanceGapsOp {
                 Vec::new()
             },
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -943,9 +943,9 @@ impl CustomOperation for AffinityDiscoverDslOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_int_opt, json_extract_string, json_extract_string_opt};
         let utterance = json_extract_string(args, "utterance")
             .or_else(|_| json_extract_string(args, "intent"))?;
@@ -1014,7 +1014,7 @@ impl CustomOperation for AffinityDiscoverDslOp {
             allowed_verbs.as_ref(),
             policy_check,
         );
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }

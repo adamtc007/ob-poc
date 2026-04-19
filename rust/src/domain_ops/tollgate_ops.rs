@@ -11,7 +11,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -249,15 +249,15 @@ impl CustomOperation for TollgateEvaluateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, _ctx, "case-id")?;
         let evaluation_type = json_extract_string(args, "evaluation-type")?;
         let evaluated_by = super::helpers::json_extract_string_opt(args, "evaluated-by");
         match tollgate_evaluate_impl(case_id, evaluation_type, evaluated_by, pool).await? {
             ExecutionResult::Record(value) => {
-                Ok(sem_os_core::execution::VerbExecutionOutcome::Record(value))
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(value))
             }
             _ => unreachable!(),
         }
@@ -331,11 +331,11 @@ impl CustomOperation for TollgateGetMetricsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             tollgate_get_metrics_impl(cbu_id, pool).await?,
         ))
     }
@@ -458,16 +458,16 @@ impl CustomOperation for TollgateOverrideOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
         let override_reason = json_extract_string(args, "override-reason")?;
         let approved_by = json_extract_string(args, "approved-by")?;
         let approval_authority = json_extract_string(args, "approval-authority")?;
         let conditions = super::helpers::json_extract_string_opt(args, "conditions");
         let expiry_date = super::helpers::json_extract_string_opt(args, "expiry-date");
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             tollgate_override_impl(
                 evaluation_id,
                 override_reason,
@@ -622,11 +622,11 @@ impl CustomOperation for TollgateDecisionReadinessOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             tollgate_decision_readiness_impl(case_id, pool).await?,
         ))
     }

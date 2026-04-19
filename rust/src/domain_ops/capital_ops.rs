@@ -11,7 +11,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -228,9 +228,9 @@ impl CustomOperation for CapitalTransferOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
 
         let share_class_id = json_get_required_uuid(args, "share-class-id")?;
@@ -353,7 +353,7 @@ impl CustomOperation for CapitalTransferOp {
 
         tx.commit().await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             transfer_out_id.0,
         ))
     }
@@ -503,9 +503,9 @@ impl CustomOperation for CapitalReconcileOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_get_required_uuid(args, "entity-id")?;
 
         let share_classes: Vec<(Uuid, String, i64, rust_decimal::Decimal)> = sqlx::query_as(
@@ -596,7 +596,7 @@ impl CustomOperation for CapitalReconcileOp {
         let unallocated = total_issued_dec - total_allocated;
         let is_reconciled = unallocated == rust_decimal::Decimal::ZERO;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "is_reconciled": is_reconciled,
                 "issued_shares": total_issued,
@@ -729,9 +729,9 @@ impl CustomOperation for CapitalOwnershipChainOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_get_required_uuid(args, "entity-id")?;
         let min_pct: rust_decimal::Decimal = json_extract_string_opt(args, "min-ownership-pct")
             .and_then(|s| s.parse().ok())
@@ -795,7 +795,7 @@ impl CustomOperation for CapitalOwnershipChainOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             chain_data,
         ))
     }
@@ -902,9 +902,9 @@ impl CustomOperation for CapitalIssueSharesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
 
         let share_class_id = json_get_required_uuid(args, "share-class-id")?;
@@ -943,7 +943,7 @@ impl CustomOperation for CapitalIssueSharesOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             result.rows_affected(),
         ))
     }
@@ -1066,9 +1066,9 @@ impl CustomOperation for CapitalCancelSharesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
 
         let share_class_id = json_get_required_uuid(args, "share-class-id")?;
@@ -1118,7 +1118,7 @@ impl CustomOperation for CapitalCancelSharesOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             result.rows_affected(),
         ))
     }
@@ -1283,9 +1283,9 @@ impl CustomOperation for CapitalShareClassCreateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
 
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
@@ -1370,7 +1370,7 @@ impl CustomOperation for CapitalShareClassCreateOp {
 
         tx.commit().await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             share_class_id,
         ))
     }
@@ -1447,9 +1447,9 @@ impl CustomOperation for CapitalShareClassGetSupplyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
         let as_of: NaiveDate = json_extract_string_opt(args, "as-of")
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
@@ -1463,7 +1463,7 @@ impl CustomOperation for CapitalShareClassGetSupplyOp {
                 .await?;
 
         match supply {
-            Some(row) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            Some(row) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 json!({
                     "share_class_id": share_class_id,
                     "authorized_units": row.authorized_units.map(|d| d.to_string()),
@@ -1632,9 +1632,9 @@ impl CustomOperation for CapitalIssueInitialOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
 
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
@@ -1717,7 +1717,7 @@ impl CustomOperation for CapitalIssueInitialOp {
 
         tx.commit().await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(event_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(event_id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1851,9 +1851,9 @@ impl CustomOperation for CapitalIssueNewOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
 
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
@@ -1928,7 +1928,7 @@ impl CustomOperation for CapitalIssueNewOp {
 
         tx.commit().await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(event_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(event_id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2177,9 +2177,9 @@ impl CustomOperation for CapitalSplitOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_int;
 
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
@@ -2208,7 +2208,7 @@ impl CustomOperation for CapitalSplitOp {
         .await?;
 
         if let Some(event_id) = existing {
-            return Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(event_id));
+            return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(event_id));
         }
 
         let issuer_entity_id: Uuid = sqlx::query_scalar(
@@ -2324,7 +2324,7 @@ impl CustomOperation for CapitalSplitOp {
 
         tx.commit().await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(event_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(event_id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2444,9 +2444,9 @@ impl CustomOperation for CapitalBuybackOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
 
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
@@ -2509,7 +2509,7 @@ impl CustomOperation for CapitalBuybackOp {
 
         tx.commit().await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(event_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(event_id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2622,9 +2622,9 @@ impl CustomOperation for CapitalCancelOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_string;
 
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
@@ -2682,7 +2682,7 @@ impl CustomOperation for CapitalCancelOp {
 
         tx.commit().await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(event_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(event_id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2868,9 +2868,9 @@ impl CustomOperation for CapitalCapTableOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of: NaiveDate = json_extract_string_opt(args, "as-of")
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
@@ -2957,7 +2957,7 @@ impl CustomOperation for CapitalCapTableOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "issuer_entity_id": issuer_entity_id,
                 "issuer_name": issuer_name,
@@ -3061,9 +3061,9 @@ impl CustomOperation for CapitalHoldersOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of: NaiveDate = json_extract_string_opt(args, "as-of")
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
@@ -3103,7 +3103,7 @@ impl CustomOperation for CapitalHoldersOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             filtered,
         ))
     }

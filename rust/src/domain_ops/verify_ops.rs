@@ -13,7 +13,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
@@ -427,9 +427,9 @@ impl CustomOperation for VerifyDetectPatternsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use crate::verification::PatternDetector;
         use uuid::Uuid;
 
@@ -471,7 +471,7 @@ impl CustomOperation for VerifyDetectPatternsOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             result,
         ))
     }
@@ -577,9 +577,9 @@ impl CustomOperation for VerifyDetectEvasionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use crate::verification::EvasionDetector;
 
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
@@ -613,7 +613,7 @@ impl CustomOperation for VerifyDetectEvasionOp {
                 "followup_response_rate": report.metrics.followup_response_rate
             }
         });
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     #[cfg(not(feature = "database"))]
@@ -849,13 +849,13 @@ impl CustomOperation for VerifyCalculateConfidenceOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let attribute = json_extract_string_opt(args, "attribute");
         let result = verify_calculate_confidence_impl(entity_id, attribute, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1023,9 +1023,9 @@ impl CustomOperation for VerifyGetStatusOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let pattern_stats: Vec<(String, i64)> = sqlx::query_as(
             r#"SELECT status, COUNT(*) as count
@@ -1107,7 +1107,7 @@ impl CustomOperation for VerifyGetStatusOp {
                 "decided": escalation_stats.iter().find(|(s, _)| s == "DECIDED").map(|(_, c)| c).unwrap_or(&0)
             }
         });
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1250,9 +1250,9 @@ impl CustomOperation for VerifyAgainstRegistryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use crate::verification::RegistryVerifier;
 
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -1297,7 +1297,7 @@ impl CustomOperation for VerifyAgainstRegistryOp {
                 ));
             }
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "entity_id": entity_id,
                 "registry": registry,
@@ -1543,9 +1543,9 @@ impl CustomOperation for VerifyAssertOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
         let min_confidence: f64 = json_extract_string(args, "min-confidence")?
@@ -1555,7 +1555,7 @@ impl CustomOperation for VerifyAssertOp {
             json_extract_string_opt(args, "fail-action").unwrap_or_else(|| "error".to_string());
         let result =
             verify_assert_impl(cbu_id, entity_id, min_confidence, &fail_action, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     #[cfg(not(feature = "database"))]

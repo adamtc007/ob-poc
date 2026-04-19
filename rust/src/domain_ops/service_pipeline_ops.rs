@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 
 use super::CustomOperation;
@@ -131,9 +131,9 @@ impl CustomOperation for ServiceIntentCreateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use crate::service_resources::{NewServiceIntent, ServiceResourcePipelineService};
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -149,7 +149,7 @@ impl CustomOperation for ServiceIntentCreateOp {
             created_by: None,
         };
         let intent_id = service.create_service_intent(&input).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             intent_id,
         ))
     }
@@ -232,15 +232,15 @@ impl CustomOperation for ServiceIntentListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use crate::service_resources::ServiceResourcePipelineService;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let service = ServiceResourcePipelineService::new(pool.clone());
         let intents = service.get_service_intents(cbu_id).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             intents
                 .iter()
                 .map(|i| {
@@ -361,9 +361,9 @@ impl CustomOperation for ServiceIntentSupersedeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_get_required_uuid;
         use uuid::Uuid;
         let intent_id = json_get_required_uuid(args, "intent-id")?;
@@ -391,7 +391,7 @@ impl CustomOperation for ServiceIntentSupersedeOp {
         .bind(&options)
         .fetch_one(pool)
         .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(new_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(new_id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -467,15 +467,15 @@ impl CustomOperation for DiscoveryRunOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use crate::service_resources::{load_srdefs_from_config, run_discovery_pipeline};
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let registry = load_srdefs_from_config().unwrap_or_default();
         let result = run_discovery_pipeline(pool, &registry, cbu_id).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "cbu_id": result.cbu_id,
                 "srdefs_discovered": result.srdefs_discovered,
@@ -591,9 +591,9 @@ impl CustomOperation for DiscoveryExplainOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let srdef_filter = json_extract_string_opt(args, "srdef-id");
@@ -610,7 +610,7 @@ impl CustomOperation for DiscoveryExplainOp {
                 WHERE cbu_id = $1 ORDER BY srdef_id, discovered_at DESC"#,
             ).bind(cbu_id).fetch_all(pool).await?
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             reasons
                 .iter()
                 .map(|r| {
@@ -705,15 +705,15 @@ impl CustomOperation for AttributeRollupOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use crate::service_resources::AttributeRollupEngine;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let engine = AttributeRollupEngine::new(pool);
         let result = engine.rollup_for_cbu(cbu_id).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "total_attributes": result.total_attributes,
                 "required_count": result.required_count,
@@ -790,15 +790,15 @@ impl CustomOperation for AttributePopulateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use crate::service_resources::PopulationEngine;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let engine = PopulationEngine::new(pool);
         let result = engine.populate_for_cbu(cbu_id).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "populated": result.populated,
                 "already_populated": result.already_populated,
@@ -889,9 +889,9 @@ impl CustomOperation for AttributeGapsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let gaps: Vec<AttrGapRow> = sqlx::query_as(
@@ -903,7 +903,7 @@ impl CustomOperation for AttributeGapsOp {
         .bind(cbu_id)
         .fetch_all(pool)
         .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             gaps.iter()
                 .map(|g| {
                     json!({
@@ -1014,9 +1014,9 @@ impl CustomOperation for AttributeSetOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_uuid, json_get_required_uuid};
         use crate::service_resources::{
             AttributeSource, ServiceResourcePipelineService, SetCbuAttrValue,
@@ -1034,7 +1034,7 @@ impl CustomOperation for AttributeSetOp {
             explain_refs: None,
         };
         service.set_cbu_attr_value(&input).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1112,15 +1112,15 @@ impl CustomOperation for ProvisioningRunOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use crate::service_resources::{load_srdefs_from_config, run_provisioning_pipeline};
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let registry = load_srdefs_from_config().unwrap_or_default();
         let result = run_provisioning_pipeline(pool, &registry, cbu_id).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "cbu_id": result.cbu_id,
                 "requests_created": result.requests_created,
@@ -1210,9 +1210,9 @@ impl CustomOperation for ProvisioningStatusOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_get_required_uuid;
         let request_id = json_get_required_uuid(args, "request-id")?;
         let row = sqlx::query(
@@ -1228,7 +1228,7 @@ impl CustomOperation for ProvisioningStatusOp {
         .await?
         .ok_or_else(|| anyhow::anyhow!("Request not found: {}", request_id))?;
         use sqlx::Row;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "request_id": row.get::<uuid::Uuid, _>("request_id"),
                 "cbu_id": row.get::<uuid::Uuid, _>("cbu_id"),
@@ -1314,16 +1314,16 @@ impl CustomOperation for ReadinessComputeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use crate::service_resources::{load_srdefs_from_config, ReadinessEngine};
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let registry = load_srdefs_from_config().unwrap_or_default();
         let engine = ReadinessEngine::new(pool, &registry);
         let result = engine.compute_for_cbu(cbu_id).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "total_services": result.total_services,
                 "ready": result.ready,
@@ -1422,9 +1422,9 @@ impl CustomOperation for ReadinessExplainOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_uuid, json_extract_uuid_opt};
         use crate::service_resources::ServiceResourcePipelineService;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -1442,7 +1442,7 @@ impl CustomOperation for ReadinessExplainOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             blocking,
         ))
     }
@@ -1539,9 +1539,9 @@ impl CustomOperation for PipelineFullOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use crate::service_resources::{
             load_srdefs_from_config, run_discovery_pipeline, run_provisioning_pipeline,
@@ -1550,7 +1550,7 @@ impl CustomOperation for PipelineFullOp {
         let registry = load_srdefs_from_config().unwrap_or_default();
         let discovery = run_discovery_pipeline(pool, &registry, cbu_id).await?;
         let provisioning = run_provisioning_pipeline(pool, &registry, cbu_id).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "cbu_id": cbu_id,
                 "discovery": {
@@ -1663,9 +1663,9 @@ impl CustomOperation for ServiceResourceCheckAttributeGapsOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use crate::service_resources::load_srdefs_from_config;
         let registry = load_srdefs_from_config().unwrap_or_default();
         let mut gap_rows: Vec<serde_json::Value> = Vec::new();
@@ -1689,7 +1689,7 @@ impl CustomOperation for ServiceResourceCheckAttributeGapsOp {
                 gap_rows.push(json!({ "srdef_id": srdef_id, "attribute_fqn": attr.attr_id, "status": status }));
             }
         }
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             gap_rows,
         ))
     }
@@ -1746,12 +1746,12 @@ impl CustomOperation for ServiceResourceSyncDefinitionsOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use crate::service_resources::load_and_sync_srdefs;
         let (_registry, sync_result) = load_and_sync_srdefs(pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "inserted": sync_result.inserted,
                 "updated": sync_result.updated,

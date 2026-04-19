@@ -1,0 +1,15 @@
+[package]
+name = "determinism-harness"
+version = "0.1.0"
+edition = "2021"
+description = "Byte-compare stage outputs across runs to detect determinism drift (v0.3 §9.4)."
+
+[dependencies]
+ob-poc-types = { path = "../ob-poc-types" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+blake3 = { version = "1", default-features = false }
+
+[dev-dependencies]
+# nothing yet — fixtures land in Phase 5b+

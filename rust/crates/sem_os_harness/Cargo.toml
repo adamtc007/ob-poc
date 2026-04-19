@@ -8,6 +8,7 @@ description = "Semantic OS test harness — golden/invariant tests against SemOs
 sem_os_core = { path = "../sem_os_core" }
 sem_os_client = { path = "../sem_os_client" }
 sem_os_postgres = { path = "../sem_os_postgres" }
+dsl-runtime = { path = "../dsl-runtime" }
 async-trait = "0.1"
 tokio = { version = "1", features = ["full"] }
 anyhow = "1.0"

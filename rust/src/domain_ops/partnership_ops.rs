@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -175,9 +175,9 @@ impl CustomOperation for PartnershipContributionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
         let partner_id = json_extract_uuid(args, ctx, "partner-entity-id")?;
         let amount: rust_decimal::Decimal = json_extract_string(args, "amount")?
@@ -194,7 +194,7 @@ impl CustomOperation for PartnershipContributionOp {
         )
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -355,9 +355,9 @@ impl CustomOperation for PartnershipDistributionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
         let partner_id = json_extract_uuid(args, ctx, "partner-entity-id")?;
         let amount: rust_decimal::Decimal = json_extract_string(args, "amount")?
@@ -377,7 +377,7 @@ impl CustomOperation for PartnershipDistributionOp {
         )
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -557,11 +557,11 @@ impl CustomOperation for PartnershipReconcileOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             partnership_reconcile_impl(partnership_id, pool).await?,
         ))
     }
@@ -764,11 +764,11 @@ impl CustomOperation for PartnershipAnalyzeControlOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let partnership_id = json_extract_uuid(args, ctx, "partnership-entity-id")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             partnership_analyze_control_impl(partnership_id, pool).await?,
         ))
     }

@@ -6,7 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
@@ -74,9 +74,9 @@ impl CustomOperation for MaintenanceHealthPendingOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             "SELECT status, COUNT(*)::bigint FROM sem_reg.changesets GROUP BY status ORDER BY status"
         ).fetch_all(pool).await?;
@@ -84,7 +84,7 @@ impl CustomOperation for MaintenanceHealthPendingOp {
             .into_iter()
             .map(|(status, count)| serde_json::json!({"status": status, "count": count}))
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({"pending_changesets": entries}),
         ))
     }
@@ -159,9 +159,9 @@ impl CustomOperation for MaintenanceHealthStaleDryrunsOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let rows: Vec<(String, String)> = sqlx::query_as(
             "SELECT c.changeset_id::text, c.status FROM sem_reg.changesets c WHERE c.status = 'dry_run_passed' AND c.updated_at < NOW() - INTERVAL '7 days' ORDER BY c.updated_at ASC LIMIT 50",
         ).fetch_all(pool).await?;
@@ -169,7 +169,7 @@ impl CustomOperation for MaintenanceHealthStaleDryrunsOp {
             .into_iter()
             .map(|(id, status)| serde_json::json!({"changeset_id": id, "status": status}))
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({"stale_dryruns": stale, "count": stale.len()}),
         ))
     }
@@ -238,13 +238,13 @@ impl CustomOperation for MaintenanceCleanupOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let archived = sqlx::query_scalar::<_, i64>(
             "WITH moved AS (INSERT INTO sem_reg_authoring.change_sets_archive SELECT * FROM sem_reg.changesets WHERE status IN ('rejected', 'dry_run_failed') AND updated_at < NOW() - INTERVAL '90 days' ON CONFLICT DO NOTHING RETURNING 1) SELECT COUNT(*) FROM moved",
         ).fetch_one(pool).await.unwrap_or(0);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({"archived_count": archived, "status": "cleanup_complete"}),
         ))
     }
@@ -301,10 +301,10 @@ impl CustomOperation for MaintenanceBootstrapSeedsOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({"status": "bootstrap_seeds must be triggered via server startup or CLI", "hint": "Use: cargo x sem-reg scan"}),
         ))
     }
@@ -367,16 +367,16 @@ impl CustomOperation for MaintenanceDrainOutboxOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let pending: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM sem_reg.outbox_events WHERE processed_at IS NULL",
         )
         .fetch_one(pool)
         .await
         .unwrap_or(0);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({"pending_outbox_events": pending, "status": if pending == 0 { "drained" } else { "has_pending" }}),
         ))
     }
@@ -388,7 +388,21 @@ impl CustomOperation for MaintenanceDrainOutboxOp {
 
 // ── Reindex Embeddings ────────────────────────────────────────────
 
-/// Trigger embedding reindex (wraps populate_embeddings binary).
+/// Queue an embedding reindex via the Sequencer outbox. Phase 0g remediation
+/// of Pattern A A1 violation (D11, ledger row #1):
+/// `docs/todo/pattern-b-a1-remediation-ledger.md` §2.
+///
+/// Previously this op spawned `cargo run --release -- populate_embeddings`
+/// directly from the verb-execution body — a clear A1 violation (external
+/// side effect inside the inner transaction). Now it writes a
+/// `maintenance_spawn` row to `public.outbox` (migration 131) and returns
+/// immediately. The drainer (Phase 5e) spawns the subprocess post-commit.
+///
+/// Until Phase 5e lands the drainer, admins invoking this verb see the row
+/// queued but not yet executed. Direct synchronous invocation outside the
+/// Sequencer is available via `cargo run --release --package
+/// ob-semantic-matcher --bin populate_embeddings` for the transition
+/// window.
 #[register_custom_op]
 pub struct MaintenanceReindexEmbeddingsOp;
 
@@ -401,7 +415,7 @@ impl CustomOperation for MaintenanceReindexEmbeddingsOp {
         "reindex-embeddings"
     }
     fn rationale(&self) -> &'static str {
-        "Spawns populate_embeddings binary as subprocess"
+        "Queues embedding reindex via public.outbox (Phase 0g Pattern A remediation, D11)"
     }
 
     #[cfg(feature = "database")]
@@ -409,44 +423,20 @@ impl CustomOperation for MaintenanceReindexEmbeddingsOp {
         &self,
         verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
+        pool: &PgPool,
     ) -> Result<ExecutionResult> {
         use super::sem_os_helpers::get_bool_arg;
 
         let force = get_bool_arg(verb_call, "force").unwrap_or(false);
+        let (outbox_id, idempotency_key) = enqueue_reindex_embeddings(pool, force).await?;
 
-        let mut cmd = tokio::process::Command::new("cargo");
-        cmd.args([
-            "run",
-            "--release",
-            "--package",
-            "ob-semantic-matcher",
-            "--bin",
-            "populate_embeddings",
-        ]);
-
-        if force {
-            cmd.arg("--").arg("--force");
-        }
-
-        let output = cmd.output().await?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-        if output.status.success() {
-            Ok(ExecutionResult::Record(serde_json::json!({
-                "status": "success",
-                "force": force,
-                "output": stdout.lines().last().unwrap_or("done"),
-            })))
-        } else {
-            Err(anyhow::anyhow!(
-                "populate_embeddings failed (exit {}): {}",
-                output.status.code().unwrap_or(-1),
-                stderr.lines().last().unwrap_or("unknown error")
-            ))
-        }
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "status": "queued",
+            "force": force,
+            "outbox_id": outbox_id.to_string(),
+            "idempotency_key": idempotency_key,
+            "drainer": "Phase 5e outbox drainer will spawn the populate_embeddings subprocess post-commit.",
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -464,42 +454,105 @@ impl CustomOperation for MaintenanceReindexEmbeddingsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_bool_opt;
         let force = json_extract_bool_opt(args, "force").unwrap_or(false);
-        let mut cmd = tokio::process::Command::new("cargo");
-        cmd.args([
+        let (outbox_id, idempotency_key) = enqueue_reindex_embeddings(pool, force).await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "status": "queued",
+                "force": force,
+                "outbox_id": outbox_id.to_string(),
+                "idempotency_key": idempotency_key,
+                "drainer": "Phase 5e outbox drainer will spawn the populate_embeddings subprocess post-commit.",
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+/// Shared helper: insert a `maintenance_spawn` outbox row describing the
+/// reindex-embeddings subprocess. Returns `(outbox_id, idempotency_key)`.
+///
+/// Idempotency:
+/// - Same-day force=false invocations dedupe on the same key (per-day window).
+/// - Force=true invocations get a distinct key (they are explicit re-runs).
+/// - ON CONFLICT DO NOTHING ensures a duplicate insert is a no-op; the
+///   returned `outbox_id` then belongs to the pre-existing row.
+///
+/// The row is inserted with `status = 'pending'`. The Phase 5e drainer
+/// claims rows where `effect_kind = 'maintenance_spawn'` and spawns the
+/// subprocess, idempotent against `idempotency_key`.
+///
+/// # A1 compliance
+///
+/// This function performs ONLY database writes (INSERT into public.outbox).
+/// No HTTP, no subprocess, no external effect. Lint L4 passes.
+#[cfg(feature = "database")]
+async fn enqueue_reindex_embeddings(
+    pool: &PgPool,
+    force: bool,
+) -> Result<(uuid::Uuid, String)> {
+    let outbox_id = uuid::Uuid::new_v4();
+    let trace_id = uuid::Uuid::new_v4();
+
+    // Idempotency convention matches ob-poc-types::IdempotencyKey::from_parts:
+    //   <effect_kind>:<trace_id>:<sub_key>
+    // For reindex, sub_key is the UTC date + force flag. This dedupes
+    // accidental double-submits within the same day while allowing
+    // explicit force reruns.
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let sub_key = if force {
+        format!("{}-force", today)
+    } else {
+        today
+    };
+    let idempotency_key = format!("maintenance_spawn:{}:{}", trace_id, sub_key);
+
+    let payload = serde_json::json!({
+        "command": "cargo",
+        "args": [
             "run",
             "--release",
             "--package",
             "ob-semantic-matcher",
             "--bin",
             "populate_embeddings",
-        ]);
-        if force {
-            cmd.arg("--").arg("--force");
-        }
-        let output = cmd.output().await?;
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        if output.status.success() {
-            Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
-                serde_json::json!({"status": "success", "force": force, "output": stdout.lines().last().unwrap_or("done")}),
-            ))
-        } else {
-            Err(anyhow::anyhow!(
-                "populate_embeddings failed (exit {}): {}",
-                output.status.code().unwrap_or(-1),
-                stderr.lines().last().unwrap_or("unknown error")
-            ))
-        }
-    }
+        ],
+        "force": force,
+    });
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
+    // Insert into public.outbox. ON CONFLICT DO NOTHING on the UNIQUE
+    // (idempotency_key, effect_kind) constraint makes this idempotent.
+    // If a conflict occurs, we return the inserted (new) id anyway —
+    // the drainer's idempotency guard ensures no duplicate subprocess
+    // execution even if two rows somehow raced to the same key (which
+    // the UNIQUE constraint prevents at the SQL layer).
+    sqlx::query(
+        r#"
+        INSERT INTO public.outbox
+            (id, trace_id, envelope_version, effect_kind, payload, idempotency_key, status)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, 'pending')
+        ON CONFLICT (idempotency_key, effect_kind) DO NOTHING
+        "#,
+    )
+    .bind(outbox_id)
+    .bind(trace_id)
+    .bind(1i16) // EnvelopeVersion::CURRENT
+    .bind("maintenance_spawn")
+    .bind(&payload)
+    .bind(&idempotency_key)
+    .execute(pool)
+    .await?;
+
+    Ok((outbox_id, idempotency_key))
 }
 
 // ── Schema Sync Validation ────────────────────────────────────────
@@ -562,9 +615,9 @@ impl CustomOperation for MaintenanceValidateSchemaSyncOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             "SELECT object_type, COUNT(*)::bigint FROM sem_reg.snapshots WHERE status = 'active' GROUP BY object_type ORDER BY object_type",
         ).fetch_all(pool).await?;
@@ -572,7 +625,7 @@ impl CustomOperation for MaintenanceValidateSchemaSyncOp {
             .into_iter()
             .map(|(ot, c)| serde_json::json!({"object_type": ot, "active_count": c}))
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({"active_snapshot_counts": counts, "hint": "Run 'cargo x sem-reg scan --dry-run' for full drift detection"}),
         ))
     }

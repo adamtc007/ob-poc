@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
@@ -443,9 +443,9 @@ impl CustomOperation for ResourceCreateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -496,7 +496,7 @@ impl CustomOperation for ResourceCreateOp {
 
         ctx.bind("instance", result_id);
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             result_id,
         ))
     }
@@ -586,9 +586,9 @@ impl CustomOperation for ResourceSetAttrOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
         let attr_name = json_extract_string(args, "attr")?;
         let value = json_extract_string(args, "value")?;
@@ -596,7 +596,7 @@ impl CustomOperation for ResourceSetAttrOp {
             json_extract_string_opt(args, "state").unwrap_or_else(|| "proposed".to_string());
         let value_id =
             resource_set_attr_impl(instance_id, &attr_name, &value, &state, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(value_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(value_id))
     }
 
     #[cfg(not(feature = "database"))]
@@ -662,12 +662,12 @@ impl CustomOperation for ResourceActivateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
         resource_activate_impl(instance_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
+        Ok(dsl_runtime::VerbExecutionOutcome::Void)
     }
 
     #[cfg(not(feature = "database"))]
@@ -731,12 +731,12 @@ impl CustomOperation for ResourceSuspendOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
         resource_suspend_impl(instance_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
+        Ok(dsl_runtime::VerbExecutionOutcome::Void)
     }
 
     #[cfg(not(feature = "database"))]
@@ -800,12 +800,12 @@ impl CustomOperation for ResourceDecommissionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
         resource_decommission_impl(instance_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
+        Ok(dsl_runtime::VerbExecutionOutcome::Void)
     }
 
     #[cfg(not(feature = "database"))]
@@ -869,12 +869,12 @@ impl CustomOperation for ResourceValidateAttrsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
         let result = resource_validate_attrs_impl(instance_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     #[cfg(not(feature = "database"))]

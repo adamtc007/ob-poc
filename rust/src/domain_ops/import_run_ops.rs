@@ -18,7 +18,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -217,9 +217,9 @@ impl CustomOperation for ImportRunBeginOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{
             json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
         };
@@ -246,7 +246,7 @@ impl CustomOperation for ImportRunBeginOp {
         )
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -329,16 +329,16 @@ impl CustomOperation for ImportRunCompleteOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
 
         let run_id = json_extract_uuid(args, ctx, "run-id")?;
         let status =
             json_extract_string_opt(args, "status").unwrap_or_else(|| "ACTIVE".to_string());
         let result = import_run_complete_impl(run_id, status, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -552,9 +552,9 @@ impl CustomOperation for ImportRunSupersedeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_uuid, json_extract_uuid_opt};
 
         let run_id = json_extract_uuid(args, ctx, "run-id")?;
@@ -570,7 +570,7 @@ impl CustomOperation for ImportRunSupersedeOp {
 
         let result =
             import_run_supersede_impl(run_id, reason, superseded_by, corrected_by, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }

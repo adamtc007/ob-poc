@@ -8,7 +8,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -182,9 +182,9 @@ impl CustomOperation for TemporalOwnershipAsOfOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let as_of_date = get_date_arg_json(args, "as-of-date")?;
         let rows: Vec<(
@@ -218,7 +218,7 @@ impl CustomOperation for TemporalOwnershipAsOfOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "entity_id": entity_id.to_string(),
                 "as_of_date": as_of_date.to_string(),
@@ -317,9 +317,9 @@ impl CustomOperation for TemporalUboChainAsOfOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let as_of_date = get_date_arg_json(args, "as-of-date")?;
         let threshold = get_decimal_arg_json(args, "threshold", 25.0);
@@ -351,7 +351,7 @@ impl CustomOperation for TemporalUboChainAsOfOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "entity_id": entity_id.to_string(),
                 "as_of_date": as_of_date.to_string(),
@@ -458,9 +458,9 @@ impl CustomOperation for TemporalCbuRelationshipsAsOfOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let as_of_date = get_date_arg_json(args, "as-of-date")?;
         let rows: Vec<(
@@ -500,7 +500,7 @@ impl CustomOperation for TemporalCbuRelationshipsAsOfOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "cbu_id": cbu_id.to_string(),
                 "as_of_date": as_of_date.to_string(),
@@ -594,9 +594,9 @@ impl CustomOperation for TemporalCbuRolesAsOfOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let as_of_date = get_date_arg_json(args, "as-of-date")?;
         let rows: Vec<(
@@ -624,7 +624,7 @@ impl CustomOperation for TemporalCbuRolesAsOfOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "cbu_id": cbu_id.to_string(),
                 "as_of_date": as_of_date.to_string(),
@@ -727,9 +727,9 @@ impl CustomOperation for TemporalCbuStateAtApprovalOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let rows: Vec<(
             Uuid,
@@ -744,7 +744,7 @@ impl CustomOperation for TemporalCbuStateAtApprovalOp {
             .fetch_all(pool)
             .await?;
         if rows.is_empty() {
-            return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 json!({
                     "cbu_id": cbu_id.to_string(),
                     "error": "No approved KYC case found for this CBU",
@@ -765,7 +765,7 @@ impl CustomOperation for TemporalCbuStateAtApprovalOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "cbu_id": cbu_id.to_string(),
                 "case_id": case_id.to_string(),
@@ -876,9 +876,9 @@ impl CustomOperation for TemporalRelationshipHistoryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let relationship_id = json_extract_uuid(args, ctx, "relationship-id")?;
         let limit = get_int_arg_json(args, "limit", 50);
         let rows: Vec<(
@@ -923,7 +923,7 @@ impl CustomOperation for TemporalRelationshipHistoryOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "relationship_id": relationship_id.to_string(),
                 "count": history.len(),
@@ -1043,9 +1043,9 @@ impl CustomOperation for TemporalEntityHistoryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let from_date = get_optional_date_arg_json(args, "from-date")?;
         let to_date = get_optional_date_arg_json(args, "to-date")?;
@@ -1099,7 +1099,7 @@ impl CustomOperation for TemporalEntityHistoryOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "entity_id": entity_id.to_string(),
                 "from_date": from_date.map(|d| d.to_string()),
@@ -1255,9 +1255,9 @@ impl CustomOperation for TemporalCompareOwnershipOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let date_a = get_optional_date_arg_json(args, "date-a")?
             .ok_or_else(|| anyhow!("date-a is required"))?;
@@ -1327,7 +1327,7 @@ impl CustomOperation for TemporalCompareOwnershipOp {
                 }
             }
         }
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "entity_id": entity_id.to_string(),
                 "date_a": date_a.to_string(),

@@ -7,7 +7,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use governed_query_proc::governed_query;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -189,9 +189,9 @@ impl CustomOperation for KycCaseCreateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let deal_id = json_extract_uuid_opt(args, ctx, "deal-id");
         let mut client_group_id = json_extract_uuid_opt(args, ctx, "client-group-id");
@@ -259,7 +259,7 @@ impl CustomOperation for KycCaseCreateOp {
             status: "INTAKE".to_string(),
         };
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -662,9 +662,9 @@ impl CustomOperation for KycCaseUpdateStatusOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
 
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
@@ -712,7 +712,7 @@ impl CustomOperation for KycCaseUpdateStatusOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
 
     fn is_migrated(&self) -> bool {
@@ -784,9 +784,9 @@ impl CustomOperation for KycCaseCloseOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
 
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
@@ -803,7 +803,7 @@ impl CustomOperation for KycCaseCloseOp {
         }
 
         let result = kyc_case_close_impl(case_id, &status, notes.as_deref(), pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
@@ -945,13 +945,13 @@ impl CustomOperation for KycCaseStateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
         let result = kyc_case_state_impl(case_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1228,13 +1228,13 @@ impl CustomOperation for WorkstreamStateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let workstream_id = json_extract_uuid(args, ctx, "workstream-id")?;
         let result = workstream_state_impl(workstream_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {

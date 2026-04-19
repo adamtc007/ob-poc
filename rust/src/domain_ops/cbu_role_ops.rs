@@ -13,7 +13,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use crate::domain_ops::helpers::{
     json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
@@ -220,9 +220,9 @@ impl CustomOperation for CbuRoleAssignOwnershipOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use chrono::NaiveDate;
         use sqlx::types::BigDecimal;
 
@@ -288,7 +288,7 @@ impl CustomOperation for CbuRoleAssignOwnershipOp {
         let rel_result = rel_result.0;
         tx.commit().await?;
         ctx.bind("cbu_entity_role", role_result);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "role_id": role_result,
                 "relationship_id": rel_result,
@@ -471,9 +471,9 @@ impl CustomOperation for CbuRoleAssignControlOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use chrono::NaiveDate;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -525,7 +525,7 @@ impl CustomOperation for CbuRoleAssignControlOp {
         let rel_result = rel_result.0;
         tx.commit().await?;
         ctx.bind("cbu_entity_role", role_result);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "role_id": role_result,
                 "relationship_id": rel_result,
@@ -734,9 +734,9 @@ impl CustomOperation for CbuRoleAssignTrustOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use sqlx::types::BigDecimal;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -804,7 +804,7 @@ impl CustomOperation for CbuRoleAssignTrustOp {
         let rel_result = rel_result.0;
         tx.commit().await?;
         ctx.bind("cbu_entity_role", role_result);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "role_id": role_result,
                 "relationship_id": rel_result,
@@ -1010,9 +1010,9 @@ impl CustomOperation for CbuRoleAssignFundOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use sqlx::types::BigDecimal;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -1081,7 +1081,7 @@ impl CustomOperation for CbuRoleAssignFundOp {
         };
         tx.commit().await?;
         ctx.bind("cbu_entity_role", role_result);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "role_id": role_result,
                 "relationship_id": rel_result,
@@ -1228,9 +1228,9 @@ impl CustomOperation for CbuRoleAssignServiceOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use chrono::NaiveDate;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -1260,7 +1260,7 @@ impl CustomOperation for CbuRoleAssignServiceOp {
         .fetch_one(pool)
         .await?;
         ctx.bind("cbu_entity_role", role_result);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "role_id": role_result,
                 "message": format!(
@@ -1426,9 +1426,9 @@ impl CustomOperation for CbuRoleAssignSignatoryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use sqlx::types::BigDecimal;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -1467,7 +1467,7 @@ impl CustomOperation for CbuRoleAssignSignatoryOp {
         .fetch_one(pool)
         .await?;
         ctx.bind("cbu_entity_role", role_result);
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "role_id": role_result,
                 "message": format!("Assigned signatory role {} to {}", role, person_entity_id)
@@ -1610,9 +1610,9 @@ impl CustomOperation for CbuRoleValidateAllOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = uuid::Uuid::parse_str(&json_extract_string(args, "cbu-id")?)?;
         let cbu = sqlx::query!(
             r#"SELECT cbu_category, client_type FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
@@ -1671,7 +1671,7 @@ impl CustomOperation for CbuRoleValidateAllOp {
             ));
         }
         let is_valid = issues.is_empty();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::json!({
                 "cbu_id": cbu_id,
                 "valid": is_valid,

@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use serde_json::json;
 use std::collections::BTreeSet;
 
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::sem_os_helpers::{delegate_to_tool, get_bool_arg, get_int_arg, get_string_arg};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
@@ -22,9 +22,9 @@ use sqlx::PgPool;
 async fn execute_json_via_legacy<T: CustomOperation + Sync>(
     op: &T,
     args: &serde_json::Value,
-    ctx: &mut sem_os_core::execution::VerbExecutionContext,
+    ctx: &mut dsl_runtime::VerbExecutionContext,
     pool: &PgPool,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let vc = crate::sem_os_runtime::verb_executor_adapter::build_verb_call_pub(
         op.domain(),
         op.verb(),
@@ -32,6 +32,7 @@ async fn execute_json_via_legacy<T: CustomOperation + Sync>(
     );
     let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
     let result = op.execute(&vc, &mut exec_ctx, pool).await?;
+    crate::sem_os_runtime::verb_executor_adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
     Ok(crate::sem_os_runtime::verb_executor_adapter::to_verb_outcome_pub(&result))
 }
 
@@ -352,9 +353,9 @@ impl CustomOperation for SchemaDomainDescribeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -410,9 +411,9 @@ impl CustomOperation for SchemaEntityDescribeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -476,9 +477,9 @@ impl CustomOperation for SchemaEntityListFieldsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -544,9 +545,9 @@ impl CustomOperation for SchemaEntityListRelationshipsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -610,9 +611,9 @@ impl CustomOperation for SchemaEntityListVerbsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -662,9 +663,9 @@ impl CustomOperation for SchemaIntrospectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
     }
     fn is_migrated(&self) -> bool {
@@ -716,9 +717,9 @@ impl CustomOperation for SchemaExtractAttributesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
     }
     fn is_migrated(&self) -> bool {
@@ -765,9 +766,9 @@ impl CustomOperation for SchemaExtractVerbsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
     }
     fn is_migrated(&self) -> bool {
@@ -814,9 +815,9 @@ impl CustomOperation for SchemaExtractEntitiesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
     }
     fn is_migrated(&self) -> bool {
@@ -863,9 +864,9 @@ impl CustomOperation for SchemaCrossReferenceOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, "db_introspect").await
     }
     fn is_migrated(&self) -> bool {
@@ -1142,9 +1143,9 @@ impl CustomOperation for SchemaGenerateErdOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -1234,9 +1235,9 @@ impl CustomOperation for SchemaGenerateVerbFlowOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 
@@ -1355,9 +1356,9 @@ impl CustomOperation for SchemaGenerateDiscoveryMapOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         execute_json_via_legacy(self, args, ctx, pool).await
     }
 

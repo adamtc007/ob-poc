@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -140,16 +140,16 @@ impl CustomOperation for MatrixEffectiveOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let instrument_class = json_extract_string_opt(args, "instrument-class");
         let market = json_extract_string_opt(args, "market");
         let result = matrix_effective_impl(cbu_id, instrument_class, market, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             result,
         ))
     }
@@ -302,15 +302,15 @@ impl CustomOperation for MatrixUnifiedGapsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let domain_filter = json_extract_string_opt(args, "domain");
         let result = matrix_unified_gaps_impl(cbu_id, domain_filter, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -484,16 +484,16 @@ impl CustomOperation for MatrixCompareProductsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_string_list, json_extract_uuid};
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let instrument_class = json_extract_string(args, "instrument-class")?;
         let products = json_extract_string_list(args, "products")?;
         let result = matrix_compare_products_impl(cbu_id, instrument_class, products, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {

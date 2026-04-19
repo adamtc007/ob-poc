@@ -246,7 +246,7 @@ pub fn json_extract_string_opt(args: &serde_json::Value, arg_name: &str) -> Opti
 /// Extract a required UUID from JSON args + context symbols.
 pub fn json_extract_uuid(
     args: &serde_json::Value,
-    ctx: &sem_os_core::execution::VerbExecutionContext,
+    ctx: &dsl_runtime::VerbExecutionContext,
     arg_name: &str,
 ) -> Result<Uuid> {
     json_extract_uuid_opt(args, ctx, arg_name)
@@ -256,7 +256,7 @@ pub fn json_extract_uuid(
 /// Extract an optional UUID from JSON args + context symbols.
 pub fn json_extract_uuid_opt(
     args: &serde_json::Value,
-    ctx: &sem_os_core::execution::VerbExecutionContext,
+    ctx: &dsl_runtime::VerbExecutionContext,
     arg_name: &str,
 ) -> Option<Uuid> {
     args.get(arg_name).and_then(|v| {
@@ -321,7 +321,7 @@ pub fn json_extract_string_list(args: &serde_json::Value, arg_name: &str) -> Res
 /// Extract CBU ID from JSON args, accepting "cbu" or "cbu-id".
 pub fn json_extract_cbu_id(
     args: &serde_json::Value,
-    ctx: &sem_os_core::execution::VerbExecutionContext,
+    ctx: &dsl_runtime::VerbExecutionContext,
 ) -> Result<Uuid> {
     json_extract_uuid_opt(args, ctx, "cbu-id")
         .or_else(|| json_extract_uuid_opt(args, ctx, "cbu"))
@@ -516,7 +516,7 @@ mod tests {
     fn json_extract_uuid_from_string() {
         let id = uuid::Uuid::new_v4();
         let args = serde_json::json!({"entity-id": id.to_string()});
-        let ctx = sem_os_core::execution::VerbExecutionContext::new(Principal::system());
+        let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
         assert_eq!(json_extract_uuid(&args, &ctx, "entity-id").unwrap(), id);
     }
 
@@ -524,7 +524,7 @@ mod tests {
     fn json_extract_uuid_from_symbol() {
         let id = uuid::Uuid::new_v4();
         let args = serde_json::json!({"cbu-id": "@cbu"});
-        let mut ctx = sem_os_core::execution::VerbExecutionContext::new(Principal::system());
+        let mut ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
         ctx.bind("cbu", id);
         assert_eq!(json_extract_uuid(&args, &ctx, "cbu-id").unwrap(), id);
     }
@@ -532,7 +532,7 @@ mod tests {
     #[test]
     fn json_extract_uuid_missing() {
         let args = serde_json::json!({});
-        let ctx = sem_os_core::execution::VerbExecutionContext::new(Principal::system());
+        let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
         assert!(json_extract_uuid(&args, &ctx, "id").is_err());
     }
 
@@ -574,7 +574,7 @@ mod tests {
     fn json_extract_cbu_id_from_cbu_id_key() {
         let id = uuid::Uuid::new_v4();
         let args = serde_json::json!({"cbu-id": id.to_string()});
-        let ctx = sem_os_core::execution::VerbExecutionContext::new(Principal::system());
+        let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
         assert_eq!(json_extract_cbu_id(&args, &ctx).unwrap(), id);
     }
 
@@ -582,14 +582,14 @@ mod tests {
     fn json_extract_cbu_id_from_cbu_key() {
         let id = uuid::Uuid::new_v4();
         let args = serde_json::json!({"cbu": id.to_string()});
-        let ctx = sem_os_core::execution::VerbExecutionContext::new(Principal::system());
+        let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
         assert_eq!(json_extract_cbu_id(&args, &ctx).unwrap(), id);
     }
 
     #[test]
     fn json_extract_cbu_id_missing() {
         let args = serde_json::json!({});
-        let ctx = sem_os_core::execution::VerbExecutionContext::new(Principal::system());
+        let ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
         assert!(json_extract_cbu_id(&args, &ctx).is_err());
     }
 }

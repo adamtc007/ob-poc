@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -126,9 +126,9 @@ impl CustomOperation for ScreeningPepOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use uuid::Uuid;
 
@@ -165,7 +165,7 @@ impl CustomOperation for ScreeningPepOp {
 
         if let Some(row) = existing {
             ctx.bind("screening", row.screening_id);
-            return Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
                 row.screening_id,
             ));
         }
@@ -184,7 +184,7 @@ impl CustomOperation for ScreeningPepOp {
 
         ctx.bind("screening", screening_id);
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             screening_id,
         ))
     }
@@ -303,9 +303,9 @@ impl CustomOperation for ScreeningSanctionsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         use uuid::Uuid;
 
@@ -342,7 +342,7 @@ impl CustomOperation for ScreeningSanctionsOp {
 
         if let Some(row) = existing {
             ctx.bind("screening", row.screening_id);
-            return Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            return Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
                 row.screening_id,
             ));
         }
@@ -361,7 +361,7 @@ impl CustomOperation for ScreeningSanctionsOp {
 
         ctx.bind("screening", screening_id);
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             screening_id,
         ))
     }
@@ -417,9 +417,9 @@ impl CustomOperation for ScreeningAdverseMediaOp {
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         Err(anyhow::anyhow!(
             "screening.adverse-media is not yet implemented"
         ))
@@ -538,9 +538,9 @@ impl CustomOperation for ScreeningBulkRefreshOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         use uuid::Uuid;
 
@@ -592,7 +592,7 @@ impl CustomOperation for ScreeningBulkRefreshOp {
             }
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             inserted,
         ))
     }

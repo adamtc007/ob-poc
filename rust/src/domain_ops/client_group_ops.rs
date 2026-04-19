@@ -54,7 +54,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -277,9 +277,9 @@ impl CustomOperation for ClientGroupEntityManageOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let action = args
             .get("action")
             .and_then(|value| value.as_str())
@@ -381,9 +381,9 @@ impl CustomOperation for ClientGroupEntityAddOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -406,7 +406,7 @@ impl CustomOperation for ClientGroupEntityAddOp {
         .bind(&notes)
         .fetch_one(pool)
         .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -494,9 +494,9 @@ impl CustomOperation for ClientGroupEntityRemoveOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_bool_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -523,7 +523,7 @@ impl CustomOperation for ClientGroupEntityRemoveOp {
             .await?
             .rows_affected()
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "removed": affected > 0,
                 "mark_historical": mark_historical
@@ -631,9 +631,9 @@ impl CustomOperation for ClientGroupEntityListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_int_opt, json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let membership_type = json_extract_string_opt(args, "membership-type");
@@ -683,7 +683,7 @@ impl CustomOperation for ClientGroupEntityListOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             items,
         ))
     }
@@ -788,9 +788,9 @@ impl CustomOperation for ClientGroupTagAddOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -827,7 +827,7 @@ impl CustomOperation for ClientGroupTagAddOp {
         .bind(&persona)
         .fetch_one(pool)
         .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -893,9 +893,9 @@ impl CustomOperation for ClientGroupTagRemoveOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let tag_id = json_extract_uuid(args, ctx, "tag-id")?;
         let affected = sqlx::query(r#"DELETE FROM "ob-poc".client_group_entity_tag WHERE id = $1"#)
@@ -903,7 +903,7 @@ impl CustomOperation for ClientGroupTagRemoveOp {
             .execute(pool)
             .await?
             .rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({ "removed": affected > 0 }),
         ))
     }
@@ -1006,9 +1006,9 @@ impl CustomOperation for ClientGroupTagListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
@@ -1048,7 +1048,7 @@ impl CustomOperation for ClientGroupTagListOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             items,
         ))
     }
@@ -1147,9 +1147,9 @@ impl CustomOperation for ClientGroupSearchOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{
             json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
         };
@@ -1174,7 +1174,7 @@ impl CustomOperation for ClientGroupSearchOp {
                      "confidence": conf, "match_type": mt })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             items,
         ))
     }
@@ -1321,9 +1321,9 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{
             json_extract_bool_opt, json_extract_string_list_opt, json_extract_string_opt,
             json_extract_uuid,
@@ -1390,7 +1390,7 @@ impl CustomOperation for ClientGroupDiscoverEntitiesOp {
                      "match_reason": reason, "already_member": already })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             items,
         ))
     }
@@ -1509,9 +1509,9 @@ impl CustomOperation for ClientGroupConfirmEntityOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_list_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -1557,7 +1557,7 @@ impl CustomOperation for ClientGroupConfirmEntityOp {
                 .await?;
             }
         }
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({ "confirmed": true, "entity_id": entity_id }),
         ))
     }
@@ -1645,9 +1645,9 @@ impl CustomOperation for ClientGroupRejectEntityOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -1663,7 +1663,7 @@ impl CustomOperation for ClientGroupRejectEntityOp {
         sqlx::query(
             r#"DELETE FROM "ob-poc".client_group_entity_tag WHERE group_id = $1 AND entity_id = $2"#,
         ).bind(group_id).bind(entity_id).execute(pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({ "rejected": affected > 0, "reason": reason }),
         ))
     }
@@ -1849,9 +1849,9 @@ impl CustomOperation for ClientGroupAssignRoleOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -1895,7 +1895,7 @@ impl CustomOperation for ClientGroupAssignRoleOp {
             RETURNING id"#,
         ).bind(cge_id).bind(role_id).bind(target_entity_id).bind(eff_from).bind(&source)
         .fetch_one(pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1964,9 +1964,9 @@ impl CustomOperation for ClientGroupRemoveRoleOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let role_assignment_id = json_extract_uuid(args, ctx, "role-assignment-id")?;
         let affected = sqlx::query(
@@ -1978,7 +1978,7 @@ impl CustomOperation for ClientGroupRemoveRoleOp {
         .execute(pool)
         .await?
         .rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             affected,
         ))
     }
@@ -2092,9 +2092,9 @@ impl CustomOperation for ClientGroupListRolesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_uuid, json_extract_uuid_opt};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
@@ -2138,7 +2138,7 @@ impl CustomOperation for ClientGroupListRolesOp {
                 "source": r.get::<String, _>("source"),
             })
         }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             items,
         ))
     }
@@ -2251,9 +2251,9 @@ impl CustomOperation for ClientGroupPartiesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_bool_opt, json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let role_category = json_extract_string_opt(args, "role-category");
@@ -2299,7 +2299,7 @@ impl CustomOperation for ClientGroupPartiesOp {
                 })
             })
             .collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             items,
         ))
     }
@@ -2386,9 +2386,9 @@ impl CustomOperation for ClientGroupAddRelationshipOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let parent_entity_id = json_extract_uuid(args, ctx, "parent-entity-id")?;
@@ -2410,7 +2410,7 @@ impl CustomOperation for ClientGroupAddRelationshipOp {
             RETURNING id"#,
         ).bind(group_id).bind(parent_entity_id).bind(child_entity_id).bind(&relationship_kind).bind(eff_from)
         .fetch_one(pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2523,9 +2523,9 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
@@ -2570,7 +2570,7 @@ impl CustomOperation for ClientGroupListRelationshipsOp {
                 "review_status": r.get::<String, _>("review_status"),
             })
         }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             items,
         ))
     }
@@ -2688,9 +2688,9 @@ impl CustomOperation for ClientGroupAddOwnershipSourceOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{
             json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
         };
@@ -2735,7 +2735,7 @@ impl CustomOperation for ClientGroupAddOwnershipSourceOp {
         .bind(confidence_bd)
         .fetch_one(pool)
         .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -2811,9 +2811,9 @@ impl CustomOperation for ClientGroupVerifyOwnershipOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let source_id = json_extract_uuid(args, ctx, "source-id")?;
         let verified_by = json_extract_string_opt(args, "verified-by");
@@ -2830,7 +2830,7 @@ impl CustomOperation for ClientGroupVerifyOwnershipOp {
         .execute(pool)
         .await?
         .rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             affected,
         ))
     }
@@ -2920,9 +2920,9 @@ impl CustomOperation for ClientGroupSetCanonicalOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let source_id = json_extract_uuid(args, ctx, "source-id")?;
         let notes = json_extract_string_opt(args, "notes");
@@ -2941,7 +2941,7 @@ impl CustomOperation for ClientGroupSetCanonicalOp {
             SET is_canonical = true, canonical_set_at = NOW(), canonical_notes = $2, updated_at = NOW()
             WHERE id = $1"#,
         ).bind(source_id).bind(&notes).execute(pool).await?.rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             affected,
         ))
     }
@@ -3038,9 +3038,9 @@ impl CustomOperation for ClientGroupListUnverifiedOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_int_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let limit = json_extract_int_opt(args, "limit").unwrap_or(50);
@@ -3067,7 +3067,7 @@ impl CustomOperation for ClientGroupListUnverifiedOp {
                 "verification_count": r.get::<i64, _>("verification_count"),
             })
         }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             items,
         ))
     }
@@ -3178,9 +3178,9 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         use std::str::FromStr;
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
@@ -3222,7 +3222,7 @@ impl CustomOperation for ClientGroupListDiscrepanciesOp {
                 "verified_pct": verified.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
             })
         }).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             items,
         ))
     }
@@ -3301,9 +3301,9 @@ impl CustomOperation for ClientGroupStartDiscoveryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let source =
@@ -3321,7 +3321,7 @@ impl CustomOperation for ClientGroupStartDiscoveryOp {
         .execute(pool)
         .await?
         .rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             affected,
         ))
     }
@@ -3394,9 +3394,9 @@ impl CustomOperation for ClientGroupCompleteDiscoveryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let _notes = json_extract_string_opt(args, "notes");
@@ -3409,7 +3409,7 @@ impl CustomOperation for ClientGroupCompleteDiscoveryOp {
         .execute(pool)
         .await?
         .rows_affected();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Affected(
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
             affected,
         ))
     }

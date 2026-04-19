@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{
     extract_uuid, extract_uuid_opt, json_extract_cbu_id, json_extract_string_opt, json_extract_uuid,
@@ -152,9 +152,9 @@ impl CustomOperation for UboCalculateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_cbu_id(args, ctx)?;
         let threshold = json_extract_string_opt(args, "threshold")
             .as_deref()
@@ -163,7 +163,7 @@ impl CustomOperation for UboCalculateOp {
 
         match ubo_calculate_impl(cbu_id, threshold, pool).await? {
             ExecutionResult::RecordSet(rows) => Ok(
-                sem_os_core::execution::VerbExecutionOutcome::RecordSet(rows),
+                dsl_runtime::VerbExecutionOutcome::RecordSet(rows),
             ),
             _ => unreachable!(),
         }
@@ -352,9 +352,9 @@ impl CustomOperation for UboTraceChainsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_cbu_id(args, ctx)?;
         let target_entity_id = super::helpers::json_extract_uuid_opt(args, ctx, "target-entity-id");
         let threshold = json_extract_string_opt(args, "threshold")
@@ -368,7 +368,7 @@ impl CustomOperation for UboTraceChainsOp {
 
         match ubo_trace_chains_impl(cbu_id, target_entity_id, threshold, as_of_date, pool).await? {
             ExecutionResult::Record(value) => {
-                Ok(sem_os_core::execution::VerbExecutionOutcome::Record(value))
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(value))
             }
             _ => unreachable!(),
         }
@@ -518,9 +518,9 @@ impl CustomOperation for UboListOwnersOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let as_of_date = json_extract_string_opt(args, "as-of-date")
             .as_deref()
@@ -529,7 +529,7 @@ impl CustomOperation for UboListOwnersOp {
 
         match ubo_list_owners_impl(entity_id, as_of_date, pool).await? {
             ExecutionResult::Record(value) => {
-                Ok(sem_os_core::execution::VerbExecutionOutcome::Record(value))
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(value))
             }
             _ => unreachable!(),
         }

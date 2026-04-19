@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use ob_poc_types::session_stack::SessionStackState;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -139,9 +139,9 @@ impl CustomOperation for BpmnCompileOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let bpmn_xml = json_extract_string(args, "bpmn-xml")?;
         let client = get_bpmn_client()?;
         let result = client.compile(&bpmn_xml).await?;
@@ -159,7 +159,7 @@ impl CustomOperation for BpmnCompileOp {
                 })
                 .collect(),
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(typed)?,
         ))
     }
@@ -234,9 +234,9 @@ impl CustomOperation for BpmnStartOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let process_key = json_extract_string(args, "process-key")?;
         let payload = json_extract_string_opt(args, "payload").unwrap_or_else(|| "{}".to_string());
 
@@ -260,7 +260,7 @@ impl CustomOperation for BpmnStartOp {
             })
             .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             instance_id,
         ))
     }
@@ -325,9 +325,9 @@ impl CustomOperation for BpmnSignalOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let instance_id = json_get_required_uuid(args, "instance-id")?;
         let message_name = json_extract_string(args, "message-name")?;
         let payload = json_extract_string_opt(args, "payload");
@@ -341,7 +341,7 @@ impl CustomOperation for BpmnSignalOp {
             )
             .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
+        Ok(dsl_runtime::VerbExecutionOutcome::Void)
     }
 
     fn is_migrated(&self) -> bool {
@@ -398,9 +398,9 @@ impl CustomOperation for BpmnCancelOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let instance_id = json_get_required_uuid(args, "instance-id")?;
         let reason = json_extract_string_opt(args, "reason")
             .unwrap_or_else(|| "Cancelled by operator".to_string());
@@ -408,7 +408,7 @@ impl CustomOperation for BpmnCancelOp {
         let client = get_bpmn_client()?;
         client.cancel(instance_id, &reason).await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
+        Ok(dsl_runtime::VerbExecutionOutcome::Void)
     }
 
     fn is_migrated(&self) -> bool {
@@ -470,9 +470,9 @@ impl CustomOperation for BpmnInspectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let instance_id = json_get_required_uuid(args, "instance-id")?;
 
         let client = get_bpmn_client()?;
@@ -485,7 +485,7 @@ impl CustomOperation for BpmnInspectOp {
             bytecode_version_hex: hex::encode(&inspection.bytecode_version),
             domain_payload_hash: inspection.domain_payload_hash,
         };
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(typed)?,
         ))
     }

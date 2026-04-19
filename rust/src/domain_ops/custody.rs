@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::{CustomOperation, ExecutionContext, ExecutionResult};
 use crate::dsl_v2::ast::VerbCall;
@@ -83,9 +83,9 @@ impl CustomOperation for SubcustodianLookupOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_string_opt};
 
         let market = json_extract_string(args, "market")?;
@@ -94,7 +94,7 @@ impl CustomOperation for SubcustodianLookupOp {
             .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
 
         let result = subcustodian_lookup_impl(&market, &currency, as_of_date, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -345,9 +345,9 @@ impl CustomOperation for LookupSsiForTradeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
         use serde_json::json;
         use uuid::Uuid;
@@ -424,7 +424,7 @@ impl CustomOperation for LookupSsiForTradeOp {
         .await?;
 
         match row {
-            Some(r) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 json!({
                     "ssi_id": r.ssi_id,
                     "ssi_name": r.ssi_name,
@@ -513,13 +513,13 @@ impl CustomOperation for ValidateBookingCoverageOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let result = validate_booking_coverage_impl(cbu_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -684,13 +684,13 @@ impl CustomOperation for DeriveRequiredCoverageOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::json_extract_uuid;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let result = derive_required_coverage_impl(cbu_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             result,
         ))
     }
@@ -844,9 +844,9 @@ impl CustomOperation for SetupSsiFromDocumentOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use super::helpers::{json_extract_string_opt, json_extract_uuid};
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -856,7 +856,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
 
         let result =
             setup_ssi_from_document_impl(cbu_id, document_id, &validation_mode, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {

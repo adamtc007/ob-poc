@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{
     json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
@@ -423,9 +423,9 @@ impl CustomOperation for ObservationFromDocumentOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -483,7 +483,7 @@ impl CustomOperation for ObservationFromDocumentOp {
         .execute(pool)
         .await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
             observation_id,
         ))
     }
@@ -608,9 +608,9 @@ impl CustomOperation for ObservationGetCurrentOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -652,7 +652,7 @@ impl CustomOperation for ObservationGetCurrentOp {
                 source_type,
                 confidence,
                 is_authoritative,
-            )) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            )) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 serde_json::json!({
                     "observation_id": obs_id,
                     "value_text": value_text,
@@ -664,7 +664,7 @@ impl CustomOperation for ObservationGetCurrentOp {
                     "is_authoritative": is_authoritative
                 }),
             )),
-            None => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 serde_json::json!({
                     "found": false,
                     "message": "No active observation found for this attribute"
@@ -772,9 +772,9 @@ impl CustomOperation for ObservationReconcileOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
 
         let attr_name = json_extract_string(args, "attribute")?;
@@ -789,7 +789,7 @@ impl CustomOperation for ObservationReconcileOp {
 
         let result =
             observation_reconcile_impl(entity_id, attribute_id, case_id, auto_create, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -872,14 +872,14 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
 
         let result = observation_verify_allegations_impl(cbu_id, entity_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -970,16 +970,16 @@ impl CustomOperation for DocumentExtractObservationsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let auto_verify = json_extract_bool_opt(args, "auto-verify-allegations").unwrap_or(true);
 
         let result =
             document_extract_observations_impl(document_id, entity_id, auto_verify, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {

@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde_json::Value as JsonValue;
 
 #[cfg(feature = "database")]
@@ -567,7 +567,7 @@ async fn ensure_refdata_json(
     args: &serde_json::Value,
     spec: &RefdataDomainSpec,
     pool: &PgPool,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let mut present_fields = Vec::new();
     let mut qb =
         QueryBuilder::<Postgres>::new(format!("INSERT INTO \"{}\".{} (", spec.schema, spec.table));
@@ -653,13 +653,13 @@ async fn ensure_refdata_json(
     match spec.return_kind {
         RefdataReturnKind::Uuid => {
             let query = qb.build_query_scalar::<uuid::Uuid>();
-            Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(
+            Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
                 query.fetch_one(pool).await?,
             ))
         }
         RefdataReturnKind::String => {
             let query = qb.build_query_scalar::<String>();
-            Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 serde_json::json!({ spec.return_column: query.fetch_one(pool).await? }),
             ))
         }
@@ -692,7 +692,7 @@ async fn read_refdata_json(
     args: &serde_json::Value,
     spec: &RefdataDomainSpec,
     pool: &PgPool,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let key = args
         .get(spec.key_arg)
         .and_then(|value| value.as_str())
@@ -705,7 +705,7 @@ async fn read_refdata_json(
         .bind(key)
         .fetch_optional(pool)
         .await?;
-    Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+    Ok(dsl_runtime::VerbExecutionOutcome::Record(
         record.ok_or_else(|| anyhow!("No {} record found", spec.domain))?,
     ))
 }
@@ -785,7 +785,7 @@ async fn list_refdata_json(
     args: &serde_json::Value,
     spec: &RefdataDomainSpec,
     pool: &PgPool,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let mut qb = QueryBuilder::<Postgres>::new(format!(
         "SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (SELECT * FROM \"{}\".{}",
         spec.schema, spec.table
@@ -844,7 +844,7 @@ async fn list_refdata_json(
     qb.push(") t");
     let query = qb.build_query_scalar::<JsonValue>();
     let rows = query.fetch_one(pool).await?;
-    Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+    Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
         match rows {
             JsonValue::Array(items) => items,
             _ => Vec::new(),
@@ -880,7 +880,7 @@ async fn deactivate_refdata_json(
     args: &serde_json::Value,
     spec: &RefdataDomainSpec,
     pool: &PgPool,
-) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+) -> Result<dsl_runtime::VerbExecutionOutcome> {
     let key = args
         .get(spec.key_arg)
         .and_then(|value| value.as_str())
@@ -897,7 +897,7 @@ async fn deactivate_refdata_json(
         )
     };
     sqlx::query(&sql).bind(key).execute(pool).await?;
-    Ok(sem_os_core::execution::VerbExecutionOutcome::Void)
+    Ok(dsl_runtime::VerbExecutionOutcome::Void)
 }
 
 enum RefdataBoundValue {
@@ -939,9 +939,9 @@ impl CustomOperation for RefdataEnsureOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let spec = resolve_domain_spec_json(args)?;
         ensure_refdata_json(args, spec, pool).await
     }
@@ -984,9 +984,9 @@ impl CustomOperation for RefdataReadOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let spec = resolve_domain_spec_json(args)?;
         read_refdata_json(args, spec, pool).await
     }
@@ -1028,9 +1028,9 @@ impl CustomOperation for RefdataListOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let spec = resolve_domain_spec_json(args)?;
         list_refdata_json(args, spec, pool).await
     }
@@ -1072,9 +1072,9 @@ impl CustomOperation for RefdataDeactivateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let spec = resolve_domain_spec_json(args)?;
         deactivate_refdata_json(args, spec, pool).await
     }

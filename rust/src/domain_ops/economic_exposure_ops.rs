@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{json_extract_string_opt, json_extract_uuid};
 use super::CustomOperation;
@@ -194,9 +194,9 @@ impl CustomOperation for EconomicExposureComputeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let root_entity_id = json_extract_uuid(args, ctx, "root-entity-id")?;
 
         let as_of_date_str = json_extract_string_opt(args, "as-of-date");
@@ -257,7 +257,7 @@ impl CustomOperation for EconomicExposureComputeOp {
         .await?;
 
         let results: Vec<serde_json::Value> = rows.into_iter().map(|r| r.into()).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             results,
         ))
     }
@@ -348,9 +348,9 @@ impl CustomOperation for EconomicExposureSummaryOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
 
         let as_of_date_str = json_extract_string_opt(args, "as-of-date");
@@ -386,7 +386,7 @@ impl CustomOperation for EconomicExposureSummaryOp {
         .await?;
 
         let results: Vec<serde_json::Value> = rows.into_iter().map(|r| r.into()).collect();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             results,
         ))
     }

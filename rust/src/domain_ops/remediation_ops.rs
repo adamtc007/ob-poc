@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{
     extract_string, extract_string_opt, extract_uuid, extract_uuid_opt, json_extract_string,
@@ -76,17 +76,17 @@ impl CustomOperation for RemediationListOpenOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
         let workspace = json_extract_string_opt(args, "workspace");
         let records = remediation_list_open_impl(entity_id, workspace, pool).await?;
         match records {
             serde_json::Value::Array(items) => Ok(
-                sem_os_core::execution::VerbExecutionOutcome::RecordSet(items),
+                dsl_runtime::VerbExecutionOutcome::RecordSet(items),
             ),
-            _ => Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+            _ => Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
                 Vec::new(),
             )),
         }
@@ -167,12 +167,12 @@ impl CustomOperation for RemediationDeferOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
         let reason = json_extract_string(args, "reason")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             remediation_defer_impl(remediation_id, reason, pool).await?,
         ))
     }
@@ -248,11 +248,11 @@ impl CustomOperation for RemediationRevokeDeferralOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             remediation_revoke_deferral_impl(remediation_id, pool).await?,
         ))
     }
@@ -334,12 +334,12 @@ impl CustomOperation for RemediationConfirmExternalOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
         let provider_ref = json_extract_string(args, "provider-ref")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             remediation_confirm_external_impl(remediation_id, provider_ref, pool).await?,
         ))
     }

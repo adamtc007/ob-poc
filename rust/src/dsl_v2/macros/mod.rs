@@ -52,9 +52,9 @@ pub use expander::{
 pub use registry::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
 #[cfg(test)]
 pub use schema::MacroTier;
-pub use schema::{MacroPrereq, MacroSchema};
 #[cfg(test)]
 pub use schema::{
     ArgStyle, MacroArg, MacroArgType, MacroArgs, MacroExpansionStep, MacroKind, MacroRouting,
     MacroTarget, MacroUi, SetState, VerbCallStep,
 };
+pub use schema::{MacroPrereq, MacroSchema};

@@ -11,7 +11,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use crate::domain_ops::helpers::{
     extract_cbu_id, extract_entity_ref, json_extract_cbu_id, json_extract_string,
@@ -266,9 +266,9 @@ impl CustomOperation for UboMarkDeceasedOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use serde_json::json;
 
         let entity_id = if args.get("entity-id").is_some() {
@@ -417,7 +417,7 @@ impl CustomOperation for UboMarkDeceasedOp {
 
         tx.commit().await?;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "entity_id": entity_id,
                 "person_name": person_name,
@@ -659,9 +659,9 @@ impl CustomOperation for UboConvergenceSupersedeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use serde_json::json;
 
         let cbu_id = json_extract_cbu_id(args, ctx)?;
@@ -780,7 +780,7 @@ impl CustomOperation for UboConvergenceSupersedeOp {
         tx.commit().await?;
         ctx.bind("relationship", new_relationship_id);
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "old_relationship_id": old_relationship_id,
                 "new_relationship_id": new_relationship_id,
@@ -1018,9 +1018,9 @@ impl CustomOperation for UboTransferControlOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use serde_json::json;
 
         let cbu_id = json_extract_cbu_id(args, ctx)?;
@@ -1140,7 +1140,7 @@ impl CustomOperation for UboTransferControlOp {
         tx.commit().await?;
         ctx.bind("relationship", new_relationship_id);
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "old_relationship_id": old_relationship_id,
                 "new_relationship_id": new_relationship_id,
@@ -1354,9 +1354,9 @@ impl CustomOperation for UboWaiveVerificationOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use serde_json::json;
 
         let cbu_id = json_extract_cbu_id(args, ctx)?;
@@ -1456,7 +1456,7 @@ impl CustomOperation for UboWaiveVerificationOp {
         .execute(pool)
         .await;
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "relationship_id": relationship_id,
                 "cbu_id": cbu_id,

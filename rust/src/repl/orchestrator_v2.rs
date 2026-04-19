@@ -216,7 +216,7 @@ pub struct ReplOrchestratorV2 {
     sem_os_client: Option<Arc<dyn SemOsClient>>,
     /// SemOS verb execution port — when set, verb execution routes through
     /// the SemOS-defined contract instead of directly through DslExecutor.
-    verb_execution_port: Option<Arc<dyn sem_os_core::execution::VerbExecutionPort>>,
+    verb_execution_port: Option<Arc<dyn dsl_runtime::VerbExecutionPort>>,
     /// Optional lookup service for trace-time entity recovery.
     lookup_service: Option<LookupService>,
     orchestrated_verbs: HashSet<String>,
@@ -348,7 +348,7 @@ impl ReplOrchestratorV2 {
     /// and the existing execution infrastructure.
     pub fn with_verb_execution_port(
         mut self,
-        port: Arc<dyn sem_os_core::execution::VerbExecutionPort>,
+        port: Arc<dyn dsl_runtime::VerbExecutionPort>,
     ) -> Self {
         self.verb_execution_port = Some(port);
         self

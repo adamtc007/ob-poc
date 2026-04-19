@@ -8,7 +8,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use crate::domain_ops::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
 use crate::domain_ops::CustomOperation;
@@ -199,9 +199,9 @@ impl CustomOperation for FindImForTradeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use serde_json::json;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -247,7 +247,7 @@ impl CustomOperation for FindImForTradeOp {
         .await?;
 
         match row {
-            Some(r) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 json!({
                     "assignment_id": r.assignment_id.to_string(),
                     "manager_lei": r.manager_lei,
@@ -258,7 +258,7 @@ impl CustomOperation for FindImForTradeOp {
                     "scope_all": r.scope_all
                 }),
             )),
-            None => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 json!({
                     "error": "no_matching_im",
                     "message": format!(
@@ -440,9 +440,9 @@ impl CustomOperation for FindPricingForInstrumentOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use serde_json::json;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -460,7 +460,7 @@ impl CustomOperation for FindPricingForInstrumentOp {
         let class_id = match class_id {
             Some(id) => id,
             None => {
-                return Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+                return Ok(dsl_runtime::VerbExecutionOutcome::Record(
                     json!({
                         "error": "unknown_instrument_class",
                         "message": format!("Unknown instrument class: {}", instrument_class)
@@ -509,7 +509,7 @@ impl CustomOperation for FindPricingForInstrumentOp {
         .await?;
 
         match row {
-            Some(r) => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 json!({
                     "config_id": r.config_id.to_string(),
                     "source": r.source,
@@ -521,7 +521,7 @@ impl CustomOperation for FindPricingForInstrumentOp {
                     "priority": r.priority
                 }),
             )),
-            None => Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
                 json!({
                     "error": "no_pricing_config",
                     "message": format!(
@@ -679,9 +679,9 @@ impl CustomOperation for ListOpenSlaBreachesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use serde_json::json;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -756,7 +756,7 @@ impl CustomOperation for ListOpenSlaBreachesOp {
             })
             .collect();
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::RecordSet(
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
             breaches,
         ))
     }

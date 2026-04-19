@@ -16,7 +16,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::path::Path;
 
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{json_extract_string, json_extract_string_opt};
 use crate::domain_ops::CustomOperation;
@@ -348,9 +348,9 @@ impl CustomOperation for LoadMarketsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let file_path = json_extract_string(args, "file-path")?;
         let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "UPSERT".to_string());
 
@@ -429,7 +429,7 @@ impl CustomOperation for LoadMarketsOp {
             }
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "status": "success",
                 "table": "\"ob-poc\".markets",
@@ -622,9 +622,9 @@ impl CustomOperation for LoadInstrumentClassesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let file_path = json_extract_string(args, "file-path")?;
@@ -738,7 +738,7 @@ impl CustomOperation for LoadInstrumentClassesOp {
             }
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "status": "success",
                 "table": "\"ob-poc\".instrument_classes",
@@ -913,9 +913,9 @@ impl CustomOperation for LoadSubcustodiansOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let file_path = json_extract_string(args, "file-path")?;
@@ -1011,7 +1011,7 @@ impl CustomOperation for LoadSubcustodiansOp {
             }
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "status": if errors.is_empty() { "success" } else { "partial" },
                 "table": "\"ob-poc\".subcustodian_network",
@@ -1179,9 +1179,9 @@ impl CustomOperation for LoadSlaTemplatesOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use rust_decimal::Decimal;
         use std::str::FromStr;
 
@@ -1270,7 +1270,7 @@ impl CustomOperation for LoadSlaTemplatesOp {
             }
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "status": if errors.is_empty() { "success" } else { "partial" },
                 "table": "ob-poc.sla_templates",
@@ -1530,9 +1530,9 @@ impl CustomOperation for LoadAllRefdataOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let directory = json_extract_string(args, "directory")?;
         let mode = json_extract_string_opt(args, "mode").unwrap_or_else(|| "UPSERT".to_string());
 
@@ -1551,19 +1551,19 @@ impl CustomOperation for LoadAllRefdataOp {
             results.insert(
                 "markets".to_string(),
                 result_to_json(match result {
-                    sem_os_core::execution::VerbExecutionOutcome::Record(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Record(v) => {
                         ExecutionResult::Record(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::RecordSet(v) => {
+                    dsl_runtime::VerbExecutionOutcome::RecordSet(v) => {
                         ExecutionResult::RecordSet(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Uuid(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Uuid(v) => {
                         ExecutionResult::Uuid(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Affected(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Affected(v) => {
                         ExecutionResult::Affected(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Void => ExecutionResult::Void,
+                    dsl_runtime::VerbExecutionOutcome::Void => ExecutionResult::Void,
                 }),
             );
         }
@@ -1580,19 +1580,19 @@ impl CustomOperation for LoadAllRefdataOp {
             results.insert(
                 "instrument_classes".to_string(),
                 result_to_json(match result {
-                    sem_os_core::execution::VerbExecutionOutcome::Record(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Record(v) => {
                         ExecutionResult::Record(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::RecordSet(v) => {
+                    dsl_runtime::VerbExecutionOutcome::RecordSet(v) => {
                         ExecutionResult::RecordSet(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Uuid(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Uuid(v) => {
                         ExecutionResult::Uuid(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Affected(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Affected(v) => {
                         ExecutionResult::Affected(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Void => ExecutionResult::Void,
+                    dsl_runtime::VerbExecutionOutcome::Void => ExecutionResult::Void,
                 }),
             );
         }
@@ -1609,19 +1609,19 @@ impl CustomOperation for LoadAllRefdataOp {
             results.insert(
                 "subcustodian_network".to_string(),
                 result_to_json(match result {
-                    sem_os_core::execution::VerbExecutionOutcome::Record(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Record(v) => {
                         ExecutionResult::Record(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::RecordSet(v) => {
+                    dsl_runtime::VerbExecutionOutcome::RecordSet(v) => {
                         ExecutionResult::RecordSet(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Uuid(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Uuid(v) => {
                         ExecutionResult::Uuid(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Affected(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Affected(v) => {
                         ExecutionResult::Affected(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Void => ExecutionResult::Void,
+                    dsl_runtime::VerbExecutionOutcome::Void => ExecutionResult::Void,
                 }),
             );
         }
@@ -1638,24 +1638,24 @@ impl CustomOperation for LoadAllRefdataOp {
             results.insert(
                 "sla_templates".to_string(),
                 result_to_json(match result {
-                    sem_os_core::execution::VerbExecutionOutcome::Record(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Record(v) => {
                         ExecutionResult::Record(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::RecordSet(v) => {
+                    dsl_runtime::VerbExecutionOutcome::RecordSet(v) => {
                         ExecutionResult::RecordSet(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Uuid(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Uuid(v) => {
                         ExecutionResult::Uuid(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Affected(v) => {
+                    dsl_runtime::VerbExecutionOutcome::Affected(v) => {
                         ExecutionResult::Affected(v)
                     }
-                    sem_os_core::execution::VerbExecutionOutcome::Void => ExecutionResult::Void,
+                    dsl_runtime::VerbExecutionOutcome::Void => ExecutionResult::Void,
                 }),
             );
         }
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             json!({
                 "status": "success",
                 "directory": directory,

@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::helpers::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
@@ -539,13 +539,13 @@ impl CustomOperation for InvestorRequestDocumentsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_request_documents_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -600,14 +600,14 @@ impl CustomOperation for InvestorStartKycOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let case_id = json_extract_uuid_opt(args, ctx, "case-id");
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_start_kyc_impl(investor_id, case_id, notes.as_deref(), pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -664,16 +664,16 @@ impl CustomOperation for InvestorApproveKycOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let risk_rating = json_extract_string_opt(args, "risk-rating");
         let notes = json_extract_string_opt(args, "notes");
         let id =
             investor_approve_kyc_impl(investor_id, risk_rating.as_deref(), notes.as_deref(), pool)
                 .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -728,14 +728,14 @@ impl CustomOperation for InvestorRejectKycOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let reason = json_extract_string(args, "reason")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_reject_kyc_impl(investor_id, &reason, notes.as_deref(), pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -796,9 +796,9 @@ impl CustomOperation for InvestorMarkEligibleOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let investor_type = json_extract_string_opt(args, "investor-type");
         let notes = json_extract_string_opt(args, "notes");
@@ -809,7 +809,7 @@ impl CustomOperation for InvestorMarkEligibleOp {
             pool,
         )
         .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -865,15 +865,15 @@ impl CustomOperation for InvestorRecordSubscriptionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let holding_id = json_extract_uuid_opt(args, ctx, "holding-id");
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_record_subscription_impl(investor_id, holding_id, notes.as_deref(), pool)
             .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -927,13 +927,13 @@ impl CustomOperation for InvestorActivateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_activate_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -994,9 +994,9 @@ impl CustomOperation for InvestorStartRedemptionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let redemption_type = json_extract_string_opt(args, "redemption-type");
         let notes = json_extract_string_opt(args, "notes");
@@ -1007,7 +1007,7 @@ impl CustomOperation for InvestorStartRedemptionOp {
             pool,
         )
         .await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1061,13 +1061,13 @@ impl CustomOperation for InvestorCompleteRedemptionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_complete_redemption_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1122,14 +1122,14 @@ impl CustomOperation for InvestorOffboardOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let reason = json_extract_string(args, "reason")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_offboard_impl(investor_id, &reason, notes.as_deref(), pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1184,14 +1184,14 @@ impl CustomOperation for InvestorSuspendOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let reason = json_extract_string(args, "reason")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_suspend_impl(investor_id, &reason, notes.as_deref(), pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1245,13 +1245,13 @@ impl CustomOperation for InvestorReinstateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_reinstate_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Uuid(id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -1308,12 +1308,12 @@ impl CustomOperation for InvestorCountByStateOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let result = investor_count_by_state_impl(cbu_id, pool).await?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {

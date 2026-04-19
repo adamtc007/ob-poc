@@ -10,7 +10,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -202,14 +202,14 @@ impl CustomOperation for WorkflowConfirmDecisionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let decision_id = json_extract_uuid(args, ctx, "decision-id")?;
         let selected_key = json_extract_string(args, "selected-key")?;
         let selected_key_type = json_extract_string(args, "selected-key-type")?;
         let verified_by: Option<Uuid> = ctx.principal.actor_id.parse().ok();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             workflow_confirm_decision_impl(
                 decision_id,
                 selected_key,
@@ -314,13 +314,13 @@ impl CustomOperation for WorkflowRejectDecisionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let decision_id = json_extract_uuid(args, ctx, "decision-id")?;
         let rejection_reason = json_extract_string(args, "rejection-reason")?;
         let verified_by: Option<Uuid> = ctx.principal.actor_id.parse().ok();
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             workflow_reject_decision_impl(decision_id, rejection_reason, verified_by, pool).await?,
         ))
     }
@@ -680,9 +680,9 @@ impl CustomOperation for WorkflowAuditTrailOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let include_decisions = json_extract_bool_opt(args, "include-decisions").unwrap_or(true);
         let include_actions = json_extract_bool_opt(args, "include-actions").unwrap_or(true);
@@ -692,7 +692,7 @@ impl CustomOperation for WorkflowAuditTrailOp {
         let include_import_runs =
             json_extract_bool_opt(args, "include-import-runs").unwrap_or(true);
 
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             workflow_audit_trail_impl(
                 entity_id,
                 include_decisions,
@@ -972,11 +972,11 @@ impl CustomOperation for WorkflowSupersessionTrailOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut sem_os_core::execution::VerbExecutionContext,
+        ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
-        Ok(sem_os_core::execution::VerbExecutionOutcome::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             serde_json::to_value(workflow_supersession_trail_impl(case_id, pool).await?)?,
         ))
     }

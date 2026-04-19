@@ -6,7 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use ob_poc_macros::register_custom_op;
+use dsl_runtime_macros::register_custom_op;
 
 use super::sem_os_helpers::delegate_to_tool;
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
@@ -56,9 +56,9 @@ macro_rules! audit_op {
             async fn execute_json(
                 &self,
                 args: &serde_json::Value,
-                ctx: &mut sem_os_core::execution::VerbExecutionContext,
+                ctx: &mut dsl_runtime::VerbExecutionContext,
                 pool: &PgPool,
-            ) -> Result<sem_os_core::execution::VerbExecutionOutcome> {
+            ) -> Result<dsl_runtime::VerbExecutionOutcome> {
                 super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, $tool).await
             }
 
