@@ -8,14 +8,12 @@
 //! co-located with its runtime types (the trait + factory it emits
 //! impls against).
 //!
-//! # Expansion note — `crate::` reference
+//! # Expansion note — absolute `::dsl_runtime` paths
 //!
-//! The expansion emits `crate::domain_ops::CustomOpFactory` — `crate::`
-//! resolves relative to the caller's crate, so ops in `ob-poc` continue
-//! to see the trait + factory in `crate::domain_ops` unchanged. A future
-//! slice (once legacy `execute()` is dissolved and the trait itself
-//! relocates into `dsl-runtime`) will rewrite the expansion to absolute
-//! `::dsl_runtime::*` paths.
+//! The expansion emits `::dsl_runtime::CustomOperation` and
+//! `::dsl_runtime::CustomOpFactory`. The trait + factory moved to the
+//! `dsl-runtime` crate in Phase 2.5 Slice G; every caller crate that
+//! invokes `#[register_custom_op]` must have `dsl-runtime` in scope.
 
 use proc_macro::TokenStream;
 
@@ -23,13 +21,12 @@ mod register_op;
 
 /// Auto-register a custom operation with the registry.
 ///
-/// Apply to unit structs that implement `CustomOperation`.
+/// Apply to unit structs that implement `dsl_runtime::CustomOperation`.
 ///
-/// **Current coupling:** the macro expansion references
-/// `crate::domain_ops::CustomOperation` and
-/// `crate::domain_ops::CustomOpFactory` — both paths must exist in the
-/// calling crate (today: `ob-poc`). See the crate-level note above for
-/// the future-slice migration to absolute paths.
+/// The macro expansion references `::dsl_runtime::CustomOperation` +
+/// `::dsl_runtime::CustomOpFactory` + `::inventory` by absolute path,
+/// so the caller crate only needs `dsl-runtime` (and `inventory`) in its
+/// dependency graph.
 ///
 /// # Example
 ///

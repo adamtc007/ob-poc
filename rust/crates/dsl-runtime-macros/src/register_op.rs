@@ -41,14 +41,14 @@ pub(crate) fn register_custom_op_impl(input: TokenStream) -> TokenStream {
         #(#cfg_attrs)*
         #[doc(hidden)]
         #[allow(non_snake_case)]
-        fn #factory_fn_name() -> ::std::sync::Arc<dyn crate::domain_ops::CustomOperation> {
+        fn #factory_fn_name() -> ::std::sync::Arc<dyn ::dsl_runtime::CustomOperation> {
             ::std::sync::Arc::new(#struct_name)
         }
 
         // Auto-register with inventory — MUST have same cfg attrs
         #(#cfg_attrs)*
         ::inventory::submit! {
-            crate::domain_ops::CustomOpFactory {
+            ::dsl_runtime::CustomOpFactory {
                 create: #factory_fn_name
             }
         }

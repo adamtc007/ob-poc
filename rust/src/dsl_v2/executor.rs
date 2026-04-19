@@ -1708,14 +1708,19 @@ impl DslExecutor {
         // Check if this is a plugin (custom operation)
         if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
             tracing::debug!("execute_verb_in_tx: routing to PLUGIN");
-            // Dispatch to custom operations handler
-            if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                // Call execute_in_tx - if op doesn't support it, it returns an error.
-                // This is intentional: in atomic execution, we fail fast rather than
-                // silently doing non-transactional work within an atomic batch.
-                let result = op.execute_in_tx(vc, ctx, tx).await;
-                tracing::debug!("execute_verb_in_tx: plugin returned {:?}", result.is_ok());
-                return result;
+            // Plugins never participate in the caller's transaction — the trait
+            // `CustomOperation` in `dsl_runtime` has no `execute_in_tx` method.
+            // Fail fast rather than silently doing non-transactional work inside
+            // an atomic batch. Slice F replaces this with a txn-aware dispatch
+            // over the `VerbExecutionPort` + `TransactionScope` pair.
+            if let Some(_op) = self.custom_ops.get(&vc.domain, &vc.verb) {
+                return Err(anyhow!(
+                    "Plugin {}.{} cannot execute in a transaction. Transactional \
+                     plugin execution requires Slice F (VerbExecutionPort + \
+                     TransactionScope); current dispatch is non-transactional only.",
+                    vc.domain,
+                    vc.verb
+                ));
             }
             return Err(anyhow!(
                 "Plugin {}.{} has no handler implementation",
