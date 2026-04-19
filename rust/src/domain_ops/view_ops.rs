@@ -23,8 +23,6 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::domain_ops::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 use crate::session::{Refinement, ViewState};
 use crate::taxonomy::{Filter, Metaphor, Status, TaxonomyBuilder, TaxonomyContext};
 
@@ -32,157 +30,138 @@ use crate::taxonomy::{Filter, Metaphor, Status, TaxonomyBuilder, TaxonomyContext
 use sqlx::PgPool;
 
 // =============================================================================
-// HELPER FUNCTIONS
+// LOCAL HELPERS — selection state transport via ctx.extensions
 // =============================================================================
+//
+// `VerbExecutionContext` has no selection API. These helpers carry the view
+// selection across native op calls through `ctx.extensions["_selection"]`,
+// mirroring the legacy `ExecutionContext::{set,get,clear}_selection` +
+// `bind_json("_selection", ...)` pattern.
 
-/// Extract UUID argument from verb call
-fn get_uuid_arg(verb_call: &VerbCall, name: &str, ctx: &ExecutionContext) -> Option<Uuid> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == name)
-        .and_then(|a| {
-            if let Some(symbol) = a.value.as_symbol() {
-                ctx.resolve(symbol)
-            } else {
-                a.value.as_uuid()
-            }
-        })
+const EXT_KEY_SELECTION: &str = "_selection";
+
+fn ext_obj_mut(
+    ctx: &mut dsl_runtime::VerbExecutionContext,
+) -> &mut serde_json::Map<String, serde_json::Value> {
+    if !ctx.extensions.is_object() {
+        ctx.extensions = serde_json::Value::Object(serde_json::Map::new());
+    }
+    ctx.extensions.as_object_mut().unwrap()
 }
 
-/// Extract string argument from verb call
-fn get_string_arg(verb_call: &VerbCall, name: &str) -> Option<String> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == name)
-        .and_then(|a| a.value.as_string().map(|s| s.to_string()))
+fn set_selection(ctx: &mut dsl_runtime::VerbExecutionContext, selection: Vec<Uuid>) {
+    if let Ok(v) = serde_json::to_value(&selection) {
+        ext_obj_mut(ctx).insert(EXT_KEY_SELECTION.to_string(), v);
+    }
 }
 
-/// Extract string list argument from verb call
-fn get_string_list_arg(verb_call: &VerbCall, name: &str) -> Option<Vec<String>> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == name)
-        .and_then(|a| {
-            if let Some(list) = a.value.as_list() {
-                let strings: Vec<String> = list
-                    .iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect();
-                if strings.is_empty() {
-                    None
-                } else {
-                    Some(strings)
-                }
-            } else if let Some(s) = a.value.as_string() {
-                Some(vec![s.to_string()])
-            } else {
-                None
-            }
-        })
+fn get_selection(ctx: &dsl_runtime::VerbExecutionContext) -> Option<Vec<Uuid>> {
+    let v = ctx.extensions.as_object()?.get(EXT_KEY_SELECTION)?;
+    serde_json::from_value(v.clone()).ok()
 }
 
-/// Extract boolean argument from verb call
-fn get_bool_arg(verb_call: &VerbCall, name: &str) -> Option<bool> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == name)
-        .and_then(|a| a.value.as_boolean())
+fn has_selection(ctx: &dsl_runtime::VerbExecutionContext) -> bool {
+    get_selection(ctx).is_some_and(|s| !s.is_empty())
 }
 
-/// Extract UUID list argument from verb call
-fn get_uuid_list_arg(
-    verb_call: &VerbCall,
-    name: &str,
-    ctx: &ExecutionContext,
+fn selection_count(ctx: &dsl_runtime::VerbExecutionContext) -> usize {
+    get_selection(ctx).map(|s| s.len()).unwrap_or(0)
+}
+
+fn clear_selection(ctx: &mut dsl_runtime::VerbExecutionContext) {
+    if let Some(obj) = ctx.extensions.as_object_mut() {
+        obj.remove(EXT_KEY_SELECTION);
+    }
+}
+
+/// Parse filter from a JSON arg object (used by view.refine).
+fn parse_filter_from_json(args: &serde_json::Value, arg_name: &str) -> Option<Filter> {
+    let obj = args.get(arg_name)?.as_object()?;
+    if let Some(jurisdictions) = obj.get("jurisdiction").and_then(|v| v.as_array()) {
+        let juris: Vec<String> = jurisdictions
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
+        return Some(Filter::Jurisdiction(juris));
+    }
+    if let Some(statuses) = obj.get("status").and_then(|v| v.as_array()) {
+        let stats: Vec<Status> = statuses
+            .iter()
+            .filter_map(|v| {
+                v.as_str().and_then(|s| match s.to_uppercase().as_str() {
+                    "RED" => Some(Status::Red),
+                    "AMBER" => Some(Status::Amber),
+                    "GREEN" => Some(Status::Green),
+                    _ => None,
+                })
+            })
+            .collect();
+        return Some(Filter::Status(stats));
+    }
+    if let Some(types) = obj.get("fund_type").and_then(|v| v.as_array()) {
+        let fund_types: Vec<String> = types
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
+        return Some(Filter::FundType(fund_types));
+    }
+    None
+}
+
+/// Extract UUID list from a JSON arg (accepts symbol refs via ctx, UUID strings, or a single scalar).
+fn json_extract_uuid_list_opt(
+    args: &serde_json::Value,
+    ctx: &dsl_runtime::VerbExecutionContext,
+    arg_name: &str,
 ) -> Option<Vec<Uuid>> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == name)
-        .and_then(|a| {
-            if let Some(list) = a.value.as_list() {
-                let uuids: Vec<Uuid> = list
-                    .iter()
-                    .filter_map(|v| {
-                        if let Some(symbol) = v.as_symbol() {
-                            ctx.resolve(symbol)
-                        } else {
-                            v.as_uuid()
-                        }
-                    })
-                    .collect();
-                if uuids.is_empty() {
-                    None
-                } else {
-                    Some(uuids)
+    let v = args.get(arg_name)?;
+    if let Some(arr) = v.as_array() {
+        let uuids: Vec<Uuid> = arr
+            .iter()
+            .filter_map(|item| {
+                if let Some(s) = item.as_str() {
+                    if let Some(sym) = s.strip_prefix('@') {
+                        return ctx.resolve(sym);
+                    }
+                    return Uuid::parse_str(s).ok();
                 }
-            } else {
                 None
-            }
-        })
-}
-
-/// Helper to find entry in map by key
-fn find_map_entry<'a>(
-    entries: &'a [(String, dsl_core::AstNode)],
-    key: &str,
-) -> Option<&'a dsl_core::AstNode> {
-    entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
-}
-
-/// Parse filter from JSON object
-fn parse_filter_from_args(verb_call: &VerbCall, arg_name: &str) -> Option<Filter> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .and_then(|a| {
-            // Try to parse as a filter from the value
-            if let Some(obj) = a.value.as_map() {
-                // Check for jurisdiction filter
-                if let Some(jurisdictions) = find_map_entry(obj, "jurisdiction") {
-                    if let Some(list) = jurisdictions.as_list() {
-                        let juris: Vec<String> = list
-                            .iter()
-                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                            .collect();
-                        return Some(Filter::Jurisdiction(juris));
-                    }
-                }
-                // Check for status filter
-                if let Some(statuses) = find_map_entry(obj, "status") {
-                    if let Some(list) = statuses.as_list() {
-                        let stats: Vec<Status> = list
-                            .iter()
-                            .filter_map(|v| {
-                                v.as_string().and_then(|s| match s.to_uppercase().as_str() {
-                                    "RED" => Some(Status::Red),
-                                    "AMBER" => Some(Status::Amber),
-                                    "GREEN" => Some(Status::Green),
-                                    _ => None,
-                                })
-                            })
-                            .collect();
-                        return Some(Filter::Status(stats));
-                    }
-                }
-                // Check for fund_type filter
-                if let Some(types) = find_map_entry(obj, "fund_type") {
-                    if let Some(list) = types.as_list() {
-                        let fund_types: Vec<String> = list
-                            .iter()
-                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                            .collect();
-                        return Some(Filter::FundType(fund_types));
-                    }
-                }
-            }
+            })
+            .collect();
+        if uuids.is_empty() {
             None
-        })
+        } else {
+            Some(uuids)
+        }
+    } else if let Some(s) = v.as_str() {
+        if let Some(sym) = s.strip_prefix('@') {
+            ctx.resolve(sym).map(|u| vec![u])
+        } else {
+            Uuid::parse_str(s).ok().map(|u| vec![u])
+        }
+    } else {
+        None
+    }
+}
+
+/// Extract a string list from a JSON arg.
+fn json_extract_string_list_opt(args: &serde_json::Value, arg_name: &str) -> Option<Vec<String>> {
+    let v = args.get(arg_name)?;
+    if let Some(arr) = v.as_array() {
+        let strings: Vec<String> = arr
+            .iter()
+            .filter_map(|item| item.as_str().map(|s| s.to_string()))
+            .collect();
+        if strings.is_empty() {
+            None
+        } else {
+            Some(strings)
+        }
+    } else if let Some(s) = v.as_str() {
+        Some(vec![s.to_string()])
+    } else {
+        None
+    }
 }
 
 // =============================================================================
@@ -243,39 +222,20 @@ impl CustomOperation for ViewUniverseOp {
     fn rationale(&self) -> &'static str {
         "Requires taxonomy building from database and session state management"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl ViewUniverseOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         // Build context from args
-        let taxonomy_ctx = if let Some(client_id) = get_uuid_arg(verb_call, "client", ctx) {
-            TaxonomyContext::Book { client_id }
-        } else {
-            TaxonomyContext::Universe
-        };
+        let taxonomy_ctx =
+            if let Some(client_id) = super::helpers::json_extract_uuid_opt(args, ctx, "client") {
+                TaxonomyContext::Book { client_id }
+            } else {
+                TaxonomyContext::Universe
+            };
 
         // Build taxonomy from database using config-driven rules
         let rules = taxonomy_ctx.to_rules_from_config(pool).await?;
@@ -285,13 +245,13 @@ impl ViewUniverseOp {
         let mut view = ViewState::from_taxonomy(taxonomy, taxonomy_ctx);
 
         // Apply any filters as refinements
-        if let Some(jurisdictions) = get_string_list_arg(verb_call, "jurisdiction") {
+        if let Some(jurisdictions) = json_extract_string_list_opt(args, "jurisdiction") {
             view.refine(Refinement::Include {
                 filter: Filter::Jurisdiction(jurisdictions),
             });
         }
 
-        if let Some(statuses) = get_string_list_arg(verb_call, "status") {
+        if let Some(statuses) = json_extract_string_list_opt(args, "status") {
             let status_enums: Vec<Status> = statuses
                 .iter()
                 .filter_map(|s| match s.to_uppercase().as_str() {
@@ -308,32 +268,29 @@ impl ViewUniverseOp {
             }
         }
 
-        if let Some(fund_types) = get_string_list_arg(verb_call, "fund-type") {
+        if let Some(fund_types) = json_extract_string_list_opt(args, "fund-type") {
             view.refine(Refinement::Include {
                 filter: Filter::FundType(fund_types),
             });
         }
 
         // Bind selection to execution context for DSL access
-        ctx.set_selection(view.selection.clone());
+        set_selection(ctx, view.selection.clone());
 
         let result = ViewOpResult::from_view_state(&view);
 
         // Store ViewState in ExecutionContext for propagation to UnifiedSessionContext
         // This fixes the "session state side door" - ViewState was previously discarded
-        ctx.set_pending_view_state(view);
+        super::helpers::ext_set_pending_view_state(ctx, view);
 
         // Return as JSON
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(&result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.universe requires database feature"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -359,35 +316,14 @@ impl CustomOperation for ViewBookOp {
     fn rationale(&self) -> &'static str {
         "Requires taxonomy building scoped to a client entity"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl ViewBookOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let client_id = get_uuid_arg(verb_call, "client", ctx)
-            .ok_or_else(|| anyhow::anyhow!("client argument is required"))?;
+        let client_id = super::helpers::json_extract_uuid(args, ctx, "client")?;
 
         let taxonomy_ctx = TaxonomyContext::Book { client_id };
         let rules = taxonomy_ctx.to_rules_from_config(pool).await?;
@@ -396,23 +332,20 @@ impl ViewBookOp {
         let view = ViewState::from_taxonomy(taxonomy, taxonomy_ctx);
 
         // Bind selection to execution context
-        ctx.set_selection(view.selection.clone());
+        set_selection(ctx, view.selection.clone());
 
         let result = ViewOpResult::from_view_state(&view);
 
         // Store ViewState in ExecutionContext for propagation to UnifiedSessionContext
-        ctx.set_pending_view_state(view);
+        super::helpers::ext_set_pending_view_state(ctx, view);
 
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(&result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.book requires database feature"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -438,37 +371,17 @@ impl CustomOperation for ViewCbuOp {
     fn rationale(&self) -> &'static str {
         "Requires CBU-specific taxonomy building with trading or UBO view modes"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let cbu_id = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl ViewCbuOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id = get_uuid_arg(verb_call, "cbu-id", ctx)
-            .ok_or_else(|| anyhow::anyhow!("cbu-id argument is required"))?;
-
-        let mode = get_string_arg(verb_call, "mode").unwrap_or_else(|| "trading".to_string());
+        let mode = super::helpers::json_extract_string_opt(args, "mode")
+            .unwrap_or_else(|| "trading".to_string());
 
         let taxonomy_ctx = match mode.as_str() {
             "ubo" => TaxonomyContext::CbuUbo { cbu_id },
@@ -481,23 +394,20 @@ impl ViewCbuOp {
         let view = ViewState::from_taxonomy(taxonomy, taxonomy_ctx);
 
         // Bind selection to execution context
-        ctx.set_selection(view.selection.clone());
+        set_selection(ctx, view.selection.clone());
 
         let result = ViewOpResult::from_view_state(&view);
 
         // Store ViewState in ExecutionContext for propagation to UnifiedSessionContext
-        ctx.set_pending_view_state(view);
+        super::helpers::ext_set_pending_view_state(ctx, view);
 
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(&result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.cbu requires database feature"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -523,36 +433,16 @@ impl CustomOperation for ViewEntityForestOp {
     fn rationale(&self) -> &'static str {
         "Requires entity forest taxonomy building with multiple filter types"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl ViewEntityForestOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         let mut filters = Vec::new();
 
-        if let Some(jurisdictions) = get_string_list_arg(verb_call, "jurisdiction") {
+        if let Some(jurisdictions) = json_extract_string_list_opt(args, "jurisdiction") {
             filters.push(Filter::Jurisdiction(jurisdictions));
         }
 
@@ -568,25 +458,20 @@ impl ViewEntityForestOp {
         let view = ViewState::from_taxonomy(taxonomy, taxonomy_ctx);
 
         // Bind selection to execution context
-        ctx.set_selection(view.selection.clone());
+        set_selection(ctx, view.selection.clone());
 
         let result = ViewOpResult::from_view_state(&view);
 
         // Store ViewState in ExecutionContext for propagation to UnifiedSessionContext
-        ctx.set_pending_view_state(view);
+        super::helpers::ext_set_pending_view_state(ctx, view);
 
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(&result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "view.entity-forest requires database feature"
-        ))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -612,35 +497,15 @@ impl CustomOperation for ViewRefineOp {
     fn rationale(&self) -> &'static str {
         "Modifies session view state with refinements"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl ViewRefineOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         // Get current selection from context
-        let current_selection = ctx.get_selection().cloned().unwrap_or_default();
+        let current_selection = get_selection(ctx).unwrap_or_default();
 
         if current_selection.is_empty() {
             return Err(anyhow::anyhow!(
@@ -651,19 +516,19 @@ impl ViewRefineOp {
         let mut new_selection = current_selection.clone();
 
         // Apply include filter
-        if let Some(filter) = parse_filter_from_args(verb_call, "include") {
+        if let Some(filter) = parse_filter_from_json(args, "include") {
             // This would normally filter against taxonomy nodes
             // For now, we just note that refinement was requested
             tracing::debug!(?filter, "Applying include filter");
         }
 
         // Apply exclude filter
-        if let Some(filter) = parse_filter_from_args(verb_call, "exclude") {
+        if let Some(filter) = parse_filter_from_json(args, "exclude") {
             tracing::debug!(?filter, "Applying exclude filter");
         }
 
         // Add specific IDs
-        if let Some(add_ids) = get_uuid_list_arg(verb_call, "add", ctx) {
+        if let Some(add_ids) = json_extract_uuid_list_opt(args, ctx, "add") {
             for id in add_ids {
                 if !new_selection.contains(&id) {
                     new_selection.push(id);
@@ -672,27 +537,22 @@ impl ViewRefineOp {
         }
 
         // Remove specific IDs
-        if let Some(remove_ids) = get_uuid_list_arg(verb_call, "remove", ctx) {
+        if let Some(remove_ids) = json_extract_uuid_list_opt(args, ctx, "remove") {
             new_selection.retain(|id| !remove_ids.contains(id));
         }
 
         // Update selection in context
-        ctx.set_selection(new_selection.clone());
+        set_selection(ctx, new_selection.clone());
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "selection_count": new_selection.len(),
             "selection_ids": new_selection,
             "message": "View refined successfully"
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.refine requires database feature"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -718,50 +578,23 @@ impl CustomOperation for ViewClearOp {
     fn rationale(&self) -> &'static str {
         "Clears refinements from session view state"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
-        args: &serde_json::Value,
+        _args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl ViewClearOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         // Clear selection
-        ctx.clear_selection();
+        clear_selection(ctx);
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "message": "View cleared. Use view.universe, view.book, or view.cbu to set a new view."
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "view.clear-refinements requires database feature"
-        ))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -783,47 +616,22 @@ impl CustomOperation for ViewClearAliasOp {
     fn rationale(&self) -> &'static str {
         "Provides backward-compatible access to clearing view refinements"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
-        args: &serde_json::Value,
+        _args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl ViewClearAliasOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        ctx.clear_selection();
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        clear_selection(ctx);
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "message": "View cleared. Use view.universe, view.book, or view.cbu to set a new view."
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.clear requires database feature"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -849,75 +657,48 @@ impl CustomOperation for ViewSelectOp {
     fn rationale(&self) -> &'static str {
         "Directly manipulates selection state"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl ViewSelectOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         // Handle :none flag
-        if get_bool_arg(verb_call, "none").unwrap_or(false) {
-            ctx.clear_selection();
-            return Ok(ExecutionResult::Record(json!({
+        if super::helpers::json_extract_bool_opt(args, "none").unwrap_or(false) {
+            clear_selection(ctx);
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
                 "selection_count": 0,
                 "message": "Selection cleared"
             })));
         }
 
         // Handle :all flag - keep current selection as-is (it's already "all" from the view)
-        if get_bool_arg(verb_call, "all").unwrap_or(false) {
-            let count = ctx.selection_count();
-            return Ok(ExecutionResult::Record(json!({
+        if super::helpers::json_extract_bool_opt(args, "all").unwrap_or(false) {
+            let count = selection_count(ctx);
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
                 "selection_count": count,
                 "message": "All items selected"
             })));
         }
 
         // Handle explicit IDs
-        if let Some(ids) = get_uuid_list_arg(verb_call, "ids", ctx) {
-            ctx.set_selection(ids.clone());
-            return Ok(ExecutionResult::Record(json!({
+        if let Some(ids) = json_extract_uuid_list_opt(args, ctx, "ids") {
+            set_selection(ctx, ids.clone());
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
                 "selection_count": ids.len(),
                 "selection_ids": ids,
                 "message": "Selection set explicitly"
             })));
         }
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "message": "No selection change. Use :ids, :all, or :none."
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "view.set-selection requires database feature"
-        ))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -943,7 +724,7 @@ impl CustomOperation for ViewLayoutOp {
     fn rationale(&self) -> &'static str {
         "Configures layout algorithm for visualization"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -981,48 +762,6 @@ impl CustomOperation for ViewLayoutOp {
         true
     }
 }
-impl ViewLayoutOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let mode = get_string_arg(verb_call, "mode").unwrap_or_else(|| "auto".to_string());
-        let primary_axis = get_string_arg(verb_call, "primary-axis");
-        let size_by = get_string_arg(verb_call, "size-by");
-        let color_by = get_string_arg(verb_call, "color-by");
-
-        // Determine metaphor from mode
-        let metaphor = match mode.as_str() {
-            "galaxy" => Metaphor::Galaxy,
-            "grid" => Metaphor::Tree, // Grid uses tree layout
-            "tree" => Metaphor::Tree,
-            "network" => Metaphor::Network,
-            "pyramid" => Metaphor::Pyramid,
-            _ => Metaphor::Tree, // auto derives from shape
-        };
-
-        Ok(ExecutionResult::Record(json!({
-            "layout_mode": mode,
-            "metaphor": format!("{:?}", metaphor),
-            "primary_axis": primary_axis,
-            "size_by": size_by,
-            "color_by": color_by,
-            "message": "Layout configuration updated"
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.set-layout requires database feature"))
-    }
-}
 
 
 // =============================================================================
@@ -1046,42 +785,22 @@ impl CustomOperation for ViewStatusOp {
     fn rationale(&self) -> &'static str {
         "Reports on current session view state"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
-        args: &serde_json::Value,
+        _args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl ViewStatusOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let selection = ctx.get_selection();
-        let has_selection = ctx.has_selection();
-        let count = ctx.selection_count();
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let selection = get_selection(ctx);
+        let has_sel = has_selection(ctx);
+        let count = selection_count(ctx);
 
-        Ok(ExecutionResult::Record(json!({
-            "has_view": has_selection,
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+            "has_view": has_sel,
             "selection_count": count,
             "selection_ids": selection,
-            "message": if has_selection {
+            "message": if has_sel {
                 format!("View active with {} items selected", count)
             } else {
                 "No active view. Use view.universe, view.book, or view.cbu to set one.".to_string()
@@ -1089,15 +808,8 @@ impl ViewStatusOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "view.read-status requires database feature"
-        ))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1123,37 +835,17 @@ impl CustomOperation for ViewSelectionInfoOp {
     fn rationale(&self) -> &'static str {
         "Provides detailed information about selected items"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
-        args: &serde_json::Value,
+        _args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl ViewSelectionInfoOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let selection = ctx.get_selection().cloned().unwrap_or_default();
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let selection = get_selection(ctx).unwrap_or_default();
 
         if selection.is_empty() {
-            return Ok(ExecutionResult::Record(json!({
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
                 "message": "No items selected",
                 "count": 0,
                 "ids": []
@@ -1163,22 +855,15 @@ impl ViewSelectionInfoOp {
         // TODO: Query database for detailed info on each selected item
         // For now, just return the IDs
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "count": selection.len(),
             "ids": selection,
             "message": format!("{} items in current selection", selection.len())
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "view.read-selection-info requires database feature"
-        ))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1204,7 +889,7 @@ impl CustomOperation for ViewZoomInOp {
     fn rationale(&self) -> &'static str {
         "Navigates into a node's child taxonomy using its expansion rule"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -1223,38 +908,6 @@ impl CustomOperation for ViewZoomInOp {
     }
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl ViewZoomInOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let node_id = get_uuid_arg(verb_call, "node-id", ctx)
-            .ok_or_else(|| anyhow::anyhow!("node-id argument is required"))?;
-
-        // Get current view from session context
-        // Note: This operation needs session context, not just execution context
-        // For now, we return a message indicating the zoom action
-        // The actual zoom is performed by the session layer
-
-        Ok(ExecutionResult::Record(json!({
-            "action": "zoom-in",
-            "node_id": node_id.to_string(),
-            "message": format!("Zoom into node {}. Use session.zoom_in() to execute.", node_id)
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.zoom-in requires database feature"))
     }
 }
 
@@ -1280,7 +933,7 @@ impl CustomOperation for ViewZoomOutOp {
     fn rationale(&self) -> &'static str {
         "Navigates back to the parent taxonomy by popping the current frame"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
@@ -1296,33 +949,6 @@ impl CustomOperation for ViewZoomOutOp {
     }
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl ViewZoomOutOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Note: This operation needs session context, not just execution context
-        // For now, we return a message indicating the zoom action
-        // The actual zoom is performed by the session layer
-
-        Ok(ExecutionResult::Record(json!({
-            "action": "zoom-out",
-            "message": "Zoom out to parent taxonomy. Use session.zoom_out() to execute."
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("view.zoom-out requires database feature"))
     }
 }
 
@@ -1348,7 +974,7 @@ impl CustomOperation for ViewBackToOp {
     fn rationale(&self) -> &'static str {
         "Navigates to a specific breadcrumb level by popping frames"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -1369,45 +995,6 @@ impl CustomOperation for ViewBackToOp {
     }
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl ViewBackToOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let depth = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "depth")
-            .and_then(|a| a.value.as_integer())
-            .map(|i| i as usize);
-
-        let frame_id = get_uuid_arg(verb_call, "frame-id", ctx);
-
-        // Note: This operation needs session context, not just execution context
-        // For now, we return a message indicating the navigation action
-
-        Ok(ExecutionResult::Record(json!({
-            "action": "navigate-back-to",
-            "depth": depth,
-            "frame_id": frame_id.map(|id| id.to_string()),
-            "message": "Navigate to breadcrumb level. Use session.back_to() to execute."
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "view.navigate-back-to requires database feature"
-        ))
     }
 }
 
@@ -1433,7 +1020,7 @@ impl CustomOperation for ViewBreadcrumbsOp {
     fn rationale(&self) -> &'static str {
         "Reports on the current navigation stack for breadcrumb display"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
@@ -1449,34 +1036,6 @@ impl CustomOperation for ViewBreadcrumbsOp {
     }
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl ViewBreadcrumbsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Note: This operation needs session context to access the stack
-        // For now, we return a placeholder indicating breadcrumbs should be fetched from session
-
-        Ok(ExecutionResult::Record(json!({
-            "action": "read-breadcrumbs",
-            "message": "Get breadcrumbs from session.breadcrumbs() or session.breadcrumbs_with_ids()"
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "view.read-breadcrumbs requires database feature"
-        ))
     }
 }
 

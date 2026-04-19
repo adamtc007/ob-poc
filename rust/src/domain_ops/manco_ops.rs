@@ -8,10 +8,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 
-use super::helpers::{extract_int_opt, extract_string_opt, extract_uuid, extract_uuid_opt};
 use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 // Re-export types for consistent use
 pub use ob_poc_types::manco_group::{
@@ -23,9 +20,9 @@ pub use ob_poc_types::manco_group::{
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-/// Extract optional date from verb args (as string, parsed to NaiveDate)
-fn extract_date_opt(verb_call: &VerbCall, arg_name: &str) -> Option<chrono::NaiveDate> {
-    extract_string_opt(verb_call, arg_name)
+/// Extract optional date from JSON args (as string, parsed to NaiveDate)
+fn json_extract_date_opt(args: &serde_json::Value, arg_name: &str) -> Option<chrono::NaiveDate> {
+    super::helpers::json_extract_string_opt(args, arg_name)
         .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
 }
 
@@ -48,34 +45,14 @@ impl CustomOperation for MancoBridgeRolesOp {
     fn rationale(&self) -> &'static str {
         "Bridges role assignments to special rights for governance controller computation"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl MancoBridgeRolesOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let as_of = extract_date_opt(verb_call, "as-of");
+        let as_of = json_extract_date_opt(args, "as-of");
 
         let row: (i32, i32) =
             sqlx::query_as("SELECT * FROM \"ob-poc\".fn_bridge_manco_role_to_board_rights($1)")
@@ -87,20 +64,13 @@ impl MancoBridgeRolesOp {
             rights_created: row.0,
             rights_updated: row.1,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let result = BridgeRolesResult {
-            rights_created: 0,
-            rights_updated: 0,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -120,34 +90,14 @@ impl CustomOperation for MancoBridgeGleifFundManagersOp {
     fn rationale(&self) -> &'static str {
         "Bridges GLEIF fund manager relationships to special rights for governance controller"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl MancoBridgeGleifFundManagersOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let as_of = extract_date_opt(verb_call, "as-of");
+        let as_of = json_extract_date_opt(args, "as-of");
 
         let row: (i32, i32) = sqlx::query_as(
             "SELECT * FROM \"ob-poc\".fn_bridge_gleif_fund_manager_to_board_rights($1)",
@@ -160,20 +110,13 @@ impl MancoBridgeGleifFundManagersOp {
             rights_created: row.0,
             rights_updated: row.1,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let result = BridgeGleifResult {
-            rights_created: 0,
-            rights_updated: 0,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -193,34 +136,14 @@ impl CustomOperation for MancoBridgeBodsOwnershipOp {
     fn rationale(&self) -> &'static str {
         "Bridges BODS ownership percentages to holdings for governance controller"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl MancoBridgeBodsOwnershipOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let as_of = extract_date_opt(verb_call, "as-of");
+        let as_of = json_extract_date_opt(args, "as-of");
 
         let row: (i32, i32, i32) =
             sqlx::query_as("SELECT * FROM \"ob-poc\".fn_bridge_bods_to_holdings($1)")
@@ -233,21 +156,13 @@ impl MancoBridgeBodsOwnershipOp {
             holdings_updated: row.1,
             entities_linked: row.2,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let result = BridgeBodsResult {
-            holdings_created: 0,
-            holdings_updated: 0,
-            entities_linked: 0,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -271,34 +186,14 @@ impl CustomOperation for MancoGroupDeriveOp {
     fn rationale(&self) -> &'static str {
         "Complex group derivation with governance controller signals and fallback logic"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl MancoGroupDeriveOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let as_of = extract_date_opt(verb_call, "as-of");
+        let as_of = json_extract_date_opt(args, "as-of");
 
         let row: (i32, i32) = sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_derive_cbu_groups($1)"#)
             .bind(as_of)
@@ -310,20 +205,13 @@ impl MancoGroupDeriveOp {
             memberships_created: row.1,
         };
 
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let result = DeriveGroupsResult {
-            groups_created: 0,
-            memberships_created: 0,
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -343,34 +231,14 @@ impl CustomOperation for MancoGroupCbusOp {
     fn rationale(&self) -> &'static str {
         "Calls function with entity lookup and returns structured result set"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl MancoGroupCbusOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let manco_entity_id = extract_uuid(verb_call, ctx, "manco-entity-id")?;
+        let manco_entity_id = super::helpers::json_extract_uuid(args, ctx, "manco-entity-id")?;
 
         let rows: Vec<(
             uuid::Uuid,
@@ -411,16 +279,11 @@ impl MancoGroupCbusOp {
             )
             .collect();
 
-        Ok(ExecutionResult::RecordSet(results))
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -440,34 +303,14 @@ impl CustomOperation for MancoGroupForCbuOp {
     fn rationale(&self) -> &'static str {
         "Calls function with CBU lookup and returns structured result"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl MancoGroupForCbuOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
+        let cbu_id = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         let row: Option<(
             uuid::Uuid,
@@ -501,27 +344,23 @@ impl MancoGroupForCbuOp {
                     group_type,
                     source,
                 };
-                Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                    serde_json::to_value(result)?,
+                ))
             }
             None => {
                 let result = CbuMancoNotFound {
                     message: "No governance controller found for this CBU".to_string(),
                 };
-                Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                    serde_json::to_value(result)?,
+                ))
             }
         }
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let result = CbuMancoNotFound {
-            message: "Database not available".to_string(),
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -541,37 +380,17 @@ impl CustomOperation for MancoPrimaryControllerOp {
     fn rationale(&self) -> &'static str {
         "Complex governance controller computation with board rights, voting control, and tie-breaking"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl MancoPrimaryControllerOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use rust_decimal::Decimal;
 
-        let issuer_entity_id = extract_uuid(verb_call, ctx, "issuer-entity-id")?;
-        let as_of = extract_date_opt(verb_call, "as-of");
+        let issuer_entity_id = super::helpers::json_extract_uuid(args, ctx, "issuer-entity-id")?;
+        let as_of = json_extract_date_opt(args, "as-of");
 
         let row: Option<(
             uuid::Uuid,         // issuer_entity_id
@@ -621,27 +440,23 @@ impl MancoPrimaryControllerOp {
                     has_control: has_control.unwrap_or(false),
                     has_significant_influence: has_significant_influence.unwrap_or(false),
                 };
-                Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                    serde_json::to_value(result)?,
+                ))
             }
             None => {
                 let result = CbuMancoNotFound {
                     message: "No governance controller found".to_string(),
                 };
-                Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(
+                    serde_json::to_value(result)?,
+                ))
             }
         }
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let result = CbuMancoNotFound {
-            message: "Database not available".to_string(),
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -661,37 +476,17 @@ impl CustomOperation for MancoControlChainOp {
     fn rationale(&self) -> &'static str {
         "Recursive CTE traversal of control chain to find ultimate parent"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl MancoControlChainOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use rust_decimal::Decimal;
 
-        let manco_entity_id = extract_uuid(verb_call, ctx, "manco-entity-id")?;
-        let max_depth = extract_int_opt(verb_call, "max-depth").unwrap_or(5);
+        let manco_entity_id = super::helpers::json_extract_uuid(args, ctx, "manco-entity-id")?;
+        let max_depth = super::helpers::json_extract_int_opt(args, "max-depth").unwrap_or(5);
 
         let rows: Vec<(
             i32,                // depth
@@ -747,16 +542,11 @@ impl MancoControlChainOp {
             )
             .collect();
 
-        Ok(ExecutionResult::RecordSet(results))
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -785,36 +575,16 @@ impl CustomOperation for MancoBookSummaryOp {
     fn rationale(&self) -> &'static str {
         "Composite query returning group info, CBUs, and control chain in one call"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl MancoBookSummaryOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use rust_decimal::Decimal;
 
-        let manco_entity_id = extract_uuid(verb_call, ctx, "manco-entity-id")?;
+        let manco_entity_id = super::helpers::json_extract_uuid(args, ctx, "manco-entity-id")?;
 
         // 1. Get group info
         let group_row: Option<(
@@ -951,21 +721,11 @@ impl MancoBookSummaryOp {
             "control_chain": control_chain
         });
 
-        Ok(ExecutionResult::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let result = serde_json::json!({
-            "group": null,
-            "cbus": [],
-            "control_chain": []
-        });
-        Ok(ExecutionResult::Record(result))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -989,35 +749,15 @@ impl CustomOperation for OwnershipComputeControlLinksOp {
     fn rationale(&self) -> &'static str {
         "Materializes control links from holdings with threshold computation"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl OwnershipComputeControlLinksOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let issuer_entity_id = extract_uuid_opt(verb_call, ctx, "issuer-entity-id");
-        let as_of = extract_date_opt(verb_call, "as-of");
+        let issuer_entity_id = super::helpers::json_extract_uuid_opt(args, ctx, "issuer-entity-id");
+        let as_of = json_extract_date_opt(args, "as-of");
 
         let count: i32 = sqlx::query_scalar("SELECT \"ob-poc\".fn_compute_control_links($1, $2)")
             .bind(issuer_entity_id)
@@ -1028,17 +768,13 @@ impl OwnershipComputeControlLinksOp {
         let result = ComputeControlLinksResult {
             links_created: count,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let result = ComputeControlLinksResult { links_created: 0 };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1058,34 +794,14 @@ impl CustomOperation for OwnershipRefreshOp {
     fn rationale(&self) -> &'static str {
         "Pipeline macro: bridges all data sources then derives governance groups"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl OwnershipRefreshOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let as_of = extract_date_opt(verb_call, "as-of");
+        let as_of = json_extract_date_opt(args, "as-of");
 
         // 1. Bridge ManCo roles → board rights
         let manco_row: (i32, i32) =
@@ -1150,36 +866,12 @@ impl OwnershipRefreshOp {
             control_links,
             groups,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let result = GovernanceRefreshResult {
-            manco_bridge: BridgeRolesResult {
-                rights_created: 0,
-                rights_updated: 0,
-            },
-            gleif_bridge: BridgeGleifResult {
-                rights_created: 0,
-                rights_updated: 0,
-            },
-            bods_bridge: BridgeBodsResult {
-                holdings_created: 0,
-                holdings_updated: 0,
-                entities_linked: 0,
-            },
-            control_links: ComputeControlLinksResult { links_created: 0 },
-            groups: DeriveGroupsResult {
-                groups_created: 0,
-                memberships_created: 0,
-            },
-        };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
-

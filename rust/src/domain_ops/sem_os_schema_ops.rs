@@ -10,8 +10,7 @@ use std::collections::BTreeSet;
 
 use dsl_runtime_macros::register_custom_op;
 
-use super::sem_os_helpers::{delegate_to_tool, get_bool_arg, get_int_arg, get_string_arg};
-use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
+use super::CustomOperation;
 use crate::dsl_v2::verb_registry::registry;
 use crate::ontology::{ontology, SearchKeyDef};
 
@@ -63,10 +62,10 @@ struct GenerateDiscoveryMapResult {
     diagram: String,
 }
 
-fn get_first_string_arg(verb_call: &VerbCall, names: &[&str]) -> Option<String> {
+fn get_first_string_arg_json(args: &serde_json::Value, names: &[&str]) -> Option<String> {
     names
         .iter()
-        .find_map(|name| get_string_arg(verb_call, name))
+        .find_map(|name| super::helpers::json_extract_string_opt(args, name))
 }
 
 fn normalize_structure_target(raw: &str) -> String {
@@ -80,9 +79,9 @@ fn normalize_structure_target(raw: &str) -> String {
     }
 }
 
-fn resolve_structure_entity_arg(verb_call: &VerbCall) -> Option<String> {
-    let raw = get_first_string_arg(
-        verb_call,
+fn resolve_structure_entity_arg_json(args: &serde_json::Value) -> Option<String> {
+    let raw = get_first_string_arg_json(
+        args,
         &[
             "entity-type",
             "entity_type",
@@ -306,50 +305,19 @@ impl CustomOperation for SchemaDomainDescribeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-
-impl SchemaDomainDescribeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_type = resolve_structure_entity_arg(verb_call).ok_or_else(|| {
+        let entity_type = resolve_structure_entity_arg_json(args).ok_or_else(|| {
             anyhow::anyhow!("schema.domain.describe requires :domain or :entity-type")
         })?;
-        Ok(ExecutionResult::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             describe_entity_structure(&entity_type, pool).await?,
         ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let entity_type = resolve_structure_entity_arg(verb_call).ok_or_else(|| {
-            anyhow::anyhow!("schema.domain.describe requires :domain or :entity-type")
-        })?;
-        Ok(ExecutionResult::Record(describe_entity_structure(
-            &entity_type,
-        )))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -373,48 +341,18 @@ impl CustomOperation for SchemaEntityDescribeOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-
-impl SchemaEntityDescribeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_type = resolve_structure_entity_arg(verb_call)
+        let entity_type = resolve_structure_entity_arg_json(args)
             .ok_or_else(|| anyhow::anyhow!("schema.entity.describe requires :entity-type"))?;
-        Ok(ExecutionResult::Record(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
             describe_entity_structure(&entity_type, pool).await?,
         ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let entity_type = resolve_structure_entity_arg(verb_call)
-            .ok_or_else(|| anyhow::anyhow!("schema.entity.describe requires :entity-type"))?;
-        Ok(ExecutionResult::Record(describe_entity_structure(
-            &entity_type,
-        )))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -438,56 +376,22 @@ impl CustomOperation for SchemaEntityListFieldsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
+        let entity_type = resolve_structure_entity_arg_json(args)
+            .ok_or_else(|| anyhow::anyhow!("schema.entity.list-fields requires :entity-type"))?;
+        let record = describe_entity_structure(&entity_type, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+            "entity_type": entity_type,
+            "fields": record["fields"].clone(),
+            "field_count": record["field_count"].clone(),
+            "source": record["source"].clone(),
+        })))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl SchemaEntityListFieldsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_type = resolve_structure_entity_arg(verb_call)
-            .ok_or_else(|| anyhow::anyhow!("schema.entity.list-fields requires :entity-type"))?;
-        let record = describe_entity_structure(&entity_type, pool).await?;
-        Ok(ExecutionResult::Record(json!({
-            "entity_type": entity_type,
-            "fields": record["fields"].clone(),
-            "field_count": record["field_count"].clone(),
-            "source": record["source"].clone(),
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let entity_type = resolve_structure_entity_arg(verb_call)
-            .ok_or_else(|| anyhow::anyhow!("schema.entity.list-fields requires :entity-type"))?;
-        let record = describe_entity_structure(&entity_type);
-        Ok(ExecutionResult::Record(json!({
-            "entity_type": entity_type,
-            "fields": record["fields"].clone(),
-            "field_count": record["field_count"].clone(),
-            "source": record["source"].clone(),
-        })))
     }
 }
 
@@ -506,64 +410,29 @@ impl CustomOperation for SchemaEntityListRelationshipsOp {
     fn rationale(&self) -> &'static str {
         "Lists ontology-backed relationships relevant to an entity type"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
+        let entity_type = resolve_structure_entity_arg_json(args).ok_or_else(|| {
+            anyhow::anyhow!("schema.entity.list-relationships requires :entity-type")
+        })?;
+        let record = describe_entity_structure(&entity_type, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+            "entity_type": entity_type,
+            "relationships": record["relationships"].clone(),
+            "relationship_count": record["relationship_count"].clone(),
+            "source": record["source"].clone(),
+        })))
     }
 
     fn is_migrated(&self) -> bool {
         true
     }
 }
-impl SchemaEntityListRelationshipsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_type = resolve_structure_entity_arg(verb_call).ok_or_else(|| {
-            anyhow::anyhow!("schema.entity.list-relationships requires :entity-type")
-        })?;
-        let record = describe_entity_structure(&entity_type, pool).await?;
-        Ok(ExecutionResult::Record(json!({
-            "entity_type": entity_type,
-            "relationships": record["relationships"].clone(),
-            "relationship_count": record["relationship_count"].clone(),
-            "source": record["source"].clone(),
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let entity_type = resolve_structure_entity_arg(verb_call).ok_or_else(|| {
-            anyhow::anyhow!("schema.entity.list-relationships requires :entity-type")
-        })?;
-        let record = describe_entity_structure(&entity_type);
-        Ok(ExecutionResult::Record(json!({
-            "entity_type": entity_type,
-            "relationships": record["relationships"].clone(),
-            "relationship_count": record["relationship_count"].clone(),
-            "source": record["source"].clone(),
-        })))
-    }
-}
-
 
 /// List verbs for an entity type's domain.
 #[register_custom_op]
@@ -580,62 +449,28 @@ impl CustomOperation for SchemaEntityListVerbsOp {
     fn rationale(&self) -> &'static str {
         "Lists runtime verb contracts for the entity type's DSL domain"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
+        let entity_type = resolve_structure_entity_arg_json(args)
+            .ok_or_else(|| anyhow::anyhow!("schema.entity.list-verbs requires :entity-type"))?;
+        let record = describe_entity_structure(&entity_type, pool).await?;
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+            "entity_type": entity_type,
+            "verbs": record["verbs"].clone(),
+            "verb_count": record["verb_count"].clone(),
+            "source": record["source"].clone(),
+        })))
     }
 
     fn is_migrated(&self) -> bool {
         true
     }
 }
-impl SchemaEntityListVerbsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_type = resolve_structure_entity_arg(verb_call)
-            .ok_or_else(|| anyhow::anyhow!("schema.entity.list-verbs requires :entity-type"))?;
-        let record = describe_entity_structure(&entity_type, pool).await?;
-        Ok(ExecutionResult::Record(json!({
-            "entity_type": entity_type,
-            "verbs": record["verbs"].clone(),
-            "verb_count": record["verb_count"].clone(),
-            "source": record["source"].clone(),
-        })))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let entity_type = resolve_structure_entity_arg(verb_call)
-            .ok_or_else(|| anyhow::anyhow!("schema.entity.list-verbs requires :entity-type"))?;
-        let record = describe_entity_structure(&entity_type);
-        Ok(ExecutionResult::Record(json!({
-            "entity_type": entity_type,
-            "verbs": record["verbs"].clone(),
-            "verb_count": record["verb_count"].clone(),
-            "source": record["source"].clone(),
-        })))
-    }
-}
-
 
 // ── Schema Introspection ──────────────────────────────────────────
 
@@ -654,7 +489,7 @@ impl CustomOperation for SchemaIntrospectOp {
     fn rationale(&self) -> &'static str {
         "Delegates to db_introspect MCP tool"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -667,27 +502,6 @@ impl CustomOperation for SchemaIntrospectOp {
         true
     }
 }
-impl SchemaIntrospectOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        delegate_to_tool(pool, ctx, verb_call, "db_introspect").await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("schema.introspect requires database"))
-    }
-}
-
 
 // ── Schema Extraction ─────────────────────────────────────────────
 
@@ -706,7 +520,7 @@ impl CustomOperation for SchemaExtractAttributesOp {
     fn rationale(&self) -> &'static str {
         "Scanner-based attribute extraction from schema columns"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -719,30 +533,6 @@ impl CustomOperation for SchemaExtractAttributesOp {
         true
     }
 }
-impl SchemaExtractAttributesOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Uses db_introspect as the underlying tool, with attribute extraction logic
-        delegate_to_tool(pool, ctx, verb_call, "db_introspect").await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "schema.extract-attributes requires database"
-        ))
-    }
-}
-
 
 /// Extract verb contracts from YAML configuration.
 #[register_custom_op]
@@ -759,7 +549,7 @@ impl CustomOperation for SchemaExtractVerbsOp {
     fn rationale(&self) -> &'static str {
         "Scanner-based verb extraction from YAML config"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -772,27 +562,6 @@ impl CustomOperation for SchemaExtractVerbsOp {
         true
     }
 }
-impl SchemaExtractVerbsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        delegate_to_tool(pool, ctx, verb_call, "db_introspect").await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("schema.extract-verbs requires database"))
-    }
-}
-
 
 /// Extract entity type definitions from schema.
 #[register_custom_op]
@@ -809,7 +578,7 @@ impl CustomOperation for SchemaExtractEntitiesOp {
     fn rationale(&self) -> &'static str {
         "Scanner-based entity type extraction from schema tables"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -822,27 +591,6 @@ impl CustomOperation for SchemaExtractEntitiesOp {
         true
     }
 }
-impl SchemaExtractEntitiesOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        delegate_to_tool(pool, ctx, verb_call, "db_introspect").await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("schema.extract-entities requires database"))
-    }
-}
-
 
 /// Cross-reference schema against registry snapshots for drift detection.
 #[register_custom_op]
@@ -859,7 +607,7 @@ impl CustomOperation for SchemaCrossReferenceOp {
     fn rationale(&self) -> &'static str {
         "Scanner drift detection: compare schema vs registry snapshots"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -872,44 +620,19 @@ impl CustomOperation for SchemaCrossReferenceOp {
         true
     }
 }
-impl SchemaCrossReferenceOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        delegate_to_tool(pool, ctx, verb_call, "db_introspect").await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("schema.cross-reference requires database"))
-    }
-}
-
 
 // ── Diagram generation ops ────────────────────────────────────────────────────
 
 #[cfg(feature = "database")]
-fn get_string_list_arg(verb_call: &VerbCall, name: &str) -> Option<Vec<String>> {
-    verb_call.arguments.iter().find_map(|a| {
-        if a.key != name {
-            return None;
-        }
-        if let Some(s) = a.value.as_string() {
-            return Some(vec![s.to_string()]);
-        }
-        a.value.as_list().map(|list| {
-            list.iter()
-                .filter_map(|node| node.as_string().map(ToOwned::to_owned))
-                .collect()
-        })
+fn get_string_list_arg_json(args: &serde_json::Value, name: &str) -> Option<Vec<String>> {
+    let v = args.get(name)?;
+    if let Some(s) = v.as_str() {
+        return Some(vec![s.to_string()]);
+    }
+    v.as_array().map(|list| {
+        list.iter()
+            .filter_map(|node| node.as_str().map(ToOwned::to_owned))
+            .collect()
     })
 }
 
@@ -1088,50 +811,34 @@ impl CustomOperation for SchemaGenerateErdOp {
     fn rationale(&self) -> &'static str {
         "ERD generation requires physical schema extraction + AffinityGraph build"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl SchemaGenerateErdOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let schema_name = get_string_arg(verb_call, "schema-name")
-            .ok_or_else(|| anyhow::anyhow!("schema.generate-erd: schema-name is required"))?;
-        let format = get_string_arg(verb_call, "format").unwrap_or_else(|| "mermaid".to_string());
+        let schema_name = super::helpers::json_extract_string(args, "schema-name")
+            .map_err(|_| anyhow::anyhow!("schema.generate-erd: schema-name is required"))?;
+        let format = super::helpers::json_extract_string_opt(args, "format")
+            .unwrap_or_else(|| "mermaid".to_string());
         if format != "mermaid" {
             return Err(anyhow::anyhow!(
                 "schema.generate-erd: unsupported format '{}', only 'mermaid' is currently supported",
                 format
             ));
         }
-        let show_verb_surface = get_bool_arg(verb_call, "show-verb-surface").unwrap_or(true);
-        let show_affinity_kind = get_bool_arg(verb_call, "show-affinity-kind").unwrap_or(false);
-        let enrich = get_bool_arg(verb_call, "enrich").unwrap_or(true);
-        let domain_filter = get_string_arg(verb_call, "domain");
-        let group_by =
-            get_string_arg(verb_call, "group-by").unwrap_or_else(|| "schema".to_string());
-        let max_tables = get_int_arg(verb_call, "max-tables").unwrap_or(50) as usize;
-        let requested_tables = get_string_list_arg(verb_call, "tables");
+        let show_verb_surface =
+            super::helpers::json_extract_bool_opt(args, "show-verb-surface").unwrap_or(true);
+        let show_affinity_kind =
+            super::helpers::json_extract_bool_opt(args, "show-affinity-kind").unwrap_or(false);
+        let enrich = super::helpers::json_extract_bool_opt(args, "enrich").unwrap_or(true);
+        let domain_filter = super::helpers::json_extract_string_opt(args, "domain");
+        let group_by = super::helpers::json_extract_string_opt(args, "group-by")
+            .unwrap_or_else(|| "schema".to_string());
+        let max_tables = super::helpers::json_extract_int_opt(args, "max-tables").unwrap_or(50)
+            as usize;
+        let requested_tables = get_string_list_arg_json(args, "tables");
 
         let mut tables = extract_tables_from_schema(pool, &schema_name).await?;
         if let Some(ref wanted) = requested_tables {
@@ -1166,19 +873,15 @@ impl SchemaGenerateErdOp {
             group_by,
             diagram: mermaid_output,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
+        ))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("schema.generate-erd requires database"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
-
 
 /// Generate a verb-flow diagram showing what data a verb touches.
 #[register_custom_op]
@@ -1195,48 +898,29 @@ impl CustomOperation for SchemaGenerateVerbFlowOp {
     fn rationale(&self) -> &'static str {
         "Verb-flow diagram requires AffinityGraph for verb→data edge traversal"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl SchemaGenerateVerbFlowOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let format = get_string_arg(verb_call, "format").unwrap_or_else(|| "mermaid".to_string());
+        let format = super::helpers::json_extract_string_opt(args, "format")
+            .unwrap_or_else(|| "mermaid".to_string());
         if format != "mermaid" {
             return Err(anyhow::anyhow!(
                 "schema.generate-verb-flow: unsupported format '{}', only 'mermaid' is currently supported",
                 format
             ));
         }
-        let verb_fqn = get_string_arg(verb_call, "verb-fqn");
-        let domain = get_string_arg(verb_call, "domain");
+        let verb_fqn = super::helpers::json_extract_string_opt(args, "verb-fqn");
+        let domain = super::helpers::json_extract_string_opt(args, "domain");
         if verb_fqn.is_none() && domain.is_none() {
             return Err(anyhow::anyhow!(
                 "schema.generate-verb-flow: either verb-fqn or domain is required"
             ));
         }
-        let depth = get_int_arg(verb_call, "depth").unwrap_or(2) as u32;
+        let depth = super::helpers::json_extract_int_opt(args, "depth").unwrap_or(2) as u32;
 
         let graph = load_affinity_graph_cached(pool).await?;
         let (mode, verb_value, diagram) = if let Some(ref vfqn) = verb_fqn {
@@ -1262,21 +946,15 @@ impl SchemaGenerateVerbFlowOp {
             format,
             diagram,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "schema.generate-verb-flow requires database"
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
         ))
     }
-}
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
 
 /// Generate a domain discovery map.
 #[register_custom_op]
@@ -1293,43 +971,24 @@ impl CustomOperation for SchemaGenerateDiscoveryMapOp {
     fn rationale(&self) -> &'static str {
         "Generate utterance -> intent -> verb -> data map from AffinityGraph and verb phrases"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl SchemaGenerateDiscoveryMapOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let domain = get_string_arg(verb_call, "domain");
-        let format = get_string_arg(verb_call, "format").unwrap_or_else(|| "mermaid".to_string());
+        let domain = super::helpers::json_extract_string_opt(args, "domain");
+        let format = super::helpers::json_extract_string_opt(args, "format")
+            .unwrap_or_else(|| "mermaid".to_string());
         if format != "mermaid" {
             return Err(anyhow::anyhow!(
                 "schema.generate-discovery-map: unsupported format '{}', only 'mermaid' is currently supported",
                 format
             ));
         }
-        let cluster_by =
-            get_string_arg(verb_call, "cluster-by").unwrap_or_else(|| "verb".to_string());
+        let cluster_by = super::helpers::json_extract_string_opt(args, "cluster-by")
+            .unwrap_or_else(|| "verb".to_string());
         let graph = load_affinity_graph_cached(pool).await?;
         let verbs = load_active_verb_contracts(pool).await?;
 
@@ -1389,18 +1048,12 @@ impl SchemaGenerateDiscoveryMapOp {
             intent_count: intent_matches.len(),
             diagram,
         };
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "schema.generate-discovery-map requires database"
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+            serde_json::to_value(result)?,
         ))
     }
-}
 
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
