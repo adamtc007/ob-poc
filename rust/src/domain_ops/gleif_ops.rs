@@ -7,17 +7,14 @@ use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 
-use super::helpers::{extract_bool_opt, extract_int_opt, extract_string_opt, extract_uuid_opt};
-
 use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[allow(unused_imports)]
 use crate::gleif::client::extract_lei_from_url;
 
 #[cfg(feature = "database")]
 use {
     crate::dsl_v2::execution::DslExecutor,
+    crate::dsl_v2::executor::ExecutionContext,
     crate::gleif::{
         client::TreeFetchOptions, ChainLink, DiscoveredEntity, FundListResult, GleifClient,
         GleifEnrichmentService, LeiRecord, OwnershipChain, SuccessorResult, UboStatus,
@@ -45,45 +42,16 @@ impl CustomOperation for GleifEnrichOp {
     fn rationale(&self) -> &'static str {
         "Requires external GLEIF API call to fetch and persist LEI data"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifEnrichOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         // Get LEI or entity-id
-        let lei = extract_string_opt(verb_call, "lei");
-        let entity_id_arg = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
+        let lei = super::helpers::json_extract_string_opt(args, "lei");
+        let entity_id_arg = super::helpers::json_extract_uuid_opt(args, ctx, "entity-id");
 
         let (lei, entity_id): (String, Uuid) = match (lei, entity_id_arg) {
             (Some(l), _) => {
@@ -156,11 +124,6 @@ impl GleifEnrichOp {
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
         let result = service.enrich_entity(entity_id, &lei).await?;
 
-        // Bind result
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind(binding, entity_id);
-        }
-
         let result_json = serde_json::json!({
             "entity_id": entity_id,
             "lei": lei,
@@ -171,7 +134,7 @@ impl GleifEnrichOp {
         });
 
         // Log research action if decision-id provided (links Phase 2 execution to Phase 1 selection)
-        if let Some(decision_id) = extract_uuid_opt(verb_call, ctx, "decision-id") {
+        if let Some(decision_id) = super::helpers::json_extract_uuid_opt(args, ctx, "decision-id") {
             let entities_updated = if result.names_added > 0 || result.addresses_added > 0 {
                 1
             } else {
@@ -188,21 +151,10 @@ impl GleifEnrichOp {
             .await?;
         }
 
-        Ok(ExecutionResult::Record(result_json))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result_json))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "entity_id": uuid::Uuid::new_v4(),
-            "lei": "MOCK_LEI",
-            "names_added": 0,
-            "addresses_added": 0,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -224,39 +176,15 @@ impl CustomOperation for GleifSearchOp {
     fn rationale(&self) -> &'static str {
         "Requires external GLEIF API search call"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifSearchOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let name = extract_string_opt(verb_call, "name");
-        let limit = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "limit")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(20) as usize;
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let name = super::helpers::json_extract_string_opt(args, "name");
+        let limit = super::helpers::json_extract_int_opt(args, "limit").unwrap_or(20) as usize;
 
         let client = GleifClient::new()?;
 
@@ -278,16 +206,10 @@ impl GleifSearchOp {
             })
             .collect();
 
-        Ok(ExecutionResult::RecordSet(candidates))
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(candidates))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -309,41 +231,17 @@ impl CustomOperation for GleifImportTreeOp {
     fn rationale(&self) -> &'static str {
         "Requires multiple GLEIF API calls to traverse and import corporate structure"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifImportTreeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let root_lei = extract_string_opt(verb_call, "root-lei")
+        let root_lei = super::helpers::json_extract_string_opt(args, "root-lei")
             .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
 
-        let max_depth = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "max-depth")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(3) as usize;
+        let max_depth = super::helpers::json_extract_int_opt(args, "max-depth").unwrap_or(3) as usize;
 
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
         let result = service.import_corporate_tree(&root_lei, max_depth).await?;
@@ -357,7 +255,7 @@ impl GleifImportTreeOp {
         });
 
         // Log research action if decision-id provided
-        if let Some(decision_id) = extract_uuid_opt(verb_call, ctx, "decision-id") {
+        if let Some(decision_id) = super::helpers::json_extract_uuid_opt(args, ctx, "decision-id") {
             log_research_action(
                 pool,
                 decision_id,
@@ -369,21 +267,10 @@ impl GleifImportTreeOp {
             .await?;
         }
 
-        Ok(ExecutionResult::Record(result_json))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result_json))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "root_lei": "MOCK_LEI",
-            "entities_created": 0,
-            "entities_updated": 0,
-            "relationships_created": 0,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -405,57 +292,18 @@ impl CustomOperation for GleifRefreshOp {
     fn rationale(&self) -> &'static str {
         "Requires GLEIF API calls to refresh stale entity data"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifRefreshOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_id_arg = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
+        let entity_id_arg = super::helpers::json_extract_uuid_opt(args, ctx, "entity-id");
 
-        let stale_days = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "stale-days")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(30) as i32;
+        let stale_days = super::helpers::json_extract_int_opt(args, "stale-days").unwrap_or(30) as i32;
 
-        let limit = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "limit")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(100) as i32;
+        let limit = super::helpers::json_extract_int_opt(args, "limit").unwrap_or(100) as i32;
 
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
 
@@ -463,7 +311,7 @@ impl GleifRefreshOp {
             Some(entity_id) => {
                 // Refresh single entity
                 let result = service.refresh_entity(entity_id).await?;
-                Ok(ExecutionResult::Record(serde_json::json!({
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
                     "refreshed": 1,
                     "entity_id": entity_id,
                     "lei": result.lei,
@@ -496,7 +344,7 @@ impl GleifRefreshOp {
                     }
                 }
 
-                Ok(ExecutionResult::Record(serde_json::json!({
+                Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
                     "refreshed": refreshed,
                     "errors": errors,
                     "stale_days": stale_days,
@@ -504,17 +352,8 @@ impl GleifRefreshOp {
             }
         }
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "refreshed": 0,
-            "errors": 0,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -536,39 +375,20 @@ impl CustomOperation for GleifGetRecordOp {
     fn rationale(&self) -> &'static str {
         "Direct GLEIF API call for record inspection"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifGetRecordOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let lei =
-            extract_string_opt(verb_call, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let lei = super::helpers::json_extract_string_opt(args, "lei")
+            .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let record = client.get_lei_record(&lei).await?;
 
-        Ok(ExecutionResult::Record(serde_json::json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
             "lei": record.lei(),
             "name": record.attributes.entity.legal_name.name,
             "jurisdiction": record.attributes.entity.jurisdiction,
@@ -579,14 +399,8 @@ impl GleifGetRecordOp {
             "registration": record.attributes.registration,
         })))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -608,60 +422,33 @@ impl CustomOperation for GleifGetParentOp {
     fn rationale(&self) -> &'static str {
         "Direct GLEIF API call for parent relationship"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifGetParentOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let lei =
-            extract_string_opt(verb_call, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let lei = super::helpers::json_extract_string_opt(args, "lei")
+            .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let parent = client.get_direct_parent(&lei).await?;
 
         match parent {
-            Some(rel) => Ok(ExecutionResult::Record(serde_json::json!({
+            Some(rel) => Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
                 "parent_lei": rel.attributes.relationship.end_node.id,
                 "relationship_type": rel.attributes.relationship.relationship_type,
                 "relationship_status": rel.attributes.relationship.status,
             }))),
-            None => Ok(ExecutionResult::Record(serde_json::json!({
+            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
                 "parent_lei": null,
                 "message": "No direct parent found"
             }))),
         }
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "parent_lei": null,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -683,63 +470,30 @@ impl CustomOperation for GleifImportManagedFundsOp {
     fn rationale(&self) -> &'static str {
         "Fetches managed funds from GLEIF API and creates entities + CBUs with role assignments"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifImportManagedFundsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let manager_lei = extract_string_opt(verb_call, "manager-lei");
-        let name_pattern = extract_string_opt(verb_call, "name-pattern");
+        let manager_lei = super::helpers::json_extract_string_opt(args, "manager-lei");
+        let name_pattern = super::helpers::json_extract_string_opt(args, "name-pattern");
 
         // Either manager-lei or name-pattern is required
         if manager_lei.is_none() && name_pattern.is_none() {
             return Err(anyhow::anyhow!(":manager-lei or :name-pattern required"));
         }
 
-        let ultimate_client_lei = extract_string_opt(verb_call, "ultimate-client-lei");
+        let ultimate_client_lei = super::helpers::json_extract_string_opt(args, "ultimate-client-lei");
 
-        let create_cbus = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "create-cbus")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(true);
+        let create_cbus = super::helpers::json_extract_bool_opt(args, "create-cbus").unwrap_or(true);
 
-        let limit = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "limit")
-            .and_then(|a| a.value.as_integer())
+        let limit = super::helpers::json_extract_int_opt(args, "limit")
             .map(|l| l as usize)
             .unwrap_or(1000); // Default limit to prevent runaway imports
 
-        let dry_run = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "dry-run")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(false);
+        let dry_run = super::helpers::json_extract_bool_opt(args, "dry-run").unwrap_or(false);
 
         let client = GleifClient::new()?;
 
@@ -806,7 +560,7 @@ impl GleifImportManagedFundsOp {
                 })
                 .collect();
 
-            return Ok(ExecutionResult::Record(serde_json::json!({
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
                 "dry_run": true,
                 "manager_lei": manager_lei,
                 "name_pattern": name_pattern,
@@ -905,7 +659,7 @@ impl GleifImportManagedFundsOp {
         });
 
         // Log research action if decision-id provided
-        if let Some(decision_id) = extract_uuid_opt(verb_call, _ctx, "decision-id") {
+        if let Some(decision_id) = super::helpers::json_extract_uuid_opt(args, ctx, "decision-id") {
             log_research_action(
                 pool,
                 decision_id,
@@ -917,19 +671,10 @@ impl GleifImportManagedFundsOp {
             .await?;
         }
 
-        Ok(ExecutionResult::Record(result_json))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result_json))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "dry_run": true,
-            "funds_imported": 0,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1103,34 +848,15 @@ impl CustomOperation for GleifGetChildrenOp {
     fn rationale(&self) -> &'static str {
         "Direct GLEIF API call for child entities"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifGetChildrenOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let lei =
-            extract_string_opt(verb_call, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let lei = super::helpers::json_extract_string_opt(args, "lei")
+            .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let children = client.get_direct_children(&lei).await?;
@@ -1146,16 +872,10 @@ impl GleifGetChildrenOp {
             })
             .collect();
 
-        Ok(ExecutionResult::RecordSet(results))
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1175,47 +895,18 @@ impl CustomOperation for GleifTraceOwnershipOp {
     fn rationale(&self) -> &'static str {
         "Follows parent relationships to UBO terminus via GLEIF API"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifTraceOwnershipOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let lei = match extract_string_opt(verb_call, "lei") {
+        let lei = match super::helpers::json_extract_string_opt(args, "lei") {
             Some(l) => l,
             None => {
                 // Try to get LEI from entity-id
-                let entity_id = verb_call
-                    .arguments
-                    .iter()
-                    .find(|a| a.key == "entity-id")
-                    .and_then(|a| {
-                        if let Some(name) = a.value.as_symbol() {
-                            ctx.resolve(name)
-                        } else {
-                            a.value.as_uuid()
-                        }
-                    })
+                let entity_id = super::helpers::json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
 
                 get_lei_for_entity(pool, entity_id)
@@ -1268,23 +959,10 @@ impl GleifTraceOwnershipOp {
             total_depth: chain.len(),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "chain": [],
-            "terminus": "Unknown",
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1304,36 +982,17 @@ impl CustomOperation for GleifGetManagedFundsOp {
     fn rationale(&self) -> &'static str {
         "Fetches all funds managed by an investment manager from GLEIF"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifGetManagedFundsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let manager_lei = extract_string_opt(verb_call, "manager-lei")
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let manager_lei = super::helpers::json_extract_string_opt(args, "manager-lei")
             .ok_or_else(|| anyhow::anyhow!(":manager-lei required"))?;
-        let resolve_umbrellas = extract_bool_opt(verb_call, "resolve-umbrellas").unwrap_or(true);
-        let limit = extract_int_opt(verb_call, "limit");
+        let resolve_umbrellas = super::helpers::json_extract_bool_opt(args, "resolve-umbrellas").unwrap_or(true);
+        let limit = super::helpers::json_extract_int_opt(args, "limit");
 
         let client = GleifClient::new()?;
 
@@ -1374,23 +1033,10 @@ impl GleifGetManagedFundsOp {
             total_count: funds.len(),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "funds": [],
-            "total_count": 0,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1410,34 +1056,15 @@ impl CustomOperation for GleifResolveSuccessorOp {
     fn rationale(&self) -> &'static str {
         "Follows successor chain for merged/inactive entities"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifResolveSuccessorOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let lei =
-            extract_string_opt(verb_call, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let lei = super::helpers::json_extract_string_opt(args, "lei")
+            .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
 
@@ -1483,22 +1110,10 @@ impl GleifResolveSuccessorOp {
             was_merged,
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "was_merged": false,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1525,48 +1140,19 @@ impl CustomOperation for GleifGetUmbrellaOp {
     fn rationale(&self) -> &'static str {
         "Single GLEIF API lookup for IS_SUBFUND_OF relationship"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifGetUmbrellaOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use crate::gleif::{UmbrellaEntity, UmbrellaResult};
 
-        let lei = match extract_string_opt(verb_call, "lei") {
+        let lei = match super::helpers::json_extract_string_opt(args, "lei") {
             Some(l) => l,
             None => {
-                let entity_id = verb_call
-                    .arguments
-                    .iter()
-                    .find(|a| a.key == "entity-id")
-                    .and_then(|a| {
-                        if let Some(name) = a.value.as_symbol() {
-                            ctx.resolve(name)
-                        } else {
-                            a.value.as_uuid()
-                        }
-                    })
+                let entity_id = super::helpers::json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
 
                 get_lei_for_entity(pool, entity_id)
@@ -1594,24 +1180,10 @@ impl GleifGetUmbrellaOp {
             }),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "subfund_lei": "MOCK",
-            "subfund_name": "Mock Fund",
-            "umbrella": null,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1634,48 +1206,19 @@ impl CustomOperation for GleifGetManagerOp {
     fn rationale(&self) -> &'static str {
         "Single GLEIF API lookup for IS_FUND-MANAGED_BY relationship"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifGetManagerOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use crate::gleif::{ManagerEntity, ManagerResult};
 
-        let lei = match extract_string_opt(verb_call, "lei") {
+        let lei = match super::helpers::json_extract_string_opt(args, "lei") {
             Some(l) => l,
             None => {
-                let entity_id = verb_call
-                    .arguments
-                    .iter()
-                    .find(|a| a.key == "entity-id")
-                    .and_then(|a| {
-                        if let Some(name) = a.value.as_symbol() {
-                            ctx.resolve(name)
-                        } else {
-                            a.value.as_uuid()
-                        }
-                    })
+                let entity_id = super::helpers::json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
 
                 get_lei_for_entity(pool, entity_id)
@@ -1704,24 +1247,10 @@ impl GleifGetManagerOp {
             }),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "fund_lei": "MOCK",
-            "fund_name": "Mock Fund",
-            "manager": null,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1743,48 +1272,19 @@ impl CustomOperation for GleifGetMasterFundOp {
     fn rationale(&self) -> &'static str {
         "Single GLEIF API lookup for IS_FEEDER_TO relationship"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifGetMasterFundOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use crate::gleif::{MasterEntity, MasterFundResult};
 
-        let lei = match extract_string_opt(verb_call, "lei") {
+        let lei = match super::helpers::json_extract_string_opt(args, "lei") {
             Some(l) => l,
             None => {
-                let entity_id = verb_call
-                    .arguments
-                    .iter()
-                    .find(|a| a.key == "entity-id")
-                    .and_then(|a| {
-                        if let Some(name) = a.value.as_symbol() {
-                            ctx.resolve(name)
-                        } else {
-                            a.value.as_uuid()
-                        }
-                    })
+                let entity_id = super::helpers::json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
 
                 get_lei_for_entity(pool, entity_id)
@@ -1812,24 +1312,10 @@ impl GleifGetMasterFundOp {
             }),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, serde_json::to_value(&result)?);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "feeder_lei": "MOCK",
-            "feeder_name": "Mock Feeder",
-            "master": null,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1851,35 +1337,16 @@ impl CustomOperation for GleifLookupByIsinOp {
     fn rationale(&self) -> &'static str {
         "Single GLEIF API lookup for ISIN to LEI mapping"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifLookupByIsinOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         use crate::gleif::IsinLookupResult;
 
-        let isin = extract_string_opt(verb_call, "isin")
+        let isin = super::helpers::json_extract_string_opt(args, "isin")
             .ok_or_else(|| anyhow::anyhow!(":isin required"))?;
 
         let client = GleifClient::new()?;
@@ -1901,23 +1368,10 @@ impl GleifLookupByIsinOp {
             }),
         };
 
-        if let Some(binding) = &verb_call.binding {
-            ctx.bind_json(binding, result.clone());
-        }
-
-        Ok(ExecutionResult::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "isin": "MOCK",
-            "lei": null,
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2001,41 +1455,22 @@ impl CustomOperation for GleifImportToClientGroupOp {
     fn rationale(&self) -> &'static str {
         "Imports GLEIF tree and populates client_group tables with role tagging"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifImportToClientGroupOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let group_id = super::helpers::get_required_uuid(verb_call, "group-id")?;
-        let root_lei = extract_string_opt(verb_call, "root-lei")
+        let group_id = super::helpers::json_get_required_uuid(args, "group-id")?;
+        let root_lei = super::helpers::json_extract_string_opt(args, "root-lei")
             .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
-        let max_depth = extract_int_opt(verb_call, "max-depth").unwrap_or(3) as usize;
+        let max_depth = super::helpers::json_extract_int_opt(args, "max-depth").unwrap_or(3) as usize;
 
         // New: fund inclusion options
-        let include_funds = extract_bool_opt(verb_call, "include-funds").unwrap_or(false);
+        let include_funds = super::helpers::json_extract_bool_opt(args, "include-funds").unwrap_or(false);
         let max_funds_per_manco =
-            extract_int_opt(verb_call, "max-funds-per-manco").map(|v| v as usize);
+            super::helpers::json_extract_int_opt(args, "max-funds-per-manco").map(|v| v as usize);
 
         // Start discovery status
         sqlx::query!(
@@ -2431,7 +1866,7 @@ impl GleifImportToClientGroupOp {
         });
 
         // Log research action if decision-id provided
-        if let Some(decision_id) = extract_uuid_opt(verb_call, _ctx, "decision-id") {
+        if let Some(decision_id) = super::helpers::json_extract_uuid_opt(args, ctx, "decision-id") {
             log_research_action(
                 pool,
                 decision_id,
@@ -2443,18 +1878,10 @@ impl GleifImportToClientGroupOp {
             .await?;
         }
 
-        Ok(ExecutionResult::Record(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for gleif.import-to-client-group"
-        ))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2479,58 +1906,32 @@ impl CustomOperation for GleifLookupOp {
     fn rationale(&self) -> &'static str {
         "Consolidated GLEIF relationship lookup — dispatches by target-type"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl GleifLookupOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let target_type = extract_string_opt(verb_call, "target-type")
+        let target_type = super::helpers::json_extract_string_opt(args, "target-type")
             .ok_or_else(|| anyhow::anyhow!(":target-type required (record|parent|children|manager|managed-funds|master-fund|umbrella|isin)"))?;
 
         match target_type.as_str() {
-            "record" => GleifGetRecordOp.execute(verb_call, ctx, pool).await,
-            "parent" => GleifGetParentOp.execute(verb_call, ctx, pool).await,
-            "children" => GleifGetChildrenOp.execute(verb_call, ctx, pool).await,
-            "manager" => GleifGetManagerOp.execute(verb_call, ctx, pool).await,
-            "managed-funds" => GleifGetManagedFundsOp.execute(verb_call, ctx, pool).await,
-            "master-fund" => GleifGetMasterFundOp.execute(verb_call, ctx, pool).await,
-            "umbrella" => GleifGetUmbrellaOp.execute(verb_call, ctx, pool).await,
-            "isin" => GleifLookupByIsinOp.execute(verb_call, ctx, pool).await,
+            "record" => GleifGetRecordOp.execute_json(args, ctx, pool).await,
+            "parent" => GleifGetParentOp.execute_json(args, ctx, pool).await,
+            "children" => GleifGetChildrenOp.execute_json(args, ctx, pool).await,
+            "manager" => GleifGetManagerOp.execute_json(args, ctx, pool).await,
+            "managed-funds" => GleifGetManagedFundsOp.execute_json(args, ctx, pool).await,
+            "master-fund" => GleifGetMasterFundOp.execute_json(args, ctx, pool).await,
+            "umbrella" => GleifGetUmbrellaOp.execute_json(args, ctx, pool).await,
+            "isin" => GleifLookupByIsinOp.execute_json(args, ctx, pool).await,
             other => Err(anyhow::anyhow!(
                 "Unknown GLEIF lookup target-type '{}'. Valid: record, parent, children, manager, managed-funds, master-fund, umbrella, isin",
                 other
             )),
         }
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
-

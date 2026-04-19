@@ -10,9 +10,8 @@ use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
+use super::helpers::{json_extract_int_opt, json_extract_string_opt};
 use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 use crate::sem_reg::derivation_spec::{
     DerivationExpression, DerivationInput, DerivationSpecBody, FreshnessRule, NullSemantics,
 };
@@ -45,39 +44,15 @@ impl CustomOperation for AttributeListSourcesOp {
     fn rationale(&self) -> &'static str {
         "Requires join across attribute registry and document links with proof strength ordering"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
+    #[governed_query(verb = "attribute.list-sources", skip_principal_check = true)]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeListSourcesOp {
-    #[cfg(feature = "database")]
-    #[governed_query(verb = "attribute.list-sources", skip_principal_check = true)]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let attr_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "attribute")
-            .and_then(|a| a.value.as_string())
+        let attr_id = json_extract_string_opt(args, "attribute")
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
         let rows = sqlx::query!(
@@ -118,20 +93,15 @@ impl AttributeListSourcesOp {
             })
             .collect();
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "attribute": attr_id,
             "source_count": sources.len(),
             "sources": sources
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"sources": []})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -154,38 +124,14 @@ impl CustomOperation for AttributeListSinksOp {
     fn rationale(&self) -> &'static str {
         "Requires join across attribute registry and document links for sink relationships"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeListSinksOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let attr_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "attribute")
-            .and_then(|a| a.value.as_string())
+        let attr_id = json_extract_string_opt(args, "attribute")
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
         let rows = sqlx::query!(
@@ -215,20 +161,15 @@ impl AttributeListSinksOp {
             })
             .collect();
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "attribute": attr_id,
             "sink_count": sinks.len(),
             "sinks": sinks
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"sinks": []})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -252,38 +193,14 @@ impl CustomOperation for AttributeTraceLineageOp {
     fn rationale(&self) -> &'static str {
         "Requires multiple queries to build complete attribute lineage including sources, sinks, and resource requirements"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeTraceLineageOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let attr_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "attribute")
-            .and_then(|a| a.value.as_string())
+        let attr_id = json_extract_string_opt(args, "attribute")
             .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
 
         // Get attribute details
@@ -294,7 +211,7 @@ impl AttributeTraceLineageOp {
             WHERE id = $1
             "#,
         )
-        .bind(attr_id)
+        .bind(&attr_id)
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Attribute not found: {}", attr_id))?;
@@ -393,7 +310,7 @@ impl AttributeTraceLineageOp {
             .filter(|s| s.proof_strength.as_deref() == Some("PRIMARY"))
             .count();
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "attribute": {
                 "id": attr.get::<String, _>("id"),
                 "display_name": attr.get::<String, _>("display_name"),
@@ -425,18 +342,8 @@ impl AttributeTraceLineageOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({
-            "attribute": {},
-            "sources": {"count": 0, "documents": []},
-            "sinks": {"count": 0, "documents": []},
-            "required_by_resources": {"count": 0, "resources": []}
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -459,45 +366,17 @@ impl CustomOperation for AttributeListByDocumentOp {
     fn rationale(&self) -> &'static str {
         "Requires join across document types, links, and attribute registry"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeListByDocumentOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let doc_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "document-type")
-            .and_then(|a| a.value.as_string())
+        let doc_type = json_extract_string_opt(args, "document-type")
             .ok_or_else(|| anyhow::anyhow!("Missing document-type argument"))?;
 
-        let direction_filter = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "direction")
-            .and_then(|a| a.value.as_string());
+        let direction_filter = json_extract_string_opt(args, "direction");
 
         // Use single query with optional direction filter
         let rows = sqlx::query!(
@@ -544,7 +423,7 @@ impl AttributeListByDocumentOp {
             .filter(|r| r.direction == "SINK" || r.direction == "BOTH")
             .count();
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "document_type": doc_type,
             "attribute_count": attributes.len(),
             "source_count": source_count,
@@ -553,13 +432,8 @@ impl AttributeListByDocumentOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"attributes": []})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -582,38 +456,14 @@ impl CustomOperation for AttributeCheckCoverageOp {
     fn rationale(&self) -> &'static str {
         "Requires comparison of required_attributes JSONB against actual document_attribute_links mappings"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeCheckCoverageOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let doc_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "document-type")
-            .and_then(|a| a.value.as_string())
+        let doc_type = json_extract_string_opt(args, "document-type")
             .ok_or_else(|| anyhow::anyhow!("Missing document-type argument"))?;
 
         // Get document type with required_attributes
@@ -672,7 +522,7 @@ impl AttributeCheckCoverageOp {
             100.0
         };
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "document_type": doc_type,
             "display_name": doc.display_name,
             "linked_attributes": linked_set.len(),
@@ -692,13 +542,8 @@ impl AttributeCheckCoverageOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"status": "UNKNOWN"})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -720,46 +565,19 @@ impl CustomOperation for DocumentListAttributesOp {
     fn rationale(&self) -> &'static str {
         "Requires join across document types, links, and attribute registry"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
+        // Delegate to AttributeListByDocumentOp
+        AttributeListByDocumentOp.execute_json(args, ctx, pool).await
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl DocumentListAttributesOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Delegate to AttributeListByDocumentOp
-        AttributeListByDocumentOp
-            .execute(verb_call, ctx, pool)
-            .await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"attributes": []})))
     }
 }
 
@@ -782,59 +600,17 @@ impl CustomOperation for DocumentCheckExtractionCoverageOp {
     fn rationale(&self) -> &'static str {
         "Requires complex analysis of entity requirements vs available documents and their extraction capabilities"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl DocumentCheckExtractionCoverageOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        let entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
-
-        let cbu_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
+        let entity_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "entity-id")?;
+        let cbu_id: Option<Uuid> = super::helpers::json_extract_uuid_opt(args, ctx, "cbu-id");
 
         // Get documents cataloged for this entity
         let documents = sqlx::query!(
@@ -917,7 +693,7 @@ impl DocumentCheckExtractionCoverageOp {
             .iter()
             .any(|a| a.is_authoritative.unwrap_or(false));
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "entity_id": entity_id,
             "entity_type": entity.entity_type,
             "available_documents": {
@@ -938,16 +714,8 @@ impl DocumentCheckExtractionCoverageOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({
-            "available_documents": {"count": 0},
-            "sourceable_attributes": {"count": 0}
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -969,43 +737,31 @@ struct AttributeSnapshotContext {
 }
 
 #[cfg(feature = "database")]
-fn string_arg(verb_call: &VerbCall, name: &str) -> Result<String> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|arg| arg.key == name)
-        .and_then(|arg| arg.value.as_string())
-        .map(str::to_owned)
-        .ok_or_else(|| anyhow!("Missing {} argument", name))
+fn string_arg(args: &serde_json::Value, name: &str) -> Result<String> {
+    json_extract_string_opt(args, name).ok_or_else(|| anyhow!("Missing {} argument", name))
 }
 
 #[cfg(feature = "database")]
-fn optional_string_arg(verb_call: &VerbCall, name: &str) -> Option<String> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|arg| arg.key == name)
-        .and_then(|arg| arg.value.as_string())
-        .map(str::to_owned)
+fn optional_string_arg(args: &serde_json::Value, name: &str) -> Option<String> {
+    json_extract_string_opt(args, name)
 }
 
 #[cfg(feature = "database")]
-fn optional_int_arg(verb_call: &VerbCall, name: &str) -> Option<i64> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|arg| arg.key == name)
-        .and_then(|arg| arg.value.as_integer())
+fn optional_int_arg(args: &serde_json::Value, name: &str) -> Option<i64> {
+    json_extract_int_opt(args, name)
 }
 
 #[cfg(feature = "database")]
-fn parse_json_arg(verb_call: &VerbCall, name: &str) -> Result<Option<serde_json::Value>> {
-    let Some(raw) = optional_string_arg(verb_call, name) else {
-        return Ok(None);
-    };
-    let value = serde_json::from_str(&raw)
-        .with_context(|| format!("Failed to parse JSON argument {}", name))?;
-    Ok(Some(value))
+fn parse_json_arg(args: &serde_json::Value, name: &str) -> Result<Option<serde_json::Value>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::String(s)) => {
+            let value = serde_json::from_str(s)
+                .with_context(|| format!("Failed to parse JSON argument {}", name))?;
+            Ok(Some(value))
+        }
+        Some(v) => Ok(Some(v.clone())),
+    }
 }
 
 #[cfg(feature = "database")]
@@ -1547,49 +1303,31 @@ impl CustomOperation for AttributeDefineGovernedOp {
     fn rationale(&self) -> &'static str {
         "Dual-writes operational attribute_registry and governed AttributeDef snapshots"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeDefineGovernedOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let raw_id = string_arg(verb_call, "id")?;
-        let display_name = string_arg(verb_call, "display-name")?;
-        let category = string_arg(verb_call, "category")?;
-        let value_type = string_arg(verb_call, "value-type")?;
-        let domain = optional_string_arg(verb_call, "domain");
+        let raw_id = string_arg(args, "id")?;
+        let display_name = string_arg(args, "display-name")?;
+        let category = string_arg(args, "category")?;
+        let value_type = string_arg(args, "value-type")?;
+        let domain = optional_string_arg(args, "domain");
         let semantic_id = normalize_attribute_id(&raw_id, domain.as_deref());
         let description = effective_description(
             &display_name,
-            optional_string_arg(verb_call, "semos-description"),
+            optional_string_arg(args, "semos-description"),
         );
         let evidence_grade = parse_evidence_grade(
-            optional_string_arg(verb_call, "evidence-grade"),
+            optional_string_arg(args, "evidence-grade"),
             EvidenceGrade::None,
         )?;
-        let validation_rules = parse_json_arg(verb_call, "validation-rules")?;
-        let applicability = parse_json_arg(verb_call, "applicability")?;
+        let validation_rules = parse_json_arg(args, "validation-rules")?;
+        let applicability = parse_json_arg(args, "applicability")?;
+
+        let audit_user = super::helpers::ext_get_string(ctx, "audit_user");
 
         // ── Step 1: Generate deterministic UUID (used as both registry uuid and SemOS object_id) ──
         let object_id = crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, &semantic_id);
@@ -1639,7 +1377,7 @@ impl AttributeDefineGovernedOp {
                 predecessor.as_ref(),
                 ObjectType::AttributeDef,
                 object_id,
-                ctx.audit_user.as_deref().unwrap_or("attribute.define"),
+                audit_user.as_deref().unwrap_or("attribute.define"),
                 if predecessor.is_some() {
                     ChangeType::NonBreaking
                 } else {
@@ -1665,16 +1403,11 @@ impl AttributeDefineGovernedOp {
 
         tx.commit().await?;
         ctx.bind("attribute", registry_uuid);
-        Ok(ExecutionResult::Uuid(registry_uuid))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(registry_uuid))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("attribute.define requires database"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1699,45 +1432,27 @@ impl CustomOperation for AttributeDefineInternalOp {
     fn rationale(&self) -> &'static str {
         "Lightweight internal attribute definition — operational tier, auto-approved"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeDefineInternalOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let raw_id = string_arg(verb_call, "id")?;
-        let display_name = string_arg(verb_call, "display-name")?;
-        let category = string_arg(verb_call, "category")?;
-        let value_type = string_arg(verb_call, "value-type")?;
-        let domain = optional_string_arg(verb_call, "domain");
+        let raw_id = string_arg(args, "id")?;
+        let display_name = string_arg(args, "display-name")?;
+        let category = string_arg(args, "category")?;
+        let value_type = string_arg(args, "value-type")?;
+        let domain = optional_string_arg(args, "domain");
         let semantic_id = normalize_attribute_id(&raw_id, domain.as_deref());
         let description = effective_description(
             &display_name,
-            optional_string_arg(verb_call, "semos-description"),
+            optional_string_arg(args, "semos-description"),
         );
-        let validation_rules = parse_json_arg(verb_call, "validation-rules")?;
-        let applicability = parse_json_arg(verb_call, "applicability")?;
+        let validation_rules = parse_json_arg(args, "validation-rules")?;
+        let applicability = parse_json_arg(args, "applicability")?;
+
+        let audit_user = super::helpers::ext_get_string(ctx, "audit_user");
 
         let object_id = crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, &semantic_id);
 
@@ -1783,7 +1498,7 @@ impl AttributeDefineInternalOp {
                 predecessor.as_ref(),
                 ObjectType::AttributeDef,
                 object_id,
-                ctx.audit_user
+                audit_user
                     .as_deref()
                     .unwrap_or("attribute.define-internal"),
                 if predecessor.is_some() {
@@ -1814,16 +1529,11 @@ impl AttributeDefineInternalOp {
 
         tx.commit().await?;
         ctx.bind("attribute", registry_uuid);
-        Ok(ExecutionResult::Uuid(registry_uuid))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(registry_uuid))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("attribute.define-internal requires database"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1848,34 +1558,16 @@ impl CustomOperation for AttributeUpdateInternalOp {
     fn rationale(&self) -> &'static str {
         "Lightweight metadata update for internal attributes — no changeset ceremony"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let id = string_arg(args, "id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeUpdateInternalOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let id = string_arg(verb_call, "id")?;
+        let audit_user = super::helpers::ext_get_string(ctx, "audit_user");
 
         // ── Step 1: Load active attribute context ──
         let attr_ctx = load_active_attribute_context(pool, &id).await?;
@@ -1896,19 +1588,19 @@ impl AttributeUpdateInternalOp {
         }
 
         // ── Step 3: Merge provided fields into existing body ──
-        if let Ok(Some(val)) = parse_json_arg(verb_call, "validation-rules") {
+        if let Ok(Some(val)) = parse_json_arg(args, "validation-rules") {
             body.validation_rules = Some(val);
         }
-        if let Ok(Some(val)) = parse_json_arg(verb_call, "applicability") {
+        if let Ok(Some(val)) = parse_json_arg(args, "applicability") {
             body.applicability = Some(val);
         }
-        if let Some(v) = optional_string_arg(verb_call, "is-required") {
+        if let Some(v) = optional_string_arg(args, "is-required") {
             body.is_required = Some(v.parse::<bool>().unwrap_or(false));
         }
-        if let Some(v) = optional_string_arg(verb_call, "default-value") {
+        if let Some(v) = optional_string_arg(args, "default-value") {
             body.default_value = Some(v);
         }
-        if let Some(v) = optional_string_arg(verb_call, "group-id") {
+        if let Some(v) = optional_string_arg(args, "group-id") {
             body.group_id = Some(v);
         }
 
@@ -1916,7 +1608,7 @@ impl AttributeUpdateInternalOp {
 
         // ── Step 4: Check if anything actually changed ──
         if hashes_match(Some(active_snapshot), &definition) {
-            return Ok(ExecutionResult::Record(serde_json::json!({
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
                 "status": "unchanged",
                 "attribute_id": attr_ctx.registry_id,
                 "snapshot_id": active_snapshot.snapshot_id,
@@ -1928,7 +1620,7 @@ impl AttributeUpdateInternalOp {
             Some(active_snapshot),
             ObjectType::AttributeDef,
             attr_ctx.registry_uuid,
-            ctx.audit_user
+            audit_user
                 .as_deref()
                 .unwrap_or("attribute.update-internal"),
             ChangeType::NonBreaking,
@@ -1956,7 +1648,7 @@ impl AttributeUpdateInternalOp {
 
         tx.commit().await?;
 
-        Ok(ExecutionResult::Record(serde_json::json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
             "status": "updated",
             "attribute_id": attr_ctx.registry_id,
             "snapshot_id": snapshot_id,
@@ -1964,13 +1656,8 @@ impl AttributeUpdateInternalOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("attribute.update-internal requires database"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1992,53 +1679,35 @@ impl CustomOperation for AttributeDefineDerivedOp {
     fn rationale(&self) -> &'static str {
         "Atomically publishes coupled AttributeDef and DerivationSpec snapshots"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeDefineDerivedOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let raw_id = string_arg(verb_call, "id")?;
-        let domain = Some(string_arg(verb_call, "domain")?);
+        let raw_id = string_arg(args, "id")?;
+        let domain = Some(string_arg(args, "domain")?);
         let semantic_id = normalize_attribute_id(&raw_id, domain.as_deref());
-        let display_name = string_arg(verb_call, "display-name")?;
-        let category = string_arg(verb_call, "category")?;
-        let value_type = string_arg(verb_call, "value-type")?;
+        let display_name = string_arg(args, "display-name")?;
+        let category = string_arg(args, "category")?;
+        let value_type = string_arg(args, "value-type")?;
         let description = effective_description(
             &display_name,
-            optional_string_arg(verb_call, "semos-description"),
+            optional_string_arg(args, "semos-description"),
         );
         let evidence_grade = parse_evidence_grade(
-            optional_string_arg(verb_call, "evidence-grade"),
+            optional_string_arg(args, "evidence-grade"),
             EvidenceGrade::Prohibited,
         )?;
-        let derivation_function = string_arg(verb_call, "derivation-function")?;
-        let derivation_inputs = parse_json_arg(verb_call, "derivation-inputs")?
+        let derivation_function = string_arg(args, "derivation-function")?;
+        let derivation_inputs = parse_json_arg(args, "derivation-inputs")?
             .ok_or_else(|| anyhow!("Missing derivation-inputs argument"))?;
         let null_semantics =
-            parse_null_semantics(optional_string_arg(verb_call, "null-semantics"))?;
-        let freshness_seconds = optional_int_arg(verb_call, "freshness-seconds");
+            parse_null_semantics(optional_string_arg(args, "null-semantics"))?;
+        let freshness_seconds = optional_int_arg(args, "freshness-seconds");
+
+        let audit_user = super::helpers::ext_get_string(ctx, "audit_user");
 
         // ── Step 1: Generate deterministic UUIDs ──
         let object_id = crate::sem_reg::ids::object_id_for(ObjectType::AttributeDef, &semantic_id);
@@ -2097,7 +1766,7 @@ impl AttributeDefineDerivedOp {
                 attr_predecessor.as_ref(),
                 ObjectType::AttributeDef,
                 object_id,
-                ctx.audit_user
+                audit_user
                     .as_deref()
                     .unwrap_or("attribute.define-derived"),
                 if attr_predecessor.is_some() {
@@ -2128,7 +1797,7 @@ impl AttributeDefineDerivedOp {
                 derivation_predecessor.as_ref(),
                 ObjectType::DerivationSpec,
                 derivation_object_id,
-                ctx.audit_user
+                audit_user
                     .as_deref()
                     .unwrap_or("attribute.define-derived"),
                 if derivation_predecessor.is_some() {
@@ -2166,16 +1835,11 @@ impl AttributeDefineDerivedOp {
 
         tx.commit().await?;
         ctx.bind("attribute", registry_uuid);
-        Ok(ExecutionResult::Uuid(registry_uuid))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(registry_uuid))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("attribute.define-derived requires database"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2197,36 +1861,16 @@ impl CustomOperation for AttributeSetEvidenceGradeOp {
     fn rationale(&self) -> &'static str {
         "Publishes a new governed AttributeDef version and keeps a linked DerivationSpec in sync"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeSetEvidenceGradeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let reference = string_arg(verb_call, "id")?;
+        let reference = string_arg(args, "id")?;
         let new_grade = parse_evidence_grade(
-            Some(string_arg(verb_call, "evidence-grade")?),
+            Some(string_arg(args, "evidence-grade")?),
             EvidenceGrade::None,
         )?;
         let context = load_active_attribute_context(pool, &reference).await?;
@@ -2236,7 +1880,7 @@ impl AttributeSetEvidenceGradeOp {
             .ok_or_else(|| anyhow!("No active AttributeDef snapshot found for {}", context.fqn))?;
         let mut body: AttributeDefBody = active.parse_definition()?;
         if body.evidence_grade == new_grade {
-            return Ok(ExecutionResult::Record(json!({
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
                 "attribute": context.registry_id,
                 "snapshot_id": active.snapshot_id,
                 "evidence_grade": new_grade.to_string(),
@@ -2314,7 +1958,7 @@ impl AttributeSetEvidenceGradeOp {
 
         tx.commit().await?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "attribute": context.registry_id,
             "snapshot_id": attr_snapshot_id,
             "evidence_grade": new_grade.to_string(),
@@ -2322,13 +1966,8 @@ impl AttributeSetEvidenceGradeOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("attribute.set-evidence-grade requires database"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2350,36 +1989,16 @@ impl CustomOperation for AttributeDeprecateOp {
     fn rationale(&self) -> &'static str {
         "Soft-deprecates governed snapshots without deleting operational attribute rows"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeDeprecateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let reference = string_arg(verb_call, "id")?;
-        let reason = string_arg(verb_call, "reason")?;
-        let replacement = optional_string_arg(verb_call, "replacement");
+        let reference = string_arg(args, "id")?;
+        let reason = string_arg(args, "reason")?;
+        let replacement = optional_string_arg(args, "replacement");
         let context = load_active_attribute_context(pool, &reference).await?;
         let active = context
             .active_snapshot
@@ -2458,20 +2077,15 @@ impl AttributeDeprecateOp {
 
         tx.commit().await?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "attribute": context.registry_id,
             "snapshot_id": attr_snapshot_id,
             "deprecated": true,
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("attribute.deprecate requires database"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2493,34 +2107,14 @@ impl CustomOperation for AttributeInspectOp {
     fn rationale(&self) -> &'static str {
         "Aggregates operational registry state, governed snapshots, derivation metadata, and usage counts"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeInspectOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let reference = string_arg(verb_call, "id")?;
+        let reference = string_arg(args, "id")?;
         let context = load_active_attribute_context(pool, &reference).await?;
         let row = sqlx::query(
             r#"
@@ -2556,7 +2150,7 @@ impl AttributeInspectOp {
             })
             .unwrap_or_else(|| json!(null));
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "identity": {
                 "registry_id": row.get::<String, _>("registry_id"),
                 "fqn": row.get::<String, _>("fqn"),
@@ -2585,13 +2179,8 @@ impl AttributeInspectOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("attribute.inspect requires database"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2611,37 +2200,17 @@ impl CustomOperation for DerivationRecomputeStaleOp {
     fn rationale(&self) -> &'static str {
         "Triggers batch recomputation of stale derived values"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl DerivationRecomputeStaleOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let limit = optional_int_arg(verb_call, "limit").unwrap_or(100);
+        let limit = optional_int_arg(args, "limit").unwrap_or(100);
         let engine = crate::service_resources::PopulationEngine::new(pool);
         let result = engine.recompute_stale_batch(limit).await?;
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "picked": result.picked,
             "recomputed": result.recomputed,
             "skipped_already_current": result.skipped_already_current,
@@ -2650,13 +2219,8 @@ impl DerivationRecomputeStaleOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("derivation.recompute-stale requires database"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2676,34 +2240,16 @@ impl CustomOperation for AttributeBridgeToSemosOp {
     fn rationale(&self) -> &'static str {
         "Bulk-publishes SemOS snapshots for ungoverned store attributes"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let limit = optional_int_arg(args, "limit").unwrap_or(100);
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl AttributeBridgeToSemosOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let limit = optional_int_arg(verb_call, "limit").unwrap_or(100);
+        let audit_user = super::helpers::ext_get_string(ctx, "audit_user");
 
         // Find store attributes without SemOS snapshots
         let rows: Vec<(
@@ -2788,7 +2334,7 @@ impl AttributeBridgeToSemosOp {
                 None,
                 ObjectType::AttributeDef,
                 object_id,
-                ctx.audit_user
+                audit_user
                     .as_deref()
                     .unwrap_or("attribute.bridge-to-semos"),
                 ChangeType::Created,
@@ -2815,7 +2361,7 @@ impl AttributeBridgeToSemosOp {
             }
         }
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "total_candidates": total,
             "bridged": bridged,
             "already_governed": total as u64 - bridged - failed,
@@ -2823,13 +2369,8 @@ impl AttributeBridgeToSemosOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("attribute.bridge-to-semos requires database"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
