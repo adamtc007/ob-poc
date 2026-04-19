@@ -19,9 +19,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::{CustomOperation, ExecutionResult};
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::ExecutionContext;
+use super::CustomOperation;
 use crate::trading_profile::{
     ast_db, document_ops, resolve::resolve_entity_ref, BookingRule, IsdaAgreementConfig,
     MaterializationResult, StandingInstruction, TradingProfileDocument, TradingProfileImport,
@@ -33,55 +31,18 @@ use ob_poc_types::trading_matrix::{
 #[cfg(feature = "database")]
 use sqlx::{PgPool, Row};
 
-fn forward_component_verb_call(verb_call: &VerbCall, verb: &str) -> VerbCall {
-    let arguments = verb_call
-        .arguments
-        .iter()
-        .filter(|arg| arg.key != "component-type")
-        .cloned()
-        .collect();
-
-    VerbCall {
-        domain: verb_call.domain.clone(),
-        verb: verb.to_string(),
-        arguments,
-        binding: verb_call.binding.clone(),
-        span: verb_call.span,
-    }
-}
-
-fn resolve_add_component_verb(component_type: &str) -> Result<&'static str> {
-    match component_type {
-        "instrument-class" => Ok("add-instrument-class"),
-        "market" => Ok("add-market"),
-        "allowed-currency" => Ok("add-allowed-currency"),
-        "standing-instruction" => Ok("add-standing-instruction"),
-        "booking-rule" => Ok("add-booking-rule"),
-        "isda-config" => Ok("add-isda-config"),
-        "isda-coverage" => Ok("add-isda-coverage"),
-        "csa-config" => Ok("add-csa-config"),
-        "csa-collateral" => Ok("add-csa-collateral"),
-        "im-mandate" => Ok("add-im-mandate"),
-        other => Err(anyhow::anyhow!(
-            "Unsupported trading-profile add-component type: {}",
-            other
-        )),
-    }
-}
-
-fn resolve_remove_component_verb(component_type: &str) -> Result<&'static str> {
-    match component_type {
-        "instrument-class" => Ok("remove-instrument-class"),
-        "market" => Ok("remove-market"),
-        "standing-instruction" => Ok("remove-standing-instruction"),
-        "booking-rule" => Ok("remove-booking-rule"),
-        "isda-config" => Ok("remove-isda-config"),
-        "csa-config" => Ok("remove-csa-config"),
-        "im-mandate" => Ok("remove-im-mandate"),
-        other => Err(anyhow::anyhow!(
-            "Unsupported trading-profile remove-component type: {}",
-            other
-        )),
+/// Build a JSON args value for delegation to a sibling op, stripping the given key.
+fn forward_component_args(args: &serde_json::Value, strip_key: &str) -> serde_json::Value {
+    match args.as_object() {
+        Some(map) => {
+            let forwarded: serde_json::Map<String, serde_json::Value> = map
+                .iter()
+                .filter(|(k, _)| k.as_str() != strip_key)
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            serde_json::Value::Object(forwarded)
+        }
+        None => args.clone(),
     }
 }
 
@@ -114,56 +75,19 @@ impl CustomOperation for TradingProfileImportOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileImportOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use sha2::{Digest, Sha256};
 
         // Get CBU ID (required)
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+        let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         // Get file path or inline document
-        let file_path = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "file-path")
-            .and_then(|a| a.value.as_string());
-
-        // For now, only file-based import is supported
-        let file_path = file_path.ok_or_else(|| {
-            anyhow::anyhow!("Missing :file-path argument. File-based import is required.")
-        })?;
+        let file_path = super::helpers::json_extract_string_opt(args, "file-path")
+            .ok_or_else(|| {
+                anyhow::anyhow!("Missing :file-path argument. File-based import is required.")
+            })?;
 
         // Read from file
-        let content = std::fs::read_to_string(file_path)
+        let content = std::fs::read_to_string(&file_path)
             .map_err(|e| anyhow::anyhow!("Failed to read file {}: {}", file_path, e))?;
 
         // Parse YAML (works for JSON too)
@@ -178,26 +102,12 @@ impl TradingProfileImportOp {
         let hash = format!("{:x}", hasher.finalize());
 
         // Get optional args
-        let version: i32 = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "version")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(1) as i32;
+        let version: i32 = super::helpers::json_extract_int_opt(args, "version").unwrap_or(1) as i32;
 
-        let status_str = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "status")
-            .and_then(|a| a.value.as_string())
-            .unwrap_or("DRAFT");
+        let status_str = super::helpers::json_extract_string_opt(args, "status")
+            .unwrap_or_else(|| "DRAFT".to_string());
 
-        let notes = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let notes = super::helpers::json_extract_string_opt(args, "notes");
 
         // Convert to JSON for storage
         let document_json = serde_json::to_value(&document)?;
@@ -217,7 +127,7 @@ impl TradingProfileImportOp {
         .bind(profile_id)
         .bind(cbu_id)
         .bind(version)
-        .bind(status_str)
+        .bind(&status_str)
         .bind(&document_json)
         .bind(&hash)
         .bind(&notes)
@@ -226,16 +136,11 @@ impl TradingProfileImportOp {
 
         ctx.bind("profile", profile_id);
 
-        Ok(ExecutionResult::Uuid(profile_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(profile_id))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -266,38 +171,7 @@ impl CustomOperation for TradingProfileGetActiveOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileGetActiveOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+        let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         let row = sqlx::query!(
             r#"SELECT profile_id, version, document, document_hash, created_at, activated_at
@@ -310,7 +184,7 @@ impl TradingProfileGetActiveOp {
         .await?;
 
         match row {
-            Some(r) => Ok(ExecutionResult::Record(json!({
+            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
                 "profile_id": r.profile_id,
                 "version": r.version,
                 "document": r.document,
@@ -318,19 +192,14 @@ impl TradingProfileGetActiveOp {
                 "created_at": r.created_at,
                 "activated_at": r.activated_at
             }))),
-            None => Ok(ExecutionResult::Record(json!({
+            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
                 "error": "No active trading profile found for CBU"
             }))),
         }
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -361,45 +230,9 @@ impl CustomOperation for TradingProfileActivateOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileActivateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
-
-        let activated_by = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "activated-by")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let activated_by = super::helpers::json_extract_string_opt(args, "activated-by");
 
         // Get cbu_id for this profile
         let cbu_id: Uuid = sqlx::query_scalar(
@@ -434,20 +267,15 @@ impl TradingProfileActivateOp {
 
         tx.commit().await?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "status": "ACTIVE",
             "activated_at": chrono::Utc::now()
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -485,67 +313,15 @@ impl CustomOperation for TradingProfileMaterializeOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileMaterializeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         let start = std::time::Instant::now();
 
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-        let dry_run = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "dry-run")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(false);
+        let dry_run = super::helpers::json_extract_bool_opt(args, "dry-run").unwrap_or(false);
 
-        let force = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "force")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(false);
+        let force = super::helpers::json_extract_bool_opt(args, "force").unwrap_or(false);
 
-        let sections: Vec<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "sections")
-            .and_then(|a| {
-                // Convert list of AstNodes to strings
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            })
+        let sections: Vec<String> = super::helpers::json_extract_string_list_opt(args, "sections")
             .unwrap_or_else(|| vec!["universe".into(), "ssis".into(), "booking_rules".into()]);
 
         // Load the profile document
@@ -598,7 +374,7 @@ impl TradingProfileMaterializeOp {
                 );
             }
             result.duration_ms = start.elapsed().as_millis() as i64;
-            return Ok(ExecutionResult::Record(serde_json::to_value(&result)?));
+            return Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?));
         }
 
         // Start transaction
@@ -756,16 +532,11 @@ impl TradingProfileMaterializeOp {
         .execute(pool)
         .await?;
 
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1457,46 +1228,12 @@ impl CustomOperation for TradingProfileCreateDraftOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileCreateDraftOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use crate::trading_profile::ast_db;
 
         // Support both CBU-level instances (cbu-id) and group-level templates (group-id)
-        let cbu_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
+        let cbu_id: Option<Uuid> = super::helpers::json_extract_uuid_opt(args, ctx, "cbu-id");
 
-        let group_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "group-id")
-            .and_then(|a| a.value.as_uuid());
+        let group_id: Option<Uuid> = super::helpers::json_extract_uuid_opt(args, ctx, "group-id");
 
         let is_template = cbu_id.is_none() && group_id.is_some();
 
@@ -1504,12 +1241,7 @@ impl TradingProfileCreateDraftOp {
             anyhow::bail!("Either cbu-id or group-id is required");
         }
 
-        let notes = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let notes = super::helpers::json_extract_string_opt(args, "notes");
 
         // For templates: insert directly with group_id and is_template=true
         // For CBU instances: use existing create_draft path
@@ -1548,16 +1280,11 @@ impl TradingProfileCreateDraftOp {
 
         ctx.bind("profile", profile_id);
 
-        Ok(ExecutionResult::Uuid(profile_id))
+        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(profile_id))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1589,78 +1316,58 @@ impl CustomOperation for TradingProfileAddComponentOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let component_type = super::helpers::json_extract_string(args, "component-type")?;
+        let forwarded = forward_component_args(args, "component-type");
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddComponentOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let component_type = verb_call
-            .get_value("component-type")
-            .and_then(|value| value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing component-type argument"))?;
-        let forwarded =
-            forward_component_verb_call(verb_call, resolve_add_component_verb(component_type)?);
-
-        match component_type {
+        match component_type.as_str() {
             "instrument-class" => {
                 TradingProfileAddInstrumentClassOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "market" => {
                 TradingProfileAddMarketOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "allowed-currency" => {
                 TradingProfileAddAllowedCurrencyOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
-            "standing-instruction" => TradingProfileAddSsiOp.execute(&forwarded, ctx, pool).await,
+            "standing-instruction" => {
+                TradingProfileAddSsiOp
+                    .execute_json(&forwarded, ctx, pool)
+                    .await
+            }
             "booking-rule" => {
                 TradingProfileAddBookingRuleOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "isda-config" => {
                 TradingProfileAddIsdaConfigOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "isda-coverage" => {
                 TradingProfileAddIsdaCoverageOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "csa-config" => {
                 TradingProfileAddCsaConfigOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "csa-collateral" => {
                 TradingProfileAddCsaCollateralOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "im-mandate" => {
                 TradingProfileAddImMandateOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             other => Err(anyhow::anyhow!(
@@ -1670,55 +1377,8 @@ impl TradingProfileAddComponentOp {
         }
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let component_type = verb_call
-            .get_value("component-type")
-            .and_then(|value| value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing component-type argument"))?;
-        let forwarded =
-            forward_component_verb_call(verb_call, resolve_add_component_verb(component_type)?);
-
-        match component_type {
-            "instrument-class" => {
-                TradingProfileAddInstrumentClassOp
-                    .execute(&forwarded, ctx)
-                    .await
-            }
-            "market" => TradingProfileAddMarketOp.execute(&forwarded, ctx).await,
-            "allowed-currency" => {
-                TradingProfileAddAllowedCurrencyOp
-                    .execute(&forwarded, ctx)
-                    .await
-            }
-            "standing-instruction" => TradingProfileAddSsiOp.execute(&forwarded, ctx).await,
-            "booking-rule" => {
-                TradingProfileAddBookingRuleOp
-                    .execute(&forwarded, ctx)
-                    .await
-            }
-            "isda-config" => TradingProfileAddIsdaConfigOp.execute(&forwarded, ctx).await,
-            "isda-coverage" => {
-                TradingProfileAddIsdaCoverageOp
-                    .execute(&forwarded, ctx)
-                    .await
-            }
-            "csa-config" => TradingProfileAddCsaConfigOp.execute(&forwarded, ctx).await,
-            "csa-collateral" => {
-                TradingProfileAddCsaCollateralOp
-                    .execute(&forwarded, ctx)
-                    .await
-            }
-            "im-mandate" => TradingProfileAddImMandateOp.execute(&forwarded, ctx).await,
-            other => Err(anyhow::anyhow!(
-                "Unsupported trading-profile add-component type: {}",
-                other
-            )),
-        }
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1746,67 +1406,43 @@ impl CustomOperation for TradingProfileRemoveComponentOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let component_type = super::helpers::json_extract_string(args, "component-type")?;
+        let forwarded = forward_component_args(args, "component-type");
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileRemoveComponentOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let component_type = verb_call
-            .get_value("component-type")
-            .and_then(|value| value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing component-type argument"))?;
-        let forwarded =
-            forward_component_verb_call(verb_call, resolve_remove_component_verb(component_type)?);
-
-        match component_type {
+        match component_type.as_str() {
             "instrument-class" => {
                 TradingProfileRemoveInstrumentClassOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "market" => {
                 TradingProfileRemoveMarketOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "standing-instruction" => {
                 TradingProfileRemoveSsiOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "booking-rule" => {
                 TradingProfileRemoveBookingRuleOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "isda-config" => {
                 TradingProfileRemoveIsdaConfigOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "csa-config" => {
                 TradingProfileRemoveCsaConfigOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             "im-mandate" => {
                 TradingProfileRemoveImMandateOp
-                    .execute(&forwarded, ctx, pool)
+                    .execute_json(&forwarded, ctx, pool)
                     .await
             }
             other => Err(anyhow::anyhow!(
@@ -1816,52 +1452,8 @@ impl TradingProfileRemoveComponentOp {
         }
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        let component_type = verb_call
-            .get_value("component-type")
-            .and_then(|value| value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing component-type argument"))?;
-        let forwarded =
-            forward_component_verb_call(verb_call, resolve_remove_component_verb(component_type)?);
-
-        match component_type {
-            "instrument-class" => {
-                TradingProfileRemoveInstrumentClassOp
-                    .execute(&forwarded, ctx)
-                    .await
-            }
-            "market" => TradingProfileRemoveMarketOp.execute(&forwarded, ctx).await,
-            "standing-instruction" => TradingProfileRemoveSsiOp.execute(&forwarded, ctx).await,
-            "booking-rule" => {
-                TradingProfileRemoveBookingRuleOp
-                    .execute(&forwarded, ctx)
-                    .await
-            }
-            "isda-config" => {
-                TradingProfileRemoveIsdaConfigOp
-                    .execute(&forwarded, ctx)
-                    .await
-            }
-            "csa-config" => {
-                TradingProfileRemoveCsaConfigOp
-                    .execute(&forwarded, ctx)
-                    .await
-            }
-            "im-mandate" => {
-                TradingProfileRemoveImMandateOp
-                    .execute(&forwarded, ctx)
-                    .await
-            }
-            other => Err(anyhow::anyhow!(
-                "Unsupported trading-profile remove-component type: {}",
-                other
-            )),
-        }
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1888,57 +1480,12 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddInstrumentClassOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let class_code = super::helpers::json_extract_string(args, "class-code")?;
 
-        let class_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "class-code")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing class-code argument"))?;
-
-        let cfi_prefix = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cfi-prefixes")
-            .and_then(|a| {
-                a.value.as_list().and_then(|list| {
-                    list.first()
-                        .and_then(|node| node.as_string().map(|s| s.to_string()))
-                })
-            });
+        let cfi_prefix = super::helpers::json_extract_string_list_opt(args, "cfi-prefixes")
+            .and_then(|list| list.into_iter().next());
 
         // Determine if OTC based on class code (IRS, FX, etc. are OTC)
         let is_otc = matches!(
@@ -1959,7 +1506,7 @@ impl TradingProfileAddInstrumentClassOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add instrument class: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "class_code": class_code,
             "version": doc.version,
@@ -1967,13 +1514,8 @@ impl TradingProfileAddInstrumentClassOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2000,49 +1542,12 @@ impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileRemoveInstrumentClassOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use crate::trading_profile::ast_db;
         use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
 
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-        let class_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "class-code")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing class-code argument"))?;
+        let class_code = super::helpers::json_extract_string(args, "class-code")?;
 
         // Build node ID: _Trading Universe / {class_code}
         let node_id = TradingMatrixNodeId::category(categories::UNIVERSE).child(&class_code);
@@ -2051,7 +1556,7 @@ impl TradingProfileRemoveInstrumentClassOp {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove instrument class: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "removed": class_code,
             "version": doc.version,
@@ -2059,13 +1564,8 @@ impl TradingProfileRemoveInstrumentClassOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2092,69 +1592,16 @@ impl CustomOperation for TradingProfileAddMarketOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddMarketOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let instrument_class = super::helpers::json_extract_string(args, "instrument-class")?;
 
-        let instrument_class = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instrument-class")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing instrument-class argument"))?;
-
-        let mic = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "mic")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing mic argument"))?;
+        let mic = super::helpers::json_extract_string(args, "mic")?;
 
         // Get market name from argument or look up from reference data
-        let market_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "market-name")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let market_name = super::helpers::json_extract_string_opt(args, "market-name");
 
-        let country_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "country-code")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let country_code = super::helpers::json_extract_string_opt(args, "country-code");
 
         // Look up market metadata from reference data if not provided
         let (resolved_name, resolved_country) = if let (Some(name), Some(code)) =
@@ -2194,7 +1641,7 @@ impl TradingProfileAddMarketOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add market: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "instrument_class": instrument_class,
             "mic": mic,
@@ -2203,13 +1650,8 @@ impl TradingProfileAddMarketOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2236,57 +1678,14 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileRemoveMarketOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use crate::trading_profile::ast_db;
         use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
 
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-        let instrument_class = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instrument-class")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing instrument-class argument"))?;
+        let instrument_class = super::helpers::json_extract_string(args, "instrument-class")?;
 
-        let mic = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "mic")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing mic argument"))?;
+        let mic = super::helpers::json_extract_string(args, "mic")?;
 
         // Build node ID: _Trading Universe / {instrument_class} / {mic}
         let node_id = TradingMatrixNodeId::category(categories::UNIVERSE)
@@ -2297,7 +1696,7 @@ impl TradingProfileRemoveMarketOp {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove market: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "instrument_class": instrument_class,
             "removed": mic,
@@ -2306,13 +1705,8 @@ impl TradingProfileRemoveMarketOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2339,99 +1733,26 @@ impl CustomOperation for TradingProfileAddSsiOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddSsiOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let ssi_type = super::helpers::json_extract_string(args, "ssi-type")?;
 
-        let ssi_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "ssi-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing ssi-type argument"))?;
-
-        let ssi_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "ssi-name")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing ssi-name argument"))?;
+        let ssi_name = super::helpers::json_extract_string(args, "ssi-name")?;
 
         // Generate ssi_id from type and name
         let ssi_id = format!("{}:{}", ssi_type, ssi_name);
 
-        let safekeeping_account = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "safekeeping-account")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let safekeeping_account = super::helpers::json_extract_string_opt(args, "safekeeping-account");
 
-        let safekeeping_bic = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "safekeeping-bic")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let safekeeping_bic = super::helpers::json_extract_string_opt(args, "safekeeping-bic");
 
-        let cash_account = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cash-account")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let cash_account = super::helpers::json_extract_string_opt(args, "cash-account");
 
-        let cash_bic = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cash-bic")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let cash_bic = super::helpers::json_extract_string_opt(args, "cash-bic");
 
-        let cash_currency = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cash-currency")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let cash_currency = super::helpers::json_extract_string_opt(args, "cash-currency");
 
-        let pset_bic = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "pset-bic")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let pset_bic = super::helpers::json_extract_string_opt(args, "pset-bic");
 
         let doc = ast_db::apply_and_save(
             pool,
@@ -2451,7 +1772,7 @@ impl TradingProfileAddSsiOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add SSI: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "ssi_id": ssi_id,
             "ssi_name": ssi_name,
@@ -2460,13 +1781,8 @@ impl TradingProfileAddSsiOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2493,49 +1809,12 @@ impl CustomOperation for TradingProfileRemoveSsiOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileRemoveSsiOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use crate::trading_profile::ast_db;
         use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
 
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-        let ssi_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "ssi-name")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing ssi-name argument"))?;
+        let ssi_name = super::helpers::json_extract_string(args, "ssi-name")?;
 
         // Build node ID: _Standing Settlement Instructions / {ssi_name}
         let node_id = TradingMatrixNodeId::category(categories::SSI).child(&ssi_name);
@@ -2544,7 +1823,7 @@ impl TradingProfileRemoveSsiOp {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove SSI: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "removed": ssi_name,
             "version": doc.version,
@@ -2552,13 +1831,8 @@ impl TradingProfileRemoveSsiOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2585,104 +1859,25 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddBookingRuleOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let rule_name = super::helpers::json_extract_string(args, "rule-name")?;
 
-        let rule_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "rule-name")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing rule-name argument"))?;
+        let priority = super::helpers::json_extract_int(args, "priority")? as i32;
 
-        let priority = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "priority")
-            .and_then(|a| a.value.as_integer())
-            .ok_or_else(|| anyhow::anyhow!("Missing priority argument"))?
-            as i32;
-
-        let ssi_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "ssi-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing ssi-ref argument"))?;
+        let ssi_ref = super::helpers::json_extract_string(args, "ssi-ref")?;
 
         // Generate rule_id from ssi_ref and rule_name
         let rule_id = format!("{}:{}", ssi_ref, rule_name);
 
         // Build match criteria
         let match_criteria = BookingMatchCriteria {
-            instrument_class: verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "match-instrument-class")
-                .and_then(|a| a.value.as_string())
-                .map(|s| s.to_string()),
-            security_type: verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "match-security-type")
-                .and_then(|a| a.value.as_string())
-                .map(|s| s.to_string()),
-            mic: verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "match-mic")
-                .and_then(|a| a.value.as_string())
-                .map(|s| s.to_string()),
-            currency: verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "match-currency")
-                .and_then(|a| a.value.as_string())
-                .map(|s| s.to_string()),
-            settlement_type: verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "match-settlement-type")
-                .and_then(|a| a.value.as_string())
-                .map(|s| s.to_string()),
-            counterparty_entity_id: verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "match-counterparty-id")
-                .and_then(|a| a.value.as_string())
-                .map(|s| s.to_string()),
+            instrument_class: super::helpers::json_extract_string_opt(args, "match-instrument-class"),
+            security_type: super::helpers::json_extract_string_opt(args, "match-security-type"),
+            mic: super::helpers::json_extract_string_opt(args, "match-mic"),
+            currency: super::helpers::json_extract_string_opt(args, "match-currency"),
+            settlement_type: super::helpers::json_extract_string_opt(args, "match-settlement-type"),
+            counterparty_entity_id: super::helpers::json_extract_string_opt(args, "match-counterparty-id"),
         };
 
         let doc = ast_db::apply_and_save(
@@ -2699,7 +1894,7 @@ impl TradingProfileAddBookingRuleOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add booking rule: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "rule_id": rule_id,
             "rule_name": rule_name,
@@ -2710,13 +1905,8 @@ impl TradingProfileAddBookingRuleOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2743,57 +1933,14 @@ impl CustomOperation for TradingProfileRemoveBookingRuleOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileRemoveBookingRuleOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use crate::trading_profile::ast_db;
         use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
 
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-        let ssi_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "ssi-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing ssi-ref argument"))?;
+        let ssi_ref = super::helpers::json_extract_string(args, "ssi-ref")?;
 
-        let rule_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "rule-id")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing rule-id argument"))?;
+        let rule_id = super::helpers::json_extract_string(args, "rule-id")?;
 
         // Build node ID: _Standing Settlement Instructions / {ssi_ref} / {rule_id}
         let node_id = TradingMatrixNodeId::category(categories::SSI)
@@ -2804,7 +1951,7 @@ impl TradingProfileRemoveBookingRuleOp {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove booking rule: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "ssi_ref": ssi_ref,
             "removed": rule_id,
@@ -2813,13 +1960,8 @@ impl TradingProfileRemoveBookingRuleOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2852,75 +1994,17 @@ impl CustomOperation for TradingProfileAddIsdaConfigOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddIsdaConfigOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let counterparty_entity_id = super::helpers::json_extract_string(args, "counterparty-entity-id")?;
 
-        let counterparty_entity_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "counterparty-entity-id")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-entity-id argument"))?;
+        let counterparty_name = super::helpers::json_extract_string(args, "counterparty-name")?;
 
-        let counterparty_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "counterparty-name")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-name argument"))?;
+        let counterparty_lei = super::helpers::json_extract_string_opt(args, "counterparty-lei");
 
-        let counterparty_lei = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "counterparty-lei")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let governing_law = super::helpers::json_extract_string_opt(args, "governing-law");
 
-        let governing_law = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "governing-law")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let agreement_date = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "agreement-date")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let agreement_date = super::helpers::json_extract_string_opt(args, "agreement-date");
 
         // Generate isda_id from counterparty name
         let isda_id = counterparty_name.clone();
@@ -2940,7 +2024,7 @@ impl TradingProfileAddIsdaConfigOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add ISDA config: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "isda_id": isda_id,
             "counterparty_name": counterparty_name,
@@ -2950,13 +2034,8 @@ impl TradingProfileAddIsdaConfigOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -2985,66 +2064,13 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddIsdaCoverageOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let isda_ref = super::helpers::json_extract_string(args, "isda-ref")?;
 
-        let isda_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "isda-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing isda-ref argument"))?;
+        let asset_class = super::helpers::json_extract_string(args, "asset-class")?;
 
-        let asset_class = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "asset-class")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing asset-class argument"))?;
-
-        let base_products = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "base-products")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            })
+        let base_products = super::helpers::json_extract_string_list_opt(args, "base-products")
             .unwrap_or_default();
 
         // Generate coverage_id from isda_ref and asset_class
@@ -3063,7 +2089,7 @@ impl TradingProfileAddIsdaCoverageOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add ISDA coverage: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "isda_ref": isda_ref,
             "coverage_id": coverage_id,
@@ -3073,13 +2099,8 @@ impl TradingProfileAddIsdaCoverageOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3108,82 +2129,43 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddCsaConfigOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
+        let isda_ref = super::helpers::json_extract_string(args, "isda-ref")?;
+
+        let csa_type = super::helpers::json_extract_string(args, "csa-type")?;
+
+        let threshold_currency = super::helpers::json_extract_string_opt(args, "threshold-currency");
+
+        let threshold_amount = args
+            .get("threshold-amount")
+            .and_then(|v| {
+                if let Some(f) = v.as_f64() {
+                    Some(f)
+                } else if let Some(i) = v.as_i64() {
+                    Some(i as f64)
+                } else if let Some(s) = v.as_str() {
+                    s.parse::<f64>().ok()
                 } else {
-                    a.value.as_uuid()
+                    None
                 }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+            });
 
-        let isda_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "isda-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing isda-ref argument"))?;
+        let minimum_transfer_amount = args
+            .get("minimum-transfer-amount")
+            .and_then(|v| {
+                if let Some(f) = v.as_f64() {
+                    Some(f)
+                } else if let Some(i) = v.as_i64() {
+                    Some(i as f64)
+                } else if let Some(s) = v.as_str() {
+                    s.parse::<f64>().ok()
+                } else {
+                    None
+                }
+            });
 
-        let csa_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "csa-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing csa-type argument"))?;
-
-        let threshold_currency = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "threshold-currency")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let threshold_amount = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "threshold-amount")
-            .and_then(|a| a.value.as_decimal())
-            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0));
-
-        let minimum_transfer_amount = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "minimum-transfer-amount")
-            .and_then(|a| a.value.as_decimal())
-            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0));
-
-        let collateral_ssi_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "collateral-ssi-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let collateral_ssi_ref = super::helpers::json_extract_string_opt(args, "collateral-ssi-ref");
 
         // Generate csa_id from isda_ref and csa_type
         let csa_id = format!("{}:{}", isda_ref, csa_type);
@@ -3204,7 +2186,7 @@ impl TradingProfileAddCsaConfigOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add CSA config: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "isda_ref": isda_ref,
             "csa_id": csa_id,
@@ -3214,13 +2196,8 @@ impl TradingProfileAddCsaConfigOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3249,102 +2226,36 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddCsaCollateralOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use rust_decimal::prelude::ToPrimitive;
+        let counterparty_ref = super::helpers::json_extract_string(args, "counterparty-ref")?;
 
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
+        let collateral_type = super::helpers::json_extract_string(args, "collateral-type")?;
+
+        let currencies: Option<Vec<String>> =
+            super::helpers::json_extract_string_list_opt(args, "currencies");
+
+        let _issuers: Option<Vec<String>> =
+            super::helpers::json_extract_string_list_opt(args, "issuers");
+
+        let _min_rating = super::helpers::json_extract_string_opt(args, "min-rating");
+
+        let haircut_pct = args
+            .get("haircut-pct")
+            .and_then(|v| {
+                if let Some(f) = v.as_f64() {
+                    Some(f)
+                } else if let Some(i) = v.as_i64() {
+                    Some(i as f64)
+                } else if let Some(s) = v.as_str() {
+                    s.parse::<f64>().ok()
                 } else {
-                    a.value.as_uuid()
+                    None
                 }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
-
-        let counterparty_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "counterparty-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
-
-        let collateral_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "collateral-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing collateral-type argument"))?;
-
-        let currencies: Option<Vec<String>> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "currencies")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
             });
-
-        let _issuers: Option<Vec<String>> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "issuers")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            });
-
-        let _min_rating = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "min-rating")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let haircut_pct = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "haircut-pct")
-            .and_then(|a| a.value.as_decimal())
-            .and_then(|d| d.to_f64());
 
         // CSA type defaults to "VM" (Variation Margin) if not specified
-        let csa_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "csa-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
+        let csa_type = super::helpers::json_extract_string_opt(args, "csa-type")
             .unwrap_or_else(|| "VM".to_string());
 
         // Generate a collateral ID from type and optional currency
@@ -3375,7 +2286,7 @@ impl TradingProfileAddCsaCollateralOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add CSA collateral: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "counterparty_ref": counterparty_ref,
             "csa_type": csa_type,
@@ -3384,13 +2295,8 @@ impl TradingProfileAddCsaCollateralOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3419,62 +2325,14 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileLinkCsaSsiOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let counterparty_ref = super::helpers::json_extract_string(args, "counterparty-ref")?;
 
-        let counterparty_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "counterparty-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
-
-        let ssi_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "ssi-name")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing ssi-name argument"))?;
+        let ssi_name = super::helpers::json_extract_string(args, "ssi-name")?;
 
         // CSA type defaults to "VM" (Variation Margin) if not specified
-        let csa_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "csa-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
+        let csa_type = super::helpers::json_extract_string_opt(args, "csa-type")
             .unwrap_or_else(|| "VM".to_string());
 
         // Apply operation to AST and save
@@ -3490,7 +2348,7 @@ impl TradingProfileLinkCsaSsiOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to link CSA SSI: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "counterparty_ref": counterparty_ref,
             "csa_type": csa_type,
@@ -3500,13 +2358,8 @@ impl TradingProfileLinkCsaSsiOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3535,46 +2388,9 @@ impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileRemoveIsdaConfigOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
-
-        let counterparty_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "counterparty-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+        let counterparty_ref = super::helpers::json_extract_string(args, "counterparty-ref")?;
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
@@ -3587,7 +2403,7 @@ impl TradingProfileRemoveIsdaConfigOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove ISDA config: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "counterparty_ref": counterparty_ref,
             "removed": true,
@@ -3596,13 +2412,8 @@ impl TradingProfileRemoveIsdaConfigOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3631,53 +2442,11 @@ impl CustomOperation for TradingProfileRemoveCsaConfigOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileRemoveCsaConfigOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let counterparty_ref = super::helpers::json_extract_string(args, "counterparty-ref")?;
 
-        let counterparty_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "counterparty-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
-
-        let csa_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "csa-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let csa_type = super::helpers::json_extract_string_opt(args, "csa-type");
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
@@ -3691,7 +2460,7 @@ impl TradingProfileRemoveCsaConfigOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove CSA config: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "counterparty_ref": counterparty_ref,
             "csa_type": csa_type,
@@ -3701,13 +2470,8 @@ impl TradingProfileRemoveCsaConfigOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3740,122 +2504,32 @@ impl CustomOperation for TradingProfileAddImMandateOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddImMandateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let manager_ref = super::helpers::json_extract_string(args, "manager-ref")?;
 
-        let manager_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "manager-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing manager-ref argument"))?;
-
-        let manager_ref_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "manager-ref-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
+        let manager_ref_type = super::helpers::json_extract_string_opt(args, "manager-ref-type")
             .unwrap_or_else(|| "NAME".to_string());
 
-        let priority = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "priority")
-            .and_then(|a| a.value.as_integer())
+        let priority = super::helpers::json_extract_int_opt(args, "priority")
             .map(|i| i as i32)
             .unwrap_or(50);
 
-        let role = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "role")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
+        let role = super::helpers::json_extract_string_opt(args, "role")
             .unwrap_or_else(|| "INVESTMENT_MANAGER".to_string());
 
-        let _scope_all = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "scope-all")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(true);
+        let _scope_all = super::helpers::json_extract_bool_opt(args, "scope-all").unwrap_or(true);
 
-        let scope_mics = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "scope-mics")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            });
+        let scope_mics = super::helpers::json_extract_string_list_opt(args, "scope-mics");
 
-        let scope_instrument_classes = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "scope-instrument-classes")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            });
+        let scope_instrument_classes =
+            super::helpers::json_extract_string_list_opt(args, "scope-instrument-classes");
 
-        let _instruction_method = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instruction-method")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let _instruction_method = super::helpers::json_extract_string_opt(args, "instruction-method");
 
-        let can_trade = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "can-trade")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(true);
+        let can_trade = super::helpers::json_extract_bool_opt(args, "can-trade").unwrap_or(true);
 
-        let can_settle = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "can-settle")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(true);
+        let can_settle = super::helpers::json_extract_bool_opt(args, "can-settle").unwrap_or(true);
 
         // Generate a unique mandate ID
         let mandate_id = Uuid::new_v4().to_string();
@@ -3897,7 +2571,7 @@ impl TradingProfileAddImMandateOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add IM mandate: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "manager_ref": manager_ref,
             "role": role,
@@ -3907,13 +2581,8 @@ impl TradingProfileAddImMandateOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -3942,76 +2611,16 @@ impl CustomOperation for TradingProfileUpdateImScopeOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileUpdateImScopeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let manager_ref = super::helpers::json_extract_string(args, "manager-ref")?;
 
-        let manager_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "manager-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing manager-ref argument"))?;
+        let _scope_all = super::helpers::json_extract_bool_opt(args, "scope-all");
 
-        let _scope_all = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "scope-all")
-            .and_then(|a| a.value.as_boolean());
+        let scope_mics = super::helpers::json_extract_string_list_opt(args, "scope-mics");
 
-        let scope_mics = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "scope-mics")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            });
-
-        let scope_instrument_classes = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "scope-instrument-classes")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            });
+        let scope_instrument_classes =
+            super::helpers::json_extract_string_list_opt(args, "scope-instrument-classes");
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
@@ -4027,7 +2636,7 @@ impl TradingProfileUpdateImScopeOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to update IM scope: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "manager_ref": manager_ref,
             "version": doc.version,
@@ -4035,13 +2644,8 @@ impl TradingProfileUpdateImScopeOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -4070,46 +2674,9 @@ impl CustomOperation for TradingProfileRemoveImMandateOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileRemoveImMandateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
-
-        let manager_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "manager-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing manager-ref argument"))?;
+        let manager_ref = super::helpers::json_extract_string(args, "manager-ref")?;
 
         // Build node ID: _Managers / {manager_ref}
         let node_id = TradingMatrixNodeId::category(categories::MANAGERS).child(&manager_ref);
@@ -4119,7 +2686,7 @@ impl TradingProfileRemoveImMandateOp {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove IM mandate: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "removed": manager_ref,
             "version": doc.version,
@@ -4127,13 +2694,8 @@ impl TradingProfileRemoveImMandateOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -4167,46 +2729,9 @@ impl CustomOperation for TradingProfileSetBaseCurrencyOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileSetBaseCurrencyOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
-
-        let currency = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "currency")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing currency argument"))?;
+        let currency = super::helpers::json_extract_string(args, "currency")?;
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
@@ -4219,7 +2744,7 @@ impl TradingProfileSetBaseCurrencyOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to set base currency: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "base_currency": currency,
             "version": doc.version,
@@ -4227,13 +2752,8 @@ impl TradingProfileSetBaseCurrencyOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -4262,46 +2782,9 @@ impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileAddAllowedCurrencyOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
-
-        let currency = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "currency")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing currency argument"))?;
+        let currency = super::helpers::json_extract_string(args, "currency")?;
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
@@ -4314,7 +2797,7 @@ impl TradingProfileAddAllowedCurrencyOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add allowed currency: {}", e))?;
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "currency": currency,
             "version": doc.version,
@@ -4322,13 +2805,8 @@ impl TradingProfileAddAllowedCurrencyOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -4362,53 +2840,17 @@ impl CustomOperation for TradingProfileDiffOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileDiffOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
 
         let result = document_ops::diff_document_vs_operational(pool, profile_id)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to diff document: {}", e))?;
 
-        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(0))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -4438,53 +2880,16 @@ impl CustomOperation for TradingProfileValidateCoverageOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+            .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
+
+        let result = document_ops::validate_coverage(pool, profile_id).await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl TradingProfileValidateCoverageOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
-
-        let result = document_ops::validate_coverage(pool, profile_id).await?;
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(
-            json!({"is_valid": true, "coverage_percentage": 100.0}),
-        ))
     }
 }
 
@@ -4511,51 +2916,16 @@ impl CustomOperation for TradingProfileValidateGoLiveReadyOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+            .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
+
+        let result = document_ops::validate_go_live_ready(pool, profile_id).await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl TradingProfileValidateGoLiveReadyOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
-
-        let result = document_ops::validate_go_live_ready(pool, profile_id).await?;
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"is_ready": true})))
     }
 }
 
@@ -4589,63 +2959,21 @@ impl CustomOperation for TradingProfileSubmitOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+            .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
+
+        let submitted_by: Option<String> =
+            super::helpers::json_extract_string_opt(args, "submitted-by");
+
+        let notes: Option<String> = super::helpers::json_extract_string_opt(args, "notes");
+
+        let result = document_ops::submit_for_review(pool, profile_id, submitted_by, notes).await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl TradingProfileSubmitOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
-
-        let submitted_by: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "submitted-by")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        let notes: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        let result = document_ops::submit_for_review(pool, profile_id, submitted_by, notes).await?;
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"status": "submitted"})))
     }
 }
 
@@ -4675,50 +3003,13 @@ impl CustomOperation for TradingProfileApproveOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+            .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileApproveOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
+        let approved_by: Option<String> =
+            super::helpers::json_extract_string_opt(args, "approved-by");
 
-        let approved_by: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "approved-by")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        let notes: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+        let notes: Option<String> = super::helpers::json_extract_string_opt(args, "notes");
 
         // First, approve the profile (transitions PENDING_REVIEW -> ACTIVE)
         let approve_result =
@@ -4777,18 +3068,13 @@ impl TradingProfileApproveOp {
         // Commit transaction
         tx.commit().await?;
 
-        Ok(ExecutionResult::Record(serde_json::to_value(
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(
             approve_result,
         )?))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"status": "approved"})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -4818,65 +3104,23 @@ impl CustomOperation for TradingProfileRejectOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+            .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileRejectOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
-
-        let rejection_reason: String = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reason")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()))
+        let rejection_reason: String = super::helpers::json_extract_string_opt(args, "reason")
             .ok_or_else(|| anyhow::anyhow!("reason is required"))?;
 
-        let rejected_by: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "rejected-by")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+        let rejected_by: Option<String> =
+            super::helpers::json_extract_string_opt(args, "rejected-by");
 
         let result =
             document_ops::reject_profile(pool, profile_id, rejection_reason, rejected_by).await?;
 
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"status": "rejected"})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -4906,63 +3150,21 @@ impl CustomOperation for TradingProfileArchiveOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
+        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+            .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
+
+        let archived_by: Option<String> =
+            super::helpers::json_extract_string_opt(args, "archived-by");
+
+        let notes: Option<String> = super::helpers::json_extract_string_opt(args, "notes");
+
+        let result = document_ops::archive_profile(pool, profile_id, archived_by, notes).await?;
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl TradingProfileArchiveOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
-
-        let archived_by: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "archived-by")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        let notes: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        let result = document_ops::archive_profile(pool, profile_id, archived_by, notes).await?;
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"status": "archived"})))
     }
 }
 
@@ -5003,60 +3205,16 @@ impl CustomOperation for TradingProfileCloneToOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl TradingProfileCloneToOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         // Source profile ID (required)
-        let source_profile_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "profile-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
+        let source_profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+            .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
 
         // Target CBU ID (required)
-        let target_cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "target-cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("target-cbu-id is required"))?;
+        let target_cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "target-cbu-id")
+            .map_err(|_| anyhow::anyhow!("target-cbu-id is required"))?;
 
         // Optional: notes
-        let notes: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+        let notes: Option<String> = super::helpers::json_extract_string_opt(args, "notes");
 
         // Use ast_db::clone_to_draft for new AST-based document format
         let (profile_id, doc) =
@@ -5064,12 +3222,12 @@ impl TradingProfileCloneToOp {
                 .await
                 .map_err(|e| anyhow::anyhow!("Clone failed: {}", e))?;
 
-        // Bind target profile ID if :as binding specified
-        if let Some(binding_name) = verb_call.binding.as_ref() {
-            ctx.bind(binding_name, profile_id);
+        // Bind target profile ID if :as binding specified (transported via args "as" key)
+        if let Some(binding_name) = super::helpers::json_extract_string_opt(args, "as") {
+            ctx.bind(&binding_name, profile_id);
         }
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "cbu_id": target_cbu_id,
             "cbu_name": doc.cbu_name,
@@ -5078,13 +3236,8 @@ impl TradingProfileCloneToOp {
         })))
     }
 
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"status": "cloned"})))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -5118,70 +3271,25 @@ impl CustomOperation for TradingProfileCreateNewVersionOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
+        let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")
+            .map_err(|_| anyhow::anyhow!("cbu-id is required"))?;
+
+        let created_by: Option<String> = super::helpers::json_extract_string_opt(args, "created-by");
+
+        let notes: Option<String> = super::helpers::json_extract_string_opt(args, "notes");
+
+        let result = document_ops::create_new_version(pool, cbu_id, created_by, notes).await?;
+
+        // Bind new profile ID if :as binding specified (transported via args "as" key)
+        if let Some(binding_name) = super::helpers::json_extract_string_opt(args, "as") {
+            ctx.bind(&binding_name, result.new_profile_id);
+        }
+
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl TradingProfileCreateNewVersionOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("cbu-id is required"))?;
-
-        let created_by: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "created-by")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        let notes: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        let result = document_ops::create_new_version(pool, cbu_id, created_by, notes).await?;
-
-        // Bind new profile ID if :as binding specified
-        if let Some(binding_name) = verb_call.binding.as_ref() {
-            ctx.bind(binding_name, result.new_profile_id);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(
-            json!({"status": "new_version_created"}),
-        ))
     }
 }
 
