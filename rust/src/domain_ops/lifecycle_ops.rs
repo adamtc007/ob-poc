@@ -9,8 +9,6 @@ use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 
 use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -38,62 +36,27 @@ impl CustomOperation for LifecycleProvisionOp {
     fn rationale(&self) -> &'static str {
         "Requires resource_type lookup, context scoping, and instance URL generation"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl LifecycleProvisionOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
         // Get CBU ID (required)
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+        let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         // Get resource type code (required)
-        let resource_type_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "resource-type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing resource-type argument"))?;
+        let resource_type_code = super::helpers::json_extract_string(args, "resource-type")?;
 
         // Get resource type with context requirements
         let rt: Option<(Uuid, bool, bool, bool)> = sqlx::query_as(
             r#"SELECT resource_type_id, per_market, per_currency, per_counterparty
                FROM "ob-poc".lifecycle_resource_types WHERE code = $1"#,
         )
-        .bind(resource_type_code)
+        .bind(&resource_type_code)
         .fetch_optional(pool)
         .await?;
 
@@ -103,29 +66,12 @@ impl LifecycleProvisionOp {
             })?;
 
         // Get optional context arguments
-        let market_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "market")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else if let Some(_mic) = a.value.as_string() {
-                    // Lookup market by MIC code
-                    None // Will resolve below
-                } else {
-                    a.value.as_uuid()
-                }
-            });
+        // Market may be provided as UUID/@symbol or as MIC string
+        let market_id: Option<Uuid> = super::helpers::json_extract_uuid_opt(args, ctx, "market");
 
         // If market was provided as MIC string, look it up
         let market_id: Option<Uuid> = if market_id.is_none() {
-            if let Some(mic) = verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "market")
-                .and_then(|a| a.value.as_string())
-            {
+            if let Some(mic) = super::helpers::json_extract_string_opt(args, "market") {
                 sqlx::query_scalar(r#"SELECT market_id FROM "ob-poc".markets WHERE mic = $1"#)
                     .bind(mic)
                     .fetch_optional(pool)
@@ -137,24 +83,10 @@ impl LifecycleProvisionOp {
             market_id
         };
 
-        let currency: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "currency")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let currency: Option<String> = super::helpers::json_extract_string_opt(args, "currency");
 
-        let counterparty_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "counterparty")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
+        let counterparty_id: Option<Uuid> =
+            super::helpers::json_extract_uuid_opt(args, ctx, "counterparty");
 
         // Validate context requirements
         if per_market && market_id.is_none() {
@@ -171,46 +103,15 @@ impl LifecycleProvisionOp {
         }
 
         // Get optional provider details
-        let provider_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "provider")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let provider_code = super::helpers::json_extract_string_opt(args, "provider");
 
-        let provider_account = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "provider-account")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let provider_account = super::helpers::json_extract_string_opt(args, "provider-account");
 
-        let provider_bic = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "provider-bic")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let provider_bic = super::helpers::json_extract_string_opt(args, "provider-bic");
 
-        let config: Option<serde_json::Value> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "config")
-            .and_then(|a| {
-                // Try to extract as map and convert to JSON
-                if let Some(map) = a.value.as_map() {
-                    let json_map: serde_json::Map<String, serde_json::Value> = map
-                        .iter()
-                        .filter_map(|(k, v)| {
-                            v.as_string()
-                                .map(|s| (k.clone(), serde_json::Value::String(s.to_string())))
-                        })
-                        .collect();
-                    Some(serde_json::Value::Object(json_map))
-                } else {
-                    None
-                }
-            });
+        let config: Option<serde_json::Value> = args
+            .get("config")
+            .and_then(|v| if v.is_object() { Some(v.clone()) } else { None });
 
         // Generate instance URL (unique identifier for this resource)
         let context_suffix = market_id
@@ -225,12 +126,8 @@ impl LifecycleProvisionOp {
         );
 
         // Get instance identifier if provided
-        let instance_identifier = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instance-identifier")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let instance_identifier =
+            super::helpers::json_extract_string_opt(args, "instance-identifier");
 
         // Idempotent upsert
         let instance_id = uuid::Uuid::new_v4();
@@ -275,20 +172,14 @@ impl LifecycleProvisionOp {
         let result_id = row.0;
         ctx.bind("instance", result_id);
 
-        Ok(ExecutionResult::Record(serde_json::json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
             "instance_id": result_id,
             "instance_url": instance_url,
             "status": "PROVISIONED"
         })))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -315,46 +206,16 @@ impl CustomOperation for LifecycleAnalyzeGapsOp {
     fn rationale(&self) -> &'static str {
         "Complex gap analysis query against view joining universe, lifecycles, and instances"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl LifecycleAnalyzeGapsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+        let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         // Query the gap view
         let gaps: Vec<(
@@ -410,16 +271,10 @@ impl LifecycleAnalyzeGapsOp {
             })
             .collect();
 
-        Ok(ExecutionResult::RecordSet(result))
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(result))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -446,59 +301,20 @@ impl CustomOperation for LifecycleCheckReadinessOp {
     fn rationale(&self) -> &'static str {
         "Combines gap analysis with blocking/warning classification"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl LifecycleCheckReadinessOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+        let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
-        let instrument_class = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instrument-class")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing instrument-class argument"))?;
+        let instrument_class = super::helpers::json_extract_string(args, "instrument-class")?;
 
-        let market: Option<&str> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "market")
-            .and_then(|a| a.value.as_string());
+        let market: Option<String> = super::helpers::json_extract_string_opt(args, "market");
 
         // Get gaps for this specific instrument/context
         let gaps: Vec<(String, String, bool, String)> = sqlx::query_as(
@@ -509,8 +325,8 @@ impl LifecycleCheckReadinessOp {
                  AND ($3::text IS NULL OR market = $3)"#,
         )
         .bind(cbu_id)
-        .bind(instrument_class)
-        .bind(market)
+        .bind(&instrument_class)
+        .bind(market.as_deref())
         .fetch_all(pool)
         .await?;
 
@@ -538,7 +354,7 @@ impl LifecycleCheckReadinessOp {
             })
             .collect();
 
-        Ok(ExecutionResult::Record(serde_json::json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
             "ready": blocking_gaps.is_empty(),
             "instrument_class": instrument_class,
             "market": market,
@@ -546,18 +362,8 @@ impl LifecycleCheckReadinessOp {
             "warnings": warnings
         })))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "ready": true,
-            "blocking_gaps": [],
-            "warnings": []
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -584,44 +390,16 @@ impl CustomOperation for LifecycleDiscoverOp {
     fn rationale(&self) -> &'static str {
         "Complex multi-join query for lifecycle/resource discovery"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl LifecycleDiscoverOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let instrument_class = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instrument-class")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing instrument-class argument"))?;
+        let instrument_class = super::helpers::json_extract_string(args, "instrument-class")?;
 
-        let include_optional = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "include-optional")
-            .and_then(|a| a.value.as_boolean())
+        let include_optional = super::helpers::json_extract_bool_opt(args, "include-optional")
             .unwrap_or(false);
 
         // Get lifecycles for instrument class
@@ -636,7 +414,7 @@ impl LifecycleDiscoverOp {
                  AND ($2 OR il.is_mandatory = true)
                ORDER BY il.display_order"#,
         )
-        .bind(instrument_class)
+        .bind(&instrument_class)
         .bind(include_optional)
         .fetch_all(pool)
         .await?;
@@ -678,26 +456,15 @@ impl LifecycleDiscoverOp {
             }
         }
 
-        Ok(ExecutionResult::Record(serde_json::json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
             "instrument_class": instrument_class,
             "requires_isda": requires_isda,
             "mandatory_lifecycles": mandatory,
             "optional_lifecycles": optional
         })))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "instrument_class": "",
-            "requires_isda": false,
-            "mandatory_lifecycles": [],
-            "optional_lifecycles": []
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -724,66 +491,20 @@ impl CustomOperation for LifecycleGeneratePlanOp {
     fn rationale(&self) -> &'static str {
         "Generates DSL statements from gap analysis with user response handling"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl LifecycleGeneratePlanOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         use uuid::Uuid;
 
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+        let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
-        let user_responses: serde_json::Value = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "user-responses")
-            .and_then(|a| {
-                // Try to extract as map and convert to JSON
-                if let Some(map) = a.value.as_map() {
-                    let json_map: serde_json::Map<String, serde_json::Value> = map
-                        .iter()
-                        .filter_map(|(k, v)| {
-                            v.as_string()
-                                .map(|s| (k.clone(), serde_json::Value::String(s.to_string())))
-                        })
-                        .collect();
-                    Some(serde_json::Value::Object(json_map))
-                } else {
-                    None
-                }
-            })
+        let user_responses: serde_json::Value = args
+            .get("user-responses")
+            .and_then(|v| if v.is_object() { Some(v.clone()) } else { None })
             .unwrap_or_else(|| serde_json::json!({}));
 
         // Get gaps
@@ -867,24 +588,14 @@ impl LifecycleGeneratePlanOp {
             }
         }
 
-        Ok(ExecutionResult::Record(serde_json::json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
             "dsl_statements": dsl_statements,
             "pending_prompts": pending_prompts,
             "ready_to_execute": pending_prompts.is_empty()
         })))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "dsl_statements": [],
-            "pending_prompts": [],
-            "ready_to_execute": true
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -910,58 +621,18 @@ impl CustomOperation for LifecycleExecutePlanOp {
     fn rationale(&self) -> &'static str {
         "Executes DSL plan with dry-run support and result aggregation"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl LifecycleExecutePlanOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
+        _ctx: &mut dsl_runtime::VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let dry_run = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "dry-run")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(false);
+    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        let dry_run = super::helpers::json_extract_bool_opt(args, "dry-run").unwrap_or(false);
 
-        let plan = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "plan")
-            .and_then(|a| {
-                // Try to extract as map and convert to JSON
-                if let Some(map) = a.value.as_map() {
-                    let json_map: serde_json::Map<String, serde_json::Value> = map
-                        .iter()
-                        .filter_map(|(k, v)| {
-                            v.as_string()
-                                .map(|s| (k.clone(), serde_json::Value::String(s.to_string())))
-                        })
-                        .collect();
-                    Some(serde_json::Value::Object(json_map))
-                } else {
-                    None
-                }
-            })
+        let plan = args
+            .get("plan")
+            .and_then(|v| if v.is_object() { Some(v.clone()) } else { None })
             .ok_or_else(|| anyhow::anyhow!("Missing plan argument"))?;
 
         let statements = plan
@@ -990,24 +661,14 @@ impl LifecycleExecutePlanOp {
             }
         }
 
-        Ok(ExecutionResult::Record(serde_json::json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
             "dry_run": dry_run,
             "executed": results.len(),
             "results": results
         })))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "dry_run": true,
-            "executed": 0,
-            "results": []
-        })))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1074,7 +735,7 @@ impl CustomOperation for ServiceResourceProvisionLifecycleOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.provision"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -1083,28 +744,8 @@ impl CustomOperation for ServiceResourceProvisionLifecycleOp {
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         LifecycleProvisionOp.execute_json(args, ctx, pool).await
     }
-fn is_migrated(&self) -> bool {
+    fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl ServiceResourceProvisionLifecycleOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        LifecycleProvisionOp.execute(verb_call, ctx, pool).await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
     }
 }
 
@@ -1124,7 +765,7 @@ impl CustomOperation for ServiceResourceAnalyzeLifecycleGapsOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.analyze-gaps"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -1133,28 +774,8 @@ impl CustomOperation for ServiceResourceAnalyzeLifecycleGapsOp {
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         LifecycleAnalyzeGapsOp.execute_json(args, ctx, pool).await
     }
-fn is_migrated(&self) -> bool {
+    fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl ServiceResourceAnalyzeLifecycleGapsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        LifecycleAnalyzeGapsOp.execute(verb_call, ctx, pool).await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
     }
 }
 
@@ -1174,7 +795,7 @@ impl CustomOperation for ServiceResourceCheckLifecycleReadinessOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.check-readiness"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -1185,30 +806,8 @@ impl CustomOperation for ServiceResourceCheckLifecycleReadinessOp {
             .execute_json(args, ctx, pool)
             .await
     }
-fn is_migrated(&self) -> bool {
+    fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl ServiceResourceCheckLifecycleReadinessOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        LifecycleCheckReadinessOp
-            .execute(verb_call, ctx, pool)
-            .await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
     }
 }
 
@@ -1228,7 +827,7 @@ impl CustomOperation for ServiceResourceDiscoverLifecyclesOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.discover"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -1237,28 +836,8 @@ impl CustomOperation for ServiceResourceDiscoverLifecyclesOp {
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         LifecycleDiscoverOp.execute_json(args, ctx, pool).await
     }
-fn is_migrated(&self) -> bool {
+    fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl ServiceResourceDiscoverLifecyclesOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        LifecycleDiscoverOp.execute(verb_call, ctx, pool).await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
     }
 }
 
@@ -1278,7 +857,7 @@ impl CustomOperation for ServiceResourceGenerateLifecyclePlanOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.generate-plan"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -1287,28 +866,8 @@ impl CustomOperation for ServiceResourceGenerateLifecyclePlanOp {
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         LifecycleGeneratePlanOp.execute_json(args, ctx, pool).await
     }
-fn is_migrated(&self) -> bool {
+    fn is_migrated(&self) -> bool {
         true
-    }
-}
-impl ServiceResourceGenerateLifecyclePlanOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        LifecycleGeneratePlanOp.execute(verb_call, ctx, pool).await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
     }
 }
 
@@ -1328,7 +887,7 @@ impl CustomOperation for ServiceResourceExecuteLifecyclePlanOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.execute-plan"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
@@ -1337,28 +896,7 @@ impl CustomOperation for ServiceResourceExecuteLifecyclePlanOp {
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
         LifecycleExecutePlanOp.execute_json(args, ctx, pool).await
     }
-fn is_migrated(&self) -> bool {
+    fn is_migrated(&self) -> bool {
         true
     }
 }
-impl ServiceResourceExecuteLifecyclePlanOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        LifecycleExecutePlanOp.execute(verb_call, ctx, pool).await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
-    }
-}
-

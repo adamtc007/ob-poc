@@ -11,10 +11,7 @@ use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
-use super::helpers::{extract_uuid, extract_uuid_opt};
 use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -64,55 +61,21 @@ impl CustomOperation for RequestCreateOp {
     fn rationale(&self) -> &'static str {
         "Creates outstanding request with computed defaults from request_types config"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl RequestCreateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
         // Extract required args
-        let subject_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "subject-type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("subject-type is required"))?;
+        let subject_type = super::helpers::json_extract_string(args, "subject-type")?;
 
-        let subject_id = extract_uuid(verb_call, ctx, "subject-id")?;
+        let subject_id = super::helpers::json_extract_uuid(args, ctx, "subject-id")?;
 
-        let request_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("type is required"))?;
+        let request_type = super::helpers::json_extract_string(args, "type")?;
 
-        let request_subtype = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "subtype")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("subtype is required"))?;
+        let request_subtype = super::helpers::json_extract_string(args, "subtype")?;
 
         // Get defaults from request_types config
         let config = sqlx::query!(
@@ -142,58 +105,33 @@ impl RequestCreateOp {
         let max_reminders = config.as_ref().and_then(|c| c.max_reminders).unwrap_or(3);
 
         // Optional args with defaults
-        let due_in_days = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "due-in-days")
-            .and_then(|a| a.value.as_integer())
+        let due_in_days = super::helpers::json_extract_int_opt(args, "due-in-days")
             .unwrap_or(default_due_days as i64);
 
-        let due_date: NaiveDate = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "due-date")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+        let due_date: NaiveDate = super::helpers::json_extract_string_opt(args, "due-date")
+            .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| {
                 (Utc::now() + Duration::days(due_in_days))
                     .naive_utc()
                     .date()
             });
 
-        let blocks = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "blocks")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(blocks_by_default);
+        let blocks = super::helpers::json_extract_bool_opt(args, "blocks").unwrap_or(blocks_by_default);
 
-        let blocker_message = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "message")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let blocker_message = super::helpers::json_extract_string_opt(args, "message");
 
-        let requested_from_label = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "from")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let requested_from_label = super::helpers::json_extract_string_opt(args, "from");
 
-        let requested_from_entity_id = extract_uuid_opt(verb_call, ctx, "from-entity");
+        let requested_from_entity_id = super::helpers::json_extract_uuid_opt(args, ctx, "from-entity");
 
-        let request_details: serde_json::Value = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "details")
-            .and_then(|a| {
-                if let Some(map) = a.value.as_map() {
+        let request_details: serde_json::Value = args
+            .get("details")
+            .and_then(|v| {
+                if let Some(map) = v.as_object() {
                     let json_map: serde_json::Map<String, serde_json::Value> = map
                         .iter()
                         .filter_map(|(k, v)| {
-                            v.as_string()
+                            v.as_str()
                                 .map(|s| (k.clone(), serde_json::Value::String(s.to_string())))
                         })
                         .collect();
@@ -205,7 +143,7 @@ impl RequestCreateOp {
             .unwrap_or(json!({}));
 
         // Derive linked IDs based on subject_type
-        let linked = derive_linked_ids(subject_type, subject_id, pool).await?;
+        let linked = derive_linked_ids(&subject_type, subject_id, pool).await?;
 
         // Create the request
         let row = sqlx::query!(
@@ -279,7 +217,7 @@ impl RequestCreateOp {
             }
         }
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "request_id": row.request_id,
             "request_type": request_type,
             "request_subtype": request_subtype,
@@ -292,14 +230,8 @@ impl RequestCreateOp {
             }
         })))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -325,41 +257,18 @@ impl CustomOperation for RequestOverdueOp {
     fn rationale(&self) -> &'static str {
         "Queries overdue requests with optional grace period consideration"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl RequestOverdueOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
+        let case_id = super::helpers::json_extract_uuid_opt(args, ctx, "case-id");
 
-        let cbu_id = extract_uuid_opt(verb_call, ctx, "cbu-id");
+        let cbu_id = super::helpers::json_extract_uuid_opt(args, ctx, "cbu-id");
 
-        let include_grace = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "include-grace-period")
-            .and_then(|a| a.value.as_boolean())
+        let include_grace = super::helpers::json_extract_bool_opt(args, "include-grace-period")
             .unwrap_or(false);
 
         let rows = sqlx::query!(
@@ -426,16 +335,10 @@ impl RequestOverdueOp {
             })
             .collect();
 
-        Ok(ExecutionResult::RecordSet(results))
+        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -461,56 +364,22 @@ impl CustomOperation for RequestFulfillOp {
     fn rationale(&self) -> &'static str {
         "Fulfills request and potentially unblocks workstream"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl RequestFulfillOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
+        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
 
-        let fulfillment_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "fulfillment-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let fulfillment_type = super::helpers::json_extract_string_opt(args, "fulfillment-type");
 
-        let reference_id = extract_uuid_opt(verb_call, ctx, "reference-id");
+        let reference_id = super::helpers::json_extract_uuid_opt(args, ctx, "reference-id");
 
-        let reference_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reference-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let reference_type = super::helpers::json_extract_string_opt(args, "reference-type");
 
-        let notes = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let notes = super::helpers::json_extract_string_opt(args, "notes");
 
         // Update the request
         let updated = sqlx::query!(
@@ -549,20 +418,14 @@ impl RequestFulfillOp {
             }
         }
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "request_id": request_id,
             "status": "FULFILLED",
             "workstream_unblocked": workstream_unblocked
         })))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -588,40 +451,16 @@ impl CustomOperation for RequestCancelOp {
     fn rationale(&self) -> &'static str {
         "Cancels request and potentially unblocks workstream"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl RequestCancelOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
+        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
 
-        let reason = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reason")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("reason is required"))?;
+        let reason = super::helpers::json_extract_string(args, "reason")?;
 
         let updated = sqlx::query!(
             r#"
@@ -663,16 +502,10 @@ impl RequestCancelOp {
         )
         .await;
 
-        Ok(ExecutionResult::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -698,54 +531,22 @@ impl CustomOperation for RequestExtendOp {
     fn rationale(&self) -> &'static str {
         "Extends due date with audit trail"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl RequestExtendOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
+        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
 
-        let reason = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reason")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("reason is required"))?;
+        let reason = super::helpers::json_extract_string(args, "reason")?;
 
         // Get new due date from either days or explicit date
-        let days = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "days")
-            .and_then(|a| a.value.as_integer());
+        let days = super::helpers::json_extract_int_opt(args, "days");
 
-        let new_due_date = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "new-due-date")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        let new_due_date = super::helpers::json_extract_string_opt(args, "new-due-date")
+            .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
 
         if days.is_none() && new_due_date.is_none() {
             return Err(anyhow!("Either days or new-due-date is required"));
@@ -829,16 +630,10 @@ impl RequestExtendOp {
         )
         .await;
 
-        Ok(ExecutionResult::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -864,47 +659,19 @@ impl CustomOperation for RequestRemindOp {
     fn rationale(&self) -> &'static str {
         "Records reminder with rate limiting"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl RequestRemindOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
+        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
 
-        let channel = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "channel")
-            .and_then(|a| a.value.as_string())
-            .unwrap_or("EMAIL");
+        let channel = super::helpers::json_extract_string_opt(args, "channel")
+            .unwrap_or_else(|| "EMAIL".to_string());
 
-        let message = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "message")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let message = super::helpers::json_extract_string_opt(args, "message");
 
         // Check if we can send another reminder
         let current = sqlx::query!(
@@ -961,16 +728,10 @@ impl RequestRemindOp {
         )
         .await;
 
-        Ok(ExecutionResult::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -996,42 +757,18 @@ impl CustomOperation for RequestEscalateOp {
     fn rationale(&self) -> &'static str {
         "Escalates request with level tracking"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl RequestEscalateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
+        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
 
-        let escalate_to = extract_uuid_opt(verb_call, ctx, "escalate-to");
+        let escalate_to = super::helpers::json_extract_uuid_opt(args, ctx, "escalate-to");
 
-        let reason = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reason")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let reason = super::helpers::json_extract_string_opt(args, "reason");
 
         // Fetch case_id before update for BPMN signal routing
         let case_id = sqlx::query_scalar!(
@@ -1079,16 +816,10 @@ impl RequestEscalateOp {
         )
         .await;
 
-        Ok(ExecutionResult::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1114,42 +845,18 @@ impl CustomOperation for RequestWaiveOp {
     fn rationale(&self) -> &'static str {
         "Waives request with approval tracking and unblocks workstream"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl RequestWaiveOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let request_id = extract_uuid(verb_call, ctx, "request-id")?;
+        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
 
-        let reason = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reason")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("reason is required"))?;
+        let reason = super::helpers::json_extract_string(args, "reason")?;
 
-        let approved_by = extract_uuid(verb_call, ctx, "approved-by")?;
+        let approved_by = super::helpers::json_extract_uuid(args, ctx, "approved-by")?;
 
         let updated = sqlx::query!(
             r#"
@@ -1183,16 +890,10 @@ impl RequestWaiveOp {
             }
         }
 
-        Ok(ExecutionResult::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1218,41 +919,17 @@ impl CustomOperation for DocumentRequestOp {
     fn rationale(&self) -> &'static str {
         "Creates DOCUMENT type outstanding request with computed defaults"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl DocumentRequestOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let doc_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("type is required"))?;
+        let doc_type = super::helpers::json_extract_string(args, "type")?;
 
         // Resolve subject (workstream > entity > case)
-        let subject = resolve_document_subject(verb_call, ctx, pool).await?;
+        let subject = resolve_document_subject(args, ctx, pool).await?;
 
         // Get defaults from request_types
         let config = sqlx::query!(
@@ -1280,34 +957,21 @@ impl DocumentRequestOp {
             .unwrap_or(true);
         let max_reminders = config.as_ref().and_then(|c| c.max_reminders).unwrap_or(3);
 
-        let due_in_days = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "due-in-days")
-            .and_then(|a| a.value.as_integer())
+        let due_in_days = super::helpers::json_extract_int_opt(args, "due-in-days")
             .unwrap_or(default_due_days as i64);
 
         let due_date = (Utc::now() + Duration::days(due_in_days))
             .naive_utc()
             .date();
 
-        let requested_from = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "from")
-            .and_then(|a| a.value.as_string())
-            .unwrap_or("client");
+        let requested_from = super::helpers::json_extract_string_opt(args, "from")
+            .unwrap_or_else(|| "client".to_string());
 
-        let notes = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let notes = super::helpers::json_extract_string_opt(args, "notes");
 
         let blocker_message = format!(
             "Awaiting {} from {}",
-            humanize_doc_type(doc_type),
+            humanize_doc_type(&doc_type),
             requested_from
         );
 
@@ -1375,7 +1039,7 @@ impl DocumentRequestOp {
             }
         }
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "request_id": row.request_id,
             "request_type": "DOCUMENT",
             "request_subtype": doc_type,
@@ -1388,14 +1052,8 @@ impl DocumentRequestOp {
             }
         })))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1421,55 +1079,21 @@ impl CustomOperation for DocumentUploadOp {
     fn rationale(&self) -> &'static str {
         "Catalogs document and auto-fulfills matching pending request"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl DocumentUploadOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let doc_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("type is required"))?;
+        let doc_type = super::helpers::json_extract_string(args, "type")?;
 
-        let file_path = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "file-path")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("file-path is required"))?;
+        let file_path = super::helpers::json_extract_string(args, "file-path")?;
 
-        let notes = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        let notes = super::helpers::json_extract_string_opt(args, "notes");
 
         // Resolve subject
-        let subject = resolve_document_subject(verb_call, ctx, pool).await?;
+        let subject = resolve_document_subject(args, ctx, pool).await?;
 
         // Store the document in catalog
         let document_id = sqlx::query_scalar!(
@@ -1546,7 +1170,7 @@ impl DocumentUploadOp {
             }
         }
 
-        Ok(ExecutionResult::Record(json!({
+        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
             "document_id": document_id,
             "document_type": doc_type,
             "fulfilled_request_id": fulfilled_request.as_ref().map(|r| r.request_id),
@@ -1557,14 +1181,8 @@ impl DocumentUploadOp {
             }
         })))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1590,49 +1208,20 @@ impl CustomOperation for DocumentWaiveOp {
     fn rationale(&self) -> &'static str {
         "Waives document request by type for a workstream"
     }
-#[cfg(feature = "database")]
+    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::sem_os_runtime::verb_executor_adapter as adapter;
-        let vc = adapter::build_verb_call_pub(self.domain(), self.verb(), args);
-        let mut exec_ctx = adapter::to_dsl_context_pub(ctx);
-        let result = self.execute(&vc, &mut exec_ctx, pool).await?;
-        adapter::sync_exec_ctx_to_sem_ctx(&exec_ctx, ctx);
-        Ok(adapter::to_verb_outcome_pub(&result))
-    }
-fn is_migrated(&self) -> bool {
-        true
-    }
-}
-impl DocumentWaiveOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let workstream_id = extract_uuid(verb_call, ctx, "workstream-id")?;
+        let workstream_id = super::helpers::json_extract_uuid(args, ctx, "workstream-id")?;
 
-        let doc_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("type is required"))?;
+        let doc_type = super::helpers::json_extract_string(args, "type")?;
 
-        let reason = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reason")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("reason is required"))?;
+        let reason = super::helpers::json_extract_string(args, "reason")?;
 
-        let approved_by = extract_uuid(verb_call, ctx, "approved-by")?;
+        let approved_by = super::helpers::json_extract_uuid(args, ctx, "approved-by")?;
 
         // Find and waive matching request
         let updated = sqlx::query!(
@@ -1670,16 +1259,10 @@ impl DocumentWaiveOp {
             try_unblock_workstream(workstream_id, pool).await?;
         }
 
-        Ok(ExecutionResult::Affected(1))
+        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
     }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -1746,12 +1329,12 @@ async fn derive_linked_ids(
 
 #[cfg(feature = "database")]
 async fn resolve_document_subject(
-    verb_call: &VerbCall,
-    ctx: &ExecutionContext,
+    args: &serde_json::Value,
+    ctx: &dsl_runtime::VerbExecutionContext,
     pool: &PgPool,
 ) -> Result<DocumentSubject> {
     // Try workstream first
-    if let Some(ws_id) = extract_uuid_opt(verb_call, ctx, "workstream-id") {
+    if let Some(ws_id) = super::helpers::json_extract_uuid_opt(args, ctx, "workstream-id") {
         let row = sqlx::query!(
             r#"
             SELECT w.workstream_id, w.entity_id, c.case_id, c.cbu_id
@@ -1776,7 +1359,7 @@ async fn resolve_document_subject(
     }
 
     // Try entity
-    if let Some(entity_id) = extract_uuid_opt(verb_call, ctx, "entity-id") {
+    if let Some(entity_id) = super::helpers::json_extract_uuid_opt(args, ctx, "entity-id") {
         return Ok(DocumentSubject {
             subject_type: "ENTITY".to_string(),
             subject_id: entity_id,
@@ -1786,7 +1369,7 @@ async fn resolve_document_subject(
     }
 
     // Try case
-    if let Some(case_id) = extract_uuid_opt(verb_call, ctx, "case-id") {
+    if let Some(case_id) = super::helpers::json_extract_uuid_opt(args, ctx, "case-id") {
         let row = sqlx::query!(
             r#"SELECT case_id, cbu_id FROM "ob-poc".cases WHERE case_id = $1"#,
             case_id
