@@ -84,7 +84,11 @@ mod sem_os_schema_ops;
 // consuming `dyn SemanticStateService` via the ServiceRegistry.
 mod service_pipeline_ops;
 mod session_ops;
-mod shared_atom_ops;
+// Phase 5a composite-blocker #3 — shared_atom_ops relocated to
+// `dsl-runtime::domain_ops::shared_atom_ops`, consuming the already-relocated
+// `dsl_runtime::cross_workspace::{repository, fact_refs, fact_versions,
+// replay, types}` module. Registration flows through inventory automatically;
+// external ob-poc code doesn't import these types directly.
 pub(crate) mod skeleton_build_ops;
 // Phase 4 Slice B Group 9 — state_ops relocated to `dsl-runtime::domain_ops::state_ops`
 // alongside the `state_reducer/` module it consumes.
