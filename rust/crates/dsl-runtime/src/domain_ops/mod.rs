@@ -21,6 +21,7 @@ pub mod coverage_compute_ops;
 pub mod capital_ops;
 pub mod cbu_ops;
 pub mod cbu_role_ops;
+pub mod client_group_ops;
 pub mod constellation_ops;
 pub mod control_compute_ops;
 pub mod control_ops;

@@ -42,7 +42,11 @@ mod bpmn_lite_ops;
 // through inventory.
 // Phase 5d — cbu_ops relocated to `dsl-runtime::domain_ops::cbu_ops`
 // Phase 5d — cbu_role_ops relocated to `dsl-runtime::domain_ops::cbu_role_ops`
-mod client_group_ops;
+// Phase 5a composite-blocker #22 — client_group_ops relocated to
+// `dsl-runtime::domain_ops::client_group_ops`. Pure clean lift —
+// matrix tag wrong (6th in this run after #16-#21). 24 ops, all
+// direct sqlx against client-group tables. Stripped via the same
+// Python script as slice #19 billing_ops.
 // Phase 5a composite-blocker #9 — constellation_ops relocated to
 // `dsl-runtime::domain_ops::constellation_ops` consuming the new
 // `dyn ConstellationRuntime` trait via the ServiceRegistry.
