@@ -667,11 +667,11 @@ Define service-level traits in `dsl-runtime::service_traits` for ob-poc-retained
   2. `cross_workspace/` module + `remediation_ops` (relocated together, cross_workspace is the consumer surface) — commit 27585e5d
   3. `shared_atom_ops` (clean lift — its blocker was cross_workspace, already resolved by #2) — commit 8f7ca9c3
   4. `research_workflow_ops` (self-contained; 4 ops, only json_* + sqlx) — commit 6480a0da
+  5. `kyc_case_ops` + `LifecycleCatalog` trait (3 methods: `is_valid_transition`, `is_terminal_state`, `valid_next_states` — projected over named `entity_type`; ob-poc bridge delegates to taxonomy-loaded `OntologyService`. 5 ops, 1427 → 1006 LOC after strip) — commit 8064c39d
 
-**Phase 5a progress: 54 / 89 op files relocated.** Remaining 35 split:
+**Phase 5a progress: 55 / 89 op files relocated.** Remaining 34 split:
 - **12 `ob-poc-adapter` destination** (legitimately stay in ob-poc): `billing_ops`, `booking_principal_ops`, `capital_ops`, `client_group_ops`, `deal_ops`, `gleif_ops`, `investor_ops`, `investor_role_ops`, `resource_ops`, `sem_os_maintenance_ops`, `sem_os_registry_ops`, `team_ops`.
-- **Composite-blocker #5+ candidates** (`dsl-runtime`-destination, each needs ONE trait/dep resolved):
-  - **No remaining blocker** (lift-and-strip candidates — verify first, then execute): `kyc_case_ops` (5 ops, touches `ontology`).
+- **Composite-blocker #6+ candidates** (`dsl-runtime`-destination, each needs ONE trait/dep resolved):
   - **Trait blocker** (needs new `service_traits` entry before move):
     - `ConstellationRuntime` → `constellation_ops` (handle_constellation_{hydrate,summary} from sem_os_runtime)
     - `TaxonomyAccess` → `view_ops` (already named in matrix §6)
@@ -691,7 +691,7 @@ Define service-level traits in `dsl-runtime::service_traits` for ob-poc-retained
     - verb_contract affinity/diagram → `sem_os_schema_ops` (mixed metadata destination)
 - **A1 Pattern B (deferred to Phase 5f ledger):** `bpmn_lite_ops` (5 ops, gRPC), `source_loader_ops` (16 ops, HTTP), `gleif_ops` (17 ops, HTTP — `ob-poc-adapter` dest regardless). See `docs/todo/pattern-b-a1-remediation-ledger.md`.
 
-**Restart instructions for a fresh session:** Pick the next composite-blocker #5. The cheapest candidate is `kyc_case_ops` — verify its `ontology` import is the `crate::ontology` (ob-poc-owned) or something re-exportable cleanly. If the former, either expose a narrow trait for the ontology accessors it needs, or (more likely) lift the relevant ontology types to a shared crate first. Smaller lift-and-strip files gate on "does every import resolve via `dsl-runtime` or via a 1-method trait we can define in one sitting?"; if yes, move it; if no, define the trait + impl + registration in `ob-poc-web::main` first, then lift.
+**Restart instructions for a fresh session:** Pick the next composite-blocker #6. The cheapest remaining `dsl-runtime`-destination candidates are probably ops that can ride the existing `SemanticStateService` trait (`onboarding`, `semantic_ops`'s peers) — the trait already exposes `list_stages` / `get_stage` / `stages_for_product` / `derive`, which is a good chunk of what `onboarding::auto-complete` needs. Verify `onboarding.rs`'s non-stage dependencies first (it calls `crate::database::derive_semantic_state` and composes runbook steps) — if those resolve via services or are small enough to lift as a helper, slice #6 is onboarding. Otherwise pick the next file whose blockers all collapse to one new trait + one ServiceRegistry registration. Smaller lift-and-strip files gate on "does every import resolve via `dsl-runtime` or via a 1-method trait we can define in one sitting?"; if yes, move it; if no, define the trait + impl + registration in `ob-poc-web::main` first, then lift.
 
 #### Phase 5b — Sequencer extraction
 
