@@ -199,7 +199,15 @@ pub(crate) mod sem_os_helpers;
 // route transparently. 1 op (`RegistryActiveManifestOp`) does direct
 // sqlx for `active-manifest` (no matching MCP tool); the other 19
 // delegate via the `registry_op!` macro.
-mod sem_os_schema_ops;
+// Phase 5a composite-blocker #25 — sem_os_schema_ops relocated to
+// `dsl-runtime::domain_ops::sem_os_schema_ops` via YAML-first
+// re-implementation against `config/verbs/sem-reg/schema.yaml`.
+// Three dispatch routes: 5 structure-semantics verbs use the new
+// `dyn SchemaIntrospectionAccess` trait (bridge reads ontology +
+// verb_registry + sem_reg snapshots); 5 introspect/extract verbs
+// route via existing `StewardshipDispatch` cascade to the
+// `db_introspect` MCP tool (slice #7 trick); 3 diagram verbs use
+// direct sqlx + sem_os_core::diagram + relocated affinity_graph_cache.
 // Phase 5a — semantic_ops relocated to `dsl-runtime::domain_ops::semantic_ops`,
 // consuming `dyn SemanticStateService` via the ServiceRegistry.
 mod service_pipeline_ops;

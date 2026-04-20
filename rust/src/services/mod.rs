@@ -75,9 +75,17 @@ pub mod trading_profile_document_impl;
 // `crate::sem_reg::agent::mcp_tools::build_sem_os_service(pool).resolve_context(...)`.
 pub mod sem_os_context_resolver_impl;
 
+// Phase 5a composite-blocker #25 — ob-poc-side impl of
+// `dsl_runtime::service_traits::SchemaIntrospectionAccess`; bridges to
+// `crate::ontology::ontology()`, `crate::dsl_v2::verb_registry::registry()`,
+// and `crate::sem_reg::store::SnapshotStore` for the 5 structure-
+// semantics verbs in `sem_os_schema_ops`.
+pub mod schema_introspection_impl;
+
 // Re-exports
 pub use attribute_identity_dispatch_impl::ObPocAttributeIdentityService;
 pub use constellation_runtime_impl::ObPocConstellationRuntime;
+pub use schema_introspection_impl::ObPocSchemaIntrospectionAccess;
 pub use sem_os_context_resolver_impl::ObPocSemOsContextResolver;
 pub use trading_profile_document_impl::ObPocTradingProfileDocument;
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};

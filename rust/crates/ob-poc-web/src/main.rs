@@ -655,6 +655,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn SemOsContextResolver (sem_reg::agent::mcp_tools::build_sem_os_service)"
         );
 
+        // dyn SchemaIntrospectionAccess — used by relocated sem_os_schema_ops
+        // for the 5 structure-semantics verbs (domain.describe, entity.describe,
+        // entity.list-fields/relationships/verbs). Bridge reads from
+        // `crate::ontology`, `crate::dsl_v2::verb_registry`, and
+        // `crate::sem_reg::store::SnapshotStore`. Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::SchemaIntrospectionAccess>(Arc::new(
+            ob_poc::services::ObPocSchemaIntrospectionAccess::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn SchemaIntrospectionAccess (ontology + verb_registry + sem_reg snapshots)"
+        );
+
         Arc::new(builder.build())
     };
 
