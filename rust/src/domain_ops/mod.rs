@@ -54,7 +54,11 @@ mod client_group_ops;
 // ob-poc code does not import these types directly.
 // Phase 5e — control_compute_ops relocated to `dsl-runtime::domain_ops::control_compute_ops`
 // Phase 5e — control_ops relocated to `dsl-runtime::domain_ops::control_ops`
-mod deal_ops;
+// Phase 5a composite-blocker #21 — deal_ops relocated to
+// `dsl-runtime::domain_ops::deal_ops`. Pure clean lift — matrix tag
+// "ob-poc-adapter destination" was wrong (5th in this run).
+// 28 ops, all direct sqlx against deal lifecycle tables. Stripped via
+// the same Python script as slice #19 billing_ops.
 // Phase 5e — dilution_ops relocated to `dsl-runtime::domain_ops::dilution_ops`
 mod discovery_ops;
 // Phase 4 Slice B Group 4 — docs_bundle_ops relocated to `dsl-runtime::domain_ops::docs_bundle_ops`
