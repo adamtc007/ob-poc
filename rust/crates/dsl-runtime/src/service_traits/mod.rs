@@ -17,6 +17,7 @@ pub mod sem_os_context_resolver;
 pub mod semantic_state;
 pub mod stewardship;
 pub mod trading_profile_document;
+pub mod view_service;
 
 pub use attribute_identity::AttributeIdentityService;
 pub use constellation_runtime::ConstellationRuntime;
@@ -27,3 +28,4 @@ pub use sem_os_context_resolver::SemOsContextResolver;
 pub use semantic_state::SemanticStateService;
 pub use stewardship::{StewardshipDispatch, StewardshipOutcome};
 pub use trading_profile_document::TradingProfileDocument;
+pub use view_service::ViewService;

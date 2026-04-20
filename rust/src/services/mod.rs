@@ -82,12 +82,20 @@ pub mod sem_os_context_resolver_impl;
 // semantics verbs in `sem_os_schema_ops`.
 pub mod schema_introspection_impl;
 
+// Phase 5a composite-blocker #26 — ob-poc-side impl of
+// `dsl_runtime::service_traits::ViewService`; single-method dispatch
+// for all 15 `view.*` verbs. Bridges to `crate::session::ViewState`
+// + `crate::taxonomy::*` (both multi-consumer mega-modules that stay
+// in ob-poc).
+pub mod view_service_impl;
+
 // Re-exports
 pub use attribute_identity_dispatch_impl::ObPocAttributeIdentityService;
 pub use constellation_runtime_impl::ObPocConstellationRuntime;
 pub use schema_introspection_impl::ObPocSchemaIntrospectionAccess;
 pub use sem_os_context_resolver_impl::ObPocSemOsContextResolver;
 pub use trading_profile_document_impl::ObPocTradingProfileDocument;
+pub use view_service_impl::ObPocViewService;
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
 pub use lifecycle_catalog_impl::ObPocLifecycleCatalog;
 pub use mcp_tool_registry_impl::ObPocMcpToolRegistry;

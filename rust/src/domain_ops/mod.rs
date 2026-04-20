@@ -260,7 +260,13 @@ mod trading_profile;
 // Phase 5e — ubo_registry_ops relocated to `dsl-runtime::domain_ops::ubo_registry_ops`
 // Phase 4 Slice B Group 2 — verify_ops relocated to `dsl-runtime::domain_ops::verify_ops`
 // alongside the `verification/` module it consumes.
-mod view_ops;
+// Phase 5a composite-blocker #26 — view_ops relocated to
+// `dsl-runtime::domain_ops::view_ops` via YAML-first re-implementation
+// (`config/verbs/view.yaml`, 15 verbs). Single-method `dyn ViewService`
+// trait dispatches all 15 verbs through the bridge in
+// `crate::services::view_service_impl`, which keeps the heavy
+// `crate::session::ViewState` + `crate::taxonomy::*` modules in
+// ob-poc (both are 5000+ LOC multi-consumer mega-modules).
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -346,12 +352,7 @@ pub use attribute_ops::{
 // BODS operations relocated to dsl-runtime::domain_ops::bods_ops in Phase 4 Slice B Group 3.
 // Phase 5a composite-blocker #23 — discovery_ops re-exports removed; see relocation comment above.
 
-// View operations (session scope and selection management)
-pub use view_ops::{
-    ViewBackToOp, ViewBookOp, ViewBreadcrumbsOp, ViewCbuOp, ViewClearAliasOp, ViewClearOp,
-    ViewEntityForestOp, ViewLayoutOp, ViewOpResult, ViewRefineOp, ViewSelectOp,
-    ViewSelectionInfoOp, ViewStatusOp, ViewUniverseOp, ViewZoomInOp, ViewZoomOutOp,
-};
+// Phase 5a composite-blocker #26 — view_ops re-exports removed; see relocation comment above.
 
 // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
 // Phase 5e — board_ops relocated. Types accessed via dsl_runtime::domain_ops::board_ops.

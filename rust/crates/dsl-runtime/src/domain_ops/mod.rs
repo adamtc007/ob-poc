@@ -80,6 +80,7 @@ pub mod tollgate_ops;
 pub mod trading_matrix;
 pub mod trading_profile_ca_ops;
 pub mod trust_ops;
+pub mod view_ops;
 pub mod ubo_analysis;
 pub mod ubo_compute_ops;
 pub mod ubo_graph_ops;

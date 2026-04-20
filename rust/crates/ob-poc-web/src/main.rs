@@ -667,6 +667,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn SchemaIntrospectionAccess (ontology + verb_registry + sem_reg snapshots)"
         );
 
+        // dyn ViewService — used by relocated view_ops to dispatch all
+        // 15 `view.*` verbs. Bridge wraps `crate::session::ViewState` +
+        // `crate::taxonomy::*` (multi-consumer mega-modules that stay
+        // in ob-poc). Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::ViewService>(Arc::new(
+            ob_poc::services::ObPocViewService::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn ViewService (session::ViewState + taxonomy::*)"
+        );
+
         Arc::new(builder.build())
     };
 
