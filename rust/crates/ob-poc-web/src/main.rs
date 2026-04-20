@@ -614,6 +614,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn LifecycleCatalog (ontology taxonomy)"
         );
 
+        // dyn AttributeIdentityService — used by relocated observation_ops
+        // (and later attribute_ops) to resolve attribute references across
+        // the legacy dictionary, operational `attribute_registry`, and
+        // SemOS-governed attribute defs.
+        builder.register::<dyn dsl_runtime::service_traits::AttributeIdentityService>(Arc::new(
+            ob_poc::services::ObPocAttributeIdentityService::new(pool.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn AttributeIdentityService (dictionary + registry + SemOS)"
+        );
+
         Arc::new(builder.build())
     };
 

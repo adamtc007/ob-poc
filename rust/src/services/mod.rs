@@ -54,7 +54,14 @@ pub mod mcp_tool_registry_impl;
 // taxonomy-loaded `OntologyService` singleton.
 pub mod lifecycle_catalog_impl;
 
+// Phase 5a composite-blocker #8 — ob-poc-side impl of
+// `dsl_runtime::service_traits::AttributeIdentityService`; bridges to
+// the in-crate `attribute_identity_service::AttributeIdentityService`
+// (multi-namespace UNION query over dictionary, registry, SemOS defs).
+pub mod attribute_identity_dispatch_impl;
+
 // Re-exports
+pub use attribute_identity_dispatch_impl::ObPocAttributeIdentityService;
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
 pub use lifecycle_catalog_impl::ObPocLifecycleCatalog;
 pub use mcp_tool_registry_impl::ObPocMcpToolRegistry;

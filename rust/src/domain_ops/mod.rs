@@ -63,7 +63,14 @@ mod investor_role_ops;
 // sqlx. Registration flows through inventory automatically; external
 // ob-poc code doesn't import these types directly.
 pub mod navigation_ops;
-mod observation_ops;
+// Phase 5a composite-blocker #8 — observation_ops relocated to
+// `dsl-runtime::domain_ops::observation_ops` consuming the new
+// `dyn AttributeIdentityService` trait via the ServiceRegistry.
+// `ObPocAttributeIdentityService` in ob-poc bridges to the in-crate
+// `services::attribute_identity_service::AttributeIdentityService`
+// (multi-namespace UNION query over dictionary, registry, SemOS defs).
+// Registration flows through inventory; external ob-poc code does not
+// import these types directly.
 mod onboarding;
 // Phase 5c — outreach_ops relocated to `dsl-runtime::domain_ops::outreach_ops`
 // Phase 5e — ownership_ops relocated to `dsl-runtime::domain_ops::ownership_ops`
@@ -204,10 +211,7 @@ pub use attribute_ops::{
 // Phase 4 Slice B Group 1 — entity_ops relocated to `dsl-runtime::domain_ops::entity_ops`
 // alongside the `placeholder/` module it consumes. Registration flows through inventory
 // automatically; external ob-poc code doesn't import these types directly.
-pub use observation_ops::{
-    DocumentExtractObservationsOp, ObservationFromDocumentOp, ObservationGetCurrentOp,
-    ObservationReconcileOp, ObservationVerifyAllegationsOp,
-};
+// Phase 5a composite-blocker #8 — observation_ops re-exports removed; see relocation comment above.
 // Phase 4 Slice A — pack_ops moved to `dsl-runtime::domain_ops::pack_ops`.
 // Registration flows through `#[register_custom_op]` + inventory automatically;
 // downstream ob-poc code does not import these types directly, so no shim

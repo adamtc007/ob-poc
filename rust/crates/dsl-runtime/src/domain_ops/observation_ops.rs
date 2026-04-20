@@ -1,30 +1,30 @@
 //! Observation custom operations
 //!
 //! Operations for attribute observations from various sources,
-//! discrepancy detection, and allegation verification.
+//! discrepancy detection, and allegation verification. Attribute
+//! identity resolution (FQN / registry id / dictionary uuid / alias /
+//! display name → runtime UUID) is delegated to the host through
+//! [`crate::service_traits::AttributeIdentityService`]; the rest is
+//! direct sqlx against the `"ob-poc"` schema.
 
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
+use sqlx::PgPool;
 
-use super::helpers::{
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{
     json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-use crate::services::attribute_identity_service::AttributeIdentityService;
-
-#[cfg(feature = "database")]
-use sqlx::PgPool;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use crate::service_traits::AttributeIdentityService;
 
 // ============================================================================
-// Shared _impl functions (called by both execute and execute_json)
+// Shared _impl functions
 // ============================================================================
 
 /// Shared impl for observation.reconcile — creates discrepancy records via sqlx::query!
-#[cfg(feature = "database")]
 async fn observation_reconcile_impl(
     entity_id: uuid::Uuid,
     attribute_id: uuid::Uuid,
@@ -92,7 +92,6 @@ async fn observation_reconcile_impl(
 }
 
 /// Shared impl for observation.verify-allegations — updates allegations via sqlx::query!
-#[cfg(feature = "database")]
 async fn observation_verify_allegations_impl(
     cbu_id: uuid::Uuid,
     entity_id: uuid::Uuid,
@@ -180,7 +179,6 @@ async fn observation_verify_allegations_impl(
 }
 
 /// Shared impl for document.extract-to-observations — creates observations + auto-verifies via sqlx::query!
-#[cfg(feature = "database")]
 async fn document_extract_observations_impl(
     document_id: uuid::Uuid,
     entity_id: uuid::Uuid,
@@ -300,26 +298,23 @@ impl CustomOperation for ObservationFromDocumentOp {
         "Requires document lookup, attribute lookup, and automatic confidence/authoritative flags"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
 
         let attr_name = json_extract_string(args, "attribute")?;
-        let attribute_id = AttributeIdentityService::new(pool.clone())
+        let attribute_id = ctx
+            .service::<dyn AttributeIdentityService>()?
             .resolve_runtime_uuid(&attr_name)
-            .await?;
-        let attribute_id =
-            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
 
         let value = json_extract_string(args, "value")?;
         let extraction_method = json_extract_string_opt(args, "extraction-method");
@@ -366,133 +361,11 @@ impl CustomOperation for ObservationFromDocumentOp {
         .execute(pool)
         .await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            observation_id,
-        ))
+        Ok(VerbExecutionOutcome::Uuid(observation_id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ObservationFromDocumentOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
-
-        let document_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "document-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing document-id argument"))?;
-
-        let attr_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "attribute")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
-
-        let attribute_id = AttributeIdentityService::new(pool.clone())
-            .resolve_runtime_uuid(attr_name)
-            .await?;
-
-        let attribute_id =
-            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
-
-        let value = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "value")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing value argument"))?;
-
-        let extraction_method = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "extraction-method")
-            .and_then(|a| a.value.as_string());
-
-        let confidence: f64 = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "confidence")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0.80);
-
-        let is_authoritative: bool = sqlx::query_scalar(
-            r#"SELECT COALESCE(dal.is_authoritative, FALSE)
-               FROM "ob-poc".document_catalog dc
-               LEFT JOIN "ob-poc".document_attribute_links dal
-                 ON dal.document_type_id = dc.document_type_id
-                 AND dal.attribute_id = $2
-                 AND dal.direction IN ('SOURCE', 'BOTH')
-               WHERE dc.doc_id = $1
-               LIMIT 1"#,
-        )
-        .bind(document_id)
-        .bind(attribute_id)
-        .fetch_optional(pool)
-        .await?
-        .unwrap_or(false);
-
-        let observation_id = Uuid::new_v4();
-
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".attribute_observations
-               (observation_id, entity_id, attribute_id, value_text, source_type,
-                source_document_id, confidence, is_authoritative, extraction_method,
-                observed_at, status)
-               VALUES ($1, $2, $3, $4, 'DOCUMENT', $5, $6, $7, $8, NOW(), 'ACTIVE')"#,
-        )
-        .bind(observation_id)
-        .bind(entity_id)
-        .bind(attribute_id)
-        .bind(value)
-        .bind(document_id)
-        .bind(confidence)
-        .bind(is_authoritative)
-        .bind(extraction_method)
-        .execute(pool)
-        .await?;
-
-        ctx.bind("observation", observation_id);
-        Ok(ExecutionResult::Uuid(observation_id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
 }
 
@@ -512,25 +385,22 @@ impl CustomOperation for ObservationGetCurrentOp {
         "Requires priority-based selection (authoritative > confidence > recency)"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
 
         let attr_name = json_extract_string(args, "attribute")?;
-        let attribute_id = AttributeIdentityService::new(pool.clone())
+        let attribute_id = ctx
+            .service::<dyn AttributeIdentityService>()?
             .resolve_runtime_uuid(&attr_name)
-            .await?;
-        let attribute_id =
-            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
 
         let result: Option<(
             Uuid,
@@ -562,100 +432,7 @@ impl CustomOperation for ObservationGetCurrentOp {
                 source_type,
                 confidence,
                 is_authoritative,
-            )) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                serde_json::json!({
-                    "observation_id": obs_id,
-                    "value_text": value_text,
-                    "value_number": value_number,
-                    "value_boolean": value_boolean,
-                    "value_date": value_date,
-                    "source_type": source_type,
-                    "confidence": confidence,
-                    "is_authoritative": is_authoritative
-                }),
-            )),
-            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                serde_json::json!({
-                    "found": false,
-                    "message": "No active observation found for this attribute"
-                }),
-            )),
-        }
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-
-impl ObservationGetCurrentOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
-
-        let attr_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "attribute")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
-
-        let attribute_id = AttributeIdentityService::new(pool.clone())
-            .resolve_runtime_uuid(attr_name)
-            .await?;
-
-        let attribute_id =
-            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
-
-        let result: Option<(
-            Uuid,
-            Option<String>,
-            Option<rust_decimal::Decimal>,
-            Option<bool>,
-            Option<chrono::NaiveDate>,
-            String,
-            Option<rust_decimal::Decimal>,
-            bool,
-        )> = sqlx::query_as(
-            r#"SELECT observation_id, value_text, value_number, value_boolean, value_date,
-                      source_type, confidence, is_authoritative
-               FROM "ob-poc".v_attribute_current
-               WHERE entity_id = $1 AND attribute_id = $2"#,
-        )
-        .bind(entity_id)
-        .bind(attribute_id)
-        .fetch_optional(pool)
-        .await?;
-
-        match result {
-            Some((
-                obs_id,
-                value_text,
-                value_number,
-                value_boolean,
-                value_date,
-                source_type,
-                confidence,
-                is_authoritative,
-            )) => Ok(ExecutionResult::Record(serde_json::json!({
+            )) => Ok(VerbExecutionOutcome::Record(serde_json::json!({
                 "observation_id": obs_id,
                 "value_text": value_text,
                 "value_number": value_number,
@@ -665,22 +442,15 @@ impl ObservationGetCurrentOp {
                 "confidence": confidence,
                 "is_authoritative": is_authoritative
             }))),
-            None => Ok(ExecutionResult::Record(serde_json::json!({
+            None => Ok(VerbExecutionOutcome::Record(serde_json::json!({
                 "found": false,
                 "message": "No active observation found for this attribute"
             }))),
         }
     }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "found": false,
-            "message": "No database available"
-        })))
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -703,106 +473,31 @@ impl CustomOperation for ObservationReconcileOp {
         "Requires comparing multiple observations and detecting value conflicts"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
 
         let attr_name = json_extract_string(args, "attribute")?;
-        let attribute_id = AttributeIdentityService::new(pool.clone())
+        let attribute_id = ctx
+            .service::<dyn AttributeIdentityService>()?
             .resolve_runtime_uuid(&attr_name)
-            .await?;
-        let attribute_id =
-            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
 
         let case_id = json_extract_uuid_opt(args, ctx, "case-id");
         let auto_create = json_extract_bool_opt(args, "auto-create-discrepancies").unwrap_or(true);
 
         let result =
             observation_reconcile_impl(entity_id, attribute_id, case_id, auto_create, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ObservationReconcileOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
-
-        let attr_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "attribute")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing attribute argument"))?;
-
-        let attribute_id = AttributeIdentityService::new(pool.clone())
-            .resolve_runtime_uuid(attr_name)
-            .await?;
-        let attribute_id =
-            attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
-
-        let case_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "case-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
-
-        let auto_create = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "auto-create-discrepancies")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(true);
-
-        let result =
-            observation_reconcile_impl(entity_id, attribute_id, case_id, auto_create, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "status": "no_database",
-            "discrepancies_created": 0
-        })))
     }
 }
 
@@ -825,77 +520,21 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
         "Requires joining allegations with observations and comparing values"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
 
         let result = observation_verify_allegations_impl(cbu_id, entity_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ObservationVerifyAllegationsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        let entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
-
-        let result = observation_verify_allegations_impl(cbu_id, entity_id, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "verified": 0,
-            "contradicted": 0,
-            "no_observation": 0
-        })))
     }
 }
 
@@ -918,86 +557,22 @@ impl CustomOperation for DocumentExtractObservationsOp {
         "Requires joining document with attribute links and creating observations"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let auto_verify = json_extract_bool_opt(args, "auto-verify-allegations").unwrap_or(true);
 
         let result =
             document_extract_observations_impl(document_id, entity_id, auto_verify, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl DocumentExtractObservationsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let document_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "document-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing document-id argument"))?;
-
-        let entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
-
-        let auto_verify = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "auto-verify-allegations")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(true);
-
-        let result =
-            document_extract_observations_impl(document_id, entity_id, auto_verify, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "observations_created": 0,
-            "attributes_extractable": 0,
-            "allegations_verified": 0
-        })))
     }
 }
