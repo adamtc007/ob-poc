@@ -63,6 +63,7 @@ pub mod semantic_ops;
 pub mod shared_atom_ops;
 pub mod skeleton_build_ops;
 pub mod state_ops;
+pub mod team_ops;
 pub mod temporal_ops;
 pub mod tollgate_evaluate_ops;
 pub mod tollgate_ops;

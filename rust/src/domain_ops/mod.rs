@@ -171,7 +171,13 @@ mod session_ops;
 // Phase 4 Slice B Group 9 — state_ops relocated to `dsl-runtime::domain_ops::state_ops`
 // alongside the `state_reducer/` module it consumes.
 mod source_loader_ops;
-mod team_ops;
+// Phase 5a composite-blocker #16 — team_ops relocated to
+// `dsl-runtime::domain_ops::team_ops`. Pure clean lift — the spec's
+// "ob-poc-adapter destination" matrix tag turned out wrong (file is
+// self-contained, only legacy-path artifacts as deps). 1 op
+// (`TeamTransferMemberOp`), 171 LOC. Registration flows through
+// inventory; `pub use team_ops::TeamTransferMemberOp` re-export had
+// zero external consumers and was dropped.
 pub mod template_ops;
 
 // Phase 4 Slice B Group 6 — tollgate_ops relocated to `dsl-runtime::domain_ops::tollgate_ops`
@@ -272,7 +278,7 @@ pub use attribute_ops::{
 // Phase 5e — ubo_graph_ops relocated. Types accessed via dsl_runtime::domain_ops::ubo_graph_ops.
 
 // Team operations (only transfer-member needs plugin, others are CRUD)
-pub use team_ops::TeamTransferMemberOp;
+// Phase 5a composite-blocker #16 — team_ops re-export removed; see relocation comment above.
 
 // Access Review operations (complex multi-step transactional operations only)
 

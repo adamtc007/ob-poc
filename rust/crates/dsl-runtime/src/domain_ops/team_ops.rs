@@ -6,17 +6,12 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
-
-use super::helpers::extract_uuid;
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-
-#[cfg(feature = "database")]
+use sqlx::PgPool;
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
-use sqlx::PgPool;
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{json_extract_string, json_extract_uuid};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================
 // TRANSFER MEMBER - Multi-step atomic operation
@@ -44,14 +39,12 @@ impl CustomOperation for TeamTransferMemberOp {
         "Atomic remove + add across teams with audit trail"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_uuid};
+    ) -> Result<VerbExecutionOutcome> {
         let from_team = json_extract_uuid(args, ctx, "from-team")?;
         let to_team = json_extract_uuid(args, ctx, "to-team")?;
         let user_id = json_extract_uuid(args, ctx, "user")?;
@@ -59,9 +52,7 @@ impl CustomOperation for TeamTransferMemberOp {
 
         let new_membership_id =
             team_transfer_member_impl(from_team, to_team, user_id, &new_role, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            new_membership_id,
-        ))
+        Ok(VerbExecutionOutcome::Uuid(new_membership_id))
     }
 
     fn is_migrated(&self) -> bool {
@@ -69,46 +60,7 @@ impl CustomOperation for TeamTransferMemberOp {
     }
 }
 
-impl TeamTransferMemberOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Extract arguments
-        let from_team = extract_uuid(verb_call, ctx, "from-team")?;
-        let to_team = extract_uuid(verb_call, ctx, "to-team")?;
-        let user_id = extract_uuid(verb_call, ctx, "user")?;
-
-        let new_role = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "new-role")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| {
-                anyhow::anyhow!("team.transfer-member: Missing required argument :new-role")
-            })?;
-
-        let new_membership_id =
-            team_transfer_member_impl(from_team, to_team, user_id, &new_role, pool).await?;
-        Ok(ExecutionResult::Uuid(new_membership_id))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
-    }
-}
-
-/// Shared implementation for team.transfer-member — called by both execute() and execute_json().
-#[cfg(feature = "database")]
+/// Shared implementation for team.transfer-member.
 async fn team_transfer_member_impl(
     from_team: Uuid,
     to_team: Uuid,
