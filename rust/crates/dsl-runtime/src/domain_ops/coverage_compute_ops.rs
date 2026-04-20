@@ -33,13 +33,11 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
-use sqlx::PgPool;
-
-use super::helpers::extract_uuid;
-use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================
 // Result Types
@@ -114,7 +112,6 @@ const ALL_PRONGS: &[&str] = &[
 #[register_custom_op]
 pub struct CoverageComputeOp;
 
-#[cfg(feature = "database")]
 async fn coverage_compute_impl(
     case_id: Uuid,
     determination_run_id: Uuid,
@@ -319,48 +316,22 @@ impl CustomOperation for CoverageComputeOp {
          and tollgate blocking logic"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::json_extract_uuid;
 
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
         let determination_run_id = json_extract_uuid(args, ctx, "determination-run-id")?;
         let result = coverage_compute_impl(case_id, determination_run_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl CoverageComputeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let determination_run_id = extract_uuid(verb_call, ctx, "determination-run-id")?;
-        let result = coverage_compute_impl(case_id, determination_run_id, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -451,7 +422,6 @@ fn update_prong_count(
 ///
 /// Checks both direct relationships in entity_relationships and
 /// chain data from chains_snapshot if available.
-#[cfg(feature = "database")]
 async fn check_ownership_prong(
     pool: &PgPool,
     subject_entity_id: Uuid,
@@ -529,7 +499,6 @@ async fn check_ownership_prong(
 ///
 /// Checks both `"ob-poc".kyc_ubo_evidence` (type IDENTITY_DOC, status VERIFIED) and
 /// `"ob-poc".entity_workstreams.identity_verified` flag.
-#[cfg(feature = "database")]
 async fn check_identity_prong(pool: &PgPool, entity_id: Uuid, case_id: Uuid) -> Result<bool> {
     // Check 1: Verified identity evidence in ubo_evidence
     let evidence_count: (i64,) = sqlx::query_as(
@@ -576,7 +545,6 @@ async fn check_identity_prong(pool: &PgPool, entity_id: Uuid, case_id: Uuid) -> 
 ///
 /// Checks entity_relationships for relationship_type = 'control' or
 /// control_type IS NOT NULL.
-#[cfg(feature = "database")]
 async fn check_control_prong(
     pool: &PgPool,
     _subject_entity_id: Uuid,
@@ -605,7 +573,6 @@ async fn check_control_prong(
 ///
 /// Returns (relationship_id, description) pairs for edges that exist
 /// but lack control documentation.
-#[cfg(feature = "database")]
 async fn find_edge_gaps_for_control(
     pool: &PgPool,
     _subject_entity_id: Uuid,
@@ -642,7 +609,6 @@ async fn find_edge_gaps_for_control(
 ///
 /// Checks `"ob-poc".kyc_ubo_evidence` for evidence_type in (SOURCE_OF_WEALTH,
 /// SOURCE_OF_FUNDS) with status VERIFIED or RECEIVED.
-#[cfg(feature = "database")]
 async fn check_source_of_wealth_prong(
     pool: &PgPool,
     entity_id: Uuid,
@@ -669,7 +635,6 @@ async fn check_source_of_wealth_prong(
 }
 
 /// Persist the coverage result as JSONB into `coverage_snapshot`.
-#[cfg(feature = "database")]
 async fn persist_coverage_snapshot(
     pool: &PgPool,
     run_id: Uuid,

@@ -8,22 +8,18 @@
 //! - `batch.abort` - Abort batch execution
 //! - `batch.status` - Get batch status
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::helpers::{
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{
     json_extract_int_opt, json_extract_string_list, json_extract_string_opt, json_extract_uuid,
 };
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-
-#[cfg(feature = "database")]
-use anyhow::{anyhow, Result};
-#[cfg(feature = "database")]
-use sqlx::PgPool;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ============================================================================
 // Result Types
@@ -42,11 +38,8 @@ pub struct BatchControlResult {
     pub message: String,
 }
 
-#[cfg(feature = "database")]
-fn batch_control_outcome(
-    result: BatchControlResult,
-) -> dsl_runtime::VerbExecutionOutcome {
-    dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
+fn batch_control_outcome(result: BatchControlResult) -> VerbExecutionOutcome {
+    VerbExecutionOutcome::Record(serde_json::json!({
         "_type": "batch_control",
         "operation": result.operation,
         "success": result.success,
@@ -79,13 +72,12 @@ impl CustomOperation for BatchPauseOp {
         "Requires session state mutation to pause active batch"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         tracing::info!("batch.pause called");
         Ok(batch_control_outcome(BatchControlResult {
             operation: "pause".to_string(),
@@ -97,32 +89,6 @@ impl CustomOperation for BatchPauseOp {
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl BatchPauseOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Note: In a full implementation, this would interact with session state
-        // For now, we check if there's batch state in context
-
-        // This operation requires session context which isn't directly available
-        // In practice, this would be called via session routes that have access
-        // to ActiveBatchState
-
-        tracing::info!("batch.pause called");
-
-        Ok(ExecutionResult::BatchControl(BatchControlResult {
-            operation: "pause".to_string(),
-            success: true,
-            status: None,
-            message: "Batch pause requested. Session handler will process.".to_string(),
-        }))
     }
 }
 
@@ -150,13 +116,12 @@ impl CustomOperation for BatchResumeOp {
         "Requires session state mutation to resume paused batch"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         tracing::info!("batch.resume called");
         Ok(batch_control_outcome(BatchControlResult {
             operation: "resume".to_string(),
@@ -168,25 +133,6 @@ impl CustomOperation for BatchResumeOp {
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl BatchResumeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        tracing::info!("batch.resume called");
-
-        Ok(ExecutionResult::BatchControl(BatchControlResult {
-            operation: "resume".to_string(),
-            success: true,
-            status: None,
-            message: "Batch resume requested. Session handler will process.".to_string(),
-        }))
     }
 }
 
@@ -214,13 +160,12 @@ impl CustomOperation for BatchContinueOp {
         "Requires session state to continue batch for N more items"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let count = json_extract_int_opt(args, "count").unwrap_or(1) as usize;
         tracing::info!(count, "batch.continue called");
         Ok(batch_control_outcome(BatchControlResult {
@@ -233,34 +178,6 @@ impl CustomOperation for BatchContinueOp {
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl BatchContinueOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Extract :count parameter
-        let count: usize = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "count")
-            .and_then(|a| a.value.as_integer())
-            .map(|n| n as usize)
-            .unwrap_or(1);
-
-        tracing::info!(count, "batch.continue called");
-
-        Ok(ExecutionResult::BatchControl(BatchControlResult {
-            operation: "continue".to_string(),
-            success: true,
-            status: Some(serde_json::json!({ "count": count })),
-            message: format!("Continue {} more items requested.", count),
-        }))
     }
 }
 
@@ -289,13 +206,12 @@ impl CustomOperation for BatchSkipOp {
         "Requires session state to skip current batch item"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let reason = json_extract_string_opt(args, "reason");
         tracing::info!(?reason, "batch.skip called");
         Ok(batch_control_outcome(BatchControlResult {
@@ -308,32 +224,6 @@ impl CustomOperation for BatchSkipOp {
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl BatchSkipOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let reason = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reason")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        tracing::info!(?reason, "batch.skip called");
-
-        Ok(ExecutionResult::BatchControl(BatchControlResult {
-            operation: "skip".to_string(),
-            success: true,
-            status: reason.as_ref().map(|r| serde_json::json!({ "reason": r })),
-            message: reason.unwrap_or_else(|| "Current item skipped.".to_string()),
-        }))
     }
 }
 
@@ -362,13 +252,12 @@ impl CustomOperation for BatchAbortOp {
         "Requires session state mutation to abort batch execution"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let reason = json_extract_string_opt(args, "reason");
         tracing::warn!(?reason, "batch.abort called");
         Ok(batch_control_outcome(BatchControlResult {
@@ -381,32 +270,6 @@ impl CustomOperation for BatchAbortOp {
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl BatchAbortOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let reason = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reason")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        tracing::warn!(?reason, "batch.abort called");
-
-        Ok(ExecutionResult::BatchControl(BatchControlResult {
-            operation: "abort".to_string(),
-            success: true,
-            status: reason.as_ref().map(|r| serde_json::json!({ "reason": r })),
-            message: reason.unwrap_or_else(|| "Batch execution aborted.".to_string()),
-        }))
     }
 }
 
@@ -445,13 +308,12 @@ impl CustomOperation for BatchStatusOp {
         "Requires session state to read batch execution status"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         tracing::debug!("batch.status called");
         Ok(batch_control_outcome(BatchControlResult {
             operation: "status".to_string(),
@@ -465,30 +327,6 @@ impl CustomOperation for BatchStatusOp {
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl BatchStatusOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // In a full implementation, this would read from session's ActiveBatchState
-        // For now, return a placeholder that indicates the operation type
-
-        tracing::debug!("batch.status called");
-
-        Ok(ExecutionResult::BatchControl(BatchControlResult {
-            operation: "status".to_string(),
-            success: true,
-            status: Some(serde_json::json!({
-                "message": "Status query - session handler will populate actual state"
-            })),
-            message: "Batch status requested.".to_string(),
-        }))
     }
 }
 
@@ -519,13 +357,12 @@ impl CustomOperation for BatchAddProductsOp {
         "Bulk operation applying products to multiple CBUs from batch results"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_ids = args
             .get("cbu-ids")
             .and_then(|v| v.as_array())
@@ -643,164 +480,6 @@ impl CustomOperation for BatchAddProductsOp {
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl BatchAddProductsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use crate::dsl_v2::ast::{AstNode, Literal};
-
-        // Extract :cbu-ids (can be list or @symbol reference)
-        let cbu_ids: Vec<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-ids")
-            .map(|a| match &a.value {
-                AstNode::List { items, .. } => items
-                    .iter()
-                    .filter_map(|item| match item {
-                        AstNode::SymbolRef { name, .. } => ctx.resolve(name),
-                        AstNode::Literal(Literal::String(s), _) => s.parse().ok(),
-                        AstNode::Literal(Literal::Uuid(u), _) => Some(*u),
-                        AstNode::EntityRef {
-                            resolved_key: Some(key),
-                            ..
-                        } => key.parse().ok(),
-                        _ => None,
-                    })
-                    .collect(),
-                AstNode::SymbolRef { name, .. } => {
-                    // Single symbol reference - resolve to a single UUID
-                    if let Some(id) = ctx.resolve(name) {
-                        vec![id]
-                    } else {
-                        Vec::new()
-                    }
-                }
-                _ => Vec::new(),
-            })
-            .unwrap_or_default();
-
-        // Extract :products list
-        let products: Vec<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "products")
-            .and_then(|a| {
-                if let AstNode::List { items, .. } = &a.value {
-                    Some(
-                        items
-                            .iter()
-                            .filter_map(|item| match item {
-                                AstNode::Literal(Literal::String(s), _) => Some(s.clone()),
-                                AstNode::EntityRef { value, .. } => Some(value.clone()),
-                                _ => None,
-                            })
-                            .collect(),
-                    )
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default();
-
-        if cbu_ids.is_empty() {
-            return Err(anyhow!("No CBU IDs provided for batch.add-products"));
-        }
-
-        if products.is_empty() {
-            return Err(anyhow!("No products specified for batch.add-products"));
-        }
-
-        tracing::info!(
-            cbu_count = cbu_ids.len(),
-            products = ?products,
-            "batch.add-products executing"
-        );
-
-        // Execute cbu.add-product for each CBU × product combination
-        let mut success_count = 0;
-        let mut failure_count = 0;
-        let mut errors: Vec<String> = Vec::new();
-
-        for cbu_id in &cbu_ids {
-            for product in &products {
-                // Look up product ID
-                let product_result: Result<Option<Uuid>, _> = sqlx::query_scalar(
-                    r#"SELECT product_id FROM "ob-poc".products WHERE product_code = $1 OR name = $1"#
-                )
-                .bind(product)
-                .fetch_optional(pool)
-                .await;
-
-                match product_result {
-                    Ok(Some(product_id)) => {
-                        // Insert CBU-product link
-                        let insert_result = sqlx::query(
-                            r#"
-                            INSERT INTO "ob-poc".cbu_products (cbu_id, product_id)
-                            VALUES ($1, $2)
-                            ON CONFLICT (cbu_id, product_id) DO NOTHING
-                            "#,
-                        )
-                        .bind(cbu_id)
-                        .bind(product_id)
-                        .execute(pool)
-                        .await;
-
-                        match insert_result {
-                            Ok(_) => success_count += 1,
-                            Err(e) => {
-                                failure_count += 1;
-                                errors.push(format!("{}/{}: {}", cbu_id, product, e));
-                            }
-                        }
-                    }
-                    Ok(None) => {
-                        failure_count += 1;
-                        errors.push(format!("Product not found: {}", product));
-                    }
-                    Err(e) => {
-                        failure_count += 1;
-                        errors.push(format!("Product lookup failed: {}", e));
-                    }
-                }
-            }
-        }
-
-        let total_ops = cbu_ids.len() * products.len();
-
-        tracing::info!(
-            success_count,
-            failure_count,
-            total_ops,
-            "batch.add-products completed"
-        );
-
-        Ok(ExecutionResult::BatchControl(BatchControlResult {
-            operation: "add-products".to_string(),
-            success: failure_count == 0,
-            status: Some(serde_json::json!({
-                "cbu_count": cbu_ids.len(),
-                "products": products,
-                "total_operations": total_ops,
-                "success_count": success_count,
-                "failure_count": failure_count,
-                "errors": errors,
-            })),
-            message: format!(
-                "Added products to {} CBUs: {} success, {} failed",
-                cbu_ids.len(),
-                success_count,
-                failure_count
-            ),
-        }))
     }
 }
 

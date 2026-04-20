@@ -1,31 +1,22 @@
-//! Matrix-Overlay custom operations
+//! Matrix-Overlay custom operations.
 //!
 //! Operations for linking trading matrix entries to product subscriptions.
-//! Key insight: Products ADD attributes to matrix entries, they don't define them.
+//! Products ADD attributes to matrix entries, they don't define them.
 
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
-
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
-// ============================================================================
-// EFFECTIVE MATRIX OPERATION
-// ============================================================================
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{
+    json_extract_string, json_extract_string_list, json_extract_string_opt, json_extract_uuid,
+};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
-/// Get effective matrix with all product overlays
-///
-/// Rationale: Queries v_cbu_matrix_effective view to get trading matrix entries
-/// with all applicable product overlays aggregated.
 #[register_custom_op]
 pub struct MatrixEffectiveOp;
 
-#[cfg(feature = "database")]
 async fn matrix_effective_impl(
     cbu_id: uuid::Uuid,
     instrument_class: Option<String>,
@@ -89,24 +80,17 @@ impl CustomOperation for MatrixEffectiveOp {
         "Complex query aggregating trading matrix with product overlays"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let instrument_class = json_extract_string_opt(args, "instrument-class");
         let market = json_extract_string_opt(args, "market");
         let result = matrix_effective_impl(cbu_id, instrument_class, market, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            result,
-        ))
+        Ok(VerbExecutionOutcome::RecordSet(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -114,66 +98,9 @@ impl CustomOperation for MatrixEffectiveOp {
     }
 }
 
-impl MatrixEffectiveOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id: uuid::Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        // Optional filters
-        let instrument_class: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instrument-class")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let market: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "market")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-        let result = matrix_effective_impl(cbu_id, instrument_class, market, pool).await?;
-        Ok(ExecutionResult::RecordSet(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
-    }
-}
-
-// ============================================================================
-// UNIFIED GAPS OPERATION
-// ============================================================================
-
-/// Get all gaps from both lifecycle and service domains
-///
-/// Rationale: Queries v_cbu_unified_gaps view to show missing resources
-/// from both the trading matrix (lifecycle) and product (service) domains.
 #[register_custom_op]
 pub struct MatrixUnifiedGapsOp;
 
-#[cfg(feature = "database")]
 async fn matrix_unified_gaps_impl(
     cbu_id: uuid::Uuid,
     domain_filter: Option<String>,
@@ -257,21 +184,16 @@ impl CustomOperation for MatrixUnifiedGapsOp {
         "Queries unified gap view across lifecycle and service domains"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let domain_filter = json_extract_string_opt(args, "domain");
         let result = matrix_unified_gaps_impl(cbu_id, domain_filter, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -279,63 +201,9 @@ impl CustomOperation for MatrixUnifiedGapsOp {
     }
 }
 
-impl MatrixUnifiedGapsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id: uuid::Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        let domain_filter: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "domain")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-        let result = matrix_unified_gaps_impl(cbu_id, domain_filter, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "total_gaps": 0,
-            "lifecycle_gaps": 0,
-            "service_gaps": 0,
-            "gaps": []
-        })))
-    }
-}
-
-// ============================================================================
-// COMPARE PRODUCTS OPERATION
-// ============================================================================
-
-/// Compare what different products add to a matrix entry
-///
-/// Rationale: Shows the delta between products - what's unique to each,
-/// what overlaps, helping with product selection.
 #[register_custom_op]
 pub struct MatrixCompareProductsOp;
 
-#[cfg(feature = "database")]
 async fn matrix_compare_products_impl(
     _cbu_id: uuid::Uuid,
     instrument_class: String,
@@ -426,87 +294,21 @@ impl CustomOperation for MatrixCompareProductsOp {
         "Complex comparison query showing product overlap and unique features"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_string_list, json_extract_uuid};
-
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let instrument_class = json_extract_string(args, "instrument-class")?;
         let products = json_extract_string_list(args, "products")?;
         let result = matrix_compare_products_impl(cbu_id, instrument_class, products, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl MatrixCompareProductsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id: uuid::Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        let instrument_class = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instrument-class")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing instrument-class argument"))?;
-
-        let products: Vec<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "products")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing products argument (must be a list)"))?;
-        let result =
-            matrix_compare_products_impl(cbu_id, instrument_class.to_string(), products, pool)
-                .await?;
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "instrument_class": "",
-            "base_lifecycles": [],
-            "by_product": {},
-            "overlap": [],
-            "unique_to_each": {}
-        })))
     }
 }
 

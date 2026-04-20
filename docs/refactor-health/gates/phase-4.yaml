@@ -1,0 +1,168 @@
+gate_version: 1
+phase: "4"
+phase_name: "Slice A — move domain-neutral plugin ops from ob-poc to dsl-runtime"
+opened_at: 2026-04-20T08:00:00Z
+opened_by: adamtc007
+depends_on: ["0", "1", "2", "2.5", "3"]
+scope_statement: |
+  Per three-plane architecture v0.3 §13 Phase 4. Physically move plugin-op
+  files from `rust/src/domain_ops/` to `rust/crates/dsl-runtime/src/domain_ops/`,
+  where the `CustomOperation` trait + registry already live. Registration
+  flows through the inventory mechanism unchanged; the `#[register_custom_op]`
+  macro uses absolute `::dsl_runtime::` paths and those now resolve inside
+  the `dsl-runtime` crate itself via `extern crate self as dsl_runtime;`.
+
+  Slice A covers 14 files whose ownership-matrix row has `dest = dsl-runtime`
+  AND `blockers = —` AND no `crate::` imports that reach ob-poc-only modules
+  beyond the inventory-friendly `domain_ops` internals. Files with blocker
+  traits (DocumentRequirementsService, AttributeIdentityService, etc.) wait
+  until Phase 5 when the adapter traits get defined.
+
+  Each moved file is rewritten during the move:
+  - Dead legacy inherent `execute(&VerbCall, &mut ExecutionContext, &PgPool)`
+    methods deleted (trait method removed in Phase 2.5 Slice D-quick — the
+    inherent impls remained as unreachable dead code).
+  - Local file-scoped VerbCall-based helpers (`get_required_string`,
+    `get_optional_date`, etc.) deleted.
+  - Imports that became unused after the deletions — `crate::dsl_v2::ast::VerbCall`,
+    `crate::dsl_v2::executor::{ExecutionContext, ExecutionResult}`,
+    `super::helpers::{extract_*}` — stripped.
+  - `#[cfg(feature = "database")]` gates dropped (dsl-runtime has sqlx
+    unconditionally; the `CustomOperation` trait requires `execute_json`
+    unconditionally).
+  - `use super::CustomOperation;` → `use crate::custom_op::CustomOperation;`
+  - `use super::helpers::{json_*};` → `use crate::domain_ops::helpers::{json_*};`
+  - `dsl_runtime::VerbExecutionContext` / `::VerbExecutionOutcome` in method
+    signatures → bare `VerbExecutionContext` / `VerbExecutionOutcome` (imported
+    via `use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};`).
+
+  A new `dsl-runtime::domain_ops::helpers` module mirrors only the `json_*`
+  arg-extraction family. The `extract_*` (VerbCall-based) and `ext_*`
+  (ob-poc-session-coupled) helper families stay in `ob-poc::domain_ops::helpers`
+  where the unmoved files that still use them live.
+
+  Deferred from Slice A to later slices:
+  - `research_workflow_ops.rs` — uses `super::sem_os_helpers::extract_args_as_json`
+    which stays in ob-poc.
+  - `batch_control_ops.rs` cross-crate type reference — `ExecutionResult::BatchControl`
+    holds a `BatchControlResult` from the moved module; `rust/src/dsl_v2/executor.rs`
+    was updated to reference `dsl_runtime::domain_ops::batch_control_ops::BatchControlResult`
+    (one-line import rewrite, not a blocker).
+
+criteria:
+  - id: files-moved
+    description: "14 files physically relocated from rust/src/domain_ops/ to rust/crates/dsl-runtime/src/domain_ops/"
+    check_command: "test ! -f rust/src/domain_ops/pack_ops.rs && test ! -f rust/src/domain_ops/research_normalize_ops.rs && test ! -f rust/src/domain_ops/economic_exposure_ops.rs && test ! -f rust/src/domain_ops/matrix_overlay_ops.rs && test ! -f rust/src/domain_ops/custody.rs && test ! -f rust/src/domain_ops/trading_matrix.rs && test ! -f rust/src/domain_ops/outreach_plan_ops.rs && test ! -f rust/src/domain_ops/import_run_ops.rs && test ! -f rust/src/domain_ops/graph_validate_ops.rs && test ! -f rust/src/domain_ops/coverage_compute_ops.rs && test ! -f rust/src/domain_ops/batch_control_ops.rs && test ! -f rust/src/domain_ops/tollgate_evaluate_ops.rs && test ! -f rust/src/domain_ops/temporal_ops.rs && test ! -f rust/src/domain_ops/access_review_ops.rs && test -f rust/crates/dsl-runtime/src/domain_ops/pack_ops.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "14 files removed from ob-poc; 14 + helpers.rs + mod.rs = 15 files in dsl-runtime::domain_ops; `pub mod` list verified in rust/crates/dsl-runtime/src/domain_ops/mod.rs"
+    closed_at: 2026-04-20T08:30:00Z
+
+  - id: dsl-runtime-helpers-ported
+    description: "json_* arg-extraction helpers ported to dsl-runtime::domain_ops::helpers without VerbCall dep"
+    check_command: "grep -q 'pub fn json_extract_string' rust/crates/dsl-runtime/src/domain_ops/helpers.rs && ! grep -q 'use crate::dsl_v2' rust/crates/dsl-runtime/src/domain_ops/helpers.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "12 json_* fns ported; helpers.rs has zero dsl_v2/VerbCall references; ctx type is `crate::execution::VerbExecutionContext`"
+    closed_at: 2026-04-20T08:30:00Z
+
+  - id: dead-execute-methods-stripped
+    description: "Moved files contain no inherent legacy execute() impl blocks or cfg-gated variants"
+    check_command: "! grep -l 'async fn execute(' rust/crates/dsl-runtime/src/domain_ops/*.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "grep returns empty — zero remaining `async fn execute(&self, ...&VerbCall...)` bodies in any moved file. Only `async fn execute_json(&self, ...&serde_json::Value...)` on the CustomOperation trait impl."
+    closed_at: 2026-04-20T08:30:00Z
+
+  - id: ob-poc-no-longer-defines-moved-ops
+    description: "rust/src/domain_ops/mod.rs has no `mod FILE;` line or `pub use FILE::...;` re-export for any of the 14 moved files"
+    check_command: "! grep -Eq '^mod (pack_ops|research_normalize_ops|economic_exposure_ops|matrix_overlay_ops|custody|trading_matrix|outreach_plan_ops|import_run_ops|graph_validate_ops|coverage_compute_ops|batch_control_ops|tollgate_evaluate_ops|temporal_ops|access_review_ops)\\b' rust/src/domain_ops/mod.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "mod.rs re-read post-move — none of the 14 moved files are declared as modules or re-exported; shim comment notes ops continue to dispatch via inventory registration"
+    closed_at: 2026-04-20T08:30:00Z
+
+  - id: extern-crate-self-alias-works
+    description: "#[register_custom_op] macro expansion resolves ::dsl_runtime:: paths inside dsl-runtime itself via `extern crate self as dsl_runtime;`"
+    check_command: "grep -q 'extern crate self as dsl_runtime' rust/crates/dsl-runtime/src/lib.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "lib.rs line 2 adds `extern crate self as dsl_runtime;` so the macro-emitted ::dsl_runtime::CustomOperation / ::dsl_runtime::CustomOpFactory paths resolve when expanding inside this crate"
+    closed_at: 2026-04-20T08:30:00Z
+
+  - id: workspace-compiles-clean
+    description: "cargo build -p dsl-runtime -p ob-poc --lib returns zero errors"
+    check_command: "cargo build -p dsl-runtime -p ob-poc --lib"
+    status: passed
+    signed_by: adamtc007
+    evidence: "Both crates build clean. Sole break is the pre-existing bin `bulk_attribute_reconcile` (flagged DELETE per Phase 2.5 §Tier 5). Warning count on ob-poc dropped — dead `execute` methods are no longer being flagged on the moved files."
+    closed_at: 2026-04-20T08:30:00Z
+
+  - id: dsl-runtime-tests-green
+    description: "cargo test -p dsl-runtime passes"
+    check_command: "cargo test -p dsl-runtime"
+    status: passed
+    signed_by: adamtc007
+    evidence: "52/52 tests pass (up from 22 in Phase 3 — new tests from the moved files: helpers json_* unit tests, canonicalize_json determinism tests, op-metadata tests)"
+    closed_at: 2026-04-20T08:30:00Z
+
+  - id: plugin-coverage-unchanged
+    description: "test_plugin_verb_coverage + test_registry_creation still pass — YAML plugin verb set matches registered ops 1:1"
+    check_command: "cargo test -p ob-poc --lib --features database -- test_plugin_verb_coverage test_registry_creation"
+    status: passed
+    signed_by: adamtc007
+    evidence: "Both tests pass. Inventory-collected registry sees all moved ops (pack.*, research.generic.normalize, economic-exposure.*, matrix-overlay.*, subcustodian.lookup, cbu-custody.*, investment-manager.find-for-trade, pricing-config.find-for-instrument, sla.list-open-breaches, outreach-plan.generate, import-run.*, graph.validate, coverage.compute, batch-control.*, tollgate.evaluate-gate, temporal.*, access-review.*)."
+    closed_at: 2026-04-20T08:30:00Z
+
+  - id: phase-0-harnesses-unchanged
+    description: "determinism-harness + round-trip-harness + ob-poc-types::gated_envelope still byte-identical to Phase 3 baseline"
+    check_command: "cargo test -p determinism-harness -p round-trip-harness -p ob-poc-types"
+    status: passed
+    signed_by: adamtc007
+    evidence: "determinism-harness 6/6, round-trip-harness 4/4, ob-poc-types 106/106 (+ StateGateHash frozen vectors match)"
+    closed_at: 2026-04-20T08:30:00Z
+
+  - id: deferred-files-tracked
+    description: "research_workflow_ops.rs explicitly deferred with reason recorded"
+    check_command: "test -f rust/src/domain_ops/research_workflow_ops.rs && grep -q 'sem_os_helpers' rust/src/domain_ops/research_workflow_ops.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "File remains in ob-poc; its `super::sem_os_helpers::extract_args_as_json` dependency means it waits until sem_os_helpers is triaged (Phase 5 service-trait work)."
+    closed_at: 2026-04-20T08:30:00Z
+
+exit_conditions:
+  phase_4_slice_b_unblocked: true    # Blocker-trait-bearing dsl-runtime ops wait on Phase 5a adapter traits.
+  phase_5_entry_criteria_met: false  # Phase 5 still needs full Pattern B remediation + service trait definition.
+
+closed_at: 2026-04-20T08:35:00Z
+closed_by: adamtc007
+sign_off_commit_sha: pending-commit
+
+# ---
+# Final summary:
+#   [PASS] 14 files relocated: pack_ops, research_normalize_ops, economic_exposure_ops,
+#          matrix_overlay_ops, custody, trading_matrix, outreach_plan_ops, import_run_ops,
+#          graph_validate_ops, coverage_compute_ops, batch_control_ops, tollgate_evaluate_ops,
+#          temporal_ops, access_review_ops. ~11,700 LOC moved.
+#   [PASS] helpers.rs split: json_* subset ported to dsl-runtime; extract_*/ext_* stay in ob-poc.
+#   [PASS] Dead execute() inherent impls (~30 methods incl. cfg(not(feature="database")) variants)
+#          stripped during move. File-local VerbCall-based helpers removed (~15 fns).
+#   [PASS] dsl-runtime Cargo.toml gained sha2, hex, bigdecimal deps + dsl-runtime-macros path dep.
+#   [PASS] `extern crate self as dsl_runtime;` in lib.rs enables #[register_custom_op] inside dsl-runtime.
+#   [PASS] ob-poc/domain_ops/mod.rs cleaned: mod declarations + re-exports for the 14 files dropped.
+#   [PASS] One cross-crate type ref rewired: dsl_v2/executor.rs now references
+#          dsl_runtime::domain_ops::batch_control_ops::BatchControlResult directly.
+#   [PASS] cargo build --lib clean. cargo test -p dsl-runtime = 52/52. Phase 0 harnesses unchanged.
+#   [PASS] test_plugin_verb_coverage + test_registry_creation both green — inventory registration
+#          works identically from dsl-runtime via extern-crate-self alias.
+#
+# Deferred:
+#   - research_workflow_ops.rs (blocked on sem_os_helpers triage)
+#   - Slice B (trait-bearing dsl-runtime candidates): 51 files waiting on Phase 5a service traits
+#     (TaxonomyAccess, DocumentRequirementsService, AttributeIdentityService, PlaceholderResolver,
+#      ConfidenceCalculator, UboDiscoveryService, DocsBundleRegistry/Service, SemanticStageRegistry,
+#      TradingProfileDocument, TradingMatrixCorporateActions, ServiceResourcePipelineService,
+#      TemplateExpander, AffinityGraph, BookingPrincipalAccess, RuleEvaluator, ClientGroupService,
+#      GleifClient/Service, BpmnLiteConnection, Stewardship access).
+#   - 12 files destined ob-poc-adapter (stay in ob-poc behind traits, per matrix).
+# ---

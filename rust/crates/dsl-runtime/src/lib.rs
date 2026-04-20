@@ -44,8 +44,15 @@
 //! surface is added here deliberately so the plane boundary is reviewable
 //! at a glance.
 
+// `#[register_custom_op]` in `dsl-runtime-macros` expands to absolute
+// `::dsl_runtime::CustomOperation` / `::dsl_runtime::CustomOpFactory`
+// paths. For plugin ops defined inside *this* crate, we alias self so
+// those absolute paths resolve during compilation.
+extern crate self as dsl_runtime;
+
 pub mod crud_executor;
 pub mod custom_op;
+pub mod domain_ops;
 pub mod execution;
 pub mod port;
 pub mod registrar;

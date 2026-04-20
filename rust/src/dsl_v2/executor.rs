@@ -212,7 +212,7 @@ pub enum ExecutionResult {
     /// Template batch execution result (template.batch verb)
     TemplateBatch(crate::domain_ops::template_ops::TemplateBatchResult),
     /// Batch control operation result (batch.pause, batch.resume, etc.)
-    BatchControl(crate::domain_ops::batch_control_ops::BatchControlResult),
+    BatchControl(dsl_runtime::domain_ops::batch_control_ops::BatchControlResult),
 }
 
 // ============================================================================

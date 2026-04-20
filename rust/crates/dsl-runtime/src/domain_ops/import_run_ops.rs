@@ -20,16 +20,11 @@ use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-
-use super::helpers::{extract_string, extract_string_opt, extract_uuid, extract_uuid_opt};
-use super::CustomOperation;
-
-#[cfg(feature = "database")]
-use sqlx::PgPool;
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ============================================================================
 // Types
@@ -66,7 +61,6 @@ pub struct ImportRunSupersedeResult {
 }
 
 /// Row returned when querying linked cases with their decision IDs.
-#[cfg(feature = "database")]
 #[derive(Debug, Clone)]
 struct LinkedCaseRow {
     case_id: Uuid,
@@ -80,7 +74,6 @@ struct LinkedCaseRow {
 #[register_custom_op]
 pub struct ImportRunBeginOp;
 
-#[cfg(feature = "database")]
 async fn import_run_begin_impl(
     scope_root: Uuid,
     source: String,
@@ -182,15 +175,13 @@ impl CustomOperation for ImportRunBeginOp {
         "Creates import run with optional case linkage — multi-table insert"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::{
             json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
         };
 
@@ -216,46 +207,11 @@ impl CustomOperation for ImportRunBeginOp {
         )
         .await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ImportRunBeginOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let scope_root = extract_uuid(verb_call, ctx, "scope-root-entity-id")?;
-        let source = extract_string(verb_call, "source")?;
-        let run_kind = extract_string_opt(verb_call, "run-kind")
-            .unwrap_or_else(|| "SKELETON_BUILD".to_string());
-        let source_ref = extract_string_opt(verb_call, "source-ref");
-        let source_query = extract_string_opt(verb_call, "source-query");
-        let as_of = extract_string_opt(verb_call, "as-of");
-        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
-        let decision_id = extract_uuid_opt(verb_call, ctx, "decision-id");
-        let result = import_run_begin_impl(
-            scope_root,
-            source,
-            run_kind,
-            source_ref,
-            source_query,
-            as_of,
-            case_id,
-            decision_id,
-            pool,
-        )
-        .await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -266,7 +222,6 @@ impl ImportRunBeginOp {
 #[register_custom_op]
 pub struct ImportRunCompleteOp;
 
-#[cfg(feature = "database")]
 async fn import_run_complete_impl(
     run_id: Uuid,
     status: String,
@@ -314,43 +269,23 @@ impl CustomOperation for ImportRunCompleteOp {
         "Updates import run status and counts after import completes"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
 
         let run_id = json_extract_uuid(args, ctx, "run-id")?;
         let status =
             json_extract_string_opt(args, "status").unwrap_or_else(|| "ACTIVE".to_string());
         let result = import_run_complete_impl(run_id, status, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ImportRunCompleteOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let run_id = extract_uuid(verb_call, ctx, "run-id")?;
-        let status =
-            extract_string_opt(verb_call, "status").unwrap_or_else(|| "ACTIVE".to_string());
-        let result = import_run_complete_impl(run_id, status, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -361,7 +296,6 @@ impl ImportRunCompleteOp {
 #[register_custom_op]
 pub struct ImportRunSupersedeOp;
 
-#[cfg(feature = "database")]
 async fn import_run_supersede_impl(
     run_id: Uuid,
     reason: String,
@@ -532,15 +466,15 @@ impl CustomOperation for ImportRunSupersedeOp {
         "Supersedes an import run: soft-ends edges, logs corrections, triggers re-derivation cascade"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_uuid, json_extract_uuid_opt};
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::{
+            json_extract_string, json_extract_uuid, json_extract_uuid_opt,
+        };
 
         let run_id = json_extract_uuid(args, ctx, "run-id")?;
         let reason = json_extract_string(args, "reason")?;
@@ -555,36 +489,10 @@ impl CustomOperation for ImportRunSupersedeOp {
 
         let result =
             import_run_supersede_impl(run_id, reason, superseded_by, corrected_by, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ImportRunSupersedeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let run_id = extract_uuid(verb_call, ctx, "run-id")?;
-        let reason = extract_string(verb_call, "reason")?;
-        let superseded_by = extract_uuid_opt(verb_call, ctx, "superseded-by");
-
-        // Resolve audit user for corrected_by (falls back to a system UUID)
-        let corrected_by: Uuid = ctx
-            .audit_user
-            .as_ref()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or_else(Uuid::nil);
-        let result =
-            import_run_supersede_impl(run_id, reason, superseded_by, corrected_by, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }

@@ -15,13 +15,11 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
-use sqlx::PgPool;
-
-use super::helpers::{extract_string, extract_uuid};
-use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================
 // Result Types
@@ -42,7 +40,6 @@ pub struct TollgateEvaluationResult {
 // =============================================================================
 
 /// Gate definition loaded from `"ob-poc".tollgate_definitions`.
-#[cfg(feature = "database")]
 #[derive(Debug, Clone)]
 struct GateDefinition {
     tollgate_id: String,
@@ -52,7 +49,6 @@ struct GateDefinition {
 }
 
 /// Result of evaluating a single gate's criteria.
-#[cfg(feature = "database")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct GateCheckResult {
     criterion: String,
@@ -72,7 +68,6 @@ struct GateCheckResult {
 /// 1. ownership_coverage_pct >= threshold (default 70%)
 /// 2. All workstream entities have at least one ownership edge
 /// 3. Minimum sources consulted (if threshold defined)
-#[cfg(feature = "database")]
 async fn evaluate_skeleton_ready(
     pool: &PgPool,
     case_id: Uuid,
@@ -211,7 +206,6 @@ async fn evaluate_skeleton_ready(
 /// 2. identity_docs_verified_pct >= threshold (default 100%)
 /// 3. screening_cleared_pct >= threshold (default 100%)
 /// 4. No outstanding outreach plan items (outreach_plan_items_max)
-#[cfg(feature = "database")]
 async fn evaluate_evidence_complete(
     pool: &PgPool,
     case_id: Uuid,
@@ -399,7 +393,6 @@ async fn evaluate_evidence_complete(
 /// 1. All workstreams closed (status IN CLOSED, COMPLETED)
 /// 2. All UBOs approved (if threshold set)
 /// 3. No open discrepancies (if threshold set)
-#[cfg(feature = "database")]
 async fn evaluate_review_complete(
     pool: &PgPool,
     case_id: Uuid,
@@ -534,7 +527,6 @@ async fn evaluate_review_complete(
 #[register_custom_op]
 pub struct TollgateEvaluateGateOp;
 
-#[cfg(feature = "database")]
 async fn tollgate_evaluate_impl(
     case_id: Uuid,
     gate_name: String,
@@ -708,55 +700,22 @@ impl CustomOperation for TollgateEvaluateGateOp {
         "Each gate has distinct pass/fail criteria requiring bespoke SQL and cross-table aggregation"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_uuid};
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::{json_extract_string, json_extract_uuid};
 
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
         let gate_name = json_extract_string(args, "gate-name")?;
         let result = tollgate_evaluate_impl(case_id, gate_name, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl TollgateEvaluateGateOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let gate_name = extract_string(verb_call, "gate-name")?;
-        let result = tollgate_evaluate_impl(case_id, gate_name, pool).await?;
-
-        if let Some(binding) = verb_call.binding.as_deref() {
-            ctx.bind(binding, result.evaluation_id);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
     }
 }
 

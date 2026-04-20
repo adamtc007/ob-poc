@@ -15,13 +15,11 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
-use sqlx::PgPool;
-
-use super::helpers::{extract_string_opt, extract_uuid};
-use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================
 // Result Types
@@ -122,7 +120,6 @@ const MAX_ITEMS_PER_PLAN: usize = 8;
 #[register_custom_op]
 pub struct OutreachPlanGenerateOp;
 
-#[cfg(feature = "database")]
 async fn outreach_plan_generate_impl(
     case_id: Uuid,
     determination_run_id: Uuid,
@@ -296,16 +293,13 @@ impl CustomOperation for OutreachPlanGenerateOp {
         "Gap-to-document mapping, entity bundling with cap, and multi-table insert require custom logic"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
 
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
         let determination_run_id = json_extract_uuid(args, ctx, "determination-run-id")?;
@@ -314,44 +308,11 @@ impl CustomOperation for OutreachPlanGenerateOp {
             outreach_plan_generate_impl(case_id, determination_run_id, doc_preference, pool)
                 .await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl OutreachPlanGenerateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let determination_run_id = extract_uuid(verb_call, ctx, "determination-run-id")?;
-        let doc_preference = extract_string_opt(verb_call, "doc-preference");
-        let result =
-            outreach_plan_generate_impl(case_id, determination_run_id, doc_preference, pool)
-                .await?;
-
-        if let Some(binding) = verb_call.binding.as_deref() {
-            ctx.bind(binding, result.plan_id);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
     }
 }
 

@@ -9,12 +9,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
-
-use super::{CustomOperation, ExecutionContext, ExecutionResult};
-use crate::dsl_v2::ast::VerbCall;
-
-#[cfg(feature = "database")]
 use sqlx::PgPool;
+
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ============================================================================
 // Sub-custodian Lookup
@@ -38,14 +36,13 @@ impl CustomOperation for SubcustodianLookupOp {
         "Requires date-effective lookup with primary/fallback logic"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_string_opt};
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::{json_extract_string, json_extract_string_opt};
 
         let market = json_extract_string(args, "market")?;
         let currency = json_extract_string(args, "currency")?;
@@ -53,7 +50,7 @@ impl CustomOperation for SubcustodianLookupOp {
             .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
 
         let result = subcustodian_lookup_impl(&market, &currency, as_of_date, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -61,50 +58,7 @@ impl CustomOperation for SubcustodianLookupOp {
     }
 }
 
-impl SubcustodianLookupOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let market = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "market")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing market argument"))?;
-
-        let currency = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "currency")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing currency argument"))?;
-
-        let as_of_date: Option<chrono::NaiveDate> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "as-of-date")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-
-        let result = subcustodian_lookup_impl(market, currency, as_of_date, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
-    }
-}
-
 /// Shared implementation for subcustodian.lookup.
-#[cfg(feature = "database")]
 async fn subcustodian_lookup_impl(
     market: &str,
     currency: &str,
@@ -182,14 +136,15 @@ impl CustomOperation for LookupSsiForTradeOp {
         "Requires ALERT-style priority-based rule matching with wildcards"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::{
+            json_extract_string, json_extract_string_opt, json_extract_uuid,
+        };
         use serde_json::json;
         use uuid::Uuid;
 
@@ -265,166 +220,7 @@ impl CustomOperation for LookupSsiForTradeOp {
         .await?;
 
         match row {
-            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(
-                json!({
-                    "ssi_id": r.ssi_id,
-                    "ssi_name": r.ssi_name,
-                    "matched_rule": r.rule_name,
-                    "rule_id": r.rule_id,
-                    "rule_priority": r.rule_priority,
-                    "specificity_score": r.specificity_score
-                }),
-            )),
-            None => Err(anyhow::anyhow!(
-                "No SSI found for CBU {} with instrument class {} currency {}",
-                cbu_id,
-                instrument_class,
-                currency
-            )),
-        }
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-
-impl LookupSsiForTradeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use serde_json::json;
-        use uuid::Uuid;
-
-        // Get CBU ID
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        // Get instrument class code
-        let instrument_class = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instrument-class")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing instrument-class argument"))?;
-
-        // Get optional security type code
-        let security_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "security-type")
-            .and_then(|a| a.value.as_string());
-
-        // Get optional market MIC
-        let market = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "market")
-            .and_then(|a| a.value.as_string());
-
-        // Get currency (required)
-        let currency = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "currency")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing currency argument"))?;
-
-        // Get optional settlement type
-        let settlement_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "settlement-type")
-            .and_then(|a| a.value.as_string());
-
-        // Get optional counterparty BIC (we'd need to look up entity)
-        let _counterparty_bic = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "counterparty-bic")
-            .and_then(|a| a.value.as_string());
-
-        // Look up instrument class ID
-        let class_id: Option<Uuid> = sqlx::query_scalar(
-            "SELECT class_id FROM \"ob-poc\".instrument_classes WHERE code = $1",
-        )
-        .bind(instrument_class)
-        .fetch_optional(pool)
-        .await?;
-
-        let class_id = class_id
-            .ok_or_else(|| anyhow::anyhow!("Unknown instrument class: {}", instrument_class))?;
-
-        // Look up security type ID if provided
-        let security_type_id: Option<Uuid> = if let Some(st) = security_type {
-            sqlx::query_scalar(
-                "SELECT security_type_id FROM \"ob-poc\".security_types WHERE code = $1",
-            )
-            .bind(st)
-            .fetch_optional(pool)
-            .await?
-        } else {
-            None
-        };
-
-        // Look up market ID if provided
-        let market_id: Option<Uuid> = if let Some(m) = market {
-            sqlx::query_scalar("SELECT market_id FROM \"ob-poc\".markets WHERE mic = $1")
-                .bind(m)
-                .fetch_optional(pool)
-                .await?
-        } else {
-            None
-        };
-
-        // Use the database function for matching.
-        #[derive(sqlx::FromRow)]
-        struct SsiMatchRow {
-            ssi_id: Uuid,
-            ssi_name: String,
-            rule_id: Option<Uuid>,
-            rule_name: Option<String>,
-            rule_priority: Option<i32>,
-            specificity_score: Option<rust_decimal::Decimal>,
-        }
-
-        let row: Option<SsiMatchRow> = sqlx::query_as(
-            r#"
-            SELECT
-                ssi_id,
-                ssi_name,
-                rule_id,
-                rule_name,
-                rule_priority,
-                specificity_score
-            FROM "ob-poc".find_ssi_for_trade($1, $2, $3, $4, $5, $6, NULL)
-            "#,
-        )
-        .bind(cbu_id)
-        .bind(class_id)
-        .bind(security_type_id)
-        .bind(market_id)
-        .bind(currency)
-        .bind(settlement_type)
-        .fetch_optional(pool)
-        .await?;
-
-        match row {
-            Some(r) => Ok(ExecutionResult::Record(json!({
+            Some(r) => Ok(VerbExecutionOutcome::Record(json!({
                 "ssi_id": r.ssi_id,
                 "ssi_name": r.ssi_name,
                 "matched_rule": r.rule_name,
@@ -440,13 +236,9 @@ impl LookupSsiForTradeOp {
             )),
         }
     }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+
+    fn is_migrated(&self) -> bool {
+        true
     }
 }
 
@@ -472,17 +264,16 @@ impl CustomOperation for ValidateBookingCoverageOp {
         "Requires complex join between universe and booking rules to find gaps"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::json_extract_uuid;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let result = validate_booking_coverage_impl(cbu_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -490,48 +281,7 @@ impl CustomOperation for ValidateBookingCoverageOp {
     }
 }
 
-impl ValidateBookingCoverageOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        let result = validate_booking_coverage_impl(cbu_id, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "complete": true,
-            "gaps": [],
-            "orphan_rules": []
-        })))
-    }
-}
-
 /// Shared implementation for cbu-custody.validate-booking-coverage.
-#[cfg(feature = "database")]
 async fn validate_booking_coverage_impl(
     cbu_id: uuid::Uuid,
     pool: &PgPool,
@@ -648,19 +398,16 @@ impl CustomOperation for DeriveRequiredCoverageOp {
         "Requires analyzing universe entries and deriving booking rule requirements"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::json_extract_uuid;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let result = derive_required_coverage_impl(cbu_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            result,
-        ))
+        Ok(VerbExecutionOutcome::RecordSet(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -668,44 +415,7 @@ impl CustomOperation for DeriveRequiredCoverageOp {
     }
 }
 
-impl DeriveRequiredCoverageOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        let result = derive_required_coverage_impl(cbu_id, pool).await?;
-        Ok(ExecutionResult::RecordSet(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
-    }
-}
-
 /// Shared implementation for cbu-custody.derive-required-coverage.
-#[cfg(feature = "database")]
 async fn derive_required_coverage_impl(
     cbu_id: uuid::Uuid,
     pool: &PgPool,
@@ -780,14 +490,13 @@ impl CustomOperation for SetupSsiFromDocumentOp {
         "Requires JSON document parsing, BIC validation, and multi-table transaction"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
@@ -796,7 +505,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
 
         let result =
             setup_ssi_from_document_impl(cbu_id, document_id, &validation_mode, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
@@ -804,73 +513,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
     }
 }
 
-impl SetupSsiFromDocumentOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        let document_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "document-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing document-id argument"))?;
-
-        let validation_mode = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "validation-mode")
-            .and_then(|a| a.value.as_string())
-            .unwrap_or("STRICT")
-            .to_string();
-
-        let result =
-            setup_ssi_from_document_impl(cbu_id, document_id, &validation_mode, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "success": true,
-            "ssis_created": 0,
-            "ssis": [],
-            "agent_overrides_created": 0,
-            "booking_rules_created": 0,
-            "errors": []
-        })))
-    }
-}
-
 // SSI Onboarding Document schema structs (shared by execute and execute_json)
-#[cfg(feature = "database")]
 mod ssi_onboarding_types {
     use serde::Deserialize;
 
@@ -928,7 +571,6 @@ mod ssi_onboarding_types {
 }
 
 /// Shared implementation for cbu-custody.setup-ssi.
-#[cfg(feature = "database")]
 async fn setup_ssi_from_document_impl(
     cbu_id: uuid::Uuid,
     document_id: uuid::Uuid,

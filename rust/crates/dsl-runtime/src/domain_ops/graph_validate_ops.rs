@@ -15,14 +15,12 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
-use sqlx::PgPool;
-
-use super::helpers::extract_uuid_opt;
-use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ============================================================================
 // Types
@@ -57,7 +55,6 @@ pub struct GraphValidateResult {
 }
 
 /// Internal edge representation loaded from the database.
-#[cfg(feature = "database")]
 #[derive(Debug, Clone)]
 struct Edge {
     relationship_id: Uuid,
@@ -75,7 +72,6 @@ struct Edge {
 #[register_custom_op]
 pub struct GraphValidateOp;
 
-#[cfg(feature = "database")]
 async fn graph_validate_impl(case_id: Option<Uuid>, pool: &PgPool) -> Result<GraphValidateResult> {
     let edges = load_edges(pool, case_id).await?;
 
@@ -124,48 +120,21 @@ impl CustomOperation for GraphValidateOp {
          terminus reachability) that cannot be expressed as data-driven CRUD"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid_opt;
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::json_extract_uuid_opt;
 
         let case_id = json_extract_uuid_opt(args, ctx, "case-id");
         let result = graph_validate_impl(case_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl GraphValidateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid_opt(verb_call, ctx, "case-id");
-        let result = graph_validate_impl(case_id, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
     }
 }
 
@@ -182,7 +151,6 @@ type EdgeRow = (
     Option<String>,
 );
 
-#[cfg(feature = "database")]
 async fn load_edges(pool: &PgPool, case_id: Option<Uuid>) -> Result<Vec<Edge>> {
     let rows: Vec<EdgeRow> = if let Some(cid) = case_id {
         // Scope to entities linked to this KYC case via entity_workstreams.
@@ -436,7 +404,6 @@ fn check_supply_exceeds_100(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
 /// Ownership chains should terminate at natural persons (entity_proper_persons)
 /// or known regulated entities. Entities that are leaf sources (no inbound ownership)
 /// and are NOT natural persons are flagged.
-#[cfg(feature = "database")]
 async fn check_terminus_integrity(
     edges: &[Edge],
     _all_entity_ids: &HashSet<Uuid>,
@@ -654,7 +621,6 @@ fn check_orphan_entities(
 /// Persists anomalies to "ob-poc".research_anomalies.
 /// Creates a research_action record to serve as the parent for anomaly rows.
 /// Returns the number of anomalies persisted.
-#[cfg(feature = "database")]
 async fn persist_anomalies(
     pool: &PgPool,
     anomalies: &[GraphAnomaly],

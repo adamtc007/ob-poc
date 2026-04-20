@@ -18,12 +18,10 @@
 //! 3. Keep operations focused and single-purpose
 //! 4. Ensure operations are testable in isolation
 
-mod access_review_ops;
 mod affinity_graph_cache;
 mod affinity_ops;
 mod agent_ops;
 mod attribute_ops;
-pub mod batch_control_ops;
 mod billing_ops;
 mod board_ops;
 mod bods_ops;
@@ -36,35 +34,27 @@ mod client_group_ops;
 mod constellation_ops;
 mod control_compute_ops;
 mod control_ops;
-mod coverage_compute_ops;
-mod custody;
 mod deal_ops;
 mod dilution_ops;
 mod discovery_ops;
 mod docs_bundle_ops;
 mod document_ops;
-mod economic_exposure_ops;
 mod edge_ops;
 mod entity_ops;
 pub mod entity_query;
 mod evidence_ops;
 mod gleif_ops;
-mod graph_validate_ops;
 pub mod helpers;
-mod import_run_ops;
 mod investor_ops;
 mod investor_role_ops;
 mod kyc_case_ops;
 mod lifecycle_ops;
 mod manco_ops;
-mod matrix_overlay_ops;
 pub mod navigation_ops;
 mod observation_ops;
 mod onboarding;
 mod outreach_ops;
-mod outreach_plan_ops;
 mod ownership_ops;
-mod pack_ops;
 mod partnership_ops;
 mod phrase_ops;
 mod refdata_loader;
@@ -73,7 +63,6 @@ mod regulatory_ops;
 mod remediation_ops;
 mod request_ops;
 mod requirement_ops;
-mod research_normalize_ops;
 mod research_workflow_ops;
 mod resource_ops;
 pub mod rule_evaluator;
@@ -100,11 +89,8 @@ pub use skeleton_build_ops::{
 mod source_loader_ops;
 mod team_ops;
 pub mod template_ops;
-mod temporal_ops;
 
-mod tollgate_evaluate_ops;
 mod tollgate_ops;
-mod trading_matrix;
 mod trading_profile;
 mod trading_profile_ca_ops;
 mod trust_ops;
@@ -124,14 +110,6 @@ use std::sync::Arc;
 pub use crate::dsl_v2::ast::VerbCall;
 pub use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
-pub use batch_control_ops::{
-    BatchAbortOp, BatchAddProductsOp, BatchContinueOp, BatchControlResult, BatchPauseOp,
-    BatchResumeOp, BatchSkipOp, BatchStatusOp,
-};
-pub use custody::{
-    DeriveRequiredCoverageOp, LookupSsiForTradeOp, SetupSsiFromDocumentOp, SubcustodianLookupOp,
-    ValidateBookingCoverageOp,
-};
 pub use entity_query::{EntityQueryOp, EntityQueryResult};
 pub use kyc_case_ops::{
     KycCaseCloseOp, KycCaseCloseResult, KycCaseCreateOp, KycCaseCreateResult, KycCaseStateOp,
@@ -144,7 +122,6 @@ pub use lifecycle_ops::{
     ServiceResourceExecuteLifecyclePlanOp, ServiceResourceGenerateLifecyclePlanOp,
     ServiceResourceProvisionLifecycleOp,
 };
-pub use matrix_overlay_ops::{MatrixCompareProductsOp, MatrixEffectiveOp, MatrixUnifiedGapsOp};
 pub use onboarding::OnboardingAutoCompleteOp;
 pub use refdata_loader::{
     get_refdata_operations, LoadAllRefdataOp, LoadInstrumentClassesOp, LoadMarketsOp,
@@ -164,13 +141,7 @@ pub use semantic_ops::{
 pub use template_ops::{
     TemplateBatchOp, TemplateBatchResult, TemplateInvokeOp, TemplateInvokeResult,
 };
-pub use temporal_ops::{
-    TemporalCbuRelationshipsAsOfOp, TemporalCbuRolesAsOfOp, TemporalCbuStateAtApprovalOp,
-    TemporalCompareOwnershipOp, TemporalEntityHistoryOp, TemporalOwnershipAsOfOp,
-    TemporalRelationshipHistoryOp, TemporalUboChainAsOfOp,
-};
 
-pub use trading_matrix::{FindImForTradeOp, FindPricingForInstrumentOp, ListOpenSlaBreachesOp};
 pub use trading_profile::{
     TradingProfileActivateOp, TradingProfileAddAllowedCurrencyOp, TradingProfileAddBookingRuleOp,
     TradingProfileAddComponentOp, TradingProfileAddCsaCollateralOp, TradingProfileAddCsaConfigOp,
@@ -228,7 +199,10 @@ pub use observation_ops::{
     DocumentExtractObservationsOp, ObservationFromDocumentOp, ObservationGetCurrentOp,
     ObservationReconcileOp, ObservationVerifyAllegationsOp,
 };
-pub use pack_ops::{PackAnswerOp, PackAnswerResult, PackSelectOp, PackSelectResult};
+// Phase 4 Slice A — pack_ops moved to `dsl-runtime::domain_ops::pack_ops`.
+// Registration flows through `#[register_custom_op]` + inventory automatically;
+// downstream ob-poc code does not import these types directly, so no shim
+// re-export is needed.
 #[cfg(feature = "database")]
 pub use requirement_ops::{RequirementCreateSetOp, RequirementUnsatisfiedOp};
 pub use resource_ops::{
@@ -246,11 +220,6 @@ pub use ubo_graph_ops::{
 pub use team_ops::TeamTransferMemberOp;
 
 // Access Review operations (complex multi-step transactional operations only)
-pub use access_review_ops::{
-    AccessReviewAttestOp, AccessReviewBulkConfirmOp, AccessReviewConfirmCleanOp,
-    AccessReviewLaunchOp, AccessReviewPopulateOp, AccessReviewProcessDeadlineOp,
-    AccessReviewRevokeOp, AccessReviewSendRemindersOp,
-};
 
 // BODS operations (UBO discovery via GLEIF + BODS)
 pub use bods_ops::{
@@ -288,7 +257,6 @@ pub use dilution_ops::{
     DilutionCreateConvertibleNoteOp, DilutionCreateSafeOp, DilutionExerciseOp, DilutionForfeitOp,
     DilutionGetSummaryOp, DilutionGrantOptionsOp, DilutionIssueWarrantOp, DilutionListOp,
 };
-pub use outreach_plan_ops::OutreachPlanGenerateOp;
 pub use ownership_ops::{
     OwnershipAnalyzeGapsOp, OwnershipComputeOp, OwnershipControlPositionsOp,
     OwnershipReconcileFindingsOp, OwnershipReconcileOp, OwnershipSnapshotListOp,
@@ -298,7 +266,6 @@ pub use partnership_ops::{
     PartnershipAnalyzeControlOp, PartnershipContributionOp, PartnershipDistributionOp,
     PartnershipReconcileOp,
 };
-pub use tollgate_evaluate_ops::TollgateEvaluateGateOp;
 pub use tollgate_ops::{
     TollgateDecisionReadinessOp, TollgateEvaluateOp, TollgateGetMetricsOp, TollgateOverrideOp,
 };

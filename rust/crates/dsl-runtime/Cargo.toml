@@ -19,6 +19,11 @@ ob-poc-types = { path = "../ob-poc-types" }
 # and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately
 # until a later slice resolves the cycle cleanly.
 sem_os_core = { path = "../sem_os_core" }
+# Phase 4 Slice A — plugin ops moved from ob-poc::domain_ops use
+# #[register_custom_op], which expands to absolute ::dsl_runtime:: paths.
+# `extern crate self as dsl_runtime;` in lib.rs makes those paths resolve
+# when the macro is invoked inside this crate itself.
+dsl-runtime-macros = { path = "../dsl-runtime-macros" }
 async-trait = "0.1"
 anyhow = "1.0"
 inventory = "0.3"
@@ -26,11 +31,18 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Phase 3 — PgCrudExecutor lives here now; needs chrono/json/uuid/rust_decimal
 # sqlx bindings for row introspection and typed value binding.
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "rust_decimal"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "rust_decimal", "bigdecimal"] }
 chrono = { version = "0.4", features = ["serde"] }
 rust_decimal = { version = "1", features = ["db-postgres"] }
+# Phase 4 Slice A — temporal_ops uses sqlx::types::BigDecimal for historical
+# ownership percentages bound directly from NUMERIC columns.
+bigdecimal = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
+# Phase 4 Slice A — research_normalize_ops uses sha2 + hex for deterministic
+# content hashing of canonicalised payloads.
+sha2 = "0.10"
+hex = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
