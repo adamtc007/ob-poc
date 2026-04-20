@@ -34,7 +34,12 @@ mod attribute_ops;
 // alongside the `bods/` module it consumes.
 mod booking_principal_ops;
 mod bpmn_lite_ops;
-mod capital_ops;
+// Phase 5a composite-blocker #20 — capital_ops relocated to
+// `dsl-runtime::domain_ops::capital_ops`. Pure clean lift — matrix tag
+// "ob-poc-adapter destination" was wrong (4th of the 6 to be re-classified).
+// 14 ops, all direct sqlx against capital structure tables. Stripped via
+// the same Python script as slice #19 billing_ops. Registration flows
+// through inventory.
 // Phase 5d — cbu_ops relocated to `dsl-runtime::domain_ops::cbu_ops`
 // Phase 5d — cbu_role_ops relocated to `dsl-runtime::domain_ops::cbu_role_ops`
 mod client_group_ops;
@@ -317,12 +322,7 @@ pub use view_ops::{
 
 // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
 // Phase 5e — board_ops relocated. Types accessed via dsl_runtime::domain_ops::board_ops.
-pub use capital_ops::{
-    CapitalBuybackOp, CapitalCancelOp, CapitalCancelSharesOp, CapitalCapTableOp, CapitalHoldersOp,
-    CapitalIssueInitialOp, CapitalIssueNewOp, CapitalIssueSharesOp, CapitalOwnershipChainOp,
-    CapitalReconcileOp, CapitalShareClassCreateOp, CapitalShareClassGetSupplyOp, CapitalSplitOp,
-    CapitalTransferOp,
-};
+// Phase 5a composite-blocker #20 — capital_ops re-exports removed; see relocation comment above.
 // Phase 5e — control_compute_ops relocated. Types accessed via dsl_runtime::domain_ops::control_compute_ops.
 // Phase 5e — control_ops relocated. Types accessed via dsl_runtime::domain_ops::control_ops.
 // Phase 5e — dilution_ops relocated. Types accessed via dsl_runtime::domain_ops::dilution_ops.

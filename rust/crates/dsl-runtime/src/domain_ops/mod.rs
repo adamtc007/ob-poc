@@ -18,6 +18,7 @@ pub mod billing_ops;
 pub mod board_ops;
 pub mod bods_ops;
 pub mod coverage_compute_ops;
+pub mod capital_ops;
 pub mod cbu_ops;
 pub mod cbu_role_ops;
 pub mod constellation_ops;
