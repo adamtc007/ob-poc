@@ -292,6 +292,32 @@ Each stage has:
 
 If any SemOS operation requires external effects inside the dispatch loop, it must either (a) be refactored to defer via outbox, or (b) force a re-design of 9a. The Phase 0 ownership matrix will test this assumption across every `PendingStateAdvance` shape; any violation is a blocker.
 
+### 8.6 Mapping to conversational tollgates (2026-04-20 addition)
+
+§8.2's nine-stage pipeline is described "per utterance," but in practice the REPL runs as an **outer conversational tollgate state machine** (ScopeGate → WorkspaceSelection → JourneySelection → InPack → Clarifying → SentencePlayback → RunbookEditing → Executing). Different tollgates activate different stage subsets; a single utterance does not necessarily flow through all nine stages. This is not a contradiction with §8.2 — it's the necessary reconciliation between the dispatch-loop model (stages 1–9 per *verb invocation*) and the conversational model (tollgates per *user turn*). The full mapping:
+
+| V&S stage | Consumed by tollgate(s) | Current home in `rust/src/repl/orchestrator_v2.rs` |
+|---|---|---|
+| 1 Utterance receipt | all | `process()` top (lines 763–788) |
+| 2a NLP interpretation | InPack | inside `handle_in_pack` via `IntentService` |
+| 2b Entity resolution | ScopeGate, WorkspaceSelection, InPack | `handle_scope_gate` + `LookupService` + SemOS |
+| 3 DAG navigation | (post-write rehydrate) | `rehydrate_tos` — called after writes, not inside a stage-numbered flow |
+| 4 Verb surface disclosure | InPack, JourneySelection | inside `handle_in_pack`, reused from `handle_journey_selection` |
+| 5 NLP match | InPack | `VerbSearchIntentMatcher` via `handle_in_pack` |
+| 6 Gate decision | InPack → SentencePlayback transition | `ObPocVerbExecutor` adapter pre-flight |
+| 7 Runbook compilation | SentencePlayback → RunbookEditing transition | `rust/src/runbook/compiler.rs` — already its own module |
+| 8 Dispatch loop | Executing | `handle_executing` → `DslExecutorV2::execute_v2` |
+| 9a Commit | Executing (but ownership inverted — see §8.4 G1) | **currently inside `DslExecutor`**, not the Sequencer. Phase 5c moves it. |
+| 9b Post-commit effects | Executing (not implemented as outbox) | narration fires inline in `process()` after rehydrate; outbox drainer is Phase 5e |
+
+**Implication for Phase 5b (Sequencer extraction).** The structural rename — `repl/orchestrator_v2.rs` → `ob-poc::sequencer` — preserves the tollgate state machine as the outer loop and names stages within tollgate handlers. It does NOT collapse tollgates into a single pipeline. The 9-stage contract §8.2 describes applies *within* tollgates and across the tollgate chain, not as a single linear flow per utterance.
+
+**Implication for Phase 5c (txn ownership) and 5e (outbox).** Two gaps flagged in §8.4 — stage 9a commit currently lives inside `DslExecutor`, and stage 9b runs inline instead of via outbox — are both deferred. Phase 5b narrow extraction does not resolve these; their resolution lands in 5c and 5e respectively. The Sequencer's doc comments after 5b must disclaim 9a ownership and 9b outbox semantics, not claim them.
+
+### 8.7 Session serialization (2026-04-20 addition)
+
+The current `ReplOrchestratorV2::process()` holds `sessions.write().await` across the whole turn (single writer lock over the in-memory session map). **This is intentional.** A REPL is a conversational medium; concurrent writes against the same session map would race tollgate transitions and corrupt the state machine. Phase 5b preserves this serialization. The observable consequence — one process-wide write lock per turn — is an ergonomic ceiling the Sequencer is not trying to remove. If multi-session concurrency becomes a goal, the lock becomes per-session (hash-keyed) in a dedicated phase, not as a side effect of Phase 5b extraction.
+
 ---
 
 ## 9. Determinism as a first-class invariant
