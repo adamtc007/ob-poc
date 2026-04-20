@@ -70,7 +70,17 @@ mod investor_role_ops;
 // dependency); all 11 ops call DB-level `fn_*` PL/pgSQL functions via
 // sqlx. Registration flows through inventory automatically; external
 // ob-poc code doesn't import these types directly.
-pub mod navigation_ops;
+// Phase 5a composite-blocker #10 — navigation_ops relocated to
+// `dsl-runtime::domain_ops::navigation_ops`. Pure clean lift — no new
+// service trait needed. After stripping the legacy
+// `execute(&VerbCall, ...)` blocks (used `find_arg(verb_call, ...)`)
+// and the supporting helper, every op is pure JSON-construction
+// (no DB calls, no service calls). The Sequencer reads
+// `NavResult` records via message-prefix matching against
+// `ReplResponseV2.message` (`apply_nav_result_if_present`), so the
+// `NavResult` struct lives wherever the verbs do — no cross-plane
+// type sharing required. Registration flows through inventory;
+// external ob-poc code does not import these types directly.
 // Phase 5a composite-blocker #8 — observation_ops relocated to
 // `dsl-runtime::domain_ops::observation_ops` consuming the new
 // `dyn AttributeIdentityService` trait via the ServiceRegistry.
