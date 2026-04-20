@@ -9,5 +9,7 @@
 //! trait-object storage in the registry.
 
 pub mod semantic_state;
+pub mod stewardship;
 
 pub use semantic_state::SemanticStateService;
+pub use stewardship::{StewardshipDispatch, StewardshipOutcome};

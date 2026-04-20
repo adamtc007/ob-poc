@@ -39,9 +39,15 @@ pub mod board_control_rules;
 // trait, registered with the platform `ServiceRegistry` at host startup.
 pub mod semantic_state_service_impl;
 
+// Phase 5a — ob-poc-side impl of the
+// `dsl_runtime::service_traits::StewardshipDispatch` trait; bridges to
+// `crate::sem_reg::stewardship::dispatch_phase{0,1}_tool`.
+pub mod stewardship_dispatch_impl;
+
 // Re-exports
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
 pub use semantic_state_service_impl::ObPocSemanticStateService;
+pub use stewardship_dispatch_impl::ObPocStewardshipDispatch;
 pub use dictionary_service_impl::DictionaryServiceImpl;
 pub use document_attribute_crud_service::DocumentAttributeCrudService;
 pub use document_extraction_service::DocumentExtractionService;

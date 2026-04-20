@@ -70,9 +70,10 @@ mod resource_ops;
 pub mod rule_evaluator;
 mod screening_ops;
 mod sem_os_audit_ops;
-mod sem_os_changeset_ops;
-mod sem_os_focus_ops;
-mod sem_os_governance_ops;
+// Phase 5a — sem_os_{focus,governance,changeset}_ops relocated to
+// `dsl-runtime::domain_ops::*` consuming `dyn StewardshipDispatch` via
+// the ServiceRegistry. `ObPocStewardshipDispatch` in ob-poc bridges
+// to `sem_reg::stewardship::dispatch_phase{0,1}_tool` + general MCP.
 pub(crate) mod sem_os_helpers;
 mod sem_os_maintenance_ops;
 mod sem_os_registry_ops;

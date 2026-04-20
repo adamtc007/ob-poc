@@ -563,6 +563,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     let service_registry: Arc<dsl_runtime::ServiceRegistry> = {
         let mut builder = dsl_runtime::ServiceRegistryBuilder::new();
+
+        // dyn SemanticStateService — ontology-backed onboarding stage derivation.
         match ob_poc::services::ObPocSemanticStateService::new(pool.clone()) {
             Ok(svc) => {
                 builder.register::<dyn dsl_runtime::service_traits::SemanticStateService>(
@@ -580,6 +582,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
         }
+
+        // dyn StewardshipDispatch — bridges plugin ops to
+        // `sem_reg::stewardship::dispatch_phase{0,1}_tool`. Registers
+        // unconditionally — stewardship is entirely in-process, no
+        // fallible construction step.
+        builder.register::<dyn dsl_runtime::service_traits::StewardshipDispatch>(Arc::new(
+            ob_poc::services::ObPocStewardshipDispatch::new(pool.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn StewardshipDispatch (sem_reg::stewardship cascade)"
+        );
+
         Arc::new(builder.build())
     };
 
