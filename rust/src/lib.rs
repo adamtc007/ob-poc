@@ -93,8 +93,11 @@ pub mod sem_os_runtime;
 #[cfg(feature = "database")]
 pub mod derived_attributes;
 
-// Cross-workspace state consistency: shared atom registry, staleness, replay
-pub mod cross_workspace;
+// Phase 5a composite #2 — `cross_workspace` relocated to
+// `dsl-runtime::cross_workspace`. External callers reach it via
+// `dsl_runtime::cross_workspace::*` now. `WorkspaceKind` dep was
+// narrowed to `String` (same snake_case serde repr) to keep the
+// module plane-neutral.
 
 // Loopback calibration harness
 #[cfg(feature = "database")]

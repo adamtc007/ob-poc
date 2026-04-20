@@ -451,7 +451,7 @@ pub struct WorkspaceFrame {
     /// Populated during hydration, used by pre-REPL staleness check and narration.
     /// Transient (not serialized).
     #[serde(skip)]
-    pub stale_shared_facts: Vec<crate::cross_workspace::fact_refs::StaleSharedFactRef>,
+    pub stale_shared_facts: Vec<dsl_runtime::cross_workspace::fact_refs::StaleSharedFactRef>,
 
     // --- Constraint cascade (workspace-scoped working context) ---
     // Each workspace frame carries its own constraint state.
@@ -615,7 +615,7 @@ pub struct SessionFeedback {
     /// Stale shared fact references in the current workspace (cross-workspace consistency).
     /// Non-empty when the workspace is operating against superseded shared attribute versions.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub stale_shared_facts: Vec<crate::cross_workspace::fact_refs::StaleSharedFactRef>,
+    pub stale_shared_facts: Vec<dsl_runtime::cross_workspace::fact_refs::StaleSharedFactRef>,
     #[serde(default)]
     pub scoped_verb_surface: Vec<VerbRef>,
     #[serde(default)]

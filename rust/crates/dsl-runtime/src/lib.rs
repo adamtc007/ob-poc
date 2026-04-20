@@ -51,6 +51,7 @@
 extern crate self as dsl_runtime;
 
 pub mod bods;
+pub mod cross_workspace;
 pub mod crud_executor;
 pub mod custom_op;
 pub mod document_bundles;

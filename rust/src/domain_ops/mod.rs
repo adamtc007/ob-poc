@@ -63,7 +63,8 @@ mod phrase_ops;
 // Phase 5c — refdata_loader relocated to `dsl-runtime::domain_ops::refdata_loader`
 // Phase 5c — refdata_ops relocated to `dsl-runtime::domain_ops::refdata_ops`
 // Phase 5d — regulatory_ops relocated to `dsl-runtime::domain_ops::regulatory_ops`
-mod remediation_ops;
+// Phase 5a composite-blocker #2 — remediation_ops relocated to `dsl-runtime::domain_ops::remediation_ops`
+// alongside the `cross_workspace/` module it consumes (relocated together).
 mod request_ops;
 // Phase 5c — requirement_ops relocated to `dsl-runtime::domain_ops::requirement_ops`
 mod research_workflow_ops;

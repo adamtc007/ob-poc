@@ -10,7 +10,12 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::repl::types_v2::WorkspaceKind;
+// `target_workspace` used to be typed `ob_poc::repl::types_v2::WorkspaceKind`;
+// widened to `String` (same snake_case serde repr) so this module is
+// plane-neutral and relocates cleanly to dsl-runtime per the
+// composite-blocker #2 plan (2026-04-20). Consumers that need the
+// typed enum parse it back via `WorkspaceKind::from_str` on the ob-poc
+// side.
 
 // ── RebuildContext ───────────────────────────────────────────────────
 
@@ -46,7 +51,7 @@ pub struct RebuildContext {
     /// The workspace that committed the superseding version.
     pub source_workspace: String,
     /// The consuming workspace being replayed.
-    pub target_workspace: WorkspaceKind,
+    pub target_workspace: String,
     /// The constellation family being replayed.
     pub target_constellation_family: String,
     /// The entity this replay is for.
@@ -105,7 +110,7 @@ mod tests {
             prior_version: 1,
             new_version: 2,
             source_workspace: "kyc".to_string(),
-            target_workspace: WorkspaceKind::OnBoarding,
+            target_workspace: "on_boarding".to_string(),
             target_constellation_family: "onboarding_workspace".to_string(),
             entity_id: Uuid::nil(),
             initiated_at: Utc::now(),

@@ -42,6 +42,7 @@ pub mod partnership_ops;
 pub mod refdata_loader;
 pub mod refdata_ops;
 pub mod regulatory_ops;
+pub mod remediation_ops;
 pub mod requirement_ops;
 pub mod screening_ops;
 pub mod research_normalize_ops;

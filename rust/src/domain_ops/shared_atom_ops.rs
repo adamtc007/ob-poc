@@ -17,7 +17,7 @@ use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 use sqlx::PgPool;
 
 #[cfg(feature = "database")]
-use crate::cross_workspace::{
+use dsl_runtime::cross_workspace::{
     repository,
     types::{RegisterSharedAtomInput, SharedAtomLifecycle},
 };
@@ -493,7 +493,7 @@ impl CustomOperation for SharedAtomReplayConstellationOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::cross_workspace::{
+        use dsl_runtime::cross_workspace::{
             fact_refs, fact_versions,
             replay::{RebuildContext, ReplayOutcome, ReplayResult, ReplayTrigger},
         };
@@ -525,7 +525,7 @@ impl CustomOperation for SharedAtomReplayConstellationOp {
             prior_version: held_version,
             new_version: current_version,
             source_workspace: atom.owner_workspace.clone(),
-            target_workspace: crate::repl::types_v2::WorkspaceKind::OnBoarding,
+            target_workspace: "on_boarding".to_string(),
             target_constellation_family: constellation_family.clone(),
             entity_id,
             initiated_at: Utc::now(),
@@ -570,7 +570,7 @@ impl SharedAtomReplayConstellationOp {
         _ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::cross_workspace::{
+        use dsl_runtime::cross_workspace::{
             fact_refs, fact_versions,
             replay::{RebuildContext, ReplayOutcome, ReplayResult, ReplayTrigger},
         };
@@ -605,7 +605,7 @@ impl SharedAtomReplayConstellationOp {
             prior_version: held_version,
             new_version: current_version,
             source_workspace: atom.owner_workspace.clone(),
-            target_workspace: crate::repl::types_v2::WorkspaceKind::OnBoarding, // TODO: resolve from constellation_family
+            target_workspace: "on_boarding".to_string(), // TODO: resolve from constellation_family
             target_constellation_family: constellation_family.clone(),
             entity_id,
             initiated_at: Utc::now(),
@@ -685,7 +685,7 @@ impl CustomOperation for SharedAtomAcknowledgeOp {
         ctx: &mut dsl_runtime::VerbExecutionContext,
         pool: &PgPool,
     ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::cross_workspace::fact_versions;
+        use dsl_runtime::cross_workspace::fact_versions;
 
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let atom_path = json_extract_string(args, "atom-path")?;
@@ -758,7 +758,7 @@ impl SharedAtomAcknowledgeOp {
         _ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::cross_workspace::fact_versions;
+        use dsl_runtime::cross_workspace::fact_versions;
 
         let entity_id = extract_uuid(verb_call, _ctx, "entity-id")?;
         let atom_path = extract_string(verb_call, "atom-path")?;
