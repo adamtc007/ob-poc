@@ -65,9 +65,15 @@ pub mod attribute_identity_dispatch_impl;
 // `crate::sem_os_runtime::constellation_runtime::handle_constellation_{hydrate,summary}`.
 pub mod constellation_runtime_impl;
 
+// Phase 5a composite-blocker #11 — ob-poc-side impl of
+// `dsl_runtime::service_traits::TradingProfileDocument`; bridges to
+// `crate::trading_profile::ast_db::{load_document, save_document}`.
+pub mod trading_profile_document_impl;
+
 // Re-exports
 pub use attribute_identity_dispatch_impl::ObPocAttributeIdentityService;
 pub use constellation_runtime_impl::ObPocConstellationRuntime;
+pub use trading_profile_document_impl::ObPocTradingProfileDocument;
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
 pub use lifecycle_catalog_impl::ObPocLifecycleCatalog;
 pub use mcp_tool_registry_impl::ObPocMcpToolRegistry;

@@ -148,7 +148,15 @@ pub mod template_ops;
 // Phase 4 Slice B Group 6 — tollgate_ops relocated to `dsl-runtime::domain_ops::tollgate_ops`
 // alongside the `document_requirements/` module it consumes.
 mod trading_profile;
-mod trading_profile_ca_ops;
+// Phase 5a composite-blocker #11 — trading_profile_ca_ops relocated to
+// `dsl-runtime::domain_ops::trading_profile_ca_ops` consuming the new
+// `dyn TradingProfileDocument` trait via the ServiceRegistry.
+// `ObPocTradingProfileDocument` in ob-poc bridges to
+// `crate::trading_profile::ast_db::{load_document, save_document}`.
+// `TradingMatrixDocument` already lives in `ob_poc_types::trading_matrix`
+// (boundary crate), so the trait can use it directly without
+// types-extraction. Registration flows through inventory; external
+// ob-poc code does not import these types directly.
 // Phase 5e — trust_ops relocated to `dsl-runtime::domain_ops::trust_ops`
 // Phase 5e — ubo_analysis relocated to `dsl-runtime::domain_ops::ubo_analysis`
 // Phase 5e — ubo_compute_ops relocated to `dsl-runtime::domain_ops::ubo_compute_ops`
@@ -204,12 +212,7 @@ pub use trading_profile::{
     TradingProfileSubmitOp, TradingProfileUpdateImScopeOp, TradingProfileValidateCoverageOp,
     TradingProfileValidateGoLiveReadyOp,
 };
-pub use trading_profile_ca_ops::{
-    TradingProfileCaAddCutoffOp, TradingProfileCaDisableEventTypesOp,
-    TradingProfileCaEnableEventTypesOp, TradingProfileCaGetPolicyOp, TradingProfileCaLinkSsiOp,
-    TradingProfileCaRemoveCutoffOp, TradingProfileCaRemoveDefaultOp, TradingProfileCaRemoveSsiOp,
-    TradingProfileCaSetDefaultOp, TradingProfileCaSetElectionOp, TradingProfileCaSetNotificationOp,
-};
+// Phase 5a composite-blocker #11 — trading_profile_ca_ops re-exports removed; see relocation comment above.
 // Phase 5e — ubo_analysis relocated. Types accessed via dsl_runtime::domain_ops::ubo_analysis.
 // Phase 5e — ubo_compute_ops relocated. Types accessed via dsl_runtime::domain_ops::ubo_compute_ops.
 

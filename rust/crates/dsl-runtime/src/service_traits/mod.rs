@@ -14,6 +14,7 @@ pub mod lifecycle_catalog;
 pub mod mcp_tool_registry;
 pub mod semantic_state;
 pub mod stewardship;
+pub mod trading_profile_document;
 
 pub use attribute_identity::AttributeIdentityService;
 pub use constellation_runtime::ConstellationRuntime;
@@ -21,3 +22,4 @@ pub use lifecycle_catalog::LifecycleCatalog;
 pub use mcp_tool_registry::{McpToolRegistry, McpToolSpec};
 pub use semantic_state::SemanticStateService;
 pub use stewardship::{StewardshipDispatch, StewardshipOutcome};
+pub use trading_profile_document::TradingProfileDocument;

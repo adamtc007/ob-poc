@@ -635,6 +635,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn ConstellationRuntime (sem_os_runtime maps)"
         );
 
+        // dyn TradingProfileDocument — used by relocated trading_profile_ca_ops
+        // to load / save the matrix JSONB document on cbu_trading_profiles.
+        // Bridge delegates to `crate::trading_profile::ast_db::{load,save}_document`.
+        builder.register::<dyn dsl_runtime::service_traits::TradingProfileDocument>(Arc::new(
+            ob_poc::services::ObPocTradingProfileDocument::new(pool.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn TradingProfileDocument (trading_profile::ast_db)"
+        );
+
         Arc::new(builder.build())
     };
 
