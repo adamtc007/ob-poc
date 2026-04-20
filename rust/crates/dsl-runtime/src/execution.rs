@@ -22,6 +22,7 @@
 //! do not collide in use.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use ob_poc_types::{OutboxDraft, PendingStateAdvance};
 use serde::{Deserialize, Serialize};
@@ -29,6 +30,8 @@ use uuid::Uuid;
 
 use sem_os_core::error::SemOsError;
 use sem_os_core::principal::Principal;
+
+use crate::services::ServiceRegistry;
 
 /// Result alias over `SemOsError`. Formerly lived at
 /// `sem_os_core::execution::Result`.
@@ -68,10 +71,32 @@ pub struct VerbExecutionContext {
     /// for side effects produced by the verb handler.
     #[serde(default)]
     pub extensions: serde_json::Value,
+
+    /// Platform service registry (trait-object injection for plugin ops).
+    ///
+    /// Plugin ops that need host capabilities (session state, DSL execution,
+    /// stewardship, etc.) look them up via [`Self::service`]. The host
+    /// (ob-poc startup) constructs the registry and threads it through the
+    /// executor; tests and the default context use an empty registry.
+    ///
+    /// Not serialised — a live trait-object graph can't round-trip through
+    /// JSON, and the registry is reconstructed at startup on every process
+    /// boundary anyway.
+    #[serde(skip, default = "default_service_registry")]
+    pub services: Arc<ServiceRegistry>,
+}
+
+fn default_service_registry() -> Arc<ServiceRegistry> {
+    Arc::new(ServiceRegistry::empty())
 }
 
 impl VerbExecutionContext {
     /// Create a new context with the given principal and a fresh execution ID.
+    ///
+    /// The service registry starts empty. Production callers that need to
+    /// inject platform services (e.g., the ob-poc host wiring at startup)
+    /// use [`Self::with_services`] or assign to [`Self::services`] directly
+    /// after construction.
     pub fn new(principal: Principal) -> Self {
         Self {
             principal,
@@ -80,7 +105,15 @@ impl VerbExecutionContext {
             symbol_types: HashMap::new(),
             execution_id: Uuid::new_v4(),
             extensions: serde_json::Value::Null,
+            services: default_service_registry(),
         }
+    }
+
+    /// Create a new context with a pre-populated service registry.
+    pub fn with_services(principal: Principal, services: Arc<ServiceRegistry>) -> Self {
+        let mut ctx = Self::new(principal);
+        ctx.services = services;
+        ctx
     }
 
     /// Bind a symbol to a UUID value.
@@ -104,6 +137,22 @@ impl VerbExecutionContext {
     pub fn has(&self, name: &str) -> bool {
         self.symbols.contains_key(name)
     }
+
+    /// Look up a platform service by trait.
+    ///
+    /// Returns `Err` when the host hasn't registered an impl for trait `T`.
+    /// The error message names the missing trait so the op author can wire
+    /// it at startup without guessing.
+    pub fn service<T: ?Sized + Send + Sync + 'static>(&self) -> anyhow::Result<Arc<T>> {
+        self.services.get::<T>().ok_or_else(|| {
+            anyhow::anyhow!(
+                "platform service `{trait_name}` is not registered in the \
+                 `ServiceRegistry`; wire it at startup via \
+                 `ServiceRegistryBuilder::register::<dyn {trait_name}>(Arc::new(impl))`",
+                trait_name = std::any::type_name::<T>()
+            )
+        })
+    }
 }
 
 impl Default for VerbExecutionContext {
@@ -115,7 +164,69 @@ impl Default for VerbExecutionContext {
             symbol_types: HashMap::new(),
             execution_id: Uuid::new_v4(),
             extensions: serde_json::Value::Null,
+            services: default_service_registry(),
         }
+    }
+}
+
+#[cfg(test)]
+mod service_lookup_tests {
+    use super::*;
+    use crate::services::ServiceRegistryBuilder;
+
+    trait TestGreeter: Send + Sync {
+        fn greet(&self) -> &'static str;
+    }
+
+    struct GreeterImpl;
+    impl TestGreeter for GreeterImpl {
+        fn greet(&self) -> &'static str {
+            "hello"
+        }
+    }
+
+    trait Missing: Send + Sync {}
+
+    #[test]
+    fn service_lookup_hit_returns_impl() {
+        let mut b = ServiceRegistryBuilder::new();
+        b.register::<dyn TestGreeter>(Arc::new(GreeterImpl));
+        let ctx = VerbExecutionContext::with_services(Principal::system(), Arc::new(b.build()));
+
+        let svc = ctx.service::<dyn TestGreeter>().expect("registered");
+        assert_eq!(svc.greet(), "hello");
+    }
+
+    #[test]
+    fn service_lookup_miss_returns_named_error() {
+        let ctx = VerbExecutionContext::default();
+
+        let result = ctx.service::<dyn Missing>();
+        let err = match result {
+            Ok(_) => panic!("expected miss but got an impl"),
+            Err(e) => e,
+        };
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("Missing"),
+            "error should name the missing trait: {msg}"
+        );
+        assert!(
+            msg.contains("ServiceRegistryBuilder::register"),
+            "error should hint at startup wiring: {msg}"
+        );
+    }
+
+    #[test]
+    fn default_context_has_empty_registry() {
+        let ctx = VerbExecutionContext::default();
+        assert!(ctx.services.is_empty());
+    }
+
+    #[test]
+    fn new_context_has_empty_registry() {
+        let ctx = VerbExecutionContext::new(Principal::system());
+        assert!(ctx.services.is_empty());
     }
 }
 

@@ -77,7 +77,8 @@ pub(crate) mod sem_os_helpers;
 mod sem_os_maintenance_ops;
 mod sem_os_registry_ops;
 mod sem_os_schema_ops;
-mod semantic_ops;
+// Phase 5a — semantic_ops relocated to `dsl-runtime::domain_ops::semantic_ops`,
+// consuming `dyn SemanticStateService` via the ServiceRegistry.
 mod service_pipeline_ops;
 mod session_ops;
 mod shared_atom_ops;
@@ -139,10 +140,8 @@ pub use request_ops::{
     RequestWaiveOp,
 };
 
-pub use semantic_ops::{
-    SemanticListStagesOp, SemanticMissingEntitiesOp, SemanticNextActionsOp,
-    SemanticPromptContextOp, SemanticStagesForProductOp, SemanticStateOp,
-};
+// Phase 5a — semantic_ops relocated to dsl-runtime. Inventory registration
+// automatic; external ob-poc code does not import these types directly.
 pub use template_ops::{
     TemplateBatchOp, TemplateBatchResult, TemplateInvokeOp, TemplateInvokeResult,
 };

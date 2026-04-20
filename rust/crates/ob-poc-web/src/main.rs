@@ -557,6 +557,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let voice_router = routes::voice::create_voice_router(pool.clone());
 
     // =========================================================================
+    // Platform service registry — trait-object injection for relocated
+    // plugin ops (Phase 5a). Host-side impls are constructed here once and
+    // threaded through every DslExecutor / step-executor bridge.
+    // =========================================================================
+    let service_registry: Arc<dsl_runtime::ServiceRegistry> = {
+        let mut builder = dsl_runtime::ServiceRegistryBuilder::new();
+        match ob_poc::services::ObPocSemanticStateService::new(pool.clone()) {
+            Ok(svc) => {
+                builder.register::<dyn dsl_runtime::service_traits::SemanticStateService>(
+                    Arc::new(svc),
+                );
+                tracing::info!(
+                    "ServiceRegistry: registered dyn SemanticStateService (ontology-backed)"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "ServiceRegistry: dyn SemanticStateService not registered ({}); \
+                     `semantic.*` verbs will fail with actionable error at runtime",
+                    e
+                );
+            }
+        }
+        Arc::new(builder.build())
+    };
+
+    // =========================================================================
     // BPMN-Lite Integration (before REPL V2 — determines executor)
     // =========================================================================
     type BpmnSetup = (
@@ -635,7 +662,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                                 // Inner executor for direct verb execution
                                 let inner: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2> =
-                                    Arc::new(RealDslExecutor::new(pool.clone()));
+                                    Arc::new(
+                                        RealDslExecutor::new(pool.clone())
+                                            .with_services(service_registry.clone()),
+                                    );
 
                                 // WorkflowDispatcher — routes Direct vs Orchestrated.
                                 // Each store wraps a PgPool (cheap Arc clone), so we
@@ -659,7 +689,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let worker_executor: Arc<
                                     dyn ob_poc::repl::orchestrator_v2::DslExecutorV2,
                                 > = Arc::new(
-                                    RealDslExecutor::new(pool.clone()).allow_durable_direct(),
+                                    RealDslExecutor::new(pool.clone())
+                                        .allow_durable_direct()
+                                        .with_services(service_registry.clone()),
                                 );
                                 let job_worker = JobWorker::new(
                                     format!("ob-poc-worker-{}", std::process::id()),
@@ -760,8 +792,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Legacy DslExecutor for the constructor (fallback path — never parks)
         use ob_poc::repl::executor_bridge::RealDslExecutor;
-        let legacy_executor: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutor> =
-            Arc::new(RealDslExecutor::new(pool.clone()));
+        let legacy_executor: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutor> = Arc::new(
+            RealDslExecutor::new(pool.clone()).with_services(service_registry.clone()),
+        );
 
         // Create RunbookStore — shared store for compiled runbook artifacts.
         // INV-3: all execution must go through execute_runbook(CompiledRunbookId).
@@ -782,8 +815,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use dsl_runtime::PgCrudExecutor;
             use ob_poc::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
 
-            let verb_executor = ObPocVerbExecutor::from_pool(pool.clone())
-                .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())));
+            let verb_executor = ObPocVerbExecutor::from_pool_with_services(
+                pool.clone(),
+                service_registry.clone(),
+            )
+            .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())));
             orchestrator = orchestrator.with_verb_execution_port(Arc::new(verb_executor));
             tracing::info!("VerbExecutionPort wired with dsl_runtime::PgCrudExecutor");
         }
@@ -795,8 +831,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             // No BPMN — wire RealDslExecutor directly (it auto-impls DslExecutorV2
             // via the blanket impl, so execute_v2 maps to Completed/Failed, never Parked)
-            orchestrator =
-                orchestrator.with_executor_v2(Arc::new(RealDslExecutor::new(pool.clone())));
+            orchestrator = orchestrator.with_executor_v2(Arc::new(
+                RealDslExecutor::new(pool.clone()).with_services(service_registry.clone()),
+            ));
             tracing::info!("REPL V2 executor: RealDslExecutor (direct, no BPMN)");
         }
 

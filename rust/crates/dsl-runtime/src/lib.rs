@@ -60,6 +60,8 @@ pub mod execution;
 pub mod placeholder;
 pub mod port;
 pub mod registrar;
+pub mod service_traits;
+pub mod services;
 pub mod state_reducer;
 pub mod verification;
 
@@ -70,6 +72,7 @@ pub use execution::{
     Result, VerbExecutionContext, VerbExecutionOutcome, VerbExecutionResult, VerbSideEffects,
 };
 pub use port::{CrudExecutionPort, VerbExecutionPort};
+pub use services::{ServiceRegistry, ServiceRegistryBuilder};
 pub use registrar::VerbRegistrar;
 
 #[cfg(test)]

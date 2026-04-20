@@ -35,8 +35,13 @@ pub mod viewport_resolution_service;
 // Board control rules engine (computes who controls the board)
 pub mod board_control_rules;
 
+// Phase 5a — ob-poc-side impl of the `dsl_runtime::service_traits::SemanticStateService`
+// trait, registered with the platform `ServiceRegistry` at host startup.
+pub mod semantic_state_service_impl;
+
 // Re-exports
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
+pub use semantic_state_service_impl::ObPocSemanticStateService;
 pub use dictionary_service_impl::DictionaryServiceImpl;
 pub use document_attribute_crud_service::DocumentAttributeCrudService;
 pub use document_extraction_service::DocumentExtractionService;

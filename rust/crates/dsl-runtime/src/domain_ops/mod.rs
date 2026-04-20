@@ -26,6 +26,7 @@ pub mod matrix_overlay_ops;
 pub mod outreach_plan_ops;
 pub mod pack_ops;
 pub mod research_normalize_ops;
+pub mod semantic_ops;
 pub mod state_ops;
 pub mod temporal_ops;
 pub mod tollgate_evaluate_ops;

@@ -50,10 +50,28 @@ impl ObPocVerbExecutor {
     ///
     /// Constructs the underlying `DslExecutor` (which auto-registers all
     /// `CustomOperation` implementations and verifies plugin verb coverage).
+    /// The platform service registry defaults to empty — callers that need
+    /// service injection use [`Self::from_pool_with_services`].
     #[cfg(feature = "database")]
     pub fn from_pool(pool: sqlx::PgPool) -> Self {
         Self {
             executor: Arc::new(DslExecutor::new(pool)),
+            crud_port: None,
+        }
+    }
+
+    /// Create an executor from a database pool with a pre-built service
+    /// registry. Prefer this in production — ops relocated to `dsl-runtime`
+    /// that depend on platform traits (e.g. `SemanticStateService`) fail
+    /// with an actionable error at runtime if their trait is not
+    /// registered.
+    #[cfg(feature = "database")]
+    pub fn from_pool_with_services(
+        pool: sqlx::PgPool,
+        services: Arc<dsl_runtime::ServiceRegistry>,
+    ) -> Self {
+        Self {
+            executor: Arc::new(DslExecutor::new(pool).with_services(services)),
             crud_port: None,
         }
     }

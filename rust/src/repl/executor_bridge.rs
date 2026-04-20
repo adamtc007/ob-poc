@@ -27,6 +27,7 @@ use crate::dsl_v2::syntax::parse_program;
 pub struct RealDslExecutor {
     pool: PgPool,
     allow_durable_direct: bool,
+    service_registry: std::sync::Arc<dsl_runtime::ServiceRegistry>,
 }
 
 impl RealDslExecutor {
@@ -34,11 +35,22 @@ impl RealDslExecutor {
         Self {
             pool,
             allow_durable_direct: false,
+            service_registry: std::sync::Arc::new(dsl_runtime::ServiceRegistry::empty()),
         }
     }
 
     pub fn allow_durable_direct(mut self) -> Self {
         self.allow_durable_direct = true;
+        self
+    }
+
+    /// Install the platform service registry. Threaded into every inner
+    /// `DslExecutor` this bridge constructs.
+    pub fn with_services(
+        mut self,
+        services: std::sync::Arc<dsl_runtime::ServiceRegistry>,
+    ) -> Self {
+        self.service_registry = services;
         self
     }
 }
@@ -61,7 +73,8 @@ impl DslExecutor for RealDslExecutor {
         ctx.execution_id = Uuid::new_v4();
 
         // 4. Execute via the real dsl_v2 executor.
-        let executor = crate::dsl_v2::executor::DslExecutor::new(self.pool.clone());
+        let executor = crate::dsl_v2::executor::DslExecutor::new(self.pool.clone())
+            .with_services(self.service_registry.clone());
         let results = executor
             .execute_plan(&plan, &mut ctx)
             .await

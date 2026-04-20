@@ -1150,6 +1150,10 @@ pub struct DslExecutor {
     verb_hash_lookup: crate::session::verb_hash_lookup::VerbHashLookupService,
     /// Event emitter for observability (optional, zero-overhead when None)
     events: Option<SharedEmitter>,
+    /// Platform service registry, threaded onto each `VerbExecutionContext`
+    /// this executor builds. Defaults to empty for tests/standalone use;
+    /// production wires it via [`Self::with_services`] at host startup.
+    service_registry: std::sync::Arc<dsl_runtime::ServiceRegistry>,
 }
 
 impl DslExecutor {
@@ -1182,7 +1186,22 @@ impl DslExecutor {
             pool,
             custom_ops,
             events: None,
+            service_registry: std::sync::Arc::new(dsl_runtime::ServiceRegistry::empty()),
         }
+    }
+
+    /// Install the platform service registry. Call once at host startup
+    /// after constructing the executor with [`Self::new`].
+    pub fn with_services(mut self, services: std::sync::Arc<dsl_runtime::ServiceRegistry>) -> Self {
+        self.service_registry = services;
+        self
+    }
+
+    /// Borrow the installed service registry. Exposed so other executor-like
+    /// shims (e.g. [`crate::runbook::step_executor_bridge`]) can clone it
+    /// onto contexts they build themselves.
+    pub fn service_registry(&self) -> std::sync::Arc<dsl_runtime::ServiceRegistry> {
+        self.service_registry.clone()
     }
 
     /// Verify that all YAML plugin verbs are backed by registered custom operations.
@@ -1302,7 +1321,7 @@ impl DslExecutor {
         if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
             tracing::debug!("execute_verb: routing to PLUGIN (execute_json)");
             if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                return dispatch_plugin_via_execute_json(op.as_ref(), vc, ctx, &self.pool).await;
+                return dispatch_plugin_via_execute_json(op.as_ref(), vc, ctx, &self.pool, &self.service_registry).await;
             }
             return Err(anyhow!(
                 "Plugin {}.{} has no handler implementation",
@@ -1323,7 +1342,7 @@ impl DslExecutor {
                     vc.verb
                 );
                 if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                    return dispatch_plugin_via_execute_json(op.as_ref(), vc, ctx, &self.pool).await;
+                    return dispatch_plugin_via_execute_json(op.as_ref(), vc, ctx, &self.pool, &self.service_registry).await;
                 }
 
                 return Err(anyhow!(
@@ -1472,12 +1491,14 @@ async fn dispatch_plugin_via_execute_json(
     vc: &VerbCall,
     ctx: &mut ExecutionContext,
     pool: &PgPool,
+    services: &std::sync::Arc<dsl_runtime::ServiceRegistry>,
 ) -> Result<ExecutionResult> {
     use crate::sem_os_runtime::verb_executor_adapter as adapter;
     use sem_os_core::principal::Principal;
 
     // 1. Build sem_ctx from legacy ctx.
     let mut sem_ctx = dsl_runtime::VerbExecutionContext::new(Principal::system());
+    sem_ctx.services = services.clone();
     sem_ctx.symbols = ctx.symbols.clone();
     sem_ctx.symbol_types = ctx.symbol_types.clone();
     sem_ctx.execution_id = ctx.execution_id;
