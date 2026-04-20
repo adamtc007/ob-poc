@@ -645,6 +645,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn TradingProfileDocument (trading_profile::ast_db)"
         );
 
+        // dyn SemOsContextResolver — used by relocated affinity_ops to call
+        // the 12-step SemOS context resolution pipeline. Bridge delegates to
+        // `build_sem_os_service(pool).resolve_context(...)`.
+        builder.register::<dyn dsl_runtime::service_traits::SemOsContextResolver>(Arc::new(
+            ob_poc::services::ObPocSemOsContextResolver::new(pool.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn SemOsContextResolver (sem_reg::agent::mcp_tools::build_sem_os_service)"
+        );
+
         Arc::new(builder.build())
     };
 

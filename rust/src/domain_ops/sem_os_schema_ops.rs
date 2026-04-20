@@ -19,7 +19,7 @@ use sqlx::PgPool;
 
 #[cfg(feature = "database")]
 use {
-    crate::domain_ops::affinity_graph_cache::load_affinity_graph_cached,
+    dsl_runtime::domain_ops::affinity_graph_cache::load_affinity_graph_cached,
     crate::sem_reg::{entity_type_def::EntityTypeDefBody, store::SnapshotStore, types::ObjectType},
     sem_os_core::affinity::{match_intent, AffinityGraph, DataRef},
     sem_os_core::diagram::{

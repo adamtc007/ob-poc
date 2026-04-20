@@ -18,8 +18,21 @@
 //! 3. Keep operations focused and single-purpose
 //! 4. Ensure operations are testable in isolation
 
-mod affinity_graph_cache;
-mod affinity_ops;
+// Phase 5a composite-blocker #24 — affinity_graph_cache relocated to
+// `dsl-runtime::domain_ops::affinity_graph_cache`. Inlined the
+// `PgSnapshotRow` Postgres-row decode + conversion to
+// `sem_os_core::types::SnapshotRow` to drop the `crate::sem_reg::types`
+// dep (61 LOC → ~140 LOC after inlining; trade-off accepted vs
+// relocating the whole sem_reg::types module).
+// Phase 5a composite-blocker #24 — affinity_ops relocated to
+// `dsl-runtime::domain_ops::affinity_ops` consuming the new
+// `dyn SemOsContextResolver` trait via the ServiceRegistry.
+// `ObPocSemOsContextResolver` in ob-poc bridges to
+// `crate::sem_reg::agent::mcp_tools::build_sem_os_service(pool).resolve_context(...)`.
+// Internal `ActorContext`/`Classification` references switched from
+// `crate::sem_reg::*` to `sem_os_core::abac::*` (already JSON-compatible
+// per the original `to_sem_os_actor` round-trip helper, now eliminated).
+// affinity_graph_cache also relocated alongside (slice #24 step B).
 // Phase 5a — agent_ops relocated to `dsl-runtime::domain_ops::agent_ops`
 // consuming `dyn McpToolRegistry` via the ServiceRegistry.
 mod attribute_ops;

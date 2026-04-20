@@ -70,9 +70,15 @@ pub mod constellation_runtime_impl;
 // `crate::trading_profile::ast_db::{load_document, save_document}`.
 pub mod trading_profile_document_impl;
 
+// Phase 5a composite-blocker #24 — ob-poc-side impl of
+// `dsl_runtime::service_traits::SemOsContextResolver`; bridges to
+// `crate::sem_reg::agent::mcp_tools::build_sem_os_service(pool).resolve_context(...)`.
+pub mod sem_os_context_resolver_impl;
+
 // Re-exports
 pub use attribute_identity_dispatch_impl::ObPocAttributeIdentityService;
 pub use constellation_runtime_impl::ObPocConstellationRuntime;
+pub use sem_os_context_resolver_impl::ObPocSemOsContextResolver;
 pub use trading_profile_document_impl::ObPocTradingProfileDocument;
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
 pub use lifecycle_catalog_impl::ObPocLifecycleCatalog;
