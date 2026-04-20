@@ -156,6 +156,14 @@ pub mod runbook;
 #[cfg(feature = "database")]
 pub mod repl;
 
+// Agentic Sequencer — the nine-stage dispatch contract (V&S §8). Phase 5b
+// relocated the orchestrator here from `repl::orchestrator_v2`; the
+// `ReplOrchestratorV2` struct is unchanged and continues to host the
+// tollgate state machine. Future slices (5c/5e) split stage ownership
+// across finer modules; 5b is a pure path move.
+#[cfg(feature = "database")]
+pub mod sequencer;
+
 // BPMN-Lite integration - gRPC client, workflow dispatch, job worker, event bridge
 #[cfg(feature = "database")]
 pub mod bpmn_integration;

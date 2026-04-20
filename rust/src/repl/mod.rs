@@ -4,7 +4,9 @@
 //!
 //! Clean redesign with explicit state machine, pack routing,
 //! proposal engine, and durable execution:
-//! - State machine in `orchestrator_v2`
+//! - State machine in `ob_poc::sequencer` (relocated from `ob_poc::sequencer`
+//!   in Phase 5b narrow-scope extraction — `ReplOrchestratorV2` struct unchanged;
+//!   only the module path moves to match V&S §8.1)
 //! - Pack selection + verb filtering in `session_v2`
 //! - Intent matching via `intent_service` wrapping `IntentMatcher` trait
 //! - Proposal generation via `proposal_engine`
@@ -46,7 +48,8 @@ pub mod intent_service;
 
 pub mod proposal_engine;
 
-pub mod orchestrator_v2;
+// Phase 5b — `orchestrator_v2` relocated to `ob_poc::sequencer` (§8.1 alignment).
+// All consumers now reach it via `crate::sequencer` / `ob_poc::sequencer`.
 
 #[cfg(feature = "database")]
 pub mod session_repository;

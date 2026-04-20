@@ -23,7 +23,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::api::constellation_routes::{hydrate_workspace_state, resolve_context};
-use crate::repl::orchestrator_v2::ReplOrchestratorV2;
+use crate::sequencer::ReplOrchestratorV2;
 use crate::repl::response_v2::ReplResponseV2;
 use crate::repl::session_v2::ReplSessionV2;
 use crate::repl::types_v2::{
@@ -1212,7 +1212,7 @@ async fn execute_runbook_plan(
         let step_id = Uuid::new_v4();
 
         // Construct DSL from verb + args
-        let dsl = crate::repl::orchestrator_v2::rebuild_dsl(&step_verb, &{
+        let dsl = crate::sequencer::rebuild_dsl(&step_verb, &{
             let mut m = std::collections::HashMap::new();
             for (k, v) in &step_args {
                 m.insert(k.clone(), v.clone());

@@ -1510,10 +1510,10 @@ mod tests {
     }
 
     /// Regression (Fix 1): Static grep ensuring no raw `self.executor.execute(`
-    /// calls exist in orchestrator_v2.rs. All execution must go through the gate.
+    /// calls exist in sequencer.rs. All execution must go through the gate.
     #[test]
     fn test_no_raw_executor_calls_in_orchestrator() {
-        let source = include_str!("../repl/orchestrator_v2.rs");
+        let source = include_str!("../sequencer.rs");
 
         // Count occurrences of the raw execution pattern.
         let raw_calls: Vec<&str> = source
@@ -1530,7 +1530,7 @@ mod tests {
 
         assert!(
             raw_calls.is_empty(),
-            "INV-3 VIOLATION: Found {} raw executor.execute() call(s) in orchestrator_v2.rs \
+            "INV-3 VIOLATION: Found {} raw executor.execute() call(s) in sequencer.rs \
              that bypass the execution gate:\n{}",
             raw_calls.len(),
             raw_calls.join("\n")
@@ -1540,7 +1540,7 @@ mod tests {
     /// Regression (Fix 1): Static grep ensuring execute_entry_v2 is fully removed.
     #[test]
     fn test_execute_entry_v2_removed() {
-        let source = include_str!("../repl/orchestrator_v2.rs");
+        let source = include_str!("../sequencer.rs");
 
         let v2_calls: Vec<&str> = source
             .lines()
@@ -1627,7 +1627,7 @@ mod tests {
     #[test]
     fn test_runbook_gate_chat_and_repl() {
         let agent_source = include_str!("../api/agent_service.rs");
-        let repl_source = include_str!("../repl/orchestrator_v2.rs");
+        let repl_source = include_str!("../sequencer.rs");
 
         let chat_has_gate = agent_source.contains("execute_runbook");
         let repl_has_gate = repl_source.contains("execute_runbook");
@@ -1639,7 +1639,7 @@ mod tests {
         );
         assert!(
             repl_has_gate,
-            "INV-11 VIOLATION: orchestrator_v2.rs does not contain 'execute_runbook'. \
+            "INV-11 VIOLATION: sequencer.rs does not contain 'execute_runbook'. \
              The REPL must go through the runbook execution gate."
         );
     }

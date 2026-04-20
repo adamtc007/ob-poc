@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 use super::executor::StepOutcome;
 use super::types::CompiledStep;
-use crate::repl::orchestrator_v2::{DslExecutionOutcome, DslExecutor, DslExecutorV2};
+use crate::sequencer::{DslExecutionOutcome, DslExecutor, DslExecutorV2};
 
 // ---------------------------------------------------------------------------
 // DslStepExecutor — sync-only bridge

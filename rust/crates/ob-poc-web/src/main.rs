@@ -587,7 +587,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // BPMN-Lite Integration (before REPL V2 — determines executor)
     // =========================================================================
     type BpmnSetup = (
-        Option<Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>>,
+        Option<Arc<dyn ob_poc::sequencer::DslExecutorV2>>,
         Option<Arc<ob_poc::bpmn_integration::WorkflowDispatcher>>,
         std::collections::HashSet<String>,
     );
@@ -661,7 +661,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let config_index = Arc::new(config_index);
 
                                 // Inner executor for direct verb execution
-                                let inner: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2> =
+                                let inner: Arc<dyn ob_poc::sequencer::DslExecutorV2> =
                                     Arc::new(
                                         RealDslExecutor::new(pool.clone())
                                             .with_services(service_registry.clone()),
@@ -687,7 +687,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let (job_shutdown_tx, job_shutdown_rx) =
                                     tokio::sync::watch::channel(false);
                                 let worker_executor: Arc<
-                                    dyn ob_poc::repl::orchestrator_v2::DslExecutorV2,
+                                    dyn ob_poc::sequencer::DslExecutorV2,
                                 > = Arc::new(
                                     RealDslExecutor::new(pool.clone())
                                         .allow_durable_direct()
@@ -728,7 +728,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                                 (
                                     Some(dispatcher.clone()
-                                        as Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>),
+                                        as Arc<dyn ob_poc::sequencer::DslExecutorV2>),
                                     Some(dispatcher),
                                     orchestrated_verbs,
                                 )
@@ -765,7 +765,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     let repl_v2_orchestrator = {
         use ob_poc::journey::router::PackRouter;
-        use ob_poc::repl::orchestrator_v2::ReplOrchestratorV2;
+        use ob_poc::sequencer::ReplOrchestratorV2;
 
         // Load journey packs from config dir (if available), otherwise empty router.
         let pack_router = {
@@ -792,7 +792,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Legacy DslExecutor for the constructor (fallback path — never parks)
         use ob_poc::repl::executor_bridge::RealDslExecutor;
-        let legacy_executor: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutor> = Arc::new(
+        let legacy_executor: Arc<dyn ob_poc::sequencer::DslExecutor> = Arc::new(
             RealDslExecutor::new(pool.clone()).with_services(service_registry.clone()),
         );
 

@@ -53,7 +53,7 @@ use ob_poc::journey::pack::{load_pack_from_bytes, PackManifest};
 use ob_poc::journey::router::PackRouter;
 use ob_poc::repl::intent_matcher::IntentMatcher;
 use ob_poc::repl::intent_service::IntentService;
-use ob_poc::repl::orchestrator_v2::{
+use ob_poc::sequencer::{
     DslExecutionOutcome, DslExecutorV2, ParkableStubExecutor, ReplOrchestratorV2, StubExecutor,
 };
 use ob_poc::repl::proposal_engine::ProposalEngine;

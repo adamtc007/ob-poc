@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use ob_poc::journey::pack::load_pack_from_bytes;
 use ob_poc::journey::router::PackRouter;
-use ob_poc::repl::orchestrator_v2::{ReplOrchestratorV2, StubExecutor};
+use ob_poc::sequencer::{ReplOrchestratorV2, StubExecutor};
 use ob_poc::repl::response_v2::ReplResponseKindV2;
 use ob_poc::repl::types_v2::{ReplStateV2, UserInputV2, WorkspaceKind};
 

@@ -32,7 +32,7 @@ use super::client::{BpmnLiteConnection, CompleteJobRequest, JobActivation};
 use super::config::WorkflowConfigIndex;
 use super::job_frames::JobFrameStore;
 use super::types::{JobFrame, JobFrameStatus};
-use crate::repl::orchestrator_v2::DslExecutorV2;
+use crate::sequencer::DslExecutorV2;
 
 /// Default long-poll timeout in milliseconds.
 const DEFAULT_POLL_TIMEOUT_MS: i64 = 30_000;
@@ -225,7 +225,7 @@ impl JobWorker {
             .await;
 
         match outcome {
-            crate::repl::orchestrator_v2::DslExecutionOutcome::Completed(result) => {
+            crate::sequencer::DslExecutionOutcome::Completed(result) => {
                 // 5a. Success — complete the job via gRPC.
                 let result_json = completion_payload_from_result(result);
                 let (canonical, _) = canonical_json_with_hash(&result_json);
@@ -248,7 +248,7 @@ impl JobWorker {
                 let _ = self.job_frames.mark_completed(job_key).await;
                 tracing::info!(job_key, verb_fqn, "Job completed successfully");
             }
-            crate::repl::orchestrator_v2::DslExecutionOutcome::Failed(err) => {
+            crate::sequencer::DslExecutionOutcome::Failed(err) => {
                 // 5b. Failure — fail the job via gRPC.
                 self.fail_job_rpc(job_key, "VERB_EXECUTION_ERROR", &err)
                     .await;
@@ -289,7 +289,7 @@ impl JobWorker {
                     );
                 }
             }
-            crate::repl::orchestrator_v2::DslExecutionOutcome::Parked { .. } => {
+            crate::sequencer::DslExecutionOutcome::Parked { .. } => {
                 // 5c. Parked — should not happen for job verbs (they're direct).
                 //     Log a warning but don't complete the job — let it retry.
                 tracing::warn!(

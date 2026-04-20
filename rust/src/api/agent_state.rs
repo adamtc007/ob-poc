@@ -45,7 +45,7 @@ pub struct AgentState {
     /// Semantic OS client for SemReg verb filtering (governance enforcement)
     pub sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
     /// REPL V2 orchestrator used by unified `/api/session/:id/input` adapter.
-    pub repl_v2_orchestrator: Option<Arc<crate::repl::orchestrator_v2::ReplOrchestratorV2>>,
+    pub repl_v2_orchestrator: Option<Arc<crate::sequencer::ReplOrchestratorV2>>,
 }
 
 impl AgentState {
@@ -373,7 +373,7 @@ pub async fn create_agent_router_with_semantic_and_repl(
     pool: PgPool,
     sessions: SessionStore,
     sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
-    repl_v2_orchestrator: Option<Arc<crate::repl::orchestrator_v2::ReplOrchestratorV2>>,
+    repl_v2_orchestrator: Option<Arc<crate::sequencer::ReplOrchestratorV2>>,
 ) -> Router {
     let mut state = AgentState::with_semantic(pool, sessions, sem_os_client).await;
     state.repl_v2_orchestrator = repl_v2_orchestrator.clone();

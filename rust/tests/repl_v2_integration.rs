@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use ob_poc::journey::pack::{load_pack_from_bytes, PackManifest};
 use ob_poc::journey::router::{PackRouteOutcome, PackRouter, PackSemanticScorer};
-use ob_poc::repl::orchestrator_v2::{DslExecutor, ReplOrchestratorV2, StubExecutor};
+use ob_poc::sequencer::{DslExecutor, ReplOrchestratorV2, StubExecutor};
 use ob_poc::repl::response_v2::ReplResponseKindV2;
 use ob_poc::repl::runbook::{ConfirmPolicy, EntryStatus, RunbookEntry};
 use ob_poc::repl::sentence_gen::SentenceGenerator;

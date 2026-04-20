@@ -34,7 +34,7 @@ use ob_poc::journey::pack::{load_pack_from_bytes, PackManifest};
 use ob_poc::journey::router::PackRouter;
 use ob_poc::repl::intent_matcher::IntentMatcher;
 use ob_poc::repl::intent_service::IntentService;
-use ob_poc::repl::orchestrator_v2::{ParkableStubExecutor, ReplOrchestratorV2, StubExecutor};
+use ob_poc::sequencer::{ParkableStubExecutor, ReplOrchestratorV2, StubExecutor};
 use ob_poc::repl::proposal_engine::ProposalEngine;
 use ob_poc::repl::response_v2::ReplResponseKindV2;
 use ob_poc::repl::runbook::{EntryStatus, ExecutionMode, RunbookEvent};

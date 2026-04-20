@@ -213,7 +213,7 @@ async fn session_input(
 /// Returns `None` if no REPL session exists for this ID (legacy agent session).
 async fn try_route_through_repl(
     req: &SessionInputRequest,
-    orchestrator: &std::sync::Arc<crate::repl::orchestrator_v2::ReplOrchestratorV2>,
+    orchestrator: &std::sync::Arc<crate::sequencer::ReplOrchestratorV2>,
     session_id: Uuid,
 ) -> Option<crate::repl::response_v2::ReplResponseV2> {
     use crate::repl::types_v2::UserInputV2;

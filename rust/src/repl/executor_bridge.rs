@@ -12,7 +12,7 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::orchestrator_v2::DslExecutor;
+use crate::sequencer::DslExecutor;
 use crate::dsl_v2::execution::{ExecutionContext, ExecutionResult};
 use crate::dsl_v2::planning::compile;
 use crate::dsl_v2::syntax::parse_program;

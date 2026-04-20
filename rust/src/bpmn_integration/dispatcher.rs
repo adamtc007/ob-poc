@@ -20,7 +20,7 @@ use super::types::{
     CorrelationRecord, CorrelationStatus, ExecutionRoute, ParkedToken, ParkedTokenStatus,
     PendingDispatch, PendingDispatchStatus, RequestStateRecord, RequestStatus,
 };
-use crate::repl::orchestrator_v2::{DslExecutionOutcome, DslExecutorV2, ReplOrchestratorV2};
+use crate::sequencer::{DslExecutionOutcome, DslExecutorV2, ReplOrchestratorV2};
 use ob_poc_types::session_stack::SessionStackState;
 
 #[cfg(feature = "database")]

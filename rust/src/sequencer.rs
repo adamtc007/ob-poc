@@ -29,26 +29,26 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use super::context_stack::ContextStack;
-use super::decision_log::{
+use crate::repl::context_stack::ContextStack;
+use crate::repl::decision_log::{
     ContextSummary, DecisionLog, ExtractionDecision, ExtractionMethod, TurnType,
     VerbCandidateSnapshot, VerbDecision,
 };
-use super::intent_service::{ClarificationOutcome, IntentService, VerbMatchOutcome};
-use super::proposal_engine::ProposalEngine;
-use super::response_v2::{ChapterView, ReplResponseKindV2, ReplResponseV2, StepResult};
-use super::runbook::{
+use crate::repl::intent_service::{ClarificationOutcome, IntentService, VerbMatchOutcome};
+use crate::repl::proposal_engine::ProposalEngine;
+use crate::repl::response_v2::{ChapterView, ReplResponseKindV2, ReplResponseV2, StepResult};
+use crate::repl::runbook::{
     ArgExtractionAudit, ConfirmPolicy, EntryStatus, ExecutionMode, GateType, InvocationRecord,
     RunbookEntry, RunbookStatus, SlotProvenance, SlotSource,
 };
-use super::sentence_gen::SentenceGenerator;
-use super::session_v2::{MessageRole, ReplSessionV2};
-use super::types_v2::{
+use crate::repl::sentence_gen::SentenceGenerator;
+use crate::repl::session_v2::{MessageRole, ReplSessionV2};
+use crate::repl::types_v2::{
     ConstellationContextRef, ExecutionProgress, ReplCommandV2, ReplStateV2,
     ResolvedConstellationContext, SessionFeedback, SubjectKind, UserInputV2, WorkspaceFrame,
     WorkspaceKind, WorkspaceOption, WorkspaceStateView,
 };
-use super::verb_config_index::VerbConfigIndex;
+use crate::repl::verb_config_index::VerbConfigIndex;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::journey::handoff::PackHandoff;
 use crate::journey::pack::AnswerKind;
@@ -200,7 +200,7 @@ pub struct ReplOrchestratorV2 {
     executor_v2: Option<Arc<dyn DslExecutorV2>>,
     /// Phase 5: Session persistence for durable execution / human gates.
     #[cfg(feature = "database")]
-    session_repository: Option<Arc<super::session_repository::SessionRepositoryV2>>,
+    session_repository: Option<Arc<crate::repl::session_repository::SessionRepositoryV2>>,
     /// Compiled runbook store — artifacts from compile_invocation() stored
     /// here for execute_runbook() to retrieve by ID.
     runbook_store: Option<Arc<RunbookStore>>,
@@ -318,7 +318,7 @@ impl ReplOrchestratorV2 {
     #[cfg(feature = "database")]
     pub fn with_session_repository(
         mut self,
-        repo: Arc<super::session_repository::SessionRepositoryV2>,
+        repo: Arc<crate::repl::session_repository::SessionRepositoryV2>,
     ) -> Self {
         self.session_repository = Some(repo);
         self
@@ -586,7 +586,7 @@ impl ReplOrchestratorV2 {
     pub async fn hydrate_tos(
         &self,
         session_id: Uuid,
-        state_view: super::types_v2::WorkspaceStateView,
+        state_view: crate::repl::types_v2::WorkspaceStateView,
     ) -> anyhow::Result<()> {
         let mut sessions = self.sessions.write().await;
         let session = sessions
@@ -782,7 +782,7 @@ impl ReplOrchestratorV2 {
                 use sha2::{Digest, Sha256};
                 format!("sha256:{:x}", Sha256::digest(content.as_bytes()))
             };
-            session.append_trace(super::session_trace::TraceOp::Input {
+            session.append_trace(crate::repl::session_trace::TraceOp::Input {
                 utterance_hash: hash,
             });
         }
@@ -929,8 +929,8 @@ impl ReplOrchestratorV2 {
                                 .find(|e| {
                                     matches!(
                                         e.status,
-                                        super::runbook::EntryStatus::Completed
-                                            | super::runbook::EntryStatus::Failed
+                                        crate::repl::runbook::EntryStatus::Completed
+                                            | crate::repl::runbook::EntryStatus::Failed
                                     )
                                 })
                                 .map(|e| e.verb.as_str())
@@ -1316,7 +1316,7 @@ impl ReplOrchestratorV2 {
                 };
 
                 // Infrastructure / SemOS intent — bypass client group resolution.
-                if super::bootstrap::is_infrastructure_intent(&content) {
+                if crate::repl::bootstrap::is_infrastructure_intent(&content) {
                     return self.complete_infrastructure_scope_gate(session).await;
                 }
 
@@ -1333,7 +1333,7 @@ impl ReplOrchestratorV2 {
                 // If we have candidates, try numeric or name selection first.
                 if let Some(ref cands) = pending_candidates {
                     if let Some(selected) =
-                        super::bootstrap::try_numeric_or_name_selection(&content, cands)
+                        crate::repl::bootstrap::try_numeric_or_name_selection(&content, cands)
                     {
                         let group_id = selected.group_id;
                         let group_name = selected.group_name.clone();
@@ -1348,7 +1348,7 @@ impl ReplOrchestratorV2 {
                 #[cfg(feature = "database")]
                 {
                     if let Some(pool) = self.pool() {
-                        let outcome = super::bootstrap::resolve_client_input(&content, pool).await;
+                        let outcome = crate::repl::bootstrap::resolve_client_input(&content, pool).await;
                         return self.handle_bootstrap_outcome(session, outcome).await;
                     }
                 }
@@ -2123,7 +2123,7 @@ impl ReplOrchestratorV2 {
         session
             .runbook
             .audit
-            .push(super::runbook::RunbookEvent::HumanGateApproved {
+            .push(crate::repl::runbook::RunbookEvent::HumanGateApproved {
                 entry_id,
                 invocation_id,
                 approved_by,
@@ -2220,7 +2220,7 @@ impl ReplOrchestratorV2 {
         session
             .runbook
             .audit
-            .push(super::runbook::RunbookEvent::HumanGateRejected {
+            .push(crate::repl::runbook::RunbookEvent::HumanGateRejected {
                 entry_id,
                 invocation_id,
                 rejected_by: None,
@@ -2693,10 +2693,10 @@ impl ReplOrchestratorV2 {
     async fn handle_bootstrap_outcome(
         &self,
         session: &mut ReplSessionV2,
-        outcome: super::bootstrap::BootstrapOutcome,
+        outcome: crate::repl::bootstrap::BootstrapOutcome,
     ) -> ReplResponseV2 {
         match outcome {
-            super::bootstrap::BootstrapOutcome::Resolved {
+            crate::repl::bootstrap::BootstrapOutcome::Resolved {
                 group_id,
                 group_name,
             } => {
@@ -2704,11 +2704,11 @@ impl ReplOrchestratorV2 {
                     .await
             }
 
-            super::bootstrap::BootstrapOutcome::Ambiguous {
+            crate::repl::bootstrap::BootstrapOutcome::Ambiguous {
                 candidates,
                 original_input,
             } => {
-                let message = super::bootstrap::format_disambiguation(&candidates, &original_input);
+                let message = crate::repl::bootstrap::format_disambiguation(&candidates, &original_input);
                 session.set_state(ReplStateV2::ScopeGate {
                     pending_input: Some(original_input),
                     candidates: Some(candidates),
@@ -2726,7 +2726,7 @@ impl ReplOrchestratorV2 {
                 }
             }
 
-            super::bootstrap::BootstrapOutcome::NoMatch { original_input } => {
+            crate::repl::bootstrap::BootstrapOutcome::NoMatch { original_input } => {
                 session.set_state(ReplStateV2::ScopeGate {
                     pending_input: Some(original_input.clone()),
                     candidates: None,
@@ -2750,7 +2750,7 @@ impl ReplOrchestratorV2 {
                 }
             }
 
-            super::bootstrap::BootstrapOutcome::Empty => {
+            crate::repl::bootstrap::BootstrapOutcome::Empty => {
                 // No client groups in DB — stay in ScopeGate.
                 // Client scope is a non-negotiable tollgate: nothing progresses without it.
                 session.set_state(ReplStateV2::ScopeGate {
@@ -2776,7 +2776,7 @@ impl ReplOrchestratorV2 {
                 }
             }
 
-            super::bootstrap::BootstrapOutcome::Infrastructure => {
+            crate::repl::bootstrap::BootstrapOutcome::Infrastructure => {
                 self.complete_infrastructure_scope_gate(session).await
             }
         }
@@ -3080,7 +3080,7 @@ impl ReplOrchestratorV2 {
         session: &mut ReplSessionV2,
         input: &str,
     ) -> Option<ReplResponseV2> {
-        use super::runbook::FastCommand;
+        use crate::repl::runbook::FastCommand;
 
         let cmd = FastCommand::parse(input)?;
 
@@ -3430,7 +3430,7 @@ impl ReplOrchestratorV2 {
         // Single high-confidence proposal → auto-advance to SentencePlayback.
         if proposal_set.proposals.len() == 1
             && proposal_set.proposals[0].evidence.confidence
-                >= super::proposal_engine::AUTO_ADVANCE_THRESHOLD
+                >= crate::repl::proposal_engine::AUTO_ADVANCE_THRESHOLD
         {
             let p = &proposal_set.proposals[0];
             let confirm_policy = p.confirm_policy;
@@ -3730,33 +3730,33 @@ impl ReplOrchestratorV2 {
             {
                 Ok(mut result) => {
                     // Apply precondition filter (P-D invariant).
-                    let _filter_stats = super::preconditions::filter_by_preconditions(
+                    let _filter_stats = crate::repl::preconditions::filter_by_preconditions(
                         &mut result.verb_candidates,
                         &self.verb_config_index,
                         &context_stack,
-                        super::preconditions::EligibilityMode::Executable,
+                        crate::repl::preconditions::EligibilityMode::Executable,
                     );
                     if _filter_stats.before_count != _filter_stats.after_count {
                         // Re-evaluate outcome after filtering.
                         let new_outcome =
-                            super::scoring::apply_ambiguity_policy(&result.verb_candidates);
+                            crate::repl::scoring::apply_ambiguity_policy(&result.verb_candidates);
                         result.outcome = match new_outcome {
-                            super::scoring::AmbiguityOutcome::NoMatch => {
-                                super::types::MatchOutcome::NoMatch {
+                            crate::repl::scoring::AmbiguityOutcome::NoMatch => {
+                                crate::repl::types::MatchOutcome::NoMatch {
                                     reason: "No verb matched after precondition filter".to_string(),
                                 }
                             }
-                            super::scoring::AmbiguityOutcome::Confident { verb, score } => {
-                                super::types::MatchOutcome::Matched {
+                            crate::repl::scoring::AmbiguityOutcome::Confident { verb, score } => {
+                                crate::repl::types::MatchOutcome::Matched {
                                     verb,
                                     confidence: score,
                                 }
                             }
-                            super::scoring::AmbiguityOutcome::Ambiguous { margin, .. } => {
-                                super::types::MatchOutcome::Ambiguous { margin }
+                            crate::repl::scoring::AmbiguityOutcome::Ambiguous { margin, .. } => {
+                                crate::repl::types::MatchOutcome::Ambiguous { margin }
                             }
-                            super::scoring::AmbiguityOutcome::Proposed { verb, score } => {
-                                super::types::MatchOutcome::Matched {
+                            crate::repl::scoring::AmbiguityOutcome::Proposed { verb, score } => {
+                                crate::repl::types::MatchOutcome::Matched {
                                     verb,
                                     confidence: score,
                                 }
@@ -3798,13 +3798,13 @@ impl ReplOrchestratorV2 {
             } => {
                 // Phase F: Try deterministic arg extraction before LLM/DSL parsing.
                 let turn = session.runbook.entries.len() as u32;
-                let context_stack = super::context_stack::ContextStack::from_runbook(
+                let context_stack = crate::repl::context_stack::ContextStack::from_runbook(
                     &session.runbook,
                     session.staged_pack.clone(),
                     turn,
                 );
                 let (args, slot_provenance, det_model_id) = if let Some(det) =
-                    super::deterministic_extraction::try_deterministic_extraction(
+                    crate::repl::deterministic_extraction::try_deterministic_extraction(
                         &verb,
                         original_input,
                         &context_stack,
@@ -3997,7 +3997,7 @@ impl ReplOrchestratorV2 {
                 // Phase G: Emit DecisionLog for ambiguous outcome.
                 {
                     let turn = session.runbook.entries.len() as u32;
-                    let ctx = super::context_stack::ContextStack::from_runbook(
+                    let ctx = crate::repl::context_stack::ContextStack::from_runbook(
                         &session.runbook,
                         session.staged_pack.clone(),
                         turn,
@@ -4036,7 +4036,7 @@ impl ReplOrchestratorV2 {
                 let v2_candidates: Vec<_> = candidates
                     .iter()
                     .take(5)
-                    .map(|c| super::types_v2::VerbCandidate {
+                    .map(|c| crate::repl::types_v2::VerbCandidate {
                         verb_fqn: c.verb_fqn.clone(),
                         description: c.description.clone(),
                         score: c.score,
@@ -4081,7 +4081,7 @@ impl ReplOrchestratorV2 {
                 // Phase G: Emit DecisionLog for no-match.
                 {
                     let turn = session.runbook.entries.len() as u32;
-                    let ctx = super::context_stack::ContextStack::from_runbook(
+                    let ctx = crate::repl::context_stack::ContextStack::from_runbook(
                         &session.runbook,
                         session.staged_pack.clone(),
                         turn,
@@ -4310,7 +4310,7 @@ impl ReplOrchestratorV2 {
                     .verb_candidates
                     .iter()
                     .take(5)
-                    .map(|c| super::types_v2::VerbCandidate {
+                    .map(|c| crate::repl::types_v2::VerbCandidate {
                         verb_fqn: c.verb_fqn.clone(),
                         description: c.description.clone(),
                         score: c.score,
@@ -4573,7 +4573,7 @@ impl ReplOrchestratorV2 {
     }
 
     /// Regenerate sentence and DSL for an entry after an arg change.
-    fn regenerate_entry_sentence(&self, entry: &super::runbook::RunbookEntry) -> (String, String) {
+    fn regenerate_entry_sentence(&self, entry: &crate::repl::runbook::RunbookEntry) -> (String, String) {
         let sentence = if let Some(ref svc) = self.intent_service {
             svc.generate_sentence(&entry.verb, &entry.args)
         } else {
@@ -4634,7 +4634,7 @@ impl ReplOrchestratorV2 {
             entry_mut
                 .slot_provenance
                 .slots
-                .insert(field.to_string(), super::runbook::SlotSource::UserProvided);
+                .insert(field.to_string(), crate::repl::runbook::SlotSource::UserProvided);
         }
 
         let summary = self.runbook_summary(session);
@@ -5072,7 +5072,7 @@ impl ReplOrchestratorV2 {
                             }
                             session.increment_tos_writes();
                             session.append_trace_enriched(
-                                super::session_trace::TraceOp::VerbExecuted {
+                                crate::repl::session_trace::TraceOp::VerbExecuted {
                                     verb_fqn: entry_dsl.clone(),
                                     step_id: entry_id,
                                 },
@@ -5205,7 +5205,7 @@ impl ReplOrchestratorV2 {
                             }
                             session.increment_tos_writes();
                             session.append_trace_enriched(
-                                super::session_trace::TraceOp::VerbExecuted {
+                                crate::repl::session_trace::TraceOp::VerbExecuted {
                                     verb_fqn: entry_dsl.clone(),
                                     step_id: entry_id,
                                 },
@@ -5815,12 +5815,12 @@ impl ReplOrchestratorV2 {
             session.activate_pack(manifest.clone(), hash.clone(), Some(handoff));
 
             // Create a fresh runbook for the new pack.
-            session.runbook = super::runbook::Runbook::new(session.id);
+            session.runbook = crate::repl::runbook::Runbook::new(session.id);
             session.runbook.pack_id = Some(target_id.clone());
             session
                 .runbook
                 .audit
-                .push(super::runbook::RunbookEvent::HandoffReceived {
+                .push(crate::repl::runbook::RunbookEvent::HandoffReceived {
                     source_runbook_id,
                     target_pack_id: handoff_target.clone(),
                     forwarded_context,
@@ -7271,7 +7271,7 @@ definition_of_done:
     // -----------------------------------------------------------------------
 
     fn kyc_yaml() -> &'static [u8] {
-        include_bytes!("../../config/packs/kyc-case.yaml")
+        include_bytes!("../config/packs/kyc-case.yaml")
     }
 
     fn make_kyc_orchestrator() -> ReplOrchestratorV2 {

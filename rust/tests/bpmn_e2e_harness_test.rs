@@ -38,7 +38,7 @@ use ob_poc::bpmn_integration::{
     WorkflowBinding, WorkflowConfig, WorkflowConfigIndex, WorkflowDispatcher,
 };
 use ob_poc::journey::router::PackRouter;
-use ob_poc::repl::orchestrator_v2::{
+use ob_poc::sequencer::{
     DslExecutionOutcome, DslExecutorV2, ReplOrchestratorV2, StubExecutor,
 };
 use ob_poc::repl::runbook::{

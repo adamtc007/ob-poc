@@ -40,7 +40,7 @@ fn test_executor_lock_event_logging() {
 fn test_execution_gate_source_invariants() {
     // INV-11: Both Chat API and REPL reference execute_runbook
     let agent_source = include_str!("../api/agent_service.rs");
-    let repl_source = include_str!("../repl/orchestrator_v2.rs");
+    let repl_source = include_str!("../sequencer.rs");
 
     assert!(
         agent_source.contains("execute_runbook"),
@@ -48,7 +48,7 @@ fn test_execution_gate_source_invariants() {
     );
     assert!(
         repl_source.contains("execute_runbook"),
-        "INV-11: REPL (orchestrator_v2.rs) must reference execute_runbook"
+        "INV-11: REPL (sequencer.rs) must reference execute_runbook"
     );
 
     // INV-1: No ungated execute_dsl calls in agent_service.rs
