@@ -1,24 +1,24 @@
 //! Resource instance custom operations
 //!
 //! Operations for service resource provisioning, attribute management,
-//! and lifecycle transitions.
+//! and lifecycle transitions. Attribute identity resolution is
+//! delegated to the host through
+//! [`crate::service_traits::AttributeIdentityService`] (already wired
+//! in slice #8 for observation_ops); the rest is direct sqlx against
+//! the `"ob-poc"` schema.
 
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
-
-use super::helpers::{
-    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
-};
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-use crate::services::attribute_identity_service::AttributeIdentityService;
-
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
-#[cfg(feature = "database")]
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{
+    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use crate::service_traits::AttributeIdentityService;
+
 async fn resource_create_impl(
     cbu_id: uuid::Uuid,
     resource_type_code: &str,
@@ -103,21 +103,16 @@ async fn resource_create_impl(
     Ok(result_id)
 }
 
-#[cfg(feature = "database")]
+/// Insert (or upsert) a resource instance attribute. Caller resolves
+/// the attribute reference via `dyn AttributeIdentityService` and
+/// passes the runtime UUID directly.
 async fn resource_set_attr_impl(
     instance_id: uuid::Uuid,
-    attr_name: &str,
+    attribute_id: uuid::Uuid,
     value: &str,
     state: &str,
     pool: &PgPool,
 ) -> Result<uuid::Uuid> {
-    let attribute_id = AttributeIdentityService::new(pool.clone())
-        .resolve_runtime_uuid(attr_name)
-        .await?;
-
-    let attribute_id =
-        attribute_id.ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
-
     let value_id = uuid::Uuid::new_v4();
 
     sqlx::query(
@@ -140,7 +135,6 @@ async fn resource_set_attr_impl(
     Ok(value_id)
 }
 
-#[cfg(feature = "database")]
 async fn resource_activate_impl(instance_id: uuid::Uuid, pool: &PgPool) -> Result<()> {
     use uuid::Uuid;
 
@@ -204,7 +198,6 @@ async fn resource_activate_impl(instance_id: uuid::Uuid, pool: &PgPool) -> Resul
     Ok(())
 }
 
-#[cfg(feature = "database")]
 async fn resource_suspend_impl(instance_id: uuid::Uuid, pool: &PgPool) -> Result<()> {
     sqlx::query(
         r#"UPDATE "ob-poc".cbu_resource_instances
@@ -218,7 +211,6 @@ async fn resource_suspend_impl(instance_id: uuid::Uuid, pool: &PgPool) -> Result
     Ok(())
 }
 
-#[cfg(feature = "database")]
 async fn resource_decommission_impl(instance_id: uuid::Uuid, pool: &PgPool) -> Result<()> {
     sqlx::query(
         r#"UPDATE "ob-poc".cbu_resource_instances
@@ -232,7 +224,6 @@ async fn resource_decommission_impl(instance_id: uuid::Uuid, pool: &PgPool) -> R
     Ok(())
 }
 
-#[cfg(feature = "database")]
 async fn resource_validate_attrs_impl(
     instance_id: uuid::Uuid,
     pool: &PgPool,
@@ -316,14 +307,12 @@ impl CustomOperation for ResourceCreateOp {
         "Requires resource_type lookup by code and CBU/product/service FK resolution"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
@@ -374,154 +363,15 @@ impl CustomOperation for ResourceCreateOp {
 
         ctx.bind("instance", result_id);
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            result_id,
-        ))
+        Ok(VerbExecutionOutcome::Uuid(result_id))
     }
-
 
     fn is_migrated(&self) -> bool {
         true
     }
 }
 
-impl ResourceCreateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        // Get CBU ID (required)
-        let cbu_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
-
-        // Get resource type code (required)
-        let resource_type_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "resource-type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing resource-type argument"))?;
-
-        // Get instance URL (optional - auto-generate if not provided)
-        let instance_url = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instance-url")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| {
-                format!(
-                    "urn:ob-poc:{}:{}:{}",
-                    cbu_id,
-                    resource_type_code.to_lowercase().replace('_', "-"),
-                    Uuid::new_v4()
-                )
-            });
-
-        let instance_identifier = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instance-id")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let instance_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instance-name")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        // Get product-id if provided
-        let product_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "product-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
-
-        // Get service-id if provided, otherwise auto-derive from resource type capabilities
-        let service_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "service-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
-
-        let depends_on_refs: Vec<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "depends-on")
-            .and_then(|a| a.value.as_list())
-            .map(|list| {
-                list.iter()
-                    .filter_map(|node| {
-                        if let Some(sym) = node.as_symbol() {
-                            ctx.resolve(sym)
-                        } else {
-                            node.as_uuid()
-                        }
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let result_id = resource_create_impl(
-            cbu_id,
-            resource_type_code,
-            instance_url,
-            instance_identifier,
-            instance_name,
-            product_id,
-            service_id,
-            depends_on_refs,
-            pool,
-        )
-        .await?;
-
-        ctx.bind("instance", result_id);
-
-        Ok(ExecutionResult::Uuid(result_id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
-    }
-}
-
-/// Set an attribute on a resource instance
-///
-/// Rationale: Requires lookup of attribute_id from dictionary by name,
-/// then upsert into resource_instance_attributes with typed value.
+/// Set or upsert a typed attribute on a resource instance
 #[register_custom_op]
 pub struct ResourceSetAttrOp;
 
@@ -537,85 +387,31 @@ impl CustomOperation for ResourceSetAttrOp {
         "Requires attribute lookup by name and typed value storage"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
         let attr_name = json_extract_string(args, "attr")?;
         let value = json_extract_string(args, "value")?;
         let state =
             json_extract_string_opt(args, "state").unwrap_or_else(|| "proposed".to_string());
-        let value_id =
-            resource_set_attr_impl(instance_id, &attr_name, &value, &state, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(value_id))
-    }
 
+        let attribute_id = ctx
+            .service::<dyn AttributeIdentityService>()?
+            .resolve_runtime_uuid(&attr_name)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Unknown attribute: {}", attr_name))?;
+
+        let value_id =
+            resource_set_attr_impl(instance_id, attribute_id, &value, &state, pool).await?;
+        Ok(VerbExecutionOutcome::Uuid(value_id))
+    }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ResourceSetAttrOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let instance_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instance-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
-
-        let attr_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "attr")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing attr argument"))?;
-
-        let value = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "value")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing value argument"))?;
-
-        let state = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "state")
-            .and_then(|a| a.value.as_string())
-            .unwrap_or("proposed");
-
-        let value_id = resource_set_attr_impl(instance_id, attr_name, value, state, pool).await?;
-
-        Ok(ExecutionResult::Uuid(value_id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
 }
 
@@ -637,59 +433,19 @@ impl CustomOperation for ResourceActivateOp {
         "Validates required attributes before status transition"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
         resource_activate_impl(instance_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Void)
+        Ok(VerbExecutionOutcome::Void)
     }
-
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ResourceActivateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let instance_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instance-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
-
-        resource_activate_impl(instance_id, pool).await?;
-
-        Ok(ExecutionResult::Void)
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
     }
 }
 
@@ -709,59 +465,19 @@ impl CustomOperation for ResourceSuspendOp {
         "Status transition with optional reason logging"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
         resource_suspend_impl(instance_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Void)
+        Ok(VerbExecutionOutcome::Void)
     }
-
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ResourceSuspendOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let instance_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instance-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
-
-        resource_suspend_impl(instance_id, pool).await?;
-
-        Ok(ExecutionResult::Void)
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
     }
 }
 
@@ -781,59 +497,19 @@ impl CustomOperation for ResourceDecommissionOp {
         "Terminal status transition with timestamp"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
         resource_decommission_impl(instance_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Void)
+        Ok(VerbExecutionOutcome::Void)
     }
-
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ResourceDecommissionOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let instance_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instance-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
-
-        resource_decommission_impl(instance_id, pool).await?;
-
-        Ok(ExecutionResult::Void)
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
     }
 }
 
@@ -853,62 +529,18 @@ impl CustomOperation for ResourceValidateAttrsOp {
         "Validates required attributes against resource_attribute_requirements"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let instance_id = json_extract_uuid(args, ctx, "instance-id")?;
         let result = resource_validate_attrs_impl(instance_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
-
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ResourceValidateAttrsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let instance_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "instance-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing instance-id argument"))?;
-
-        let result = resource_validate_attrs_impl(instance_id, pool).await?;
-
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "valid": true,
-            "missing": [],
-            "message": "Validation skipped (no database)"
-        })))
     }
 }

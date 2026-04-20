@@ -114,7 +114,15 @@ mod request_ops;
 // service-trait dependency); the 4 ops use only json_* helpers and
 // direct sqlx. Registration flows through inventory automatically;
 // external ob-poc code doesn't import these types directly.
-mod resource_ops;
+// Phase 5a composite-blocker #13 — resource_ops relocated to
+// `dsl-runtime::domain_ops::resource_ops`. Reuses the existing
+// `dyn AttributeIdentityService` trait from slice #8 (already
+// registered via `ObPocAttributeIdentityService`); only one of the
+// six ops (`set-attr`) needs `resolve_runtime_uuid`. After stripping
+// the legacy `execute(&VerbCall, ...)` blocks (deps `crate::dsl_v2::*`)
+// and refactoring `resource_set_attr_impl` to take a pre-resolved
+// `attribute_id: Uuid` (caller fetches the trait), the ob-poc surface
+// reduces to zero. Registration flows through inventory.
 pub mod rule_evaluator;
 // Phase 5d — screening_ops relocated to `dsl-runtime::domain_ops::screening_ops`
 // Phase 5a composite-blocker #7 — sem_os_audit_ops relocated to
@@ -246,10 +254,7 @@ pub use attribute_ops::{
 // downstream ob-poc code does not import these types directly, so no shim
 // re-export is needed.
 // Phase 5c — requirement_ops relocated. Types accessed via dsl_runtime::domain_ops::requirement_ops.
-pub use resource_ops::{
-    ResourceActivateOp, ResourceCreateOp, ResourceDecommissionOp, ResourceSetAttrOp,
-    ResourceSuspendOp, ResourceValidateAttrsOp,
-};
+// Phase 5a composite-blocker #13 — resource_ops re-exports removed; see relocation comment above.
 // Phase 5d — screening_ops relocated. Types accessed via dsl_runtime::domain_ops::screening_ops.
 // Phase 5e — ubo_graph_ops relocated. Types accessed via dsl_runtime::domain_ops::ubo_graph_ops.
 
