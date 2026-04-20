@@ -84,7 +84,13 @@ mod request_ops;
 mod resource_ops;
 pub mod rule_evaluator;
 // Phase 5d — screening_ops relocated to `dsl-runtime::domain_ops::screening_ops`
-mod sem_os_audit_ops;
+// Phase 5a composite-blocker #7 — sem_os_audit_ops relocated to
+// `dsl-runtime::domain_ops::sem_os_audit_ops`. Clean lift on the existing
+// `dyn StewardshipDispatch` trait — `ObPocStewardshipDispatch` already
+// cascades non-`stew_` tool names through `sem_reg::agent::mcp_tools::dispatch_tool`,
+// so the 8 audit ops (`sem_reg_create_plan`, `sem_reg_record_decision`, …)
+// resolve transparently without a new service trait. Registration flows
+// through inventory; external ob-poc code does not import these types directly.
 // Phase 5a — sem_os_{focus,governance,changeset}_ops relocated to
 // `dsl-runtime::domain_ops::*` consuming `dyn StewardshipDispatch` via
 // the ServiceRegistry. `ObPocStewardshipDispatch` in ob-poc bridges

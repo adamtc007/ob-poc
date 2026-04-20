@@ -49,6 +49,7 @@ pub mod requirement_ops;
 pub mod screening_ops;
 pub mod research_normalize_ops;
 pub mod research_workflow_ops;
+pub mod sem_os_audit_ops;
 pub mod sem_os_changeset_ops;
 pub mod sem_os_focus_ops;
 pub mod sem_os_governance_ops;

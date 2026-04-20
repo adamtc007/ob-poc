@@ -1,20 +1,45 @@
 //! Audit domain CustomOps (Spec §C.8 — 8 verbs).
 //!
-//! All verbs delegate to existing sem_reg MCP tools via `dispatch_tool()`.
+//! All verbs delegate to general SemReg MCP tools (planning / decisions /
+//! evidence categories — `sem_reg_create_plan`, `sem_reg_record_decision`,
+//! `sem_reg_record_observation`, etc.) via the `StewardshipDispatch`
+//! trait. The ob-poc-side dispatcher (`ObPocStewardshipDispatch`)
+//! cascades phase 0 → phase 1 → general `dispatch_tool`, so the audit
+//! tools — none of which carry the `stew_` prefix — fall through to the
+//! general arm transparently.
+//!
 //! Allowed in BOTH Research and Governed AgentModes.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-
 use dsl_runtime_macros::register_custom_op;
-
-use super::sem_os_helpers::delegate_to_tool;
-use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
-
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
-// ── Macro to reduce boilerplate for simple delegation ops ──────────
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use crate::service_traits::StewardshipDispatch;
+
+async fn dispatch_tool(
+    ctx: &VerbExecutionContext,
+    tool_name: &str,
+    args: &serde_json::Value,
+) -> Result<VerbExecutionOutcome> {
+    let dispatcher = ctx.service::<dyn StewardshipDispatch>()?;
+    let outcome = dispatcher
+        .dispatch(tool_name, args, &ctx.principal)
+        .await?
+        .ok_or_else(|| anyhow!("Unknown audit tool: {}", tool_name))?;
+    if outcome.success {
+        Ok(VerbExecutionOutcome::Record(outcome.data))
+    } else {
+        Err(anyhow!(
+            "{}",
+            outcome
+                .message
+                .unwrap_or_else(|| format!("Audit tool {} failed", tool_name))
+        ))
+    }
+}
 
 macro_rules! audit_op {
     ($struct_name:ident, $verb:literal, $tool:literal, $rationale:literal) => {
@@ -33,41 +58,17 @@ macro_rules! audit_op {
                 $rationale
             }
 
-            #[cfg(feature = "database")]
             async fn execute_json(
                 &self,
                 args: &serde_json::Value,
-                ctx: &mut dsl_runtime::VerbExecutionContext,
-                pool: &PgPool,
-            ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-                super::sem_os_helpers::delegate_to_tool_json(pool, ctx, args, $tool).await
+                ctx: &mut VerbExecutionContext,
+                _pool: &PgPool,
+            ) -> Result<VerbExecutionOutcome> {
+                dispatch_tool(ctx, $tool, args).await
             }
 
             fn is_migrated(&self) -> bool {
                 true
-            }
-        }
-
-        impl $struct_name {
-            #[cfg(feature = "database")]
-            #[allow(dead_code)]
-            async fn execute(
-                &self,
-                verb_call: &VerbCall,
-                ctx: &mut ExecutionContext,
-                pool: &PgPool,
-            ) -> Result<ExecutionResult> {
-                delegate_to_tool(pool, ctx, verb_call, $tool).await
-            }
-
-            #[cfg(not(feature = "database"))]
-            #[allow(dead_code)]
-            async fn execute(
-                &self,
-                _verb_call: &VerbCall,
-                _ctx: &mut ExecutionContext,
-            ) -> Result<ExecutionResult> {
-                Err(anyhow::anyhow!("audit.{} requires database", $verb))
             }
         }
     };
