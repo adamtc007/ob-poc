@@ -657,7 +657,41 @@ Define service-level traits in `dsl-runtime::service_traits` for ob-poc-retained
 
 **Gate:** `ServiceRegistry` + `ServiceRegistryBuilder` compile with object-safe trait primitives; at least one trait pilot (recommended: `SemanticStateService`) proves the pattern end-to-end (ob-poc-side impl registered at startup; a relocated plugin op consumes it and passes all integration tests). Subsequent traits follow the same recipe.
 
-**Status:** DONE — `SemanticStateService` pilot shipped 55b0be16. Pattern available for TaxonomyAccess / AffinityGraph / Stewardship / remaining Group 5/6/7 blocked files.
+**Status:** Pilot DONE — `SemanticStateService` shipped 55b0be16. Pattern established and in use by subsequent composite-blocker slices. Trait catalogue grown to 3 concrete services so far (`SemanticStateService`, `StewardshipDispatch`, `McpToolRegistry`). Additional traits (`TaxonomyAccess`, `AffinityGraph`, `ConstellationRuntime`, `AttributeIdentityService`, `ServiceResourcePipelineService`, `TemplateExpander+DslExecutor`, `TradingProfileDocument`, `TradingMatrixCorporateActions`) still to be defined as their consumer ops are worked.
+
+**R-sweep relocation progress (tracked out-of-band in this file while 5a is in flight; authoritative until closed):**
+
+- **R-batches (one per commit):** 9bc2fbb5 (8 files) · ec95f9e3 (4 files) · a7b68033 (11 files) · c90c66c0 (29 sem_os_* files) — ~52 files lifted into `dsl-runtime::domain_ops` via mechanical strip-and-move.
+- **Composite-blockers (one trait/blocker per slice, smallest first):**
+  1. `agent_ops` + `McpToolRegistry` trait — commit b441d132
+  2. `cross_workspace/` module + `remediation_ops` (relocated together, cross_workspace is the consumer surface) — commit 27585e5d
+  3. `shared_atom_ops` (clean lift — its blocker was cross_workspace, already resolved by #2) — commit 8f7ca9c3
+  4. `research_workflow_ops` (self-contained; 4 ops, only json_* + sqlx) — commit 6480a0da
+
+**Phase 5a progress: 54 / 89 op files relocated.** Remaining 35 split:
+- **12 `ob-poc-adapter` destination** (legitimately stay in ob-poc): `billing_ops`, `booking_principal_ops`, `capital_ops`, `client_group_ops`, `deal_ops`, `gleif_ops`, `investor_ops`, `investor_role_ops`, `resource_ops`, `sem_os_maintenance_ops`, `sem_os_registry_ops`, `team_ops`.
+- **Composite-blocker #5+ candidates** (`dsl-runtime`-destination, each needs ONE trait/dep resolved):
+  - **No remaining blocker** (lift-and-strip candidates — verify first, then execute): `kyc_case_ops` (5 ops, touches `ontology`).
+  - **Trait blocker** (needs new `service_traits` entry before move):
+    - `ConstellationRuntime` → `constellation_ops` (handle_constellation_{hydrate,summary} from sem_os_runtime)
+    - `TaxonomyAccess` → `view_ops` (already named in matrix §6)
+    - `NavigationRuntime` / viewport state → `navigation_ops`
+    - `SessionLifecycle` + `UnifiedSession` access → `session_ops`
+    - `AttributeIdentityService` → `attribute_ops` + `observation_ops` (shared — compose as one slice)
+    - `SemanticStageRegistry` → `onboarding` + `semantic_ops` (shared — compose)
+    - `SkeletonBuildOrchestrator` → `skeleton_build_ops`
+    - `DiscoveryExecutor` + insight builders → `discovery_ops`
+    - `PhraseWatermarkScanner` + embedding similarity → `phrase_ops`
+    - `ServiceResourcePipelineService` → `service_pipeline_ops`
+    - `TemplateExpander` + `DslExecutor` → `template_ops`
+    - `TradingProfileDocument` + `TradingMatrixCorporateActions` → `trading_profile` + `trading_profile_ca_ops` (shared — compose)
+    - `MancoRoleBridge` SQL fn → `manco_ops`
+    - `AffinityGraph` → `affinity_ops`
+    - sem_reg audit_op! macros → `sem_os_audit_ops`
+    - verb_contract affinity/diagram → `sem_os_schema_ops` (mixed metadata destination)
+- **A1 Pattern B (deferred to Phase 5f ledger):** `bpmn_lite_ops` (5 ops, gRPC), `source_loader_ops` (16 ops, HTTP), `gleif_ops` (17 ops, HTTP — `ob-poc-adapter` dest regardless). See `docs/todo/pattern-b-a1-remediation-ledger.md`.
+
+**Restart instructions for a fresh session:** Pick the next composite-blocker #5. The cheapest candidate is `kyc_case_ops` — verify its `ontology` import is the `crate::ontology` (ob-poc-owned) or something re-exportable cleanly. If the former, either expose a narrow trait for the ontology accessors it needs, or (more likely) lift the relevant ontology types to a shared crate first. Smaller lift-and-strip files gate on "does every import resolve via `dsl-runtime` or via a 1-method trait we can define in one sitting?"; if yes, move it; if no, define the trait + impl + registration in `ob-poc-web::main` first, then lift.
 
 #### Phase 5b — Sequencer extraction
 
