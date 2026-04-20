@@ -28,7 +28,9 @@ use {
 };
 
 #[cfg(feature = "database")]
-use crate::database::{GovernedDocumentRequirementsService, GovernedRequirementMatrix};
+use dsl_runtime::document_requirements::{
+    GovernedDocumentRequirementsService, GovernedRequirementMatrix,
+};
 
 fn get_int_arg_or_default(verb_call: &VerbCall, name: &str, default: i64) -> i64 {
     verb_call

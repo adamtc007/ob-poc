@@ -54,6 +54,7 @@ pub mod bods;
 pub mod crud_executor;
 pub mod custom_op;
 pub mod document_bundles;
+pub mod document_requirements;
 pub mod domain_ops;
 pub mod execution;
 pub mod placeholder;

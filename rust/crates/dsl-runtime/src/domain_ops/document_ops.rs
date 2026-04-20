@@ -17,28 +17,19 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::NaiveDate;
 use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use std::collections::HashSet;
+use uuid::Uuid;
 
-use super::helpers::{
+use crate::custom_op::CustomOperation;
+use crate::document_requirements::{GovernedDocumentRequirementsService, GovernedRequirementMatrix};
+use crate::domain_ops::helpers::{
     json_extract_string, json_extract_string_list_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-
-#[cfg(feature = "database")]
-use crate::database::{GovernedDocumentRequirementsService, GovernedRequirementMatrix};
-
-#[cfg(feature = "database")]
-use sqlx::PgPool;
-
-#[cfg(feature = "database")]
-use chrono::NaiveDate;
-
-#[cfg(feature = "database")]
-use uuid::Uuid;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DocumentSolicitationResult {
@@ -69,7 +60,6 @@ struct DocumentUploadVersionResult {
     status: String,
 }
 
-#[cfg(feature = "database")]
 async fn resolve_document_type_id(pool: &PgPool, doc_type: &str) -> Result<Option<Uuid>> {
     let type_id = sqlx::query_scalar(
         r#"
@@ -85,7 +75,6 @@ async fn resolve_document_type_id(pool: &PgPool, doc_type: &str) -> Result<Optio
     Ok(type_id)
 }
 
-#[cfg(feature = "database")]
 async fn table_exists(pool: &PgPool, qualified_name: &str) -> Result<bool> {
     let exists = sqlx::query_scalar::<_, Option<String>>("SELECT to_regclass($1)")
         .bind(qualified_name)
@@ -94,179 +83,9 @@ async fn table_exists(pool: &PgPool, qualified_name: &str) -> Result<bool> {
     Ok(exists.is_some())
 }
 
-#[cfg(feature = "database")]
-async fn derive_subject_entity_id(
-    verb_call: &VerbCall,
-    ctx: &ExecutionContext,
-    pool: &PgPool,
-) -> Result<Uuid> {
-    if let Some(subject_entity_id) = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == "subject-entity-id" || a.key == "entity-id")
-        .and_then(|a| {
-            if let Some(name) = a.value.as_symbol() {
-                ctx.resolve(name)
-            } else {
-                a.value.as_uuid()
-            }
-        })
-    {
-        return Ok(subject_entity_id);
-    }
-
-    let cbu_id = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == "cbu-id")
-        .and_then(|a| {
-            if let Some(name) = a.value.as_symbol() {
-                ctx.resolve(name)
-            } else {
-                a.value.as_uuid()
-            }
-        });
-    let case_id = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == "case-id")
-        .and_then(|a| {
-            if let Some(name) = a.value.as_symbol() {
-                ctx.resolve(name)
-            } else {
-                a.value.as_uuid()
-            }
-        });
-
-    if let Some(case_id) = case_id {
-        let subject = sqlx::query_scalar(
-            r#"
-            SELECT cer.entity_id
-            FROM "ob-poc".cases c
-            JOIN "ob-poc".cbu_entity_roles cer ON cer.cbu_id = c.cbu_id
-            WHERE c.case_id = $1
-            ORDER BY cer.created_at DESC NULLS LAST, cer.entity_id
-            LIMIT 1
-            "#,
-        )
-        .bind(case_id)
-        .fetch_optional(pool)
-        .await?;
-
-        if let Some(subject) = subject {
-            return Ok(subject);
-        }
-    }
-
-    if let Some(cbu_id) = cbu_id {
-        let subject = sqlx::query_scalar(
-            r#"
-            SELECT cer.entity_id
-            FROM "ob-poc".cbu_entity_roles cer
-            WHERE cer.cbu_id = $1
-            ORDER BY cer.created_at DESC NULLS LAST, cer.entity_id
-            LIMIT 1
-            "#,
-        )
-        .bind(cbu_id)
-        .fetch_optional(pool)
-        .await?;
-
-        if let Some(subject) = subject {
-            return Ok(subject);
-        }
-    }
-
-    Err(anyhow::anyhow!(
-        "Missing subject-entity-id argument and unable to derive subject from case-id/cbu-id"
-    ))
-}
-
-#[cfg(feature = "database")]
-async fn derive_doc_types(
-    verb_call: &VerbCall,
-    subject_entity_id: Uuid,
-    pool: &PgPool,
-) -> Result<Vec<String>> {
-    if let Some(doc_types) = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == "doc-types")
-        .and_then(|a| a.value.as_list())
-        .map(|list| {
-            list.iter()
-                .filter_map(|item| item.as_string().map(|s| s.to_string()))
-                .collect::<Vec<_>>()
-        })
-    {
-        if doc_types.is_empty() {
-            return Err(anyhow::anyhow!("doc-types cannot be empty"));
-        }
-        return Ok(doc_types);
-    }
-
-    let governed_service = GovernedDocumentRequirementsService::new(pool.clone());
-    match governed_service.compute_for_entity(subject_entity_id).await {
-        Ok(Some(governed)) => {
-            let mut seen = HashSet::new();
-            let mut doc_types = Vec::new();
-            for gap in governed.gaps {
-                let candidate = gap
-                    .document_type_fqn
-                    .rsplit('.')
-                    .next()
-                    .unwrap_or(&gap.document_type_fqn)
-                    .replace('-', "_")
-                    .to_ascii_uppercase();
-                if seen.insert(candidate.clone()) {
-                    doc_types.push(candidate);
-                }
-            }
-            if !doc_types.is_empty() {
-                return Ok(doc_types);
-            }
-        }
-        Ok(None) => {}
-        Err(error) => {
-            tracing::warn!(
-                subject_entity_id = %subject_entity_id,
-                error = %error,
-                "Failed to compute governed document requirements; using fallback doc types"
-            );
-        }
-    }
-
-    let fallback_doc_types = ["ARTICLES_OF_INCORPORATION", "BANK_STATEMENT"];
-    let mut resolved = Vec::new();
-    for doc_type in fallback_doc_types {
-        let exists = sqlx::query_scalar::<_, Option<Uuid>>(
-            r#"
-            SELECT type_id
-            FROM "ob-poc".document_types
-            WHERE type_code = $1
-            "#,
-        )
-        .bind(doc_type)
-        .fetch_one(pool)
-        .await?;
-        if exists.is_some() {
-            resolved.push(doc_type.to_string());
-        }
-    }
-
-    if resolved.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Missing doc-types argument and unable to derive governed or fallback document types"
-        ));
-    }
-
-    Ok(resolved)
-}
-
-#[cfg(feature = "database")]
 async fn derive_subject_entity_id_json(
     args: &serde_json::Value,
-    ctx: &dsl_runtime::VerbExecutionContext,
+    ctx: &VerbExecutionContext,
     pool: &PgPool,
 ) -> Result<Uuid> {
     if let Some(subject_entity_id) = json_extract_uuid_opt(args, ctx, "subject-entity-id")
@@ -322,7 +141,6 @@ async fn derive_subject_entity_id_json(
     ))
 }
 
-#[cfg(feature = "database")]
 async fn derive_doc_types_json(
     args: &serde_json::Value,
     subject_entity_id: Uuid,
@@ -393,7 +211,6 @@ async fn derive_doc_types_json(
     Ok(resolved)
 }
 
-#[cfg(feature = "database")]
 fn parse_date_opt(value: Option<&str>, arg_name: &str) -> Result<Option<NaiveDate>> {
     value
         .map(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d"))
@@ -401,7 +218,6 @@ fn parse_date_opt(value: Option<&str>, arg_name: &str) -> Result<Option<NaiveDat
         .map_err(|_| anyhow::anyhow!("Invalid {} argument; expected YYYY-MM-DD", arg_name))
 }
 
-#[cfg(feature = "database")]
 async fn document_catalog_impl(
     doc_type: &str,
     document_name: Option<String>,
@@ -451,7 +267,6 @@ async fn document_catalog_impl(
     Ok(doc_id)
 }
 
-#[cfg(feature = "database")]
 async fn document_extract_impl(doc_id: Uuid, pool: &PgPool) -> Result<()> {
     sqlx::query(
         r#"UPDATE "ob-poc".document_catalog SET extraction_status = 'IN_PROGRESS' WHERE doc_id = $1"#,
@@ -462,7 +277,6 @@ async fn document_extract_impl(doc_id: Uuid, pool: &PgPool) -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "database")]
 async fn document_solicit_impl(
     subject_entity_id: Uuid,
     doc_type: &str,
@@ -568,7 +382,6 @@ async fn document_solicit_impl(
     })
 }
 
-#[cfg(feature = "database")]
 async fn document_solicit_set_impl(
     subject_entity_id: Uuid,
     doc_types: Vec<String>,
@@ -695,7 +508,6 @@ async fn document_solicit_set_impl(
     })
 }
 
-#[cfg(feature = "database")]
 async fn document_upload_version_impl(
     document_id: Uuid,
     content_type: &str,
@@ -773,7 +585,6 @@ async fn document_upload_version_impl(
     })
 }
 
-#[cfg(feature = "database")]
 async fn document_verify_impl(version_id: Uuid, verified_by: &str, pool: &PgPool) -> Result<u64> {
     let result = sqlx::query(
         r#"
@@ -799,7 +610,6 @@ async fn document_verify_impl(version_id: Uuid, verified_by: &str, pool: &PgPool
     Ok(1)
 }
 
-#[cfg(feature = "database")]
 async fn document_reject_impl(
     version_id: Uuid,
     rejection_code: &str,
@@ -852,7 +662,6 @@ async fn document_reject_impl(
     Ok(1)
 }
 
-#[cfg(feature = "database")]
 async fn document_missing_for_entity_impl(
     entity_id: Uuid,
     workflow_instance_id: Option<Uuid>,
@@ -924,7 +733,6 @@ async fn document_missing_for_entity_impl(
         .collect())
 }
 
-#[cfg(feature = "database")]
 async fn document_compute_requirements_impl(
     entity_id: Uuid,
     pool: &PgPool,
@@ -964,13 +772,12 @@ impl CustomOperation for DocumentCatalogOp {
         "Requires document_type lookup and attribute mapping from document_type_attributes"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let doc_type = json_extract_string(args, "doc-type")
             .or_else(|_| json_extract_string(args, "document-type"))?;
         let document_name = args
@@ -983,69 +790,11 @@ impl CustomOperation for DocumentCatalogOp {
         let doc_id =
             document_catalog_impl(&doc_type, document_name, cbu_id, entity_id, pool).await?;
         ctx.bind("document", doc_id);
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(doc_id))
+        Ok(VerbExecutionOutcome::Uuid(doc_id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl DocumentCatalogOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let doc_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "doc-type" || a.key == "document-type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing doc-type argument"))?;
-
-        let document_name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "title" || a.key == "document-name")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-        let cbu_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cbu-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
-        let entity_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
-        let doc_id =
-            document_catalog_impl(doc_type, document_name, cbu_id, entity_id, pool).await?;
-        ctx.bind("document", doc_id);
-        Ok(ExecutionResult::Uuid(doc_id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
     }
 }
 
@@ -1068,54 +817,20 @@ impl CustomOperation for DocumentExtractOp {
         "Requires external AI/OCR service call and attribute mapping"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let doc_id = json_extract_uuid(args, ctx, "document-id")
             .or_else(|_| json_extract_uuid(args, ctx, "doc-id"))?;
         document_extract_impl(doc_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Void)
+        Ok(VerbExecutionOutcome::Void)
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl DocumentExtractOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let doc_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "document-id" || a.key == "doc-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing document-id argument"))?;
-        document_extract_impl(doc_id, pool).await?;
-        Ok(ExecutionResult::Void)
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
     }
 }
 
@@ -1129,10 +844,8 @@ impl DocumentExtractOp {
 /// ensures document_requirements row exists, and links them together.
 /// Returns task_id for tracking and requirement_id for status queries.
 #[register_custom_op]
-#[cfg(feature = "database")]
 pub struct DocumentSolicitOp;
 
-#[cfg(feature = "database")]
 #[async_trait]
 impl CustomOperation for DocumentSolicitOp {
     fn domain(&self) -> &'static str {
@@ -1148,9 +861,9 @@ impl CustomOperation for DocumentSolicitOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let subject_entity_id = derive_subject_entity_id_json(args, ctx, pool).await?;
         let doc_type = json_extract_string(args, "doc-type")?;
         let workflow_instance_id = json_extract_uuid_opt(args, ctx, "workflow-instance-id");
@@ -1172,65 +885,11 @@ impl CustomOperation for DocumentSolicitOp {
         if workflow_instance_id.is_some() {
             ctx.bind("task", result.request_id);
         }
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl DocumentSolicitOp {
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let subject_entity_id = derive_subject_entity_id(verb_call, ctx, pool).await?;
-        let doc_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "doc-type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing doc-type argument"))?;
-
-        // Optional arguments
-        let workflow_instance_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "workflow-instance-id")
-            .and_then(|a| a.value.as_uuid());
-        let due_date = parse_date_opt(
-            verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "due-date")
-                .and_then(|a| a.value.as_string()),
-            "due-date",
-        )?;
-        let required_state = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "required-state")
-            .and_then(|a| a.value.as_string())
-            .unwrap_or("verified");
-        let result = document_solicit_impl(
-            subject_entity_id,
-            doc_type,
-            workflow_instance_id,
-            due_date,
-            required_state,
-            pool,
-        )
-        .await?;
-        ctx.bind("requirement", result.requirement_id);
-        if workflow_instance_id.is_some() {
-            ctx.bind("task", result.request_id);
-        }
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -1239,10 +898,8 @@ impl DocumentSolicitOp {
 /// Rationale: Creates one pending task with expected_cargo_count > 1,
 /// and multiple requirements linked to that task.
 #[register_custom_op]
-#[cfg(feature = "database")]
 pub struct DocumentSolicitSetOp;
 
-#[cfg(feature = "database")]
 #[async_trait]
 impl CustomOperation for DocumentSolicitSetOp {
     fn domain(&self) -> &'static str {
@@ -1258,9 +915,9 @@ impl CustomOperation for DocumentSolicitSetOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let subject_entity_id = derive_subject_entity_id_json(args, ctx, pool).await?;
         let doc_types = derive_doc_types_json(args, subject_entity_id, pool).await?;
         let workflow_instance_id = json_extract_uuid_opt(args, ctx, "workflow-instance-id");
@@ -1281,57 +938,11 @@ impl CustomOperation for DocumentSolicitSetOp {
         if workflow_instance_id.is_some() {
             ctx.bind("task", result.request_id);
         }
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl DocumentSolicitSetOp {
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let subject_entity_id = derive_subject_entity_id(verb_call, ctx, pool).await?;
-        let doc_types = derive_doc_types(verb_call, subject_entity_id, pool).await?;
-        let workflow_instance_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "workflow-instance-id")
-            .and_then(|a| a.value.as_uuid());
-        let due_date = parse_date_opt(
-            verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "due-date")
-                .and_then(|a| a.value.as_string()),
-            "due-date",
-        )?;
-        let required_state = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "required-state")
-            .and_then(|a| a.value.as_string())
-            .unwrap_or("verified");
-        let result = document_solicit_set_impl(
-            subject_entity_id,
-            doc_types,
-            workflow_instance_id,
-            due_date,
-            required_state,
-            pool,
-        )
-        .await?;
-        if workflow_instance_id.is_some() {
-            ctx.bind("task", result.request_id);
-        }
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -1340,10 +951,8 @@ impl DocumentSolicitSetOp {
 /// Rationale: Requires version numbering, content validation, and
 /// returns cargo_ref URI for use in task completion webhook.
 #[register_custom_op]
-#[cfg(feature = "database")]
 pub struct DocumentUploadVersionOp;
 
-#[cfg(feature = "database")]
 #[async_trait]
 impl CustomOperation for DocumentUploadVersionOp {
     fn domain(&self) -> &'static str {
@@ -1359,9 +968,9 @@ impl CustomOperation for DocumentUploadVersionOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
         let content_type = json_extract_string(args, "content-type")?;
         let blob_ref = args
@@ -1388,103 +997,11 @@ impl CustomOperation for DocumentUploadVersionOp {
         )
         .await?;
         ctx.bind("version", result.version_id);
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl DocumentUploadVersionOp {
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Extract required arguments
-        let document_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "document-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing document-id argument"))?;
-
-        let content_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "content-type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing content-type argument"))?;
-
-        // Optional content (at least one required)
-        let blob_ref: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "blob-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        // For structured-data, we accept a map and convert to JSON
-        let structured_data: Option<serde_json::Value> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "structured-data")
-            .and_then(|a| {
-                // Try to convert the AST node to JSON
-                if let Some(map) = a.value.as_map() {
-                    let obj: serde_json::Map<String, serde_json::Value> = map
-                        .iter()
-                        .filter_map(|(k, v)| {
-                            v.as_string()
-                                .map(|s| (k.clone(), serde_json::Value::String(s.to_string())))
-                        })
-                        .collect();
-                    Some(serde_json::Value::Object(obj))
-                } else if let Some(s) = a.value.as_string() {
-                    // Try parsing as JSON string
-                    serde_json::from_str(s).ok()
-                } else {
-                    None
-                }
-            });
-        let valid_from = parse_date_opt(
-            verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "valid-from")
-                .and_then(|a| a.value.as_string()),
-            "valid-from",
-        )?;
-        let valid_to = parse_date_opt(
-            verb_call
-                .arguments
-                .iter()
-                .find(|a| a.key == "valid-to")
-                .and_then(|a| a.value.as_string()),
-            "valid-to",
-        )?;
-        let result = document_upload_version_impl(
-            document_id,
-            content_type,
-            blob_ref,
-            structured_data,
-            valid_from,
-            valid_to,
-            pool,
-        )
-        .await?;
-        ctx.bind("version", result.version_id);
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -1493,10 +1010,8 @@ impl DocumentUploadVersionOp {
 /// Rationale: Updates verification status and triggers requirement sync
 /// via database trigger (fn_sync_requirement_from_version).
 #[register_custom_op]
-#[cfg(feature = "database")]
 pub struct DocumentVerifyOp;
 
-#[cfg(feature = "database")]
 #[async_trait]
 impl CustomOperation for DocumentVerifyOp {
     fn domain(&self) -> &'static str {
@@ -1512,12 +1027,12 @@ impl CustomOperation for DocumentVerifyOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let version_id = json_extract_uuid(args, ctx, "version-id")?;
         let verified_by = json_extract_string(args, "verified-by")?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
+        Ok(VerbExecutionOutcome::Affected(
             document_verify_impl(version_id, &verified_by, pool).await?,
         ))
     }
@@ -1527,48 +1042,13 @@ impl CustomOperation for DocumentVerifyOp {
     }
 }
 
-impl DocumentVerifyOp {
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        // Extract required arguments
-        let version_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "version-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing version-id argument"))?;
-
-        let verified_by = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "verified-by")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing verified-by argument"))?;
-        Ok(ExecutionResult::Affected(
-            document_verify_impl(version_id, verified_by, pool).await?,
-        ))
-    }
-}
-
 /// QA rejects a document version with standardized reason code
 ///
 /// Rationale: Uses rejection_reason_codes for standardized messaging,
 /// updates requirement status, and may trigger re-solicitation.
 #[register_custom_op]
-#[cfg(feature = "database")]
 pub struct DocumentRejectOp;
 
-#[cfg(feature = "database")]
 #[async_trait]
 impl CustomOperation for DocumentRejectOp {
     fn domain(&self) -> &'static str {
@@ -1584,9 +1064,9 @@ impl CustomOperation for DocumentRejectOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let version_id = json_extract_uuid(args, ctx, "version-id")?;
         let rejection_code = json_extract_string(args, "rejection-code")?;
         let verified_by = json_extract_string(args, "verified-by")?;
@@ -1594,7 +1074,7 @@ impl CustomOperation for DocumentRejectOp {
             .get("rejection-reason")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(
+        Ok(VerbExecutionOutcome::Affected(
             document_reject_impl(
                 version_id,
                 &rejection_code,
@@ -1611,69 +1091,13 @@ impl CustomOperation for DocumentRejectOp {
     }
 }
 
-impl DocumentRejectOp {
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let version_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "version-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing version-id argument"))?;
-
-        let rejection_code = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "rejection-code")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing rejection-code argument"))?;
-
-        let verified_by = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "verified-by")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing verified-by argument"))?;
-
-        // Optional free-text reason
-        let rejection_reason: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "rejection-reason")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-        Ok(ExecutionResult::Affected(
-            document_reject_impl(
-                version_id,
-                rejection_code,
-                verified_by,
-                rejection_reason,
-                pool,
-            )
-            .await?,
-        ))
-    }
-}
-
 /// List missing document requirements for an entity
 ///
 /// Rationale: Query joins requirements with status filtering
 /// for workflow progress tracking.
 #[register_custom_op]
-#[cfg(feature = "database")]
 pub struct DocumentMissingForEntityOp;
 
-#[cfg(feature = "database")]
 #[async_trait]
 impl CustomOperation for DocumentMissingForEntityOp {
     fn domain(&self) -> &'static str {
@@ -1689,12 +1113,12 @@ impl CustomOperation for DocumentMissingForEntityOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let workflow_instance_id = json_extract_uuid_opt(args, ctx, "workflow-instance-id");
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
+        Ok(VerbExecutionOutcome::RecordSet(
             document_missing_for_entity_impl(entity_id, workflow_instance_id, pool).await?,
         ))
     }
@@ -1704,47 +1128,13 @@ impl CustomOperation for DocumentMissingForEntityOp {
     }
 }
 
-impl DocumentMissingForEntityOp {
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
-
-        // Optional workflow filter
-        let workflow_instance_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "workflow-instance-id")
-            .and_then(|a| a.value.as_uuid());
-        Ok(ExecutionResult::RecordSet(
-            document_missing_for_entity_impl(entity_id, workflow_instance_id, pool).await?,
-        ))
-    }
-}
-
 /// Compute governed document requirements for an entity.
 ///
 /// Rationale: Resolves the published SemOS requirement profile and computes
 /// obligation coverage against the current document runtime.
 #[register_custom_op]
-#[cfg(feature = "database")]
 pub struct DocumentComputeRequirementsOp;
 
-#[cfg(feature = "database")]
 #[async_trait]
 impl CustomOperation for DocumentComputeRequirementsOp {
     fn domain(&self) -> &'static str {
@@ -1760,42 +1150,16 @@ impl CustomOperation for DocumentComputeRequirementsOp {
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(document_compute_requirements_impl(entity_id, pool).await?)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(
+            document_compute_requirements_impl(entity_id, pool).await?,
+        )?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl DocumentComputeRequirementsOp {
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
-
-        Ok(ExecutionResult::Record(serde_json::to_value(
-            document_compute_requirements_impl(entity_id, pool).await?,
-        )?))
     }
 }

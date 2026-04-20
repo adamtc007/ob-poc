@@ -13,28 +13,24 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
+use sqlx::PgPool;
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
-use crate::database::GovernedDocumentRequirementsService;
-
-#[cfg(feature = "database")]
-use sqlx::PgPool;
-
-use super::helpers::{get_required_uuid, json_extract_string, json_extract_uuid};
-use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
+use crate::custom_op::CustomOperation;
+use crate::document_requirements::GovernedDocumentRequirementsService;
+use crate::domain_ops::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 /// Evaluate tollgate for a KYC case
 #[register_custom_op]
 pub struct TollgateEvaluateOp;
 
-#[cfg(feature = "database")]
 async fn tollgate_evaluate_impl(
     case_id: Uuid,
     evaluation_type: String,
     evaluated_by: Option<String>,
     pool: &PgPool,
-) -> Result<ExecutionResult> {
+) -> Result<serde_json::Value> {
     let case_info: Option<(Uuid,)> =
         sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cases WHERE case_id = $1"#)
             .bind(case_id)
@@ -186,7 +182,7 @@ async fn tollgate_evaluate_impl(
     .fetch_one(pool)
     .await?;
 
-    Ok(ExecutionResult::Record(json!({
+    Ok(json!({
         "evaluation_id": evaluation_id.0,
         "case_id": case_id,
         "evaluation_type": evaluation_type,
@@ -195,7 +191,7 @@ async fn tollgate_evaluate_impl(
         "metrics": metrics,
         "blocking_failures": blocking_failures,
         "warnings": warnings
-    })))
+    }))
 }
 
 #[async_trait]
@@ -212,22 +208,17 @@ impl CustomOperation for TollgateEvaluateOp {
         "Tollgate evaluation requires computing metrics across tables and comparing against thresholds"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, _ctx, "case-id")?;
         let evaluation_type = json_extract_string(args, "evaluation-type")?;
-        let evaluated_by = super::helpers::json_extract_string_opt(args, "evaluated-by");
-        match tollgate_evaluate_impl(case_id, evaluation_type, evaluated_by, pool).await? {
-            ExecutionResult::Record(value) => {
-                Ok(dsl_runtime::VerbExecutionOutcome::Record(value))
-            }
-            _ => unreachable!(),
-        }
+        let evaluated_by = json_extract_string_opt(args, "evaluated-by");
+        let value = tollgate_evaluate_impl(case_id, evaluation_type, evaluated_by, pool).await?;
+        Ok(VerbExecutionOutcome::Record(value))
     }
 
     fn is_migrated(&self) -> bool {
@@ -235,47 +226,10 @@ impl CustomOperation for TollgateEvaluateOp {
     }
 }
 
-impl TollgateEvaluateOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = get_required_uuid(verb_call, "case-id")?;
-        let evaluation_type = verb_call
-            .get_arg("evaluation-type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("evaluation-type is required"))?;
-        let evaluated_by = verb_call
-            .get_arg("evaluated-by")
-            .and_then(|a| a.value.as_string());
-        tollgate_evaluate_impl(
-            case_id,
-            evaluation_type.to_string(),
-            evaluated_by.map(str::to_string),
-            pool,
-        )
-        .await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
-    }
-}
-
 /// Get current metrics for a CBU
 #[register_custom_op]
 pub struct TollgateGetMetricsOp;
 
-#[cfg(feature = "database")]
 async fn tollgate_get_metrics_impl(cbu_id: Uuid, pool: &PgPool) -> Result<serde_json::Value> {
     let case_id: Option<(Uuid,)> = sqlx::query_as(
         r#"
@@ -308,15 +262,14 @@ impl CustomOperation for TollgateGetMetricsOp {
         "Metrics computation requires aggregation across ownership, control, documents, and screenings"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             tollgate_get_metrics_impl(cbu_id, pool).await?,
         ))
     }
@@ -326,36 +279,10 @@ impl CustomOperation for TollgateGetMetricsOp {
     }
 }
 
-impl TollgateGetMetricsOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
-        Ok(ExecutionResult::Record(
-            tollgate_get_metrics_impl(cbu_id, pool).await?,
-        ))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
-    }
-}
-
 /// Record management override of tollgate failure
 #[register_custom_op]
 pub struct TollgateOverrideOp;
 
-#[cfg(feature = "database")]
 async fn tollgate_override_impl(
     evaluation_id: Uuid,
     override_reason: String,
@@ -411,20 +338,19 @@ impl CustomOperation for TollgateOverrideOp {
         "Override recording requires linking to evaluation and maintaining audit trail"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let evaluation_id = json_extract_uuid(args, ctx, "evaluation-id")?;
         let override_reason = json_extract_string(args, "override-reason")?;
         let approved_by = json_extract_string(args, "approved-by")?;
         let approval_authority = json_extract_string(args, "approval-authority")?;
-        let conditions = super::helpers::json_extract_string_opt(args, "conditions");
-        let expiry_date = super::helpers::json_extract_string_opt(args, "expiry-date");
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
+        let conditions = json_extract_string_opt(args, "conditions");
+        let expiry_date = json_extract_string_opt(args, "expiry-date");
+        Ok(VerbExecutionOutcome::Uuid(
             tollgate_override_impl(
                 evaluation_id,
                 override_reason,
@@ -443,63 +369,10 @@ impl CustomOperation for TollgateOverrideOp {
     }
 }
 
-impl TollgateOverrideOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let evaluation_id = get_required_uuid(verb_call, "evaluation-id")?;
-        let override_reason = verb_call
-            .get_arg("override-reason")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("override-reason is required"))?;
-        let approved_by = verb_call
-            .get_arg("approved-by")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("approved-by is required"))?;
-        let approval_authority = verb_call
-            .get_arg("approval-authority")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("approval-authority is required (ANALYST, SENIOR_ANALYST, TEAM_LEAD, COMPLIANCE_OFFICER, SENIOR_COMPLIANCE, MLRO, EXECUTIVE, BOARD)"))?;
-        let conditions = verb_call
-            .get_arg("conditions")
-            .and_then(|a| a.value.as_string());
-        let expiry_date = verb_call
-            .get_arg("expiry-date")
-            .and_then(|a| a.value.as_string());
-        Ok(ExecutionResult::Uuid(
-            tollgate_override_impl(
-                evaluation_id,
-                override_reason.to_string(),
-                approved_by.to_string(),
-                approval_authority.to_string(),
-                conditions.map(str::to_string),
-                expiry_date.map(str::to_string),
-                pool,
-            )
-            .await?,
-        ))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
-    }
-}
-
 /// Get decision readiness summary
 #[register_custom_op]
 pub struct TollgateDecisionReadinessOp;
 
-#[cfg(feature = "database")]
 async fn tollgate_decision_readiness_impl(
     case_id: Uuid,
     pool: &PgPool,
@@ -605,46 +478,20 @@ impl CustomOperation for TollgateDecisionReadinessOp {
         "Decision readiness requires evaluating all tollgates and providing actionable summary"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             tollgate_decision_readiness_impl(case_id, pool).await?,
         ))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl TollgateDecisionReadinessOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = get_required_uuid(verb_call, "case-id")?;
-        Ok(ExecutionResult::Record(
-            tollgate_decision_readiness_impl(case_id, pool).await?,
-        ))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Void)
     }
 }
 
@@ -661,7 +508,6 @@ struct TollgateMetrics {
     days_since_last_refresh: Option<i64>,
 }
 
-#[cfg(feature = "database")]
 async fn compute_metrics(pool: &PgPool, cbu_id: Uuid, case_id: Uuid) -> Result<TollgateMetrics> {
     // Ownership verified percentage
     let ownership_stats: (i64, i64) = sqlx::query_as(
@@ -781,7 +627,6 @@ async fn compute_metrics(pool: &PgPool, cbu_id: Uuid, case_id: Uuid) -> Result<T
     })
 }
 
-#[cfg(feature = "database")]
 async fn compute_doc_completeness_pct(
     pool: &PgPool,
     cbu_id: Uuid,

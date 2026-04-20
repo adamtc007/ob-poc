@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use crate::database::{
+use super::policy::{
     ActiveDocumentPolicyBundle, DocumentPolicyService, PublishedEvidenceStrategy,
     PublishedProofObligation,
 };
@@ -574,7 +574,7 @@ fn compute_strategy_status(
 }
 
 fn profile_applies(
-    profile: &crate::database::PublishedRequirementProfile,
+    profile: &super::policy::PublishedRequirementProfile,
     context: &EntityPolicyContext,
 ) -> bool {
     matches_filter(&profile.body.entity_types, &context.entity_type)

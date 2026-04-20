@@ -40,7 +40,8 @@ mod dilution_ops;
 mod discovery_ops;
 // Phase 4 Slice B Group 4 — docs_bundle_ops relocated to `dsl-runtime::domain_ops::docs_bundle_ops`
 // alongside the `document_bundles/` module it consumes.
-mod document_ops;
+// Phase 4 Slice B Group 6 — document_ops relocated to `dsl-runtime::domain_ops::document_ops`
+// alongside the `document_requirements/` module it consumes.
 mod edge_ops;
 pub mod entity_query;
 mod evidence_ops;
@@ -92,7 +93,8 @@ mod source_loader_ops;
 mod team_ops;
 pub mod template_ops;
 
-mod tollgate_ops;
+// Phase 4 Slice B Group 6 — tollgate_ops relocated to `dsl-runtime::domain_ops::tollgate_ops`
+// alongside the `document_requirements/` module it consumes.
 mod trading_profile;
 mod trading_profile_ca_ops;
 mod trust_ops;
@@ -187,14 +189,9 @@ pub use cbu_role_ops::{
     CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOwnershipOp, CbuRoleAssignServiceOp,
     CbuRoleAssignSignatoryOp, CbuRoleAssignTrustOp, CbuRoleValidateAllOp,
 };
-pub use document_ops::{DocumentCatalogOp, DocumentExtractOp};
-
-// Task queue document operations (Migration 049)
-#[cfg(feature = "database")]
-pub use document_ops::{
-    DocumentMissingForEntityOp, DocumentRejectOp, DocumentSolicitOp, DocumentSolicitSetOp,
-    DocumentUploadVersionOp, DocumentVerifyOp,
-};
+// Phase 4 Slice B Group 6 — document_ops relocated to `dsl-runtime::domain_ops::document_ops`.
+// Registration flows through inventory automatically; external ob-poc code doesn't
+// import these types directly.
 
 // Requirement operations (Migration 049)
 // Phase 4 Slice B Group 1 — entity_ops relocated to `dsl-runtime::domain_ops::entity_ops`
@@ -267,9 +264,9 @@ pub use partnership_ops::{
     PartnershipAnalyzeControlOp, PartnershipContributionOp, PartnershipDistributionOp,
     PartnershipReconcileOp,
 };
-pub use tollgate_ops::{
-    TollgateDecisionReadinessOp, TollgateEvaluateOp, TollgateGetMetricsOp, TollgateOverrideOp,
-};
+// Phase 4 Slice B Group 6 — tollgate_ops relocated to `dsl-runtime::domain_ops::tollgate_ops`.
+// Registration flows through inventory automatically; external ob-poc code doesn't
+// import these types directly.
 pub use trust_ops::{TrustAnalyzeControlOp, TrustClassifyOp, TrustIdentifyUbosOp};
 
 // Service pipeline operations (intent → discovery → provision → readiness)
