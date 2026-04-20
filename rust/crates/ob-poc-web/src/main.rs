@@ -594,6 +594,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn StewardshipDispatch (sem_reg::stewardship cascade)"
         );
 
+        // dyn McpToolRegistry — used by `agent.read-mcp-tools` to
+        // enumerate the SemReg MCP tool surface. Zero construction
+        // deps; projects `SemRegToolSpec` → `McpToolSpec`.
+        builder.register::<dyn dsl_runtime::service_traits::McpToolRegistry>(Arc::new(
+            ob_poc::services::ObPocMcpToolRegistry::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn McpToolRegistry (sem_reg::agent::mcp_tools)"
+        );
+
         Arc::new(builder.build())
     };
 

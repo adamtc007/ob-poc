@@ -24,6 +24,10 @@ sem_os_core = { path = "../sem_os_core" }
 # `extern crate self as dsl_runtime;` in lib.rs makes those paths resolve
 # when the macro is invoked inside this crate itself.
 dsl-runtime-macros = { path = "../dsl-runtime-macros" }
+# Composite-blocker #1 (agent_ops) uses `#[governed_query]` on a live
+# execute_json method; keeping the attribute requires the proc-macro
+# crate in dsl-runtime's graph. Zero transitive ob-poc pull.
+governed_query_proc = { path = "../governed_query_proc" }
 async-trait = "0.1"
 anyhow = "1.0"
 inventory = "0.3"
@@ -51,7 +55,11 @@ nom = "7"
 thiserror = "1"
 # Phase 5e — dilution_ops uses tokio::time::sleep for retry backoff and
 # futures::future::try_join_all for parallel summary aggregation.
-tokio = { version = "1", features = ["time"] }
+# `process` for agent_ops `activate-teaching` subprocess spawn. This is
+# a latent A1 violation (external effect in execute_json body) —
+# tracked in the Pattern-B-A1 ledger, to be refactored to the outbox
+# in Phase 5f. Until then the feature stays on so the op compiles.
+tokio = { version = "1", features = ["time", "process"] }
 futures = "0.3"
 
 [dev-dependencies]

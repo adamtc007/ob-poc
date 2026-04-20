@@ -20,7 +20,8 @@
 
 mod affinity_graph_cache;
 mod affinity_ops;
-mod agent_ops;
+// Phase 5a — agent_ops relocated to `dsl-runtime::domain_ops::agent_ops`
+// consuming `dyn McpToolRegistry` via the ServiceRegistry.
 mod attribute_ops;
 mod billing_ops;
 // Phase 5e — board_ops relocated to `dsl-runtime::domain_ops::board_ops`

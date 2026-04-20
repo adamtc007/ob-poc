@@ -44,8 +44,14 @@ pub mod semantic_state_service_impl;
 // `crate::sem_reg::stewardship::dispatch_phase{0,1}_tool`.
 pub mod stewardship_dispatch_impl;
 
+// Phase 5a composite-blocker #1 — ob-poc-side impl of
+// `dsl_runtime::service_traits::McpToolRegistry`; bridges to
+// `crate::sem_reg::agent::mcp_tools::all_tool_specs()`.
+pub mod mcp_tool_registry_impl;
+
 // Re-exports
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
+pub use mcp_tool_registry_impl::ObPocMcpToolRegistry;
 pub use semantic_state_service_impl::ObPocSemanticStateService;
 pub use stewardship_dispatch_impl::ObPocStewardshipDispatch;
 pub use dictionary_service_impl::DictionaryServiceImpl;

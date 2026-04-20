@@ -8,8 +8,10 @@
 //! Traits here are object-safe and `Send + Sync + 'static` — required for
 //! trait-object storage in the registry.
 
+pub mod mcp_tool_registry;
 pub mod semantic_state;
 pub mod stewardship;
 
+pub use mcp_tool_registry::{McpToolRegistry, McpToolSpec};
 pub use semantic_state::SemanticStateService;
 pub use stewardship::{StewardshipDispatch, StewardshipOutcome};
