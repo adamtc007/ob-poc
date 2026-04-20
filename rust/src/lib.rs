@@ -171,9 +171,8 @@ pub mod plan_builder;
 #[cfg(feature = "database")]
 pub mod document_bundles;
 
-// Placeholder Entities - Deferred entity resolution for macro expansion
-#[cfg(feature = "database")]
-pub mod placeholder;
+// Phase 4 Slice B (Group 1) — `placeholder` module relocated to
+// `dsl-runtime::placeholder`; consumer `entity_ops` moved alongside it.
 
 // Clarify module - Unified DecisionPacket-based clarification UX
 pub mod clarify;

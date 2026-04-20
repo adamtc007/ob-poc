@@ -18,7 +18,7 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use ob_poc::placeholder::{PlaceholderResolver, CreatePlaceholderRequest};
+//! use dsl_runtime::placeholder::{PlaceholderResolver, CreatePlaceholderRequest};
 //!
 //! let resolver = PlaceholderResolver::new(pool);
 //!

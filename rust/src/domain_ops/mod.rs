@@ -40,7 +40,6 @@ mod discovery_ops;
 mod docs_bundle_ops;
 mod document_ops;
 mod edge_ops;
-mod entity_ops;
 pub mod entity_query;
 mod evidence_ops;
 mod gleif_ops;
@@ -194,7 +193,9 @@ pub use document_ops::{
 };
 
 // Requirement operations (Migration 049)
-pub use entity_ops::{EntityGhostOp, EntityIdentifyOp};
+// Phase 4 Slice B Group 1 — entity_ops relocated to `dsl-runtime::domain_ops::entity_ops`
+// alongside the `placeholder/` module it consumes. Registration flows through inventory
+// automatically; external ob-poc code doesn't import these types directly.
 pub use observation_ops::{
     DocumentExtractObservationsOp, ObservationFromDocumentOp, ObservationGetCurrentOp,
     ObservationReconcileOp, ObservationVerifyAllegationsOp,

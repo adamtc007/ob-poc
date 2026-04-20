@@ -16,6 +16,7 @@ pub mod batch_control_ops;
 pub mod coverage_compute_ops;
 pub mod custody;
 pub mod economic_exposure_ops;
+pub mod entity_ops;
 pub mod graph_validate_ops;
 pub mod import_run_ops;
 pub mod matrix_overlay_ops;
