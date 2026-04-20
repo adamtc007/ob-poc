@@ -152,7 +152,14 @@ pub(crate) mod sem_os_helpers;
 // validate-schema-sync) — all direct sqlx against `sem_reg.changesets`,
 // `sem_reg.snapshots`, `sem_reg_authoring.change_sets_archive`,
 // `public.outbox`. No new service trait.
-mod sem_os_registry_ops;
+// Phase 5a composite-blocker #18 — sem_os_registry_ops relocated to
+// `dsl-runtime::domain_ops::sem_os_registry_ops` via the existing
+// `dyn StewardshipDispatch` trait (slice #7 cascade trick).
+// `ObPocStewardshipDispatch` already cascades non-`stew_` tool names
+// through the general SemReg dispatcher, so the 20 `sem_reg_*` tools
+// route transparently. 1 op (`RegistryActiveManifestOp`) does direct
+// sqlx for `active-manifest` (no matching MCP tool); the other 19
+// delegate via the `registry_op!` macro.
 mod sem_os_schema_ops;
 // Phase 5a — semantic_ops relocated to `dsl-runtime::domain_ops::semantic_ops`,
 // consuming `dyn SemanticStateService` via the ServiceRegistry.
