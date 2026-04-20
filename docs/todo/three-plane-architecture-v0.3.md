@@ -649,17 +649,67 @@ Five deliverables, reviewed together:
 
 ### Phase 5 — Adapter traits, Sequencer extraction, outbox wiring, transaction-scope model
 
-The heaviest phase structurally.
+The heaviest phase structurally. The original v0.3 draft bundled everything under a single Phase 5; practical execution split it into six sub-phases (5a–5f) as each sub-phase has its own risk surface. Sub-phase decomposition is authoritative as of 2026-04-20; each sub-phase has its own gate.
 
-- Define service-level traits in `dsl-runtime` for ob-poc-retained ops. Granularity: one trait per service, coarse-grained.
-- Extract the Agentic Sequencer into `ob-poc::sequencer` implementing the nine-stage contract (§8).
-- Wire the scope-vs-mechanics transaction model: Sequencer opens transaction at stage 8; runtime executes statements inside the scope; SemOS applies `PendingStateAdvance` inside the same transaction; Sequencer commits at 9a.
-- Move TOCTOU recheck inside the transaction boundary, per §10.5.
-- Wire the outbox: `OutboxDraft` from outcomes → rows in `outbox` table inside the stage-8 transaction.
-- Start the `outbox_drainer` task; wire stage 9b effects (narration, UI push, broadcast) via drainer.
-- Enforce single dispatch site via workspace lint L2.
+#### Phase 5a — service traits (ServiceRegistry + trait injection)
 
-**Gate:** `dsl-runtime` has no transitive dependency on `ob-poc` for these ops; ob-poc can swap service impls without touching runtime; `VerbExecutionPort::execute_json` has exactly one caller (Sequencer stage 8); transaction-abort-on-stage-9a-fail test passes (no committed writes); outbox drainer replay-safe test passes (kill drainer mid-stream, restart, all effects delivered exactly-semantically-once via idempotency key); determinism harness byte-identical.
+Define service-level traits in `dsl-runtime::service_traits` for ob-poc-retained capabilities. ob-poc wires concrete impls at startup via `ServiceRegistryBuilder`. Plugin ops that relocate to `dsl-runtime` consume services via `VerbExecutionContext::service::<dyn T>()`.
+
+**Gate:** `ServiceRegistry` + `ServiceRegistryBuilder` compile with object-safe trait primitives; at least one trait pilot (recommended: `SemanticStateService`) proves the pattern end-to-end (ob-poc-side impl registered at startup; a relocated plugin op consumes it and passes all integration tests). Subsequent traits follow the same recipe.
+
+**Status:** DONE — `SemanticStateService` pilot shipped 55b0be16. Pattern available for TaxonomyAccess / AffinityGraph / Stewardship / remaining Group 5/6/7 blocked files.
+
+#### Phase 5b — Sequencer extraction
+
+Relocate the orchestrator from `ob-poc::repl::orchestrator_v2` to `ob-poc::sequencer` per §8.1. This has two scopes:
+
+- **5b-narrow:** path move only — `ReplOrchestratorV2` struct and tollgate state machine unchanged; module path aligns with §8.1. ~2-3 hours.
+- **5b-deep:** typed per-stage functions with explicit I/O per §8.3; tollgate states re-modelled as persistent state between stage runs; per-stage test fixtures.
+
+**Gate (5b-narrow):** `rust/src/sequencer.rs` exists and hosts the orchestrator; consumers reach it via `ob_poc::sequencer::`; Phase 0 harnesses + full test suite unchanged. §8.6 tollgate↔stage mapping pinned in the spec.
+
+**Status:** 5b-narrow DONE — commit aec638de. 5b-deep deferred; not blocking.
+
+#### Phase 5c — transaction-scope model
+
+Hoist txn begin/commit out of `DslExecutor` into the Sequencer at stage 8; plugin ops consume a `&mut dyn TransactionScope` instead of `&PgPool`. Split into two sub-sub-slices:
+
+- **5c-prep:** `TransactionScope` trait extended with `fn transaction(&mut self) -> &mut sqlx::Transaction<'static, Postgres>`; concrete `PgTransactionScope` added in `ob_poc::sequencer_tx` wrapping `sqlx::Transaction`. Plugin op signatures NOT changed — the primitives simply exist. ~1-2 hours.
+- **5c-migrate:** mass-rewrite `CustomOperation::execute_json(pool: &PgPool)` → `execute_json(scope: &mut dyn TransactionScope)` across ~90 op files; adopt `scope.transaction()` inside each op body; hoist txn begin/commit from `DslExecutor::execute_plan_atomic*` into the Sequencer's stage-8 path; wire the stage-9a atomic-commit invariant (rollback if apply-PendingStateAdvance fails). 1-2 days.
+
+**Gate (5c-prep):** trait extension + concrete impl compile; both dyn-compatible; unit + integration tests pass.
+
+**Gate (5c-migrate):** `VerbExecutionPort::execute_json` has exactly one caller (Sequencer stage 8); transaction-abort-on-stage-9a-fail test passes (no committed writes).
+
+**Status:** 5c-prep DONE this commit. 5c-migrate OPEN — depends on `PendingStateAdvance` production pipeline being real (no current plugin op produces non-empty values).
+
+#### Phase 5d — TOCTOU recheck inside txn
+
+Move `StateGateHash` re-computation inside the stage-8 transaction after acquiring row locks, per §10.5. Requires 5c-migrate (to have a real Sequencer-scoped txn) + row-versioning migrations per §0f.
+
+**Gate:** every dispatched envelope re-checks `StateGateHash` inside the txn; mismatch aborts the runbook with `DispatchError::ToctouMismatch`.
+
+**Status:** NOT STARTED. Blocked on 5c-migrate + row-versioning (§0f doc exists; migrations drafted but not executed).
+
+#### Phase 5e — outbox wiring + drainer
+
+`OutboxDraft` values from verb outcomes land in `public.outbox` rows written inside the stage-8 transaction (migration 131 already drafted at Phase 0d). Drainer task consumes outbox rows post-commit and routes stage-9b effects (narration synthesis, UI push, broadcast).
+
+**Gate:** drainer replay-safe test passes (kill mid-stream, restart, all effects delivered exactly-semantically-once via idempotency key); narration no longer fires inline in `process()`.
+
+**Status:** NOT STARTED. Scaffold migration + trait contracts exist in `ob-poc-types::OutboxDrainer`; drainer task absent.
+
+#### Phase 5f — Pattern B A1 remediation
+
+Refactor the 38 ops flagged as external-I/O in `pattern-b-a1-remediation-ledger.md` (bpmn_lite_ops, source_loader_ops, gleif_ops) into either (a) two-phase fetch-then-persist or (b) outbox deferral.
+
+**Gate:** no plugin op performs external HTTP / gRPC / subprocess spawn inside `execute_json` body; workspace lint `L4 forbid-external-effects-in-verb` green; ledger §2 CLOSED.
+
+**Status:** NOT STARTED. Pattern A (1 file) closed at Phase 0g.
+
+#### Phase 5 integration gate
+
+`dsl-runtime` has no transitive dependency on `ob-poc` for runtime ops; ob-poc can swap service impls without touching runtime; determinism harness byte-identical across all 5a-5f changes; single dispatch-site lint enforced post-5c-migrate.
 
 ### Phase 6 — Metadata-driven CRUD dissolution
 

@@ -164,6 +164,14 @@ pub mod repl;
 #[cfg(feature = "database")]
 pub mod sequencer;
 
+// Sequencer-side concrete `TransactionScope` impl (Phase 5c-prep). The
+// trait lives in `dsl_runtime::tx`; `PgTransactionScope` wraps a
+// `sqlx::Transaction` so the Sequencer can begin/commit a txn and pass
+// a `&mut dyn TransactionScope` through stage-8 dispatch once plugin
+// ops migrate their signatures in Phase 5c-migrate.
+#[cfg(feature = "database")]
+pub mod sequencer_tx;
+
 // BPMN-Lite integration - gRPC client, workflow dispatch, job worker, event bridge
 #[cfg(feature = "database")]
 pub mod bpmn_integration;
