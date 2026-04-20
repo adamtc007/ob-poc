@@ -70,6 +70,7 @@ pub mod sem_os_maintenance_ops;
 pub mod sem_os_registry_ops;
 pub mod sem_os_schema_ops;
 pub mod semantic_ops;
+pub mod session_ops;
 pub mod shared_atom_ops;
 pub mod skeleton_build_ops;
 pub mod state_ops;

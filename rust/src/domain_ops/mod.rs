@@ -211,7 +211,15 @@ pub(crate) mod sem_os_helpers;
 // Phase 5a — semantic_ops relocated to `dsl-runtime::domain_ops::semantic_ops`,
 // consuming `dyn SemanticStateService` via the ServiceRegistry.
 mod service_pipeline_ops;
-mod session_ops;
+// Phase 5a composite-blocker #27 — session_ops relocated to
+// `dsl-runtime::domain_ops::session_ops` via YAML-first re-implementation
+// against `config/verbs/session.yaml`. All 19 `session.*` verbs dispatch
+// through the new `dyn SessionService` trait (single-method bridge at
+// `crate::services::session_service_impl::ObPocSessionService`) which
+// wraps `crate::session::UnifiedSession` — a 10934 LOC multi-consumer
+// mega-module that stays in ob-poc. Pending session state crosses turns
+// through `ctx.extensions["_pending_session"]` (mirrors the legacy
+// `ext_set_pending_session` helper).
 // Phase 5a composite-blocker #3 — shared_atom_ops relocated to
 // `dsl-runtime::domain_ops::shared_atom_ops`, consuming the already-relocated
 // `dsl_runtime::cross_workspace::{repository, fact_refs, fact_versions,

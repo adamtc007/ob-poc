@@ -89,12 +89,19 @@ pub mod schema_introspection_impl;
 // in ob-poc).
 pub mod view_service_impl;
 
+// Phase 5a composite-blocker #27 — ob-poc-side impl of
+// `dsl_runtime::service_traits::SessionService`; single-method dispatch
+// for all 19 `session.*` verbs. Bridges to `crate::session::UnifiedSession`
+// (the 10934 LOC multi-consumer session mega-module that stays in ob-poc).
+pub mod session_service_impl;
+
 // Re-exports
 pub use attribute_identity_dispatch_impl::ObPocAttributeIdentityService;
 pub use constellation_runtime_impl::ObPocConstellationRuntime;
 pub use schema_introspection_impl::ObPocSchemaIntrospectionAccess;
 pub use sem_os_context_resolver_impl::ObPocSemOsContextResolver;
 pub use trading_profile_document_impl::ObPocTradingProfileDocument;
+pub use session_service_impl::ObPocSessionService;
 pub use view_service_impl::ObPocViewService;
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
 pub use lifecycle_catalog_impl::ObPocLifecycleCatalog;

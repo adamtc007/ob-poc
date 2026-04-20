@@ -678,6 +678,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn ViewService (session::ViewState + taxonomy::*)"
         );
 
+        // dyn SessionService — used by relocated session_ops to dispatch
+        // all 19 `session.*` verbs. Bridge wraps `crate::session::UnifiedSession`
+        // (the 10934 LOC multi-consumer session mega-module that stays in
+        // ob-poc). Pending session state crosses turns through
+        // `ctx.extensions["_pending_session"]`. Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::SessionService>(Arc::new(
+            ob_poc::services::ObPocSessionService::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn SessionService (session::UnifiedSession)"
+        );
+
         Arc::new(builder.build())
     };
 
