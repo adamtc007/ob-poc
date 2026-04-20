@@ -20,13 +20,11 @@ use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
-use super::helpers::{
-    extract_string_opt, extract_uuid, json_extract_string_opt, json_extract_uuid,
-};
-use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
+use crate::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ============================================================================
 // Result Types (typed structs per CLAUDE.md Non-Negotiable Rule #1)
@@ -66,7 +64,6 @@ pub struct OwnershipChain {
 // ============================================================================
 
 /// An ownership edge loaded from entity_relationships.
-#[cfg(feature = "database")]
 #[derive(Debug, Clone)]
 struct OwnershipEdge {
     from_entity_id: Uuid,
@@ -75,7 +72,6 @@ struct OwnershipEdge {
 }
 
 /// Metadata for an entity relevant to chain computation.
-#[cfg(feature = "database")]
 #[derive(Debug, Clone)]
 struct EntityMeta {
     #[allow(dead_code)]
@@ -96,7 +92,6 @@ struct EntityMeta {
 #[register_custom_op]
 pub struct UboComputeChainsOp;
 
-#[cfg(feature = "database")]
 async fn ubo_compute_chains_impl(
     case_id: Uuid,
     threshold_pct: f64,
@@ -391,13 +386,12 @@ impl CustomOperation for UboComputeChainsOp {
          detects cycles, and persists JSONB snapshot to ubo_determination_runs"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
         let threshold_pct = json_extract_string_opt(args, "threshold")
             .as_deref()
@@ -416,67 +410,13 @@ impl CustomOperation for UboComputeChainsOp {
         )
         .await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl UboComputeChainsOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let threshold_pct: f64 = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "threshold")
-            .and_then(|a| a.value.as_decimal())
-            .map(|d| d.to_string().parse::<f64>().unwrap_or(5.0))
-            .unwrap_or(5.0);
-        let workstream_id_filter =
-            super::helpers::extract_uuid_opt(verb_call, ctx, "workstream-id");
-        let config_version =
-            extract_string_opt(verb_call, "config-version").unwrap_or_else(|| "v1.0".to_string());
-        let result = ubo_compute_chains_impl(
-            case_id,
-            threshold_pct,
-            workstream_id_filter,
-            config_version,
-            pool,
-        )
-        .await?;
-
-        if let Some(ref binding) = verb_call.binding {
-            ctx.bind(binding, result.run_id);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "run_id": Uuid::nil(),
-            "case_id": Uuid::nil(),
-            "candidates_found": 0,
-            "chains_computed": 0,
-            "threshold_pct": 5.0,
-            "candidates": []
-        })))
     }
 }
 
@@ -527,7 +467,6 @@ pub struct UboChange {
 #[register_custom_op]
 pub struct UboSnapshotCaptureOp;
 
-#[cfg(feature = "database")]
 async fn ubo_snapshot_capture_impl(
     case_id: Uuid,
     determination_run_id: Uuid,
@@ -627,62 +566,23 @@ impl CustomOperation for UboSnapshotCaptureOp {
          JSONB snapshots with SHA-256 code hash for deterministic replay auditing"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
         let determination_run_id = json_extract_uuid(args, ctx, "determination-run-id")?;
         let result = ubo_snapshot_capture_impl(case_id, determination_run_id, pool).await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl UboSnapshotCaptureOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let determination_run_id = extract_uuid(verb_call, ctx, "determination-run-id")?;
-        let result = ubo_snapshot_capture_impl(case_id, determination_run_id, pool).await?;
-
-        if let Some(ref binding) = verb_call.binding {
-            ctx.bind(binding, determination_run_id);
-        }
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::to_value(
-            UboSnapshotCaptureResult {
-                run_id: Uuid::nil(),
-                code_hash: String::new(),
-                config_version: "1.0.0".to_string(),
-                candidates_captured: 0,
-                chains_captured: 0,
-            },
-        )?))
     }
 }
 
@@ -699,7 +599,6 @@ impl UboSnapshotCaptureOp {
 pub struct UboSnapshotDiffOp;
 
 /// Internal representation of a snapshot candidate row for diffing.
-#[cfg(feature = "database")]
 #[derive(Debug, Clone, Deserialize)]
 struct SnapshotCandidate {
     entity_id: Uuid,
@@ -709,7 +608,6 @@ struct SnapshotCandidate {
     ubo_id: Option<Uuid>,
 }
 
-#[cfg(feature = "database")]
 async fn ubo_snapshot_diff_impl(
     run_id_a: Uuid,
     run_id_b: Uuid,
@@ -827,58 +725,23 @@ impl CustomOperation for UboSnapshotDiffOp {
          with field-level change detection for UBO candidates"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let run_id_a = json_extract_uuid(args, ctx, "run-id-a")?;
         let run_id_b = json_extract_uuid(args, ctx, "run-id-b")?;
         let result = ubo_snapshot_diff_impl(run_id_a, run_id_b, pool).await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl UboSnapshotDiffOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let run_id_a = extract_uuid(verb_call, ctx, "run-id-a")?;
-        let run_id_b = extract_uuid(verb_call, ctx, "run-id-b")?;
-        let result = ubo_snapshot_diff_impl(run_id_a, run_id_b, pool).await?;
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::to_value(
-            UboSnapshotDiffResult {
-                run_id_a: Uuid::nil(),
-                run_id_b: Uuid::nil(),
-                added: vec![],
-                removed: vec![],
-                changed: vec![],
-            },
-        )?))
     }
 }
 

@@ -49,6 +49,10 @@ serde_yaml = "0.9"
 # and thiserror for its ReducerError enum.
 nom = "7"
 thiserror = "1"
+# Phase 5e — dilution_ops uses tokio::time::sleep for retry backoff and
+# futures::future::try_join_all for parallel summary aggregation.
+tokio = { version = "1", features = ["time"] }
+futures = "0.3"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

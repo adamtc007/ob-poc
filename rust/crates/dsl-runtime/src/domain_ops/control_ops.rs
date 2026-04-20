@@ -14,10 +14,10 @@ use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
-use super::CustomOperation;
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ============================================================================
 // ControlAnalyzeOp - Comprehensive control analysis for any entity type
@@ -39,13 +39,12 @@ impl CustomOperation for ControlAnalyzeOp {
     fn rationale(&self) -> &'static str {
         "Performs comprehensive control analysis across all control vectors (ownership, voting, board, trust, partnership) to identify who controls an entity"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let entity_id = super::helpers::json_extract_uuid(args, ctx, "entity-id")?;
 
         let include_indirect = args
@@ -421,13 +420,12 @@ impl CustomOperation for ControlAnalyzeOp {
         });
 
         let _ = ctx;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 // ============================================================================
 // ControlBuildGraphOp - Build full control graph for a CBU
@@ -449,13 +447,12 @@ impl CustomOperation for ControlBuildGraphOp {
     fn rationale(&self) -> &'static str {
         "Builds a complete control graph for a CBU showing all control relationships across ownership, voting, board, trust, and partnership vectors"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         let max_depth = args
@@ -621,13 +618,12 @@ impl CustomOperation for ControlBuildGraphOp {
             "built_at": chrono::Utc::now().to_rfc3339()
         });
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 // ============================================================================
 // ControlIdentifyUbosOp - Identify all UBOs across all control vectors
@@ -649,13 +645,12 @@ impl CustomOperation for ControlIdentifyUbosOp {
     fn rationale(&self) -> &'static str {
         "Identifies all Ultimate Beneficial Owners for a CBU by tracing all control vectors to natural persons"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         let ownership_threshold = args
@@ -891,13 +886,12 @@ impl CustomOperation for ControlIdentifyUbosOp {
         });
 
         let _ = ctx;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 // ============================================================================
 // ControlTraceChainOp - Trace specific control chain between entities
@@ -919,13 +913,12 @@ impl CustomOperation for ControlTraceChainOp {
     fn rationale(&self) -> &'static str {
         "Traces the control chain between two specific entities, showing all intermediate relationships"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let from_entity_id = super::helpers::json_extract_uuid(args, ctx, "from-entity-id")?;
         let to_entity_id = super::helpers::json_extract_uuid(args, ctx, "to-entity-id")?;
 
@@ -1071,13 +1064,12 @@ impl CustomOperation for ControlTraceChainOp {
         };
 
         let _ = ctx;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 // ============================================================================
 // ControlReconcileOwnershipOp - Reconcile ownership percentages with control
@@ -1099,13 +1091,12 @@ impl CustomOperation for ControlReconcileOwnershipOp {
     fn rationale(&self) -> &'static str {
         "Reconciles ownership percentages from different sources (share capital, entity relationships) and identifies discrepancies"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let entity_id = super::helpers::json_extract_uuid(args, ctx, "entity-id")?;
 
         let tolerance = args
@@ -1248,13 +1239,12 @@ impl CustomOperation for ControlReconcileOwnershipOp {
         });
 
         let _ = ctx;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 // ============================================================================
 // ShowBoardControllerOp - Show board controller for a CBU
@@ -1276,13 +1266,12 @@ impl CustomOperation for ShowBoardControllerOp {
     fn rationale(&self) -> &'static str {
         "Shows the computed board controller for a CBU with derivation explanation, confidence, and data gaps"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         // Get CBU info
@@ -1342,7 +1331,7 @@ impl CustomOperation for ShowBoardControllerOp {
                 "LEGAL_ENTITY"
             };
 
-            return Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+            return Ok(VerbExecutionOutcome::Record(json!({
                 "cbu_id": cbu_id,
                 "cbu_name": cbu_name,
                 "board_controller_entity_id": override_row.controller_entity_id,
@@ -1428,7 +1417,7 @@ impl CustomOperation for ShowBoardControllerOp {
                     };
                     evidence_sources.push("COMPUTED");
 
-                    return Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+                    return Ok(VerbExecutionOutcome::Record(json!({
                         "cbu_id": cbu_id,
                         "cbu_name": cbu_name,
                         "board_controller_entity_id": top.appointer_id,
@@ -1497,7 +1486,7 @@ impl CustomOperation for ShowBoardControllerOp {
             };
             evidence_sources.push("COMPUTED");
 
-            return Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+            return Ok(VerbExecutionOutcome::Record(json!({
                 "cbu_id": cbu_id,
                 "cbu_name": cbu_name,
                 "board_controller_entity_id": owner.owner_id,
@@ -1562,7 +1551,7 @@ impl CustomOperation for ShowBoardControllerOp {
             };
             evidence_sources.push("GLEIF");
 
-            return Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+            return Ok(VerbExecutionOutcome::Record(json!({
                 "cbu_id": cbu_id,
                 "cbu_name": cbu_name,
                 "board_controller_entity_id": parent.parent_entity_id,
@@ -1587,7 +1576,7 @@ impl CustomOperation for ShowBoardControllerOp {
         data_gaps.push("No GLEIF ultimate parent found".to_string());
 
         let _ = ctx;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "cbu_id": cbu_id,
             "cbu_name": cbu_name,
             "board_controller_entity_id": null,
@@ -1606,7 +1595,6 @@ fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 // ============================================================================
 // RecomputeBoardControllerOp - Recompute board controller for a CBU
@@ -1628,13 +1616,12 @@ impl CustomOperation for RecomputeBoardControllerOp {
     fn rationale(&self) -> &'static str {
         "Recomputes the board controller for a CBU by traversing ownership/control graph"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         // Get previous controller (if any)
@@ -1655,7 +1642,7 @@ impl CustomOperation for RecomputeBoardControllerOp {
         let show_result = show_op.execute_json(args, ctx, pool).await?;
 
         let computed = match &show_result {
-            dsl_runtime::VerbExecutionOutcome::Record(r) => r.clone(),
+            VerbExecutionOutcome::Record(r) => r.clone(),
             _ => return Err(anyhow!("Unexpected result from show-board-controller")),
         };
 
@@ -1711,7 +1698,7 @@ impl CustomOperation for RecomputeBoardControllerOp {
             .await; // Ignore error if table doesn't exist
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "cbu_id": cbu_id,
             "board_controller_entity_id": new_controller_id,
             "board_controller_name": new_controller_name,
@@ -1727,7 +1714,6 @@ fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 // ============================================================================
 // SetBoardControllerOp - Manually set board controller
@@ -1749,13 +1735,12 @@ impl CustomOperation for SetBoardControllerOp {
     fn rationale(&self) -> &'static str {
         "Manually sets the board controller for a CBU, creating an override"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
         let controller_entity_id =
             super::helpers::json_extract_uuid(args, ctx, "controller-entity-id")?;
@@ -1809,7 +1794,7 @@ impl CustomOperation for SetBoardControllerOp {
         .await;
 
         let _ = ctx;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "cbu_id": cbu_id,
             "board_controller_entity_id": controller_entity_id,
             "override_id": override_id,
@@ -1821,7 +1806,6 @@ fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 // ============================================================================
 // ClearBoardControllerOverrideOp - Clear manual override
@@ -1843,13 +1827,12 @@ impl CustomOperation for ClearBoardControllerOverrideOp {
     fn rationale(&self) -> &'static str {
         "Clears a manual board controller override, returning to computed value"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         // Clear override
@@ -1871,7 +1854,7 @@ impl CustomOperation for ClearBoardControllerOverrideOp {
         let show_result = show_op.execute_json(args, ctx, pool).await?;
 
         let computed = match &show_result {
-            dsl_runtime::VerbExecutionOutcome::Record(r) => r.clone(),
+            VerbExecutionOutcome::Record(r) => r.clone(),
             _ => json!({}),
         };
 
@@ -1880,7 +1863,7 @@ impl CustomOperation for ClearBoardControllerOverrideOp {
             .and_then(|v| v.as_str())
             .and_then(|s| Uuid::parse_str(s).ok());
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "cbu_id": cbu_id,
             "override_cleared": override_cleared,
             "now_using_computed": true,
@@ -1891,7 +1874,6 @@ fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 // ============================================================================
 // ImportPscRegisterOp - Import PSC register data
@@ -1913,13 +1895,12 @@ impl CustomOperation for ImportPscRegisterOp {
     fn rationale(&self) -> &'static str {
         "Imports board controller data from a PSC (Persons with Significant Control) register"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         let company_number = super::helpers::json_extract_string(args, "company-number")?;
@@ -1954,7 +1935,7 @@ impl CustomOperation for ImportPscRegisterOp {
         let pscs_imported = existing_psc.map(|r| r.psc_count).unwrap_or(0);
 
         let _ = ctx;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "cbu_id": cbu_id,
             "company_number": company_number,
             "source": source,
@@ -1968,7 +1949,6 @@ fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 // ============================================================================
 // ImportGleifControlOp - Import GLEIF control data
@@ -1990,13 +1970,12 @@ impl CustomOperation for ImportGleifControlOp {
     fn rationale(&self) -> &'static str {
         "Imports control data from GLEIF (Global LEI Foundation) relationship records"
     }
-#[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
 
         let lei = super::helpers::json_extract_string(args, "lei")?;
@@ -2049,7 +2028,7 @@ impl CustomOperation for ImportGleifControlOp {
             .unwrap_or((0, false, false));
 
         let _ = ctx;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "cbu_id": cbu_id,
             "lei": lei,
             "include_ultimate_parent": include_ultimate,
@@ -2065,7 +2044,6 @@ fn is_migrated(&self) -> bool {
         true
     }
 }
-
 
 #[cfg(test)]
 mod tests {

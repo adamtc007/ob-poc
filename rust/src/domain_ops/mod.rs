@@ -23,7 +23,7 @@ mod affinity_ops;
 mod agent_ops;
 mod attribute_ops;
 mod billing_ops;
-mod board_ops;
+// Phase 5e — board_ops relocated to `dsl-runtime::domain_ops::board_ops`
 // Phase 4 Slice B Group 3 — bods_ops relocated to `dsl-runtime::domain_ops::bods_ops`
 // alongside the `bods/` module it consumes.
 mod booking_principal_ops;
@@ -33,10 +33,10 @@ mod capital_ops;
 // Phase 5d — cbu_role_ops relocated to `dsl-runtime::domain_ops::cbu_role_ops`
 mod client_group_ops;
 mod constellation_ops;
-mod control_compute_ops;
-mod control_ops;
+// Phase 5e — control_compute_ops relocated to `dsl-runtime::domain_ops::control_compute_ops`
+// Phase 5e — control_ops relocated to `dsl-runtime::domain_ops::control_ops`
 mod deal_ops;
-mod dilution_ops;
+// Phase 5e — dilution_ops relocated to `dsl-runtime::domain_ops::dilution_ops`
 mod discovery_ops;
 // Phase 4 Slice B Group 4 — docs_bundle_ops relocated to `dsl-runtime::domain_ops::docs_bundle_ops`
 // alongside the `document_bundles/` module it consumes.
@@ -56,8 +56,8 @@ pub mod navigation_ops;
 mod observation_ops;
 mod onboarding;
 // Phase 5c — outreach_ops relocated to `dsl-runtime::domain_ops::outreach_ops`
-mod ownership_ops;
-mod partnership_ops;
+// Phase 5e — ownership_ops relocated to `dsl-runtime::domain_ops::ownership_ops`
+// Phase 5e — partnership_ops relocated to `dsl-runtime::domain_ops::partnership_ops`
 mod phrase_ops;
 // Phase 5c — refdata_loader relocated to `dsl-runtime::domain_ops::refdata_loader`
 // Phase 5c — refdata_ops relocated to `dsl-runtime::domain_ops::refdata_ops`
@@ -99,11 +99,11 @@ pub mod template_ops;
 // alongside the `document_requirements/` module it consumes.
 mod trading_profile;
 mod trading_profile_ca_ops;
-mod trust_ops;
-mod ubo_analysis;
-mod ubo_compute_ops;
-pub mod ubo_graph_ops;
-mod ubo_registry_ops;
+// Phase 5e — trust_ops relocated to `dsl-runtime::domain_ops::trust_ops`
+// Phase 5e — ubo_analysis relocated to `dsl-runtime::domain_ops::ubo_analysis`
+// Phase 5e — ubo_compute_ops relocated to `dsl-runtime::domain_ops::ubo_compute_ops`
+// Phase 5e — ubo_graph_ops relocated to `dsl-runtime::domain_ops::ubo_graph_ops`
+// Phase 5e — ubo_registry_ops relocated to `dsl-runtime::domain_ops::ubo_registry_ops`
 // Phase 4 Slice B Group 2 — verify_ops relocated to `dsl-runtime::domain_ops::verify_ops`
 // alongside the `verification/` module it consumes.
 mod view_ops;
@@ -162,11 +162,8 @@ pub use trading_profile_ca_ops::{
     TradingProfileCaRemoveCutoffOp, TradingProfileCaRemoveDefaultOp, TradingProfileCaRemoveSsiOp,
     TradingProfileCaSetDefaultOp, TradingProfileCaSetElectionOp, TradingProfileCaSetNotificationOp,
 };
-pub use ubo_analysis::{UboCalculateOp, UboListOwnersOp, UboTraceChainsOp};
-pub use ubo_compute_ops::{
-    OwnershipChain, UboCandidate, UboChange, UboComputeChainsOp, UboComputeResult,
-    UboSnapshotCaptureOp, UboSnapshotCaptureResult, UboSnapshotDiffOp, UboSnapshotDiffResult,
-};
+// Phase 5e — ubo_analysis relocated. Types accessed via dsl_runtime::domain_ops::ubo_analysis.
+// Phase 5e — ubo_compute_ops relocated. Types accessed via dsl_runtime::domain_ops::ubo_compute_ops.
 
 // Domain-specific operation modules
 pub use attribute_ops::{
@@ -198,9 +195,7 @@ pub use resource_ops::{
     ResourceSuspendOp, ResourceValidateAttrsOp,
 };
 // Phase 5d — screening_ops relocated. Types accessed via dsl_runtime::domain_ops::screening_ops.
-pub use ubo_graph_ops::{
-    UboConvergenceSupersedeOp, UboMarkDeceasedOp, UboTransferControlOp, UboWaiveVerificationOp,
-};
+// Phase 5e — ubo_graph_ops relocated. Types accessed via dsl_runtime::domain_ops::ubo_graph_ops.
 
 // Team operations (only transfer-member needs plugin, others are CRUD)
 pub use team_ops::TeamTransferMemberOp;
@@ -222,36 +217,22 @@ pub use view_ops::{
 };
 
 // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
-pub use board_ops::BoardAnalyzeControlOp;
+// Phase 5e — board_ops relocated. Types accessed via dsl_runtime::domain_ops::board_ops.
 pub use capital_ops::{
     CapitalBuybackOp, CapitalCancelOp, CapitalCancelSharesOp, CapitalCapTableOp, CapitalHoldersOp,
     CapitalIssueInitialOp, CapitalIssueNewOp, CapitalIssueSharesOp, CapitalOwnershipChainOp,
     CapitalReconcileOp, CapitalShareClassCreateOp, CapitalShareClassGetSupplyOp, CapitalSplitOp,
     CapitalTransferOp,
 };
-pub use control_compute_ops::{ControlComputeOp, ControlComputeResult, ControllerRecord};
-pub use control_ops::{
-    ClearBoardControllerOverrideOp, ControlAnalyzeOp, ControlBuildGraphOp, ControlIdentifyUbosOp,
-    ControlReconcileOwnershipOp, ControlTraceChainOp, ImportGleifControlOp, ImportPscRegisterOp,
-    RecomputeBoardControllerOp, SetBoardControllerOp, ShowBoardControllerOp,
-};
-pub use dilution_ops::{
-    DilutionCreateConvertibleNoteOp, DilutionCreateSafeOp, DilutionExerciseOp, DilutionForfeitOp,
-    DilutionGetSummaryOp, DilutionGrantOptionsOp, DilutionIssueWarrantOp, DilutionListOp,
-};
-pub use ownership_ops::{
-    OwnershipAnalyzeGapsOp, OwnershipComputeOp, OwnershipControlPositionsOp,
-    OwnershipReconcileFindingsOp, OwnershipReconcileOp, OwnershipSnapshotListOp,
-    OwnershipTraceChainOp, OwnershipWhoControlsOp,
-};
-pub use partnership_ops::{
-    PartnershipAnalyzeControlOp, PartnershipContributionOp, PartnershipDistributionOp,
-    PartnershipReconcileOp,
-};
+// Phase 5e — control_compute_ops relocated. Types accessed via dsl_runtime::domain_ops::control_compute_ops.
+// Phase 5e — control_ops relocated. Types accessed via dsl_runtime::domain_ops::control_ops.
+// Phase 5e — dilution_ops relocated. Types accessed via dsl_runtime::domain_ops::dilution_ops.
+// Phase 5e — ownership_ops relocated. Types accessed via dsl_runtime::domain_ops::ownership_ops.
+// Phase 5e — partnership_ops relocated. Types accessed via dsl_runtime::domain_ops::partnership_ops.
 // Phase 4 Slice B Group 6 — tollgate_ops relocated to `dsl-runtime::domain_ops::tollgate_ops`.
 // Registration flows through inventory automatically; external ob-poc code doesn't
 // import these types directly.
-pub use trust_ops::{TrustAnalyzeControlOp, TrustClassifyOp, TrustIdentifyUbosOp};
+// Phase 5e — trust_ops relocated. Types accessed via dsl_runtime::domain_ops::trust_ops.
 
 // Service pipeline operations (intent → discovery → provision → readiness)
 pub use service_pipeline_ops::{

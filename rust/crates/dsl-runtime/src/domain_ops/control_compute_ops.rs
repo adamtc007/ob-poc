@@ -21,13 +21,12 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
-use sqlx::PgPool;
-
-use super::helpers::{extract_uuid, extract_uuid_opt};
-use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{json_extract_uuid, json_extract_uuid_opt};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ============================================================================
 // Result Types (typed structs per CLAUDE.md Non-Negotiable Rule #1)
@@ -103,7 +102,6 @@ fn officer_basis(role_type: &str) -> String {
 #[register_custom_op]
 pub struct ControlComputeOp;
 
-#[cfg(feature = "database")]
 async fn control_compute_impl(
     case_id: Uuid,
     entity_id_filter: Option<Uuid>,
@@ -288,53 +286,20 @@ impl CustomOperation for ControlComputeOp {
          by priority. Multi-source aggregation cannot be expressed as CRUD."
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_uuid, json_extract_uuid_opt};
-
+    ) -> Result<VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
         let entity_id_filter = json_extract_uuid_opt(args, ctx, "entity-id");
         let result = control_compute_impl(case_id, entity_id_filter, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl ControlComputeOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let entity_id_filter = extract_uuid_opt(verb_call, ctx, "entity-id");
-        let result = control_compute_impl(case_id, entity_id_filter, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "case_id": Uuid::nil(),
-            "entity_id": Uuid::nil(),
-            "controllers": [],
-            "governance_controller_identified": false
-        })))
     }
 }
 

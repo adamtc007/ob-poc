@@ -11,16 +11,13 @@ use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
+use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
-use sqlx::PgPool;
-
-use super::helpers::get_required_uuid;
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ============================================================================
 // TrustAnalyzeControlOp - Analyze control over a trust
@@ -31,7 +28,6 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[register_custom_op]
 pub struct TrustAnalyzeControlOp;
 
-#[cfg(feature = "database")]
 #[derive(Debug, sqlx::FromRow)]
 struct TrustProvision {
     holder_entity_id: Option<Uuid>,
@@ -40,7 +36,6 @@ struct TrustProvision {
     discretion_level: Option<String>,
 }
 
-#[cfg(feature = "database")]
 #[derive(Debug, sqlx::FromRow)]
 struct TrustParty {
     entity_id: Uuid,
@@ -48,7 +43,6 @@ struct TrustParty {
     party_role: String,
 }
 
-#[cfg(feature = "database")]
 async fn trust_analyze_control_impl(
     trust_entity_id: Uuid,
     cbu_id: Uuid,
@@ -251,50 +245,20 @@ impl CustomOperation for TrustAnalyzeControlOp {
         "Trust control analysis requires interpreting trust deed provisions and mapping them to control vectors"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-
+    ) -> Result<VerbExecutionOutcome> {
         let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let result = trust_analyze_control_impl(trust_entity_id, cbu_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl TrustAnalyzeControlOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let trust_entity_id = get_required_uuid(verb_call, "trust-entity-id")?;
-        let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
-        let result = trust_analyze_control_impl(trust_entity_id, cbu_id, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!(
-            "Database feature required for trust.analyze-control"
-        ))
     }
 }
 
@@ -306,7 +270,6 @@ impl TrustAnalyzeControlOp {
 #[register_custom_op]
 pub struct TrustIdentifyUbosOp;
 
-#[cfg(feature = "database")]
 #[derive(Debug, sqlx::FromRow)]
 struct BeneficiaryProvision {
     holder_entity_id: Option<Uuid>,
@@ -318,7 +281,6 @@ struct BeneficiaryProvision {
     is_natural_person: Option<bool>,
 }
 
-#[cfg(feature = "database")]
 async fn trust_identify_ubos_impl(
     trust_entity_id: Uuid,
     cbu_id: Uuid,
@@ -465,57 +427,23 @@ impl CustomOperation for TrustIdentifyUbosOp {
         "UBO identification for trusts requires applying regulatory rules to provision holders"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-
+    ) -> Result<VerbExecutionOutcome> {
         let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let threshold = json_extract_string_opt(args, "threshold")
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(25.0);
         let result = trust_identify_ubos_impl(trust_entity_id, cbu_id, threshold, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl TrustIdentifyUbosOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let trust_entity_id = get_required_uuid(verb_call, "trust-entity-id")?;
-        let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
-
-        let threshold = verb_call
-            .get_arg("threshold")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(25.0);
-        let result = trust_identify_ubos_impl(trust_entity_id, cbu_id, threshold, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required for trust.identify-ubos"))
     }
 }
 
@@ -527,7 +455,6 @@ impl TrustIdentifyUbosOp {
 #[register_custom_op]
 pub struct TrustClassifyOp;
 
-#[cfg(feature = "database")]
 #[derive(Debug, sqlx::FromRow)]
 struct ProvisionSummary {
     provision_type: String,
@@ -536,7 +463,6 @@ struct ProvisionSummary {
     total_interest: Option<rust_decimal::Decimal>,
 }
 
-#[cfg(feature = "database")]
 async fn trust_classify_impl(
     trust_entity_id: Uuid,
     cbu_id: Uuid,
@@ -637,48 +563,20 @@ impl CustomOperation for TrustClassifyOp {
         "Trust classification requires analyzing beneficiary interests and trustee discretion"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_uuid;
-
+    ) -> Result<VerbExecutionOutcome> {
         let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let result = trust_classify_impl(trust_entity_id, cbu_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl TrustClassifyOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let trust_entity_id = get_required_uuid(verb_call, "trust-entity-id")?;
-        let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
-        let result = trust_classify_impl(trust_entity_id, cbu_id, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required for trust.classify"))
     }
 }
 

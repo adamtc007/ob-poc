@@ -6,16 +6,11 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
-
-use super::helpers::{
-    extract_uuid, extract_uuid_opt, json_extract_cbu_id, json_extract_string_opt, json_extract_uuid,
-};
-use crate::domain_ops::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-
-#[cfg(feature = "database")]
 use sqlx::PgPool;
+
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{json_extract_cbu_id, json_extract_string_opt, json_extract_uuid};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 /// Calculate UBO (Ultimate Beneficial Ownership) chain
 ///
@@ -24,12 +19,11 @@ use sqlx::PgPool;
 #[register_custom_op]
 pub struct UboCalculateOp;
 
-#[cfg(feature = "database")]
 async fn ubo_calculate_impl(
     cbu_id: uuid::Uuid,
     threshold: f64,
     pool: &PgPool,
-) -> Result<ExecutionResult> {
+) -> Result<Vec<serde_json::Value>> {
     use serde_json::json;
 
     let cbu_entity: Option<(uuid::Uuid,)> = sqlx::query_as(
@@ -50,7 +44,7 @@ async fn ubo_calculate_impl(
 
     let target_entity_id = match cbu_entity {
         Some((entity_id,)) => entity_id,
-        None => return Ok(ExecutionResult::RecordSet(vec![])),
+        None => return Ok(vec![]),
     };
 
     let ubos: Vec<(uuid::Uuid, Option<rust_decimal::Decimal>)> = sqlx::query_as(
@@ -105,7 +99,7 @@ async fn ubo_calculate_impl(
         })
         .collect();
 
-    Ok(ExecutionResult::RecordSet(ubo_list))
+    Ok(ubo_list)
 }
 
 #[async_trait]
@@ -120,60 +114,24 @@ impl CustomOperation for UboCalculateOp {
         "Requires recursive graph traversal through ownership hierarchy"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_cbu_id(args, ctx)?;
         let threshold = json_extract_string_opt(args, "threshold")
             .as_deref()
             .and_then(|value| value.parse::<f64>().ok())
             .unwrap_or(25.0);
 
-        match ubo_calculate_impl(cbu_id, threshold, pool).await? {
-            ExecutionResult::RecordSet(rows) => Ok(
-                dsl_runtime::VerbExecutionOutcome::RecordSet(rows),
-            ),
-            _ => unreachable!(),
-        }
+        let rows = ubo_calculate_impl(cbu_id, threshold, pool).await?;
+        Ok(VerbExecutionOutcome::RecordSet(rows))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl UboCalculateOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
-        let threshold: f64 = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "threshold")
-            .and_then(|a| a.value.as_decimal())
-            .map(|d| d.to_string().parse().unwrap_or(25.0))
-            .unwrap_or(25.0);
-
-        ubo_calculate_impl(cbu_id, threshold, pool).await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
     }
 }
 
@@ -184,14 +142,13 @@ impl UboCalculateOp {
 #[register_custom_op]
 pub struct UboTraceChainsOp;
 
-#[cfg(feature = "database")]
 async fn ubo_trace_chains_impl(
     cbu_id: uuid::Uuid,
     target_entity_id: Option<uuid::Uuid>,
     threshold: f64,
     as_of_date: chrono::NaiveDate,
     pool: &PgPool,
-) -> Result<ExecutionResult> {
+) -> Result<serde_json::Value> {
     use serde_json::json;
 
     let threshold_bd: sqlx::types::BigDecimal = threshold
@@ -282,7 +239,7 @@ async fn ubo_trace_chains_impl(
         })
         .collect();
 
-    let result = json!({
+    Ok(json!({
         "cbu_id": cbu_id,
         "target_entity_id": target_entity_id,
         "threshold": threshold,
@@ -292,9 +249,7 @@ async fn ubo_trace_chains_impl(
         "ownership_chain_count": ownership_chains.len(),
         "control_chain_count": control_chains.len(),
         "includes_control_relationships": true
-    });
-
-    Ok(ExecutionResult::Record(result))
+    }))
 }
 
 #[async_trait]
@@ -309,15 +264,15 @@ impl CustomOperation for UboTraceChainsOp {
         "Calls SQL recursive function to compute ownership chains"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_cbu_id(args, ctx)?;
-        let target_entity_id = super::helpers::json_extract_uuid_opt(args, ctx, "target-entity-id");
+        let target_entity_id =
+            crate::domain_ops::helpers::json_extract_uuid_opt(args, ctx, "target-entity-id");
         let threshold = json_extract_string_opt(args, "threshold")
             .as_deref()
             .and_then(|value| value.parse::<f64>().ok())
@@ -327,61 +282,13 @@ impl CustomOperation for UboTraceChainsOp {
             .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
 
-        match ubo_trace_chains_impl(cbu_id, target_entity_id, threshold, as_of_date, pool).await? {
-            ExecutionResult::Record(value) => {
-                Ok(dsl_runtime::VerbExecutionOutcome::Record(value))
-            }
-            _ => unreachable!(),
-        }
+        let value =
+            ubo_trace_chains_impl(cbu_id, target_entity_id, threshold, as_of_date, pool).await?;
+        Ok(VerbExecutionOutcome::Record(value))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl UboTraceChainsOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id = extract_uuid(verb_call, ctx, "cbu-id")?;
-        let target_entity_id = extract_uuid_opt(verb_call, ctx, "target-entity-id");
-
-        let threshold: f64 = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "threshold")
-            .and_then(|a| a.value.as_decimal())
-            .map(|d| d.to_string().parse().unwrap_or(25.0))
-            .unwrap_or(25.0);
-
-        // Get as-of-date (optional, defaults to today)
-        let as_of_date: chrono::NaiveDate = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "as-of-date")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
-            .unwrap_or_else(|| chrono::Utc::now().date_naive());
-
-        ubo_trace_chains_impl(cbu_id, target_entity_id, threshold, as_of_date, pool).await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "chain_count": 0,
-            "chains": []
-        })))
     }
 }
 
@@ -392,12 +299,11 @@ impl UboTraceChainsOp {
 #[register_custom_op]
 pub struct UboListOwnersOp;
 
-#[cfg(feature = "database")]
 async fn ubo_list_owners_impl(
     entity_id: uuid::Uuid,
     as_of_date: chrono::NaiveDate,
     pool: &PgPool,
-) -> Result<ExecutionResult> {
+) -> Result<serde_json::Value> {
     use serde_json::json;
 
     type OwnerRow = (
@@ -467,14 +373,12 @@ async fn ubo_list_owners_impl(
         )
         .collect();
 
-    let result = json!({
+    Ok(json!({
         "entity_id": entity_id,
         "as_of_date": as_of_date.to_string(),
         "owner_count": owner_list.len(),
         "owners": owner_list
-    });
-
-    Ok(ExecutionResult::Record(result))
+    }))
 }
 
 #[async_trait]
@@ -489,62 +393,23 @@ impl CustomOperation for UboListOwnersOp {
         "Lists ownership relationships with temporal filtering"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let as_of_date = json_extract_string_opt(args, "as-of-date")
             .as_deref()
             .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
 
-        match ubo_list_owners_impl(entity_id, as_of_date, pool).await? {
-            ExecutionResult::Record(value) => {
-                Ok(dsl_runtime::VerbExecutionOutcome::Record(value))
-            }
-            _ => unreachable!(),
-        }
+        let value = ubo_list_owners_impl(entity_id, as_of_date, pool).await?;
+        Ok(VerbExecutionOutcome::Record(value))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl UboListOwnersOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_id = extract_uuid(verb_call, ctx, "entity-id")?;
-        let as_of_date: chrono::NaiveDate = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "as-of-date")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
-            .unwrap_or_else(|| chrono::Utc::now().date_naive());
-
-        ubo_list_owners_impl(entity_id, as_of_date, pool).await
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "owner_count": 0,
-            "owners": []
-        })))
     }
 }
