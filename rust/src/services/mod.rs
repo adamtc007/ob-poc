@@ -49,8 +49,14 @@ pub mod stewardship_dispatch_impl;
 // `crate::sem_reg::agent::mcp_tools::all_tool_specs()`.
 pub mod mcp_tool_registry_impl;
 
+// Phase 5a composite-blocker #5 — ob-poc-side impl of
+// `dsl_runtime::service_traits::LifecycleCatalog`; bridges to the
+// taxonomy-loaded `OntologyService` singleton.
+pub mod lifecycle_catalog_impl;
+
 // Re-exports
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
+pub use lifecycle_catalog_impl::ObPocLifecycleCatalog;
 pub use mcp_tool_registry_impl::ObPocMcpToolRegistry;
 pub use semantic_state_service_impl::ObPocSemanticStateService;
 pub use stewardship_dispatch_impl::ObPocStewardshipDispatch;

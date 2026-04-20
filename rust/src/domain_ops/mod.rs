@@ -50,7 +50,12 @@ mod gleif_ops;
 pub mod helpers;
 mod investor_ops;
 mod investor_role_ops;
-mod kyc_case_ops;
+// Phase 5a composite-blocker #5 — kyc_case_ops relocated to
+// `dsl-runtime::domain_ops::kyc_case_ops` consuming the new
+// `dyn LifecycleCatalog` service. `ObPocLifecycleCatalog` in ob-poc
+// bridges to the taxonomy-loaded `OntologyService` singleton.
+// Registration flows through inventory automatically; external ob-poc
+// code doesn't import these types directly.
 // Phase 5c — lifecycle_ops relocated to `dsl-runtime::domain_ops::lifecycle_ops`
 mod manco_ops;
 pub mod navigation_ops;
@@ -128,10 +133,8 @@ pub use crate::dsl_v2::ast::VerbCall;
 pub use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 // Phase 5c — entity_query relocated. Types accessed via dsl_runtime::domain_ops::entity_query.
-pub use kyc_case_ops::{
-    KycCaseCloseOp, KycCaseCloseResult, KycCaseCreateOp, KycCaseCreateResult, KycCaseStateOp,
-    WorkstreamStateOp,
-};
+// Phase 5a composite-blocker #5 — kyc_case_ops relocated. Types accessed via
+// dsl_runtime::domain_ops::kyc_case_ops; no external ob-poc consumer imports them.
 // Phase 5c — lifecycle_ops relocated to `dsl-runtime::domain_ops::lifecycle_ops`.
 // Registration flows through inventory automatically; external ob-poc code doesn't
 // import these types directly.

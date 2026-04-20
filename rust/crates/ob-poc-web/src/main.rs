@@ -604,6 +604,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn McpToolRegistry (sem_reg::agent::mcp_tools)"
         );
 
+        // dyn LifecycleCatalog — used by relocated kyc_case_ops to
+        // check state-machine transitions against ob-poc's ontology
+        // (entity taxonomy singleton). Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::LifecycleCatalog>(Arc::new(
+            ob_poc::services::ObPocLifecycleCatalog::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn LifecycleCatalog (ontology taxonomy)"
+        );
+
         Arc::new(builder.build())
     };
 
