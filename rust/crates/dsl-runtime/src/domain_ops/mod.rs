@@ -14,6 +14,7 @@ pub mod helpers;
 pub mod access_review_ops;
 pub mod agent_ops;
 pub mod batch_control_ops;
+pub mod billing_ops;
 pub mod board_ops;
 pub mod bods_ops;
 pub mod coverage_compute_ops;

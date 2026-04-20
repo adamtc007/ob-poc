@@ -23,7 +23,12 @@ mod affinity_ops;
 // Phase 5a — agent_ops relocated to `dsl-runtime::domain_ops::agent_ops`
 // consuming `dyn McpToolRegistry` via the ServiceRegistry.
 mod attribute_ops;
-mod billing_ops;
+// Phase 5a composite-blocker #19 — billing_ops relocated to
+// `dsl-runtime::domain_ops::billing_ops`. Pure clean lift — matrix
+// tag "ob-poc-adapter destination" was wrong (same as slices #16-#18).
+// All 14 ops are direct sqlx against the billing tables. Strip via
+// Python script: 14 legacy execute blocks deleted, all cfg gates
+// stripped. Registration flows through inventory.
 // Phase 5e — board_ops relocated to `dsl-runtime::domain_ops::board_ops`
 // Phase 4 Slice B Group 3 — bods_ops relocated to `dsl-runtime::domain_ops::bods_ops`
 // alongside the `bods/` module it consumes.
