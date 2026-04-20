@@ -59,6 +59,7 @@ pub mod sem_os_audit_ops;
 pub mod sem_os_changeset_ops;
 pub mod sem_os_focus_ops;
 pub mod sem_os_governance_ops;
+pub mod sem_os_maintenance_ops;
 pub mod semantic_ops;
 pub mod shared_atom_ops;
 pub mod skeleton_build_ops;

@@ -144,7 +144,14 @@ pub mod rule_evaluator;
 // the ServiceRegistry. `ObPocStewardshipDispatch` in ob-poc bridges
 // to `sem_reg::stewardship::dispatch_phase{0,1}_tool` + general MCP.
 pub(crate) mod sem_os_helpers;
-mod sem_os_maintenance_ops;
+// Phase 5a composite-blocker #17 — sem_os_maintenance_ops relocated to
+// `dsl-runtime::domain_ops::sem_os_maintenance_ops`. Pure clean lift —
+// the spec's "ob-poc-adapter destination" matrix tag turned out wrong
+// (same as team_ops slice #16). 7 ops (health-pending, health-stale-
+// dryruns, cleanup, bootstrap-seeds, drain-outbox, reindex-embeddings,
+// validate-schema-sync) — all direct sqlx against `sem_reg.changesets`,
+// `sem_reg.snapshots`, `sem_reg_authoring.change_sets_archive`,
+// `public.outbox`. No new service trait.
 mod sem_os_registry_ops;
 mod sem_os_schema_ops;
 // Phase 5a — semantic_ops relocated to `dsl-runtime::domain_ops::semantic_ops`,
