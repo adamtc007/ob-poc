@@ -67,7 +67,11 @@ mod phrase_ops;
 // alongside the `cross_workspace/` module it consumes (relocated together).
 mod request_ops;
 // Phase 5c — requirement_ops relocated to `dsl-runtime::domain_ops::requirement_ops`
-mod research_workflow_ops;
+// Phase 5a composite-blocker #4 — research_workflow_ops relocated to
+// `dsl-runtime::domain_ops::research_workflow_ops`. Self-contained (no
+// service-trait dependency); the 4 ops use only json_* helpers and
+// direct sqlx. Registration flows through inventory automatically;
+// external ob-poc code doesn't import these types directly.
 mod resource_ops;
 pub mod rule_evaluator;
 // Phase 5d — screening_ops relocated to `dsl-runtime::domain_ops::screening_ops`
