@@ -13,7 +13,7 @@
 //! in Slice D-quick and now lives on per-op inherent impls; Slice C-native
 //! rewrites those call sites and deletes the inherent bodies altogether.
 //! `execute_in_tx` dropped entirely — no op overrode it; plugins are
-//! non-transactional until Slice F (VerbExecutionPort + TransactionScope).
+//! non-transactional until Slice F (VerbExecutionPort + `crate::tx::TransactionScope`).
 
 use std::collections::HashMap;
 use std::sync::Arc;

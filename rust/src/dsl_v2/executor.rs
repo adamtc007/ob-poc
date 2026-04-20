@@ -1733,12 +1733,13 @@ impl DslExecutor {
             // `CustomOperation` in `dsl_runtime` has no `execute_in_tx` method.
             // Fail fast rather than silently doing non-transactional work inside
             // an atomic batch. Slice F replaces this with a txn-aware dispatch
-            // over the `VerbExecutionPort` + `TransactionScope` pair.
+            // over the `VerbExecutionPort` + `dsl_runtime::tx::TransactionScope` pair.
             if let Some(_op) = self.custom_ops.get(&vc.domain, &vc.verb) {
                 return Err(anyhow!(
                     "Plugin {}.{} cannot execute in a transaction. Transactional \
                      plugin execution requires Slice F (VerbExecutionPort + \
-                     TransactionScope); current dispatch is non-transactional only.",
+                     dsl_runtime::tx::TransactionScope); current dispatch is \
+                     non-transactional only.",
                     vc.domain,
                     vc.verb
                 ));

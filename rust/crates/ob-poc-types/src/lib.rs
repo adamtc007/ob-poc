@@ -81,8 +81,7 @@ pub use gated_envelope::{
     OutboxEffectKind,
     OutboxProcessOutcome,
     OutboxRowStatus,
-    // transaction scope
-    TransactionScope,
+    // transaction scope — ID only; the trait lives in `dsl-runtime::tx`
     TransactionScopeId,
     // state gate hash
     StateGateHash,

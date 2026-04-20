@@ -340,7 +340,8 @@ Testable: same `(snapshot, utterance)` → byte-identical stage outputs across r
 | `VerbExecutionContext` | various | `dsl-runtime` | Runtime-owned context. |
 | `VerbExecutionOutcome` (+ `PendingStateAdvance`) | various | `dsl-runtime` | Runtime output (§10.3). |
 | `GatedVerbEnvelope` | — (new) | `ob-poc-types` | Bi-plane boundary type; preserves one-way deps. |
-| `TransactionScope` | — (new) | `ob-poc-types` | Handle the Sequencer supplies; runtime executes mechanics inside it. |
+| `TransactionScopeId` | — (new) | `ob-poc-types` | Correlation ID only. Pure data, storage-backend-agnostic. |
+| `TransactionScope` (trait) | — (new) | `dsl-runtime::tx` | Handle the Sequencer supplies; runtime executes mechanics inside it. **Lives in `dsl-runtime`, not `ob-poc-types`** — see correction note at §10.3 below. |
 | `PendingStateAdvance` | — (new) | `ob-poc-types` | Declarative state mutation payload returned from runtime, applied by SemOS in same txn. |
 | `OutboxRow` schema | — (new) | `ob-poc-types` + SQL migration | Outbox table. |
 | `StateGateHash` | — (new, concrete) | `ob-poc-types` | Deterministic fingerprint (§10.5). |
@@ -417,13 +418,26 @@ pub struct OutboxDraft {
     pub idempotency_key: IdempotencyKey,             // drainer uses for at-least-once semantics
 }
 
-/// Sequencer supplies this to the runtime; runtime executes mechanics inside.
-/// Implementation is a wrapper around sqlx::Transaction or equivalent.
-pub trait TransactionScope: Send + Sync {
-    fn executor(&mut self) -> &mut dyn PgExecutor;   // runtime uses this for statements
-    fn scope_id(&self) -> TransactionScopeId;        // for logging / tracing
-}
+// `TransactionScope` — the trait — lives in `dsl-runtime::tx`, NOT
+// `ob-poc-types`. `ob-poc-types` carries only the correlation id:
+//
+//   // in ob-poc-types
+//   pub struct TransactionScopeId(pub Uuid);
+//
+// The executor-access method lives with the trait in dsl-runtime:
+//
+//   // in dsl-runtime::tx
+//   pub trait TransactionScope: Send + Sync {
+//       fn scope_id(&self) -> TransactionScopeId;
+//       fn executor(&mut self) -> &mut dyn sqlx::PgExecutor;   // Phase 5c
+//   }
+//
+// ob-poc supplies a concrete `PgTransactionScope` wrapping
+// `sqlx::Transaction`. This layering keeps `ob-poc-types` logic-free
+// and sqlx-free; see the 2026-04-20 architectural correction below.
 ```
+
+**2026-04-20 architectural correction.** The original v0.3 draft placed `TransactionScope` in `ob-poc-types` with a `fn executor(&mut self) -> &mut dyn PgExecutor` method. That was a latent contradiction: `ob-poc-types` is supposed to be logic-free and carry values only, but an executor-access method forces it to depend on `sqlx` (or whatever future backend). The contradiction was caught during Phase 0b (the trait was defined `scope_id()`-only and `executor()` deferred) and fully resolved at the start of Phase 5c: the trait moved to `dsl-runtime::tx`. The boundary crate now carries only `TransactionScopeId` (a pure `Uuid` newtype). This preserves one-way deps, keeps future backend-swap possible, and removes the habit risk of turning `ob-poc-types` into a shadow architecture crate. Nothing else in the bi-plane boundary type set references the `TransactionScope` trait directly (envelopes, outcomes, state-advance payloads all carry values only), so the move was a 30-LOC code change and a doc correction, not a structural refactor.
 
 **Why `catalogue_snapshot_id`:** enables the runtime to detect "gated against catalogue v147, dispatched against catalogue v148" as its own failure class, distinct from TOCTOU on entity state. Mid-refactor catalogue reloads don't silently invalidate in-flight envelopes.
 
@@ -510,7 +524,7 @@ CREATE INDEX outbox_pending_idx ON outbox (status, created_at) WHERE status IN (
 
 - Create `dsl-runtime` crate.
 - Relocate `VerbExecutionPort`, `CustomOperation`, `CustomOperationRegistry`, `VerbExecutionContext`, `VerbExecutionOutcome` (with `PendingStateAdvance`), `VerbRegistrar` to `dsl-runtime`.
-- Define `GatedVerbEnvelope`, `PendingStateAdvance`, `TransactionScope`, `OutboxDraft`, `StateGateHash`, `OutboxRow` schema in `ob-poc-types`.
+- Define `GatedVerbEnvelope`, `PendingStateAdvance`, `TransactionScopeId`, `OutboxDraft`, `StateGateHash`, `OutboxRow` schema in `ob-poc-types`. (The `TransactionScope` trait itself lives in `dsl-runtime::tx` per the §10.3 correction.)
 - Relocate `PgCrudExecutor` to `dsl-runtime`.
 - Relocate domain-neutral plugin ops (~10–15% of `domain_ops`) to `dsl-runtime`.
 - Define adapter traits in `dsl-runtime` for app-coupled ops; impls in `ob-poc`.
@@ -745,7 +759,7 @@ Some entity tables may lack a `row_version` column (or reliable `xmin` semantics
 4. ✅ / ❌ — Agentic Sequencer is a named, bounded module implementing the nine-stage contract.
 5. ✅ / ❌ — `VerbExecutionPort` and `PgCrudExecutor` move out of `sem_os_*`.
 6. ✅ / ❌ — `dsl-runtime` is a new crate (not an expansion of `dsl-core`).
-7. ✅ / ❌ — `GatedVerbEnvelope`, `PendingStateAdvance`, `TransactionScope`, `OutboxDraft` live in `ob-poc-types`.
+7. ✅ / ❌ — `GatedVerbEnvelope`, `PendingStateAdvance`, `TransactionScopeId`, `OutboxDraft` live in `ob-poc-types`. The `TransactionScope` *trait* lives in `dsl-runtime::tx` (§10.3 2026-04-20 correction).
 8. ✅ / ❌ — three-destination model replaces the ten-plugin topology.
 9. ✅ / ❌ — round-trip is effect-equivalence (§14), not SQL-equivalence.
 10. ✅ / ❌ — SemOS does not call `VerbExecutionPort` directly; Sequencer stage 8 is the only dispatch site.
@@ -767,7 +781,7 @@ The refactor is complete when:
 
 1. No `sem_os_*` crate contains any `execute_*` function outside metadata loading.
 2. `dsl-runtime` exists and owns `VerbExecutionPort`, `CustomOperation`, `CustomOperationRegistry`, `VerbRegistrar`, `PgCrudExecutor`, `VerbExecutionContext`, `VerbExecutionOutcome` (with `PendingStateAdvance`).
-3. `GatedVerbEnvelope`, `PendingStateAdvance`, `TransactionScope`, `OutboxDraft`, `StateGateHash`, `OutboxRow` schema exist in `ob-poc-types`; envelope carries `envelope_version`, `catalogue_snapshot_id`, `trace_id`.
+3. `GatedVerbEnvelope`, `PendingStateAdvance`, `TransactionScopeId`, `OutboxDraft`, `StateGateHash`, `OutboxRow` schema exist in `ob-poc-types`; the `TransactionScope` trait lives in `dsl-runtime::tx` (§10.3 correction); envelope carries `envelope_version`, `catalogue_snapshot_id`, `trace_id`.
 4. `ob-poc/domain_ops` contains only app-coupled op implementations, each behind a `dsl-runtime`-defined service trait.
 5. `ob-poc::sequencer` is the named module implementing the nine-stage contract. `VerbExecutionPort::execute_json` has exactly one caller.
 6. Transaction model: Sequencer opens at stage 8, runtime executes mechanics inside, SemOS applies `PendingStateAdvance` in same txn, Sequencer commits at 9a.
@@ -922,17 +936,22 @@ pub enum OutboxEffectKind {
 }
 
 // --- transaction scope ---
-
-pub trait TransactionScope: Send + Sync {
-    fn executor(&mut self) -> &mut dyn PgExecutor;
-    fn scope_id(&self) -> TransactionScopeId;
-}
+// `ob-poc-types` carries only the correlation id. The `TransactionScope`
+// trait (with executor access) lives in `dsl-runtime::tx`; see §10.3
+// note dated 2026-04-20.
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct TransactionScopeId(pub Uuid);
+pub struct TransactionScopeId(pub Uuid);      // in ob-poc-types
+
+// in dsl-runtime::tx (NOT ob-poc-types):
+//
+//   pub trait TransactionScope: Send + Sync {
+//       fn scope_id(&self) -> TransactionScopeId;
+//       fn executor(&mut self) -> &mut dyn sqlx::PgExecutor;   // Phase 5c
+//   }
 ```
 
-Full definitions land in Phase 0.
+Full definitions land in Phase 0 (`TransactionScopeId`) and Phase 5c (`TransactionScope` trait executor method).
 
 ---
 

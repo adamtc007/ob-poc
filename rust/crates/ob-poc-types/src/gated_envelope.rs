@@ -16,8 +16,11 @@
 //!   transaction, and a vector of [`OutboxDraft`] rows for post-commit effects.
 //!   Named `GatedOutcome` to avoid collision with `dsl_runtime::VerbExecutionOutcome`
 //!   (the per-op outcome enum returned by CustomOperation impls).
-//! - [`TransactionScope`] — Sequencer → Runtime. A handle the Sequencer
-//!   supplies; the runtime executes statement mechanics inside the scope.
+//! - [`TransactionScopeId`] — correlation identifier for a Sequencer-owned
+//!   transaction scope. The scope *trait* (with executor access) lives in
+//!   `dsl-runtime::tx` — this crate carries the ID only so the boundary
+//!   stays logic-free. See the 2026-04-20 architectural correction noted
+//!   at `dsl-runtime/src/tx.rs`.
 //! - [`StateGateHash`] — TOCTOU fingerprint re-checked inside the transaction.
 //!
 //! ## Compile-only in Phase 0b
@@ -486,11 +489,21 @@ pub struct OutboxDraft {
 }
 
 // ============================================================================
-// TransactionScope — Sequencer-supplied execution context handle
+// TransactionScopeId — correlation id for a Sequencer-owned txn scope
 // ============================================================================
+//
+// 2026-04-20 architectural correction: the scope *trait* used to live
+// here, which made this crate execution-aware and established a habit
+// risk the v0.3 spec was otherwise trying to avoid. The trait moved to
+// `dsl-runtime::tx::TransactionScope`. This crate keeps only the ID —
+// pure data, round-trippable, backend-agnostic. See `dsl-runtime/src/tx.rs`
+// for the rationale.
 
-/// Identifier for a [`TransactionScope`] instance. Used in logs and traces
-/// to correlate statement execution back to its enclosing Sequencer txn.
+/// Identifier for a transaction scope instance. Used in logs, traces, and
+/// replay to correlate statement execution back to its enclosing
+/// Sequencer-owned transaction. Storage-backend-agnostic — every scope
+/// backend (sqlx today, anything else in the future) produces a
+/// [`TransactionScopeId`].
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct TransactionScopeId(pub Uuid);
 
@@ -505,26 +518,6 @@ impl Default for TransactionScopeId {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// A transaction-scope handle supplied by the Sequencer to the runtime at
-/// dispatch time. The Sequencer owns scope (when a txn begins, when it
-/// commits, when it rolls back, what the boundary includes). The runtime
-/// owns mechanics (statements, rows, deadlock retries) inside the scope
-/// — per v0.3 §7.1 scope-vs-mechanics reconciliation.
-///
-/// # Phase 0b scope
-///
-/// The compile-only surface exposed here is just the correlating
-/// [`TransactionScopeId`]. The executor-access method
-/// (`fn executor(&mut self) -> &mut dyn PgExecutor`) is deferred to
-/// Phase 5c so that `ob-poc-types` stays sqlx-free. Phase 5c will either
-/// add a feature-gated method or move the trait to `dsl-runtime`
-/// altogether — the decision is recorded in the Phase 5c gate YAML.
-pub trait TransactionScope: Send + Sync {
-    /// Scope id, for logs and traces. Available regardless of storage
-    /// backend.
-    fn scope_id(&self) -> TransactionScopeId;
 }
 
 // ============================================================================

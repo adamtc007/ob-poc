@@ -63,6 +63,7 @@ pub mod registrar;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;
+pub mod tx;
 pub mod verification;
 
 // Explicit re-exports — do NOT add `pub use module::*`.
