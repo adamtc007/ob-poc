@@ -57,7 +57,15 @@ mod discovery_ops;
 mod gleif_ops;
 pub mod helpers;
 mod investor_ops;
-mod investor_role_ops;
+// Phase 5a composite-blocker #12 — investor_role_ops relocated to
+// `dsl-runtime::domain_ops::investor_role_ops`. Pure clean lift — no
+// new service trait needed. After stripping the legacy
+// `execute(&VerbCall, ...)` blocks (used 6 file-local helpers
+// `get_required_uuid` / `get_optional_*`) and dropping the
+// `#[cfg(feature = "database")]` gates, every op is a direct sqlx
+// call to the in-DB `"ob-poc".upsert_role_profile` function.
+// Registration flows through inventory; external ob-poc code does not
+// import these types directly.
 // Phase 5a composite-blocker #5 — kyc_case_ops relocated to
 // `dsl-runtime::domain_ops::kyc_case_ops` consuming the new
 // `dyn LifecycleCatalog` service. `ObPocLifecycleCatalog` in ob-poc
