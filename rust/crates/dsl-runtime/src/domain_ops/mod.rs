@@ -34,6 +34,7 @@ pub mod graph_validate_ops;
 pub mod import_run_ops;
 pub mod kyc_case_ops;
 pub mod lifecycle_ops;
+pub mod manco_ops;
 pub mod matrix_overlay_ops;
 pub mod outreach_ops;
 pub mod outreach_plan_ops;

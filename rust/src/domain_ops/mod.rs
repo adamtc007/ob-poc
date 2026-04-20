@@ -57,7 +57,11 @@ mod investor_role_ops;
 // Registration flows through inventory automatically; external ob-poc
 // code doesn't import these types directly.
 // Phase 5c — lifecycle_ops relocated to `dsl-runtime::domain_ops::lifecycle_ops`
-mod manco_ops;
+// Phase 5a composite-blocker #6 — manco_ops relocated to
+// `dsl-runtime::domain_ops::manco_ops`. Self-contained (no service-trait
+// dependency); all 11 ops call DB-level `fn_*` PL/pgSQL functions via
+// sqlx. Registration flows through inventory automatically; external
+// ob-poc code doesn't import these types directly.
 pub mod navigation_ops;
 mod observation_ops;
 mod onboarding;
