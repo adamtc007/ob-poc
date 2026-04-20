@@ -61,6 +61,7 @@ pub mod sem_os_focus_ops;
 pub mod sem_os_governance_ops;
 pub mod semantic_ops;
 pub mod shared_atom_ops;
+pub mod skeleton_build_ops;
 pub mod state_ops;
 pub mod temporal_ops;
 pub mod tollgate_evaluate_ops;

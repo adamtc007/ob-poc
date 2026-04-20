@@ -156,14 +156,20 @@ mod session_ops;
 // `dsl_runtime::cross_workspace::{repository, fact_refs, fact_versions,
 // replay, types}` module. Registration flows through inventory automatically;
 // external ob-poc code doesn't import these types directly.
-pub(crate) mod skeleton_build_ops;
+// Phase 5a composite-blocker #15 — skeleton_build_ops relocated to
+// `dsl-runtime::domain_ops::skeleton_build_ops`. Pure clean lift —
+// no new service trait needed (the spec's projected
+// `SkeletonBuildOrchestrator` trait turned out unnecessary). The
+// file is self-contained: 1 op (`SkeletonBuildOp`) + 5 long
+// `pub async fn run_*` orchestrator helpers (graph_validate,
+// ubo_compute, coverage_compute, outreach_plan, tollgate_evaluate)
+// called only from within the file. The `pub use run_*` re-exports
+// in this mod.rs had zero external consumers; dropped along with
+// the file relocation. All ob-poc-side imports were
+// `crate::dsl_v2::*` legacy-path artifacts. Registration flows
+// through inventory.
 // Phase 4 Slice B Group 9 — state_ops relocated to `dsl-runtime::domain_ops::state_ops`
 // alongside the `state_reducer/` module it consumes.
-#[cfg(feature = "database")]
-pub use skeleton_build_ops::{
-    run_coverage_compute, run_graph_validate, run_outreach_plan, run_tollgate_evaluate,
-    run_ubo_compute,
-};
 mod source_loader_ops;
 mod team_ops;
 pub mod template_ops;

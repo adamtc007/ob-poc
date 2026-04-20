@@ -9,21 +9,15 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
+use rust_decimal::prelude::ToPrimitive;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-use rust_decimal::prelude::ToPrimitive;
-
-use super::helpers::{extract_string_opt, extract_uuid};
-use super::CustomOperation;
-
-#[cfg(feature = "database")]
-use sqlx::PgPool;
-
-#[cfg(feature = "database")]
-use std::collections::{HashMap, HashSet};
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ============================================================================
 // Types
@@ -51,7 +45,6 @@ pub struct SkeletonBuildResult {
 #[register_custom_op]
 pub struct SkeletonBuildOp;
 
-#[cfg(feature = "database")]
 async fn skeleton_build_impl(
     case_id: Uuid,
     source: String,
@@ -143,15 +136,12 @@ impl CustomOperation for SkeletonBuildOp {
         "Orchestrates the full skeleton build pipeline across 7 steps"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
-
+    ) -> Result<VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
         let source =
             json_extract_string_opt(args, "source").unwrap_or_else(|| "MANUAL".to_string());
@@ -167,42 +157,11 @@ impl CustomOperation for SkeletonBuildOp {
             skeleton_build_impl(case_id, source, threshold, max_outreach_items, pool).await?;
         ctx.bind("run", result.import_run_id);
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl SkeletonBuildOp {
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let case_id = extract_uuid(verb_call, ctx, "case-id")?;
-        let source =
-            extract_string_opt(verb_call, "source").unwrap_or_else(|| "MANUAL".to_string());
-        let threshold: f64 = extract_string_opt(verb_call, "threshold")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(5.0);
-        let max_outreach_items: usize = extract_string_opt(verb_call, "max-outreach-items")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(8)
-            .clamp(1, 50);
-        let result =
-            skeleton_build_impl(case_id, source, threshold, max_outreach_items, pool).await?;
-
-        // Bind the result UUID so downstream can reference @skeleton
-        ctx.bind("run", result.import_run_id);
-
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -219,7 +178,6 @@ impl SkeletonBuildOp {
 // ============================================================================
 
 /// Edge representation for graph validation.
-#[cfg(feature = "database")]
 #[derive(Debug, Clone)]
 pub(crate) struct Edge {
     relationship_id: Uuid,
@@ -231,7 +189,6 @@ pub(crate) struct Edge {
 }
 
 /// A single graph anomaly detected during validation.
-#[cfg(feature = "database")]
 #[derive(Debug, Clone)]
 pub(crate) struct GraphAnomaly {
     anomaly_type: String,
@@ -243,7 +200,6 @@ pub(crate) struct GraphAnomaly {
 /// Shared skeleton build step 2: validate entity relationship graph for a case.
 /// Returns the number of anomalies found.
 /// NOTE: standalone ops in graph_validate_ops.rs have their own pool-based implementation.
-#[cfg(feature = "database")]
 pub async fn run_graph_validate(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     case_id: Uuid,
@@ -398,7 +354,6 @@ pub async fn run_graph_validate(
 
 /// Cycle detection via iterative Tarjan SCC algorithm.
 /// SCCs with more than one node are cycles.
-#[cfg(feature = "database")]
 fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     let mut adj: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
     let mut all_nodes: HashSet<Uuid> = HashSet::new();
@@ -493,7 +448,6 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
 }
 
 /// Flags ownership edges that have no percentage value.
-#[cfg(feature = "database")]
 fn check_missing_percentages(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     for edge in edges {
         if edge.relationship_type == "ownership" && edge.percentage.is_none() {
@@ -511,7 +465,6 @@ fn check_missing_percentages(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) 
 }
 
 /// For each target entity, sums inbound ownership percentages and flags >100%.
-#[cfg(feature = "database")]
 fn check_supply_exceeds_100(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     let mut supply_map: HashMap<Uuid, f64> = HashMap::new();
     let mut holders_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
@@ -548,7 +501,6 @@ fn check_supply_exceeds_100(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
 }
 
 /// Detects conflicting ownership data from different sources.
-#[cfg(feature = "database")]
 fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     let mut edge_groups: HashMap<(Uuid, Uuid, String), Vec<&Edge>> = HashMap::new();
 
@@ -626,7 +578,6 @@ fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
 /// Shared skeleton build step 3: compute UBO chains via DFS ownership walk.
 /// Returns the number of UBO candidates found.
 /// NOTE: standalone ops in ubo_compute_ops.rs have their own pool-based implementation.
-#[cfg(feature = "database")]
 pub async fn run_ubo_compute(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     case_id: Uuid,
@@ -893,7 +844,6 @@ pub async fn run_ubo_compute(
 /// Shared skeleton build step 4: compute 4-prong coverage for a case.
 /// Returns overall coverage percentage.
 /// NOTE: standalone ops in coverage_compute_ops.rs have their own pool-based implementation.
-#[cfg(feature = "database")]
 pub async fn run_coverage_compute(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     case_id: Uuid,
@@ -1123,7 +1073,6 @@ pub async fn run_coverage_compute(
 }
 
 /// Extract candidate entity IDs from a determination run's output_snapshot JSON.
-#[cfg(feature = "database")]
 pub(crate) fn extract_candidate_entity_ids(snapshot: &serde_json::Value) -> Vec<Uuid> {
     // The snapshot may be an array of candidates or have a "candidates" key
     let arr = snapshot
@@ -1144,7 +1093,6 @@ pub(crate) fn extract_candidate_entity_ids(snapshot: &serde_json::Value) -> Vec<
 }
 
 /// Update prong (covered, total) counter.
-#[cfg(feature = "database")]
 pub(crate) fn update_prong(totals: &mut HashMap<&str, (i32, i32)>, prong: &str, is_covered: bool) {
     if let Some(counts) = totals.get_mut(prong) {
         counts.1 += 1;
@@ -1168,7 +1116,6 @@ pub(crate) fn update_prong(totals: &mut HashMap<&str, (i32, i32)>, prong: &str, 
 /// Shared skeleton build step 5: generate outreach plan from coverage gaps.
 /// Returns (plan_id, total_gaps_before_cap).
 /// NOTE: standalone ops in outreach_plan_ops.rs have their own pool-based implementation.
-#[cfg(feature = "database")]
 pub async fn run_outreach_plan(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     case_id: Uuid,
@@ -1359,7 +1306,6 @@ pub async fn run_outreach_plan(
 /// Shared skeleton build step 6: evaluate SKELETON_READY tollgate.
 /// Returns true if the skeleton is ready (all gates passed).
 /// NOTE: standalone ops in tollgate_evaluate_ops.rs have their own pool-based implementation.
-#[cfg(feature = "database")]
 pub async fn run_tollgate_evaluate(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     case_id: Uuid,
