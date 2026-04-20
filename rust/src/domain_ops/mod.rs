@@ -56,7 +56,14 @@ mod discovery_ops;
 // Phase 5c — evidence_ops relocated to `dsl-runtime::domain_ops::evidence_ops`
 mod gleif_ops;
 pub mod helpers;
-mod investor_ops;
+// Phase 5a composite-blocker #14 — investor_ops relocated to
+// `dsl-runtime::domain_ops::investor_ops`. Pure clean lift — no new
+// service trait needed (same pattern as slice #12 sibling
+// `investor_role_ops`). The 2 ob-poc deps were `crate::dsl_v2::*`
+// legacy-path artifacts; after stripping the 13 legacy
+// `execute(&VerbCall, ...)` blocks and 4 file-local `get_*` helpers,
+// every op is direct sqlx against the `"ob-poc".investors` (and
+// `"ob-poc".holdings`) tables. Registration flows through inventory.
 // Phase 5a composite-blocker #12 — investor_role_ops relocated to
 // `dsl-runtime::domain_ops::investor_role_ops`. Pure clean lift — no
 // new service trait needed. After stripping the legacy

@@ -33,6 +33,7 @@ pub mod entity_query;
 pub mod evidence_ops;
 pub mod graph_validate_ops;
 pub mod import_run_ops;
+pub mod investor_ops;
 pub mod investor_role_ops;
 pub mod kyc_case_ops;
 pub mod lifecycle_ops;

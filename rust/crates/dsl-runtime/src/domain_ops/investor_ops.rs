@@ -10,88 +10,16 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
-
-use super::helpers::{
-    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
-};
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{
+    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
-/// Extract a required UUID argument from verb call
-#[cfg(feature = "database")]
-fn get_required_uuid(
-    verb_call: &VerbCall,
-    key: &str,
-    ctx: &ExecutionContext,
-) -> Result<uuid::Uuid> {
-    use uuid::Uuid;
+// ── Shared _impl functions ──────────────────────────────────────────────
 
-    let arg = verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == key)
-        .ok_or_else(|| anyhow::anyhow!("Missing required argument :{}", key))?;
-
-    // Try as symbol reference first
-    if let Some(ref_name) = arg.value.as_symbol() {
-        let resolved = ctx
-            .resolve(ref_name)
-            .ok_or_else(|| anyhow::anyhow!("Unresolved reference @{}", ref_name))?;
-        return Ok(resolved);
-    }
-
-    // Try as UUID directly
-    if let Some(uuid_val) = arg.value.as_uuid() {
-        return Ok(uuid_val);
-    }
-
-    // Try as string (may be UUID string)
-    if let Some(str_val) = arg.value.as_string() {
-        return Uuid::parse_str(str_val)
-            .map_err(|e| anyhow::anyhow!("Invalid UUID for :{}: {}", key, e));
-    }
-
-    Err(anyhow::anyhow!(":{} must be a UUID or @reference", key))
-}
-
-/// Extract an optional string argument from verb call
-#[cfg(feature = "database")]
-fn get_optional_string(verb_call: &VerbCall, key: &str) -> Option<String> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == key)
-        .and_then(|a| a.value.as_string().map(|s| s.to_string()))
-}
-
-/// Extract a required string argument from verb call
-#[cfg(feature = "database")]
-fn get_required_string(verb_call: &VerbCall, key: &str) -> Result<String> {
-    get_optional_string(verb_call, key)
-        .ok_or_else(|| anyhow::anyhow!("Missing required argument :{}", key))
-}
-
-/// Extract an optional UUID argument from verb call
-#[cfg(feature = "database")]
-fn get_optional_uuid(
-    verb_call: &VerbCall,
-    key: &str,
-    ctx: &ExecutionContext,
-) -> Option<uuid::Uuid> {
-    get_required_uuid(verb_call, key, ctx).ok()
-}
-
-// ── Shared _impl functions (called by both execute and execute_json) ──
-
-#[cfg(feature = "database")]
 async fn investor_request_documents_impl(
     investor_id: uuid::Uuid,
     notes: Option<&str>,
@@ -115,7 +43,6 @@ async fn investor_request_documents_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_start_kyc_impl(
     investor_id: uuid::Uuid,
     case_id: Option<uuid::Uuid>,
@@ -143,7 +70,6 @@ async fn investor_start_kyc_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_approve_kyc_impl(
     investor_id: uuid::Uuid,
     risk_rating: Option<&str>,
@@ -172,7 +98,6 @@ async fn investor_approve_kyc_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_reject_kyc_impl(
     investor_id: uuid::Uuid,
     reason: &str,
@@ -200,7 +125,6 @@ async fn investor_reject_kyc_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_mark_eligible_impl(
     investor_id: uuid::Uuid,
     investor_type: Option<&str>,
@@ -227,7 +151,6 @@ async fn investor_mark_eligible_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_record_subscription_impl(
     investor_id: uuid::Uuid,
     holding_id: Option<uuid::Uuid>,
@@ -264,7 +187,6 @@ async fn investor_record_subscription_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_activate_impl(
     investor_id: uuid::Uuid,
     notes: Option<&str>,
@@ -288,7 +210,6 @@ async fn investor_activate_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_start_redemption_impl(
     investor_id: uuid::Uuid,
     redemption_type: Option<&str>,
@@ -315,7 +236,6 @@ async fn investor_start_redemption_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_complete_redemption_impl(
     investor_id: uuid::Uuid,
     notes: Option<&str>,
@@ -349,7 +269,6 @@ async fn investor_complete_redemption_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_offboard_impl(
     investor_id: uuid::Uuid,
     reason: &str,
@@ -385,7 +304,6 @@ async fn investor_offboard_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_suspend_impl(
     investor_id: uuid::Uuid,
     reason: &str,
@@ -424,7 +342,6 @@ async fn investor_suspend_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_reinstate_impl(
     investor_id: uuid::Uuid,
     notes: Option<&str>,
@@ -462,7 +379,6 @@ async fn investor_reinstate_impl(
     Ok(row.investor_id)
 }
 
-#[cfg(feature = "database")]
 async fn investor_count_by_state_impl(
     cbu_id: uuid::Uuid,
     pool: &PgPool,
@@ -502,57 +418,27 @@ impl CustomOperation for InvestorRequestDocumentsOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "request-documents"
     }
-
     fn rationale(&self) -> &'static str {
         "Transitions investor from ENQUIRY to PENDING_DOCUMENTS state"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_request_documents_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorRequestDocumentsOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_request_documents_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -565,59 +451,28 @@ impl CustomOperation for InvestorStartKycOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "start-kyc"
     }
-
     fn rationale(&self) -> &'static str {
         "Transitions investor from PENDING_DOCUMENTS to KYC_IN_PROGRESS"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let case_id = json_extract_uuid_opt(args, ctx, "case-id");
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_start_kyc_impl(investor_id, case_id, notes.as_deref(), pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorStartKycOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let case_id = get_optional_uuid(verb_call, "case-id", ctx);
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_start_kyc_impl(investor_id, case_id, notes.as_deref(), pool).await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -630,63 +485,30 @@ impl CustomOperation for InvestorApproveKycOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "approve-kyc"
     }
-
     fn rationale(&self) -> &'static str {
         "Transitions investor from KYC_IN_PROGRESS to KYC_APPROVED"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let risk_rating = json_extract_string_opt(args, "risk-rating");
         let notes = json_extract_string_opt(args, "notes");
         let id =
             investor_approve_kyc_impl(investor_id, risk_rating.as_deref(), notes.as_deref(), pool)
                 .await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorApproveKycOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let risk_rating = get_optional_string(verb_call, "risk-rating");
-        let notes = get_optional_string(verb_call, "notes");
-        let id =
-            investor_approve_kyc_impl(investor_id, risk_rating.as_deref(), notes.as_deref(), pool)
-                .await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -699,59 +521,28 @@ impl CustomOperation for InvestorRejectKycOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "reject-kyc"
     }
-
     fn rationale(&self) -> &'static str {
         "Transitions investor from KYC_IN_PROGRESS to REJECTED state"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let reason = json_extract_string(args, "reason")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_reject_kyc_impl(investor_id, &reason, notes.as_deref(), pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorRejectKycOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let reason = get_required_string(verb_call, "reason")?;
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_reject_kyc_impl(investor_id, &reason, notes.as_deref(), pool).await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -764,24 +555,19 @@ impl CustomOperation for InvestorMarkEligibleOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "mark-eligible"
     }
-
     fn rationale(&self) -> &'static str {
         "Transitions investor from KYC_APPROVED to ELIGIBLE_TO_SUBSCRIBE"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let investor_type = json_extract_string_opt(args, "investor-type");
         let notes = json_extract_string_opt(args, "notes");
@@ -792,43 +578,11 @@ impl CustomOperation for InvestorMarkEligibleOp {
             pool,
         )
         .await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorMarkEligibleOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let investor_type = get_optional_string(verb_call, "investor-type");
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_mark_eligible_impl(
-            investor_id,
-            investor_type.as_deref(),
-            notes.as_deref(),
-            pool,
-        )
-        .await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -841,61 +595,29 @@ impl CustomOperation for InvestorRecordSubscriptionOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "record-subscription"
     }
-
     fn rationale(&self) -> &'static str {
         "Records initial subscription, transitions to SUBSCRIBED"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let holding_id = json_extract_uuid_opt(args, ctx, "holding-id");
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_record_subscription_impl(investor_id, holding_id, notes.as_deref(), pool)
             .await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorRecordSubscriptionOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let holding_id = get_optional_uuid(verb_call, "holding-id", ctx);
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_record_subscription_impl(investor_id, holding_id, notes.as_deref(), pool)
-            .await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -908,57 +630,27 @@ impl CustomOperation for InvestorActivateOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "activate"
     }
-
     fn rationale(&self) -> &'static str {
         "Transitions investor from SUBSCRIBED to ACTIVE_HOLDER"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_activate_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorActivateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_activate_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -971,24 +663,19 @@ impl CustomOperation for InvestorStartRedemptionOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "start-redemption"
     }
-
     fn rationale(&self) -> &'static str {
         "Transitions investor from ACTIVE_HOLDER to REDEEMING"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let redemption_type = json_extract_string_opt(args, "redemption-type");
         let notes = json_extract_string_opt(args, "notes");
@@ -999,43 +686,11 @@ impl CustomOperation for InvestorStartRedemptionOp {
             pool,
         )
         .await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorStartRedemptionOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let redemption_type = get_optional_string(verb_call, "redemption-type");
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_start_redemption_impl(
-            investor_id,
-            redemption_type.as_deref(),
-            notes.as_deref(),
-            pool,
-        )
-        .await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -1048,57 +703,27 @@ impl CustomOperation for InvestorCompleteRedemptionOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "complete-redemption"
     }
-
     fn rationale(&self) -> &'static str {
         "Completes full redemption, transitions to OFFBOARDED"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_complete_redemption_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorCompleteRedemptionOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_complete_redemption_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -1111,59 +736,28 @@ impl CustomOperation for InvestorOffboardOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "offboard"
     }
-
     fn rationale(&self) -> &'static str {
         "Immediately offboards an investor with reason"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let reason = json_extract_string(args, "reason")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_offboard_impl(investor_id, &reason, notes.as_deref(), pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorOffboardOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let reason = get_required_string(verb_call, "reason")?;
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_offboard_impl(investor_id, &reason, notes.as_deref(), pool).await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -1176,59 +770,28 @@ impl CustomOperation for InvestorSuspendOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "suspend"
     }
-
     fn rationale(&self) -> &'static str {
         "Suspends an investor, blocking transactions until reinstated"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let reason = json_extract_string(args, "reason")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_suspend_impl(investor_id, &reason, notes.as_deref(), pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorSuspendOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let reason = get_required_string(verb_call, "reason")?;
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_suspend_impl(investor_id, &reason, notes.as_deref(), pool).await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -1241,57 +804,27 @@ impl CustomOperation for InvestorReinstateOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "reinstate"
     }
-
     fn rationale(&self) -> &'static str {
         "Reinstates a suspended investor to their previous state"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let investor_id = json_extract_uuid(args, ctx, "investor-id")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = investor_reinstate_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorReinstateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let investor_id = get_required_uuid(verb_call, "investor-id", ctx)?;
-        let notes = get_optional_string(verb_call, "notes");
-        let id = investor_reinstate_impl(investor_id, notes.as_deref(), pool).await?;
-        Ok(ExecutionResult::Uuid(id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
 
@@ -1308,54 +841,25 @@ impl CustomOperation for InvestorCountByStateOp {
     fn domain(&self) -> &'static str {
         "investor"
     }
-
     fn verb(&self) -> &'static str {
         "count-by-state"
     }
-
     fn rationale(&self) -> &'static str {
         "Returns investor counts by lifecycle state for reporting"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let result = investor_count_by_state_impl(cbu_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl InvestorCountByStateOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let cbu_id = get_required_uuid(verb_call, "cbu-id", ctx)?;
-        let result = investor_count_by_state_impl(cbu_id, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for investor operations"
-        ))
     }
 }
