@@ -57,6 +57,7 @@ pub mod custom_op;
 pub mod document_bundles;
 pub mod document_requirements;
 pub mod domain_ops;
+pub mod entity_kind;
 pub mod execution;
 pub mod placeholder;
 pub mod port;
@@ -64,6 +65,7 @@ pub mod registrar;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;
+pub mod stategraph;
 pub mod tx;
 pub mod verification;
 

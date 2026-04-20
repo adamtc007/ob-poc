@@ -49,7 +49,7 @@ use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::dsl_v2::runtime_registry::runtime_registry;
-use crate::entity_kind::canonicalize as canonicalize_entity_kind;
+use dsl_runtime::entity_kind::canonicalize as canonicalize_entity_kind;
 use crate::lexicon::LexiconService;
 use crate::mcp::compound_intent::extract_compound_signals;
 use crate::mcp::macro_index::{MacroIndex, MacroResolveOutcome};

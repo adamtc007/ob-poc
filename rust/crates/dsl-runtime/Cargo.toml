@@ -15,6 +15,13 @@ description = "DSL verb execution runtime — the data plane of the three-plane 
 #   on inversion — see the v0.3 Phase 2 gate.
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
+# Phase 5a composite-blocker #23 — discovery_ops + stategraph use
+# `dsl_core::config::loader::ConfigLoader` and `dsl_core::config::types::*`
+# for verb metadata loading; entity-gateway proto + client for
+# search-entities op.
+dsl-core = { path = "../dsl-core" }
+entity-gateway = { path = "../entity-gateway" }
+tonic = "0.12"
 # Remaining transitional dep — sem_os_core provides Principal, SemOsError,
 # and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately
 # until a later slice resolves the cycle cleanly.

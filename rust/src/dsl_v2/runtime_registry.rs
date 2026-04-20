@@ -17,7 +17,7 @@ use tracing::{info, warn};
 use sqlx::PgPool;
 
 use super::config::types::*;
-use crate::entity_kind::canonicalize as canonicalize_entity_kind;
+use dsl_runtime::entity_kind::canonicalize as canonicalize_entity_kind;
 use crate::templates::{TemplateDefinition, TemplateRegistry};
 
 // =============================================================================

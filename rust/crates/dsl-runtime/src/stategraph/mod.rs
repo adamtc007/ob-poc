@@ -448,9 +448,15 @@ pub fn walk_graph(graph: &StateGraph, entity_context: &Value) -> Result<GraphWal
 }
 
 fn discover_stategraph_dir() -> Result<PathBuf> {
+    // Try CWD-relative paths first (server runtime path).
     let candidates = [
         Path::new("config/stategraphs"),
         Path::new("rust/config/stategraphs"),
+        // Phase 5a composite-blocker #23 — relative paths walking up
+        // from `rust/crates/<crate>/` (cargo test CWD when running
+        // from a workspace member crate).
+        Path::new("../../config/stategraphs"),
+        Path::new("../../../config/stategraphs"),
     ];
     for candidate in candidates {
         if candidate.exists() {

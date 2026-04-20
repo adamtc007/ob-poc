@@ -28,6 +28,7 @@ pub mod control_ops;
 pub mod custody;
 pub mod deal_ops;
 pub mod dilution_ops;
+pub mod discovery_ops;
 pub mod docs_bundle_ops;
 pub mod document_ops;
 pub mod economic_exposure_ops;

@@ -64,7 +64,15 @@ mod bpmn_lite_ops;
 // 28 ops, all direct sqlx against deal lifecycle tables. Stripped via
 // the same Python script as slice #19 billing_ops.
 // Phase 5e — dilution_ops relocated to `dsl-runtime::domain_ops::dilution_ops`
-mod discovery_ops;
+// Phase 5a composite-blocker #23 — discovery_ops relocated to
+// `dsl-runtime::domain_ops::discovery_ops` along with its two helper
+// modules: `entity_kind` (81 LOC, zero deps) and `stategraph/`
+// (514 LOC, dsl_core only). 4 ob-poc consumers updated from
+// `crate::entity_kind` → `dsl_runtime::entity_kind`.
+// Inside discovery_ops: `dispatch_tool` calls routed via
+// `StewardshipDispatch` (slice #7 cascade trick); `gateway_addr()`
+// inlined to direct `std::env::var` lookup; legacy `sem_reg_tool`
+// helper deleted (unused after legacy execute paths removed).
 // Phase 4 Slice B Group 4 — docs_bundle_ops relocated to `dsl-runtime::domain_ops::docs_bundle_ops`
 // alongside the `document_bundles/` module it consumes.
 // Phase 4 Slice B Group 6 — document_ops relocated to `dsl-runtime::domain_ops::document_ops`
@@ -315,11 +323,7 @@ pub use attribute_ops::{
 // Access Review operations (complex multi-step transactional operations only)
 
 // BODS operations relocated to dsl-runtime::domain_ops::bods_ops in Phase 4 Slice B Group 3.
-pub use discovery_ops::{
-    DiscoveryAvailableActionsOp, DiscoveryCascadeResearchOp, DiscoveryEntityContextOp,
-    DiscoveryEntityRelationshipsOp, DiscoveryInspectDataOp, DiscoverySearchDataOp,
-    DiscoverySearchEntitiesOp, DiscoveryVerbDetailOp,
-};
+// Phase 5a composite-blocker #23 — discovery_ops re-exports removed; see relocation comment above.
 
 // View operations (session scope and selection management)
 pub use view_ops::{

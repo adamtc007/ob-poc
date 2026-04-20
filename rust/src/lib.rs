@@ -18,7 +18,10 @@
 //! ```
 
 // Core error handling
-pub mod entity_kind;
+// Phase 5a composite-blocker #23 — entity_kind relocated to dsl-runtime
+// (alongside discovery_ops which consumed it). Other ob-poc consumers
+// (mcp::verb_search, dsl_v2::runtime_registry, service_resources::discovery,
+// sage::verb_resolve) now import from `dsl_runtime::entity_kind`.
 pub mod error;
 
 // Data dictionary
@@ -60,9 +63,10 @@ pub mod agentic;
 #[cfg(feature = "database")]
 pub mod graph;
 
-// StateGraph pipeline substrate
-#[cfg(feature = "database")]
-pub mod stategraph;
+// Phase 5a composite-blocker #23 — stategraph relocated to dsl-runtime
+// (alongside discovery_ops which is its sole consumer). Pure data + file-loading
+// module with only `dsl_core::config::loader::ConfigLoader` as a non-std dep —
+// dsl_core is already a dsl-runtime dependency.
 
 // Navigation module - Nom-based parser for graph navigation commands
 #[cfg(feature = "database")]
