@@ -7,14 +7,11 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
+use sqlx::PgPool;
 use uuid::Uuid;
 
-#[cfg(feature = "database")]
-use sqlx::PgPool;
-
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 /// Entity query result - a list of (entity_id, name) tuples for batch iteration
 #[derive(Debug, Clone, Default)]
@@ -48,7 +45,6 @@ impl EntityQueryResult {
 #[register_custom_op]
 pub struct EntityQueryOp;
 
-#[cfg(feature = "database")]
 async fn entity_query_impl(
     entity_type: Option<String>,
     name_like: Option<String>,
@@ -131,7 +127,6 @@ async fn entity_query_impl(
     })
 }
 
-#[cfg(feature = "database")]
 async fn execute_unified_entity_query(
     name_like: Option<&str>,
     jurisdiction: Option<&str>,
@@ -217,14 +212,13 @@ impl CustomOperation for EntityQueryOp {
         "Returns entity list for batch template iteration, not JSON records"
     }
 
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{json_extract_int_opt, json_extract_string_opt};
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::{json_extract_int_opt, json_extract_string_opt};
 
         let entity_type = json_extract_string_opt(args, "type");
         let name_like = json_extract_string_opt(args, "name-like");
@@ -232,7 +226,7 @@ impl CustomOperation for EntityQueryOp {
         let limit = json_extract_int_opt(args, "limit").unwrap_or(1000);
         let result = entity_query_impl(entity_type, name_like, jurisdiction, limit, pool).await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             serde_json::json!({
                 "_type": "entity_query",
                 "_debug": format!("{result:?}")
@@ -242,52 +236,6 @@ impl CustomOperation for EntityQueryOp {
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EntityQueryOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let entity_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "type")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        let name_like = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "name-like")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        let jurisdiction = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "jurisdiction")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        let limit: i64 = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "limit")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(1000);
-
-        let result = entity_query_impl(entity_type, name_like, jurisdiction, limit, pool).await?;
-        Ok(ExecutionResult::EntityQuery(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::EntityQuery(EntityQueryResult::default()))
     }
 }
 

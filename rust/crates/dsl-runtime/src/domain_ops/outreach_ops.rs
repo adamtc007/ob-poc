@@ -8,18 +8,14 @@ use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde_json::json;
+use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::{CustomOperation, ExecutionResult};
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::ExecutionContext;
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
-#[cfg(feature = "database")]
-use sqlx::PgPool;
+// ── Shared _impl functions ──
 
-// ── Shared _impl functions (called by both execute and execute_json) ──
-
-#[cfg(feature = "database")]
 async fn outreach_record_response_impl(
     request_id: Uuid,
     response_type: &str,
@@ -59,7 +55,6 @@ async fn outreach_record_response_impl(
     }))
 }
 
-#[cfg(feature = "database")]
 async fn outreach_list_overdue_impl(
     days_overdue: i32,
     pool: &PgPool,
@@ -137,16 +132,13 @@ impl CustomOperation for OutreachRecordResponseOp {
         "Updates request status, records response details, and links documents"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::{
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::{
             json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
         };
 
@@ -164,73 +156,11 @@ impl CustomOperation for OutreachRecordResponseOp {
         )
         .await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl OutreachRecordResponseOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let request_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "request-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing request-id argument"))?;
-
-        let response_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "response-type")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing response-type argument"))?;
-
-        let document_id: Option<Uuid> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "document-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
-
-        let notes = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "notes")
-            .and_then(|a| a.value.as_string());
-
-        let result =
-            outreach_record_response_impl(request_id, response_type, document_id, notes, pool)
-                .await?;
-
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(json!({"status": "responded"})))
     }
 }
 
@@ -258,54 +188,21 @@ impl CustomOperation for OutreachListOverdueOp {
         "Calculates days overdue and returns filtered list"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use super::helpers::json_extract_int_opt;
+    ) -> Result<VerbExecutionOutcome> {
+        use crate::domain_ops::helpers::json_extract_int_opt;
 
         let days_overdue = json_extract_int_opt(args, "days-overdue").unwrap_or(0) as i32;
         let results = outreach_list_overdue_impl(days_overdue, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(
-            results,
-        ))
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl OutreachListOverdueOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let days_overdue = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "days-overdue")
-            .and_then(|a| a.value.as_integer())
-            .unwrap_or(0) as i32;
-
-        let results = outreach_list_overdue_impl(days_overdue, pool).await?;
-        Ok(ExecutionResult::RecordSet(results))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::RecordSet(vec![]))
     }
 }
 

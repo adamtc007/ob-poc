@@ -42,29 +42,29 @@ mod discovery_ops;
 // alongside the `document_bundles/` module it consumes.
 // Phase 4 Slice B Group 6 — document_ops relocated to `dsl-runtime::domain_ops::document_ops`
 // alongside the `document_requirements/` module it consumes.
-mod edge_ops;
-pub mod entity_query;
-mod evidence_ops;
+// Phase 5c — edge_ops relocated to `dsl-runtime::domain_ops::edge_ops`
+// Phase 5c — entity_query relocated to `dsl-runtime::domain_ops::entity_query`
+// Phase 5c — evidence_ops relocated to `dsl-runtime::domain_ops::evidence_ops`
 mod gleif_ops;
 pub mod helpers;
 mod investor_ops;
 mod investor_role_ops;
 mod kyc_case_ops;
-mod lifecycle_ops;
+// Phase 5c — lifecycle_ops relocated to `dsl-runtime::domain_ops::lifecycle_ops`
 mod manco_ops;
 pub mod navigation_ops;
 mod observation_ops;
 mod onboarding;
-mod outreach_ops;
+// Phase 5c — outreach_ops relocated to `dsl-runtime::domain_ops::outreach_ops`
 mod ownership_ops;
 mod partnership_ops;
 mod phrase_ops;
-mod refdata_loader;
-mod refdata_ops;
+// Phase 5c — refdata_loader relocated to `dsl-runtime::domain_ops::refdata_loader`
+// Phase 5c — refdata_ops relocated to `dsl-runtime::domain_ops::refdata_ops`
 mod regulatory_ops;
 mod remediation_ops;
 mod request_ops;
-mod requirement_ops;
+// Phase 5c — requirement_ops relocated to `dsl-runtime::domain_ops::requirement_ops`
 mod research_workflow_ops;
 mod resource_ops;
 pub mod rule_evaluator;
@@ -117,24 +117,17 @@ use std::sync::Arc;
 pub use crate::dsl_v2::ast::VerbCall;
 pub use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
-pub use entity_query::{EntityQueryOp, EntityQueryResult};
+// Phase 5c — entity_query relocated. Types accessed via dsl_runtime::domain_ops::entity_query.
 pub use kyc_case_ops::{
     KycCaseCloseOp, KycCaseCloseResult, KycCaseCreateOp, KycCaseCreateResult, KycCaseStateOp,
     WorkstreamStateOp,
 };
-pub use lifecycle_ops::{
-    LifecycleAnalyzeGapsOp, LifecycleCheckReadinessOp, LifecycleDiscoverOp, LifecycleExecutePlanOp,
-    LifecycleGeneratePlanOp, LifecycleProvisionOp, ServiceResourceAnalyzeLifecycleGapsOp,
-    ServiceResourceCheckLifecycleReadinessOp, ServiceResourceDiscoverLifecyclesOp,
-    ServiceResourceExecuteLifecyclePlanOp, ServiceResourceGenerateLifecyclePlanOp,
-    ServiceResourceProvisionLifecycleOp,
-};
+// Phase 5c — lifecycle_ops relocated to `dsl-runtime::domain_ops::lifecycle_ops`.
+// Registration flows through inventory automatically; external ob-poc code doesn't
+// import these types directly.
 pub use onboarding::OnboardingAutoCompleteOp;
-pub use refdata_loader::{
-    get_refdata_operations, LoadAllRefdataOp, LoadInstrumentClassesOp, LoadMarketsOp,
-    LoadSlaTemplatesOp, LoadSubcustodiansOp,
-};
-pub use refdata_ops::{RefdataDeactivateOp, RefdataEnsureOp, RefdataListOp, RefdataReadOp};
+// Phase 5c — refdata_loader relocated. Types accessed via dsl_runtime::domain_ops::refdata_loader.
+// Phase 5c — refdata_ops relocated. Types accessed via dsl_runtime::domain_ops::refdata_ops.
 pub use request_ops::{
     DocumentRequestOp, DocumentUploadOp, DocumentWaiveOp, RequestCancelOp, RequestCreateOp,
     RequestEscalateOp, RequestExtendOp, RequestFulfillOp, RequestOverdueOp, RequestRemindOp,
@@ -205,8 +198,7 @@ pub use observation_ops::{
 // Registration flows through `#[register_custom_op]` + inventory automatically;
 // downstream ob-poc code does not import these types directly, so no shim
 // re-export is needed.
-#[cfg(feature = "database")]
-pub use requirement_ops::{RequirementCreateSetOp, RequirementUnsatisfiedOp};
+// Phase 5c — requirement_ops relocated. Types accessed via dsl_runtime::domain_ops::requirement_ops.
 pub use resource_ops::{
     ResourceActivateOp, ResourceCreateOp, ResourceDecommissionOp, ResourceSetAttrOp,
     ResourceSuspendOp, ResourceValidateAttrsOp,

@@ -7,11 +7,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
-
-use super::CustomOperation;
-
-#[cfg(feature = "database")]
 use sqlx::PgPool;
+
+use crate::custom_op::CustomOperation;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // ============================================================================
 // PROVISION OPERATION
@@ -36,13 +35,12 @@ impl CustomOperation for LifecycleProvisionOp {
     fn rationale(&self) -> &'static str {
         "Requires resource_type lookup, context scoping, and instance URL generation"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         use uuid::Uuid;
 
         // Get CBU ID (required)
@@ -172,7 +170,7 @@ impl CustomOperation for LifecycleProvisionOp {
         let result_id = row.0;
         ctx.bind("instance", result_id);
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
             "instance_id": result_id,
             "instance_url": instance_url,
             "status": "PROVISIONED"
@@ -206,13 +204,12 @@ impl CustomOperation for LifecycleAnalyzeGapsOp {
     fn rationale(&self) -> &'static str {
         "Complex gap analysis query against view joining universe, lifecycles, and instances"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
@@ -271,7 +268,7 @@ impl CustomOperation for LifecycleAnalyzeGapsOp {
             })
             .collect();
 
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(result))
+        Ok(VerbExecutionOutcome::RecordSet(result))
     }
     fn is_migrated(&self) -> bool {
         true
@@ -301,13 +298,12 @@ impl CustomOperation for LifecycleCheckReadinessOp {
     fn rationale(&self) -> &'static str {
         "Combines gap analysis with blocking/warning classification"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
@@ -354,7 +350,7 @@ impl CustomOperation for LifecycleCheckReadinessOp {
             })
             .collect();
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
             "ready": blocking_gaps.is_empty(),
             "instrument_class": instrument_class,
             "market": market,
@@ -390,13 +386,12 @@ impl CustomOperation for LifecycleDiscoverOp {
     fn rationale(&self) -> &'static str {
         "Complex multi-join query for lifecycle/resource discovery"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let instrument_class = super::helpers::json_extract_string(args, "instrument-class")?;
 
         let include_optional = super::helpers::json_extract_bool_opt(args, "include-optional")
@@ -456,7 +451,7 @@ impl CustomOperation for LifecycleDiscoverOp {
             }
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
             "instrument_class": instrument_class,
             "requires_isda": requires_isda,
             "mandatory_lifecycles": mandatory,
@@ -491,13 +486,12 @@ impl CustomOperation for LifecycleGeneratePlanOp {
     fn rationale(&self) -> &'static str {
         "Generates DSL statements from gap analysis with user response handling"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         use uuid::Uuid;
 
         let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
@@ -588,7 +582,7 @@ impl CustomOperation for LifecycleGeneratePlanOp {
             }
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
             "dsl_statements": dsl_statements,
             "pending_prompts": pending_prompts,
             "ready_to_execute": pending_prompts.is_empty()
@@ -621,13 +615,12 @@ impl CustomOperation for LifecycleExecutePlanOp {
     fn rationale(&self) -> &'static str {
         "Executes DSL plan with dry-run support and result aggregation"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let dry_run = super::helpers::json_extract_bool_opt(args, "dry-run").unwrap_or(false);
 
         let plan = args
@@ -661,7 +654,7 @@ impl CustomOperation for LifecycleExecutePlanOp {
             }
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::json!({
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
             "dry_run": dry_run,
             "executed": results.len(),
             "results": results
@@ -735,13 +728,12 @@ impl CustomOperation for ServiceResourceProvisionLifecycleOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.provision"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         LifecycleProvisionOp.execute_json(args, ctx, pool).await
     }
     fn is_migrated(&self) -> bool {
@@ -765,13 +757,12 @@ impl CustomOperation for ServiceResourceAnalyzeLifecycleGapsOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.analyze-gaps"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         LifecycleAnalyzeGapsOp.execute_json(args, ctx, pool).await
     }
     fn is_migrated(&self) -> bool {
@@ -795,13 +786,12 @@ impl CustomOperation for ServiceResourceCheckLifecycleReadinessOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.check-readiness"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         LifecycleCheckReadinessOp
             .execute_json(args, ctx, pool)
             .await
@@ -827,13 +817,12 @@ impl CustomOperation for ServiceResourceDiscoverLifecyclesOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.discover"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         LifecycleDiscoverOp.execute_json(args, ctx, pool).await
     }
     fn is_migrated(&self) -> bool {
@@ -857,13 +846,12 @@ impl CustomOperation for ServiceResourceGenerateLifecyclePlanOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.generate-plan"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         LifecycleGeneratePlanOp.execute_json(args, ctx, pool).await
     }
     fn is_migrated(&self) -> bool {
@@ -887,13 +875,12 @@ impl CustomOperation for ServiceResourceExecuteLifecyclePlanOp {
     fn rationale(&self) -> &'static str {
         "Compatibility alias for lifecycle.execute-plan"
     }
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         LifecycleExecutePlanOp.execute_json(args, ctx, pool).await
     }
     fn is_migrated(&self) -> bool {

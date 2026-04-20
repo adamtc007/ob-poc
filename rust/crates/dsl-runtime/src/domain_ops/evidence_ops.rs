@@ -26,18 +26,14 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::helpers::{
-    extract_string, extract_string_opt, extract_uuid, json_extract_string, json_extract_string_opt,
-    json_extract_uuid,
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{
+    json_extract_string, json_extract_string_opt, json_extract_uuid,
 };
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-
-#[cfg(feature = "database")]
-use sqlx::PgPool;
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================
 // Result Types
@@ -90,7 +86,6 @@ pub struct EvidenceWaiveResult {
 // =============================================================================
 
 /// Fetch the current status of an evidence record. Returns an error if not found.
-#[cfg(feature = "database")]
 async fn fetch_evidence_status(pool: &PgPool, evidence_id: Uuid) -> Result<String> {
     let row: Option<(String,)> =
         sqlx::query_as(r#"SELECT status FROM "ob-poc".kyc_ubo_evidence WHERE evidence_id = $1"#)
@@ -102,7 +97,6 @@ async fn fetch_evidence_status(pool: &PgPool, evidence_id: Uuid) -> Result<Strin
         .ok_or_else(|| anyhow!("Evidence record not found: {}", evidence_id))
 }
 
-#[cfg(feature = "database")]
 async fn evidence_require_impl(
     registry_id: Uuid,
     evidence_type: String,
@@ -133,7 +127,6 @@ async fn evidence_require_impl(
     })
 }
 
-#[cfg(feature = "database")]
 async fn evidence_link_impl(
     evidence_id: Uuid,
     document_id: Uuid,
@@ -171,7 +164,6 @@ async fn evidence_link_impl(
     })
 }
 
-#[cfg(feature = "database")]
 async fn evidence_verify_impl(
     evidence_id: Uuid,
     verified_by: String,
@@ -213,7 +205,6 @@ async fn evidence_verify_impl(
     })
 }
 
-#[cfg(feature = "database")]
 async fn evidence_reject_impl(
     evidence_id: Uuid,
     reason: String,
@@ -258,7 +249,6 @@ async fn evidence_reject_impl(
     })
 }
 
-#[cfg(feature = "database")]
 async fn evidence_waive_impl(
     evidence_id: Uuid,
     reason: String,
@@ -316,14 +306,12 @@ impl CustomOperation for EvidenceRequireOp {
         "Creates evidence requirement linked to UBO registry with initial REQUIRED status"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
         let evidence_type = json_extract_string(args, "evidence-type")?;
         let description = json_extract_string_opt(args, "description");
@@ -331,41 +319,13 @@ impl CustomOperation for EvidenceRequireOp {
         let result =
             evidence_require_impl(registry_id, evidence_type, description, doc_type, pool).await?;
         ctx.bind("evidence", result.evidence_id);
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
 
-
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EvidenceRequireOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let registry_id = extract_uuid(verb_call, ctx, "registry-id")?;
-        let evidence_type = extract_string(verb_call, "evidence-type")?;
-        let description = extract_string_opt(verb_call, "description");
-        let doc_type = extract_string_opt(verb_call, "doc-type");
-        let result =
-            evidence_require_impl(registry_id, evidence_type, description, doc_type, pool).await?;
-        ctx.bind("evidence", result.evidence_id);
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -394,48 +354,22 @@ impl CustomOperation for EvidenceLinkOp {
         "Validates status allows linking and atomically updates document_id and status"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
         let result = evidence_link_impl(evidence_id, document_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
 
-
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EvidenceLinkOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let evidence_id = extract_uuid(verb_call, ctx, "evidence-id")?;
-        let document_id = extract_uuid(verb_call, ctx, "document-id")?;
-        let result = evidence_link_impl(evidence_id, document_id, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -464,50 +398,23 @@ impl CustomOperation for EvidenceVerifyOp {
         "Validates RECEIVED status before transitioning to VERIFIED with verifier attribution"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
         let verified_by = json_extract_string(args, "verified-by")?;
         let notes = json_extract_string_opt(args, "notes");
         let result = evidence_verify_impl(evidence_id, verified_by, notes, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
 
-
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EvidenceVerifyOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let evidence_id = extract_uuid(verb_call, ctx, "evidence-id")?;
-        let verified_by = extract_string(verb_call, "verified-by")?;
-        let notes = extract_string_opt(verb_call, "notes");
-        let result = evidence_verify_impl(evidence_id, verified_by, notes, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -536,48 +443,22 @@ impl CustomOperation for EvidenceRejectOp {
         "Validates RECEIVED status, clears document_id to allow re-linking after rejection"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
         let reason = json_extract_string(args, "reason")?;
         let result = evidence_reject_impl(evidence_id, reason, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
 
-
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EvidenceRejectOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let evidence_id = extract_uuid(verb_call, ctx, "evidence-id")?;
-        let reason = extract_string(verb_call, "reason")?;
-        let result = evidence_reject_impl(evidence_id, reason, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -606,50 +487,23 @@ impl CustomOperation for EvidenceWaiveOp {
         "Waiver requires authority and reason tracking for audit trail"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
         let reason = json_extract_string(args, "reason")?;
         let authority = json_extract_string(args, "authority")?;
         let result = evidence_waive_impl(evidence_id, reason, authority, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             serde_json::to_value(result)?,
         ))
     }
 
-
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EvidenceWaiveOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let evidence_id = extract_uuid(verb_call, ctx, "evidence-id")?;
-        let reason = extract_string(verb_call, "reason")?;
-        let authority = extract_string(verb_call, "authority")?;
-        let result = evidence_waive_impl(evidence_id, reason, authority, pool).await?;
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -669,40 +523,17 @@ impl CustomOperation for EvidenceCreateRequirementOp {
         "Compatibility alias for evidence.require"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         EvidenceRequireOp.execute_json(args, ctx, pool).await
     }
 
-
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EvidenceCreateRequirementOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        EvidenceRequireOp.execute(verb_call, ctx, pool).await
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -722,40 +553,17 @@ impl CustomOperation for EvidenceAttachDocumentOp {
         "Compatibility alias for evidence.link"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         EvidenceLinkOp.execute_json(args, ctx, pool).await
     }
 
-
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EvidenceAttachDocumentOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        EvidenceLinkOp.execute(verb_call, ctx, pool).await
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -775,40 +583,17 @@ impl CustomOperation for EvidenceMarkVerifiedOp {
         "Compatibility alias for evidence.verify"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         EvidenceVerifyOp.execute_json(args, ctx, pool).await
     }
 
-
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EvidenceMarkVerifiedOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        EvidenceVerifyOp.execute(verb_call, ctx, pool).await
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -828,40 +613,17 @@ impl CustomOperation for EvidenceMarkRejectedOp {
         "Compatibility alias for evidence.reject"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         EvidenceRejectOp.execute_json(args, ctx, pool).await
     }
 
-
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EvidenceMarkRejectedOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        EvidenceRejectOp.execute(verb_call, ctx, pool).await
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -881,39 +643,16 @@ impl CustomOperation for EvidenceMarkWaivedOp {
         "Compatibility alias for evidence.waive"
     }
 
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         EvidenceWaiveOp.execute_json(args, ctx, pool).await
     }
 
-
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl EvidenceMarkWaivedOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        EvidenceWaiveOp.execute(verb_call, ctx, pool).await
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }

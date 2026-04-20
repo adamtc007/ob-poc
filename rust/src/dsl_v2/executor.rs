@@ -206,7 +206,7 @@ pub enum ExecutionResult {
     /// No result (void operation)
     Void,
     /// Entity query result for batch iteration (entity.query verb)
-    EntityQuery(crate::domain_ops::entity_query::EntityQueryResult),
+    EntityQuery(dsl_runtime::domain_ops::entity_query::EntityQueryResult),
     /// Template invocation result (template.invoke verb)
     TemplateInvoked(crate::domain_ops::template_ops::TemplateInvokeResult),
     /// Template batch execution result (template.batch verb)
