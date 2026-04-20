@@ -60,8 +60,14 @@ pub mod lifecycle_catalog_impl;
 // (multi-namespace UNION query over dictionary, registry, SemOS defs).
 pub mod attribute_identity_dispatch_impl;
 
+// Phase 5a composite-blocker #9 — ob-poc-side impl of
+// `dsl_runtime::service_traits::ConstellationRuntime`; bridges to
+// `crate::sem_os_runtime::constellation_runtime::handle_constellation_{hydrate,summary}`.
+pub mod constellation_runtime_impl;
+
 // Re-exports
 pub use attribute_identity_dispatch_impl::ObPocAttributeIdentityService;
+pub use constellation_runtime_impl::ObPocConstellationRuntime;
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
 pub use lifecycle_catalog_impl::ObPocLifecycleCatalog;
 pub use mcp_tool_registry_impl::ObPocMcpToolRegistry;

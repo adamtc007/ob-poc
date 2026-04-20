@@ -33,7 +33,15 @@ mod capital_ops;
 // Phase 5d — cbu_ops relocated to `dsl-runtime::domain_ops::cbu_ops`
 // Phase 5d — cbu_role_ops relocated to `dsl-runtime::domain_ops::cbu_role_ops`
 mod client_group_ops;
-mod constellation_ops;
+// Phase 5a composite-blocker #9 — constellation_ops relocated to
+// `dsl-runtime::domain_ops::constellation_ops` consuming the new
+// `dyn ConstellationRuntime` trait via the ServiceRegistry.
+// `ObPocConstellationRuntime` in ob-poc bridges to
+// `crate::sem_os_runtime::constellation_runtime::handle_constellation_{hydrate,summary}`,
+// projecting each result through `serde_json::to_value` so the
+// internal `HydratedConstellation` / `ConstellationSummary` types
+// stay in ob-poc. Registration flows through inventory; external
+// ob-poc code does not import these types directly.
 // Phase 5e — control_compute_ops relocated to `dsl-runtime::domain_ops::control_compute_ops`
 // Phase 5e — control_ops relocated to `dsl-runtime::domain_ops::control_ops`
 mod deal_ops;

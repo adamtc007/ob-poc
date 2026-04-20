@@ -625,6 +625,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn AttributeIdentityService (dictionary + registry + SemOS)"
         );
 
+        // dyn ConstellationRuntime — used by relocated constellation_ops to
+        // hydrate / summarise SemOS constellation maps. Bridge resolves
+        // built-in maps and walks them against persisted CBU / case state.
+        builder.register::<dyn dsl_runtime::service_traits::ConstellationRuntime>(Arc::new(
+            ob_poc::services::ObPocConstellationRuntime::new(pool.clone()),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn ConstellationRuntime (sem_os_runtime maps)"
+        );
+
         Arc::new(builder.build())
     };
 

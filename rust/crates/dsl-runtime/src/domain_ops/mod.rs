@@ -19,6 +19,7 @@ pub mod bods_ops;
 pub mod coverage_compute_ops;
 pub mod cbu_ops;
 pub mod cbu_role_ops;
+pub mod constellation_ops;
 pub mod control_compute_ops;
 pub mod control_ops;
 pub mod custody;
