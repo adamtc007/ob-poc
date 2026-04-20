@@ -1,0 +1,726 @@
+//! CBU specialist role assignment operations (Role Taxonomy V2)
+//!
+//! Custom handlers for specialist `cbu.*` role verbs defined in `cbu-specialist-roles.yaml`.
+//! These operations manage entity role assignments within CBUs with validation.
+//!
+//! ## Why Custom Operations?
+//!
+//! Role assignment requires:
+//! - Entity type compatibility validation
+//! - Role conflict detection
+//! - Dual-write to cbu_entity_roles AND entity_relationships (for ownership/control)
+//! - Transaction atomicity for related records
+
+use anyhow::Result;
+use async_trait::async_trait;
+use dsl_runtime_macros::register_custom_op;
+
+use sqlx::PgPool;
+
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{
+    json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
+    json_extract_uuid_opt,
+};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+
+// =============================================================================
+// HELPER: Get role_id from role name
+// =============================================================================
+
+async fn get_role_id(pool: &PgPool, role_name: &str) -> Result<uuid::Uuid> {
+    let row = sqlx::query_scalar!(
+        r#"SELECT role_id FROM "ob-poc".roles WHERE name = UPPER($1)"#,
+        role_name
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    row.ok_or_else(|| anyhow::anyhow!("Role '{}' not found in taxonomy", role_name))
+}
+
+// =============================================================================
+// cbu.assign-ownership - Ownership role + relationship edge
+// =============================================================================
+
+/// Assign an ownership role and create the corresponding entity_relationships edge
+///
+/// This creates both:
+/// 1. cbu_entity_roles entry (role assignment)
+/// 2. entity_relationships entry (ownership edge for UBO traversal)
+#[register_custom_op]
+pub struct CbuRoleAssignOwnershipOp;
+
+#[async_trait]
+impl CustomOperation for CbuRoleAssignOwnershipOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+
+    fn verb(&self) -> &'static str {
+        "assign-ownership"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Ownership creates both role assignment AND entity_relationships edge atomically"
+    }
+
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<VerbExecutionOutcome> {
+        use chrono::NaiveDate;
+        use sqlx::types::BigDecimal;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let owner_entity_id = json_extract_uuid(args, ctx, "owner-entity-id")?;
+        let owned_entity_id = json_extract_uuid(args, ctx, "owned-entity-id")?;
+        let percentage: BigDecimal = json_extract_string(args, "percentage")?
+            .parse::<BigDecimal>()
+            .unwrap_or_default();
+        let ownership_type = json_extract_string_opt(args, "ownership-type")
+            .map(|s| s.to_uppercase())
+            .unwrap_or_else(|| "DIRECT".to_string());
+        let role = json_extract_string_opt(args, "role")
+            .map(|s| s.to_uppercase())
+            .unwrap_or_else(|| "SHAREHOLDER".to_string());
+        let effective_from = json_extract_string_opt(args, "effective-from")
+            .as_deref()
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+
+        let role_id = get_role_id(pool, &role).await?;
+        let mut tx = pool.begin().await?;
+        let role_result = sqlx::query_scalar!(
+            r#"INSERT INTO "ob-poc".cbu_entity_roles
+               (cbu_id, entity_id, role_id, target_entity_id, ownership_percentage,
+                effective_from, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+               ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
+                   target_entity_id = EXCLUDED.target_entity_id,
+                   ownership_percentage = EXCLUDED.ownership_percentage,
+                   effective_from = EXCLUDED.effective_from,
+                   updated_at = NOW()
+               RETURNING cbu_entity_role_id"#,
+            cbu_id,
+            owner_entity_id,
+            role_id,
+            Some(owned_entity_id),
+            Some(percentage.clone()),
+            effective_from
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        let percentage_display = percentage.to_string();
+        let rel_result: (uuid::Uuid,) = sqlx::query_as(
+            r#"INSERT INTO "ob-poc".entity_relationships
+               (from_entity_id, to_entity_id, relationship_type, percentage,
+                ownership_type, effective_from, source, confidence, created_at, updated_at)
+               VALUES ($1, $2, 'ownership', $3, $4, $5, 'cbu.assign-ownership', 'HIGH', NOW(), NOW())
+               ON CONFLICT (from_entity_id, to_entity_id, relationship_type, effective_from)
+                   WHERE effective_from IS NOT NULL
+               DO UPDATE SET
+                   percentage = EXCLUDED.percentage,
+                   ownership_type = EXCLUDED.ownership_type,
+                   updated_at = NOW()
+               RETURNING relationship_id"#,
+        )
+        .bind(owner_entity_id)
+        .bind(owned_entity_id)
+        .bind(Some(percentage))
+        .bind(&ownership_type)
+        .bind(effective_from)
+        .fetch_one(&mut *tx)
+        .await?;
+        let rel_result = rel_result.0;
+        tx.commit().await?;
+        ctx.bind("cbu_entity_role", role_result);
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "role_id": role_result,
+                "relationship_id": rel_result,
+                "message": format!(
+                    "Assigned ownership: {} owns {}% of {}",
+                    owner_entity_id, percentage_display, owned_entity_id
+                )
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+// =============================================================================
+// cbu.assign-control - Control role + relationship edge
+// =============================================================================
+
+/// Assign a control role and create the corresponding entity_relationships edge
+#[register_custom_op]
+pub struct CbuRoleAssignControlOp;
+
+#[async_trait]
+impl CustomOperation for CbuRoleAssignControlOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+
+    fn verb(&self) -> &'static str {
+        "assign-control"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Control roles create both role assignment AND control relationship edge"
+    }
+
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<VerbExecutionOutcome> {
+        use chrono::NaiveDate;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let controller_entity_id = json_extract_uuid(args, ctx, "controller-entity-id")?;
+        let controlled_entity_id = json_extract_uuid(args, ctx, "controlled-entity-id")?;
+        let role = json_extract_string(args, "role")?.to_uppercase();
+        let control_type = json_extract_string_opt(args, "control-type").map(|s| s.to_uppercase());
+        let appointment_date = json_extract_string_opt(args, "appointment-date")
+            .as_deref()
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+
+        let role_id = get_role_id(pool, &role).await?;
+        let mut tx = pool.begin().await?;
+        let role_result = sqlx::query_scalar!(
+            r#"INSERT INTO "ob-poc".cbu_entity_roles
+               (cbu_id, entity_id, role_id, target_entity_id, effective_from, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+               ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
+                   target_entity_id = EXCLUDED.target_entity_id,
+                   effective_from = EXCLUDED.effective_from,
+                   updated_at = NOW()
+               RETURNING cbu_entity_role_id"#,
+            cbu_id,
+            controller_entity_id,
+            role_id,
+            Some(controlled_entity_id),
+            appointment_date
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        let rel_result: (uuid::Uuid,) = sqlx::query_as(
+            r#"INSERT INTO "ob-poc".entity_relationships
+               (from_entity_id, to_entity_id, relationship_type, control_type,
+                effective_from, source, confidence, created_at, updated_at)
+               VALUES ($1, $2, 'control', $3, $4, 'cbu.assign-control', 'HIGH', NOW(), NOW())
+               ON CONFLICT (from_entity_id, to_entity_id, relationship_type, effective_from)
+                   WHERE effective_from IS NOT NULL
+               DO UPDATE SET
+                   control_type = EXCLUDED.control_type,
+                   updated_at = NOW()
+               RETURNING relationship_id"#,
+        )
+        .bind(controller_entity_id)
+        .bind(controlled_entity_id)
+        .bind(&control_type)
+        .bind(appointment_date)
+        .fetch_one(&mut *tx)
+        .await?;
+        let rel_result = rel_result.0;
+        tx.commit().await?;
+        ctx.bind("cbu_entity_role", role_result);
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "role_id": role_result,
+                "relationship_id": rel_result,
+                "message": format!(
+                    "Assigned control: {} has {} role over {}",
+                    controller_entity_id, role, controlled_entity_id
+                )
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+// =============================================================================
+// cbu.assign-trust-role - Trust-specific roles
+// =============================================================================
+
+/// Assign a trust role (settlor, trustee, beneficiary, protector, etc.)
+#[register_custom_op]
+pub struct CbuRoleAssignTrustOp;
+
+#[async_trait]
+impl CustomOperation for CbuRoleAssignTrustOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+
+    fn verb(&self) -> &'static str {
+        "assign-trust-role"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Trust roles have special UBO treatment and require trust relationship edges"
+    }
+
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<VerbExecutionOutcome> {
+        use sqlx::types::BigDecimal;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let trust_entity_id = json_extract_uuid(args, ctx, "trust-entity-id")?;
+        let participant_entity_id = json_extract_uuid(args, ctx, "participant-entity-id")?;
+        let role = json_extract_string(args, "role")?.to_uppercase();
+        let interest_percentage = json_extract_string_opt(args, "interest-percentage")
+            .map(|d| d.parse::<BigDecimal>().unwrap_or_default());
+        let interest_type = json_extract_string_opt(args, "interest-type");
+        let class_description = json_extract_string_opt(args, "class-description");
+        let role_id = get_role_id(pool, &role).await?;
+        let relationship_type = match role.as_str() {
+            "SETTLOR" => "trust_settlor",
+            "TRUSTEE" => "trust_trustee",
+            "PROTECTOR" => "trust_protector",
+            "BENEFICIARY_FIXED" | "BENEFICIARY_DISCRETIONARY" | "BENEFICIARY_CONTINGENT" => {
+                "trust_beneficiary"
+            }
+            "ENFORCER" => "trust_enforcer",
+            "APPOINTOR" => "trust_appointor",
+            _ => "trust_role",
+        };
+        let mut tx = pool.begin().await?;
+        let role_result = sqlx::query_scalar!(
+            r#"INSERT INTO "ob-poc".cbu_entity_roles
+               (cbu_id, entity_id, role_id, target_entity_id, ownership_percentage,
+                created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+               ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
+                   target_entity_id = EXCLUDED.target_entity_id,
+                   ownership_percentage = EXCLUDED.ownership_percentage,
+                   updated_at = NOW()
+               RETURNING cbu_entity_role_id"#,
+            cbu_id,
+            participant_entity_id,
+            role_id,
+            Some(trust_entity_id),
+            interest_percentage
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        let rel_result: (uuid::Uuid,) = sqlx::query_as(
+            r#"INSERT INTO "ob-poc".entity_relationships
+               (from_entity_id, to_entity_id, relationship_type, percentage,
+                trust_interest_type, trust_class_description, source, confidence,
+                created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, 'cbu.assign-trust-role', 'HIGH', NOW(), NOW())
+               ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
+                   WHERE effective_from IS NULL AND effective_to IS NULL
+               DO UPDATE SET
+                   percentage = EXCLUDED.percentage,
+                   trust_interest_type = EXCLUDED.trust_interest_type,
+                   trust_class_description = EXCLUDED.trust_class_description,
+                   updated_at = NOW()
+               RETURNING relationship_id"#,
+        )
+        .bind(participant_entity_id)
+        .bind(trust_entity_id)
+        .bind(relationship_type)
+        .bind(interest_percentage)
+        .bind(interest_type)
+        .bind(class_description)
+        .fetch_one(&mut *tx)
+        .await?;
+        let rel_result = rel_result.0;
+        tx.commit().await?;
+        ctx.bind("cbu_entity_role", role_result);
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "role_id": role_result,
+                "relationship_id": rel_result,
+                "message": format!(
+                    "Assigned trust role: {} is {} of trust {}",
+                    participant_entity_id, role, trust_entity_id
+                )
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+// =============================================================================
+// cbu.assign-fund-role - Fund structure/management roles
+// =============================================================================
+
+/// Assign a fund-related role (ManCo, IM, fund investor, etc.)
+#[register_custom_op]
+pub struct CbuRoleAssignFundOp;
+
+#[async_trait]
+impl CustomOperation for CbuRoleAssignFundOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+
+    fn verb(&self) -> &'static str {
+        "assign-fund-role"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Fund roles connect to fund_structure and may create fund hierarchy relationships"
+    }
+
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<VerbExecutionOutcome> {
+        use sqlx::types::BigDecimal;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
+        let fund_entity_id = json_extract_uuid_opt(args, ctx, "fund-entity-id");
+        let role = json_extract_string(args, "role")?.to_uppercase();
+        let investment_percentage = json_extract_string_opt(args, "investment-percentage")
+            .map(|d| d.parse::<BigDecimal>().unwrap_or_default());
+        let is_regulated = json_extract_bool_opt(args, "is-regulated").unwrap_or(true);
+        let regulatory_jurisdiction = json_extract_string_opt(args, "regulatory-jurisdiction");
+        let role_id = get_role_id(pool, &role).await?;
+        let mut tx = pool.begin().await?;
+        let role_result = sqlx::query_scalar!(
+            r#"INSERT INTO "ob-poc".cbu_entity_roles
+               (cbu_id, entity_id, role_id, target_entity_id, ownership_percentage,
+                created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+               ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
+                   target_entity_id = EXCLUDED.target_entity_id,
+                   ownership_percentage = EXCLUDED.ownership_percentage,
+                   updated_at = NOW()
+               RETURNING cbu_entity_role_id"#,
+            cbu_id,
+            entity_id,
+            role_id,
+            fund_entity_id,
+            investment_percentage
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        let rel_result = if let Some(fund_id) = fund_entity_id {
+            let relationship_type = match role.as_str() {
+                "FEEDER_FUND" => "master_feeder",
+                "SUB_FUND" => "umbrella_subfund",
+                "PARALLEL_FUND" => "parallel",
+                "FUND_INVESTOR" => "investment",
+                "MANAGEMENT_COMPANY" | "INVESTMENT_MANAGER" => "management",
+                _ => "fund_role",
+            };
+            let rel: (uuid::Uuid,) = sqlx::query_as(
+                r#"INSERT INTO "ob-poc".entity_relationships
+                   (from_entity_id, to_entity_id, relationship_type, percentage,
+                    is_regulated, regulatory_jurisdiction, source, confidence,
+                    created_at, updated_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, 'cbu.assign-fund-role', 'HIGH', NOW(), NOW())
+                   ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
+                       WHERE effective_from IS NULL AND effective_to IS NULL
+                   DO UPDATE SET
+                       percentage = EXCLUDED.percentage,
+                       is_regulated = EXCLUDED.is_regulated,
+                       regulatory_jurisdiction = EXCLUDED.regulatory_jurisdiction,
+                       updated_at = NOW()
+                   RETURNING relationship_id"#,
+            )
+            .bind(entity_id)
+            .bind(fund_id)
+            .bind(relationship_type)
+            .bind(investment_percentage)
+            .bind(is_regulated)
+            .bind(regulatory_jurisdiction)
+            .fetch_one(&mut *tx)
+            .await?;
+            Some(rel.0)
+        } else {
+            None
+        };
+        tx.commit().await?;
+        ctx.bind("cbu_entity_role", role_result);
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "role_id": role_result,
+                "relationship_id": rel_result,
+                "message": format!("Assigned fund role {} to entity {}", role, entity_id)
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+// =============================================================================
+// cbu.assign-service-provider - Service provider roles
+// =============================================================================
+
+/// Assign a service provider role (admin, custodian, auditor, etc.)
+#[register_custom_op]
+pub struct CbuRoleAssignServiceOp;
+
+#[async_trait]
+impl CustomOperation for CbuRoleAssignServiceOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+
+    fn verb(&self) -> &'static str {
+        "assign-service-provider"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Service provider roles are flat assignments with no ownership implications"
+    }
+
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<VerbExecutionOutcome> {
+        use chrono::NaiveDate;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let provider_entity_id = json_extract_uuid(args, ctx, "provider-entity-id")?;
+        let client_entity_id = json_extract_uuid_opt(args, ctx, "client-entity-id");
+        let role = json_extract_string(args, "role")?.to_uppercase();
+        let service_agreement_date = json_extract_string_opt(args, "service-agreement-date")
+            .as_deref()
+            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+        let role_id = get_role_id(pool, &role).await?;
+        let role_result = sqlx::query_scalar!(
+            r#"INSERT INTO "ob-poc".cbu_entity_roles
+               (cbu_id, entity_id, role_id, target_entity_id, effective_from,
+                created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+               ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
+                   target_entity_id = EXCLUDED.target_entity_id,
+                   effective_from = EXCLUDED.effective_from,
+                   updated_at = NOW()
+               RETURNING cbu_entity_role_id"#,
+            cbu_id,
+            provider_entity_id,
+            role_id,
+            client_entity_id,
+            service_agreement_date
+        )
+        .fetch_one(pool)
+        .await?;
+        ctx.bind("cbu_entity_role", role_result);
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "role_id": role_result,
+                "message": format!(
+                    "Assigned service provider role {} to {}",
+                    role, provider_entity_id
+                )
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+// =============================================================================
+// cbu.assign-signatory - Trading/execution roles
+// =============================================================================
+
+/// Assign a signatory role with authority limits
+#[register_custom_op]
+pub struct CbuRoleAssignSignatoryOp;
+
+#[async_trait]
+impl CustomOperation for CbuRoleAssignSignatoryOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+
+    fn verb(&self) -> &'static str {
+        "assign-signatory"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Signatory roles are for natural persons with operational authority"
+    }
+
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<VerbExecutionOutcome> {
+        use sqlx::types::BigDecimal;
+
+        let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
+        let person_entity_id = json_extract_uuid(args, ctx, "person-entity-id")?;
+        let for_entity_id = json_extract_uuid_opt(args, ctx, "for-entity-id");
+        let role = json_extract_string(args, "role")?.to_uppercase();
+        let authority_limit = json_extract_string_opt(args, "authority-limit")
+            .map(|d| d.parse::<BigDecimal>().unwrap_or_default());
+        let authority_currency = json_extract_string_opt(args, "authority-currency")
+            .map(|s| s.to_uppercase())
+            .unwrap_or_else(|| "USD".to_string());
+        let requires_co_signatory =
+            json_extract_bool_opt(args, "requires-co-signatory").unwrap_or(false);
+        let role_id = get_role_id(pool, &role).await?;
+        let role_result = sqlx::query_scalar!(
+            r#"INSERT INTO "ob-poc".cbu_entity_roles
+               (cbu_id, entity_id, role_id, target_entity_id,
+                authority_limit, authority_currency, requires_co_signatory,
+                created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+               ON CONFLICT (cbu_id, entity_id, role_id) DO UPDATE SET
+                   target_entity_id = EXCLUDED.target_entity_id,
+                   authority_limit = EXCLUDED.authority_limit,
+                   authority_currency = EXCLUDED.authority_currency,
+                   requires_co_signatory = EXCLUDED.requires_co_signatory,
+                   updated_at = NOW()
+               RETURNING cbu_entity_role_id"#,
+            cbu_id,
+            person_entity_id,
+            role_id,
+            for_entity_id,
+            authority_limit,
+            authority_currency,
+            requires_co_signatory
+        )
+        .fetch_one(pool)
+        .await?;
+        ctx.bind("cbu_entity_role", role_result);
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "role_id": role_result,
+                "message": format!("Assigned signatory role {} to {}", role, person_entity_id)
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}
+
+// =============================================================================
+// cbu.validate-roles - Validate all CBU role requirements
+// =============================================================================
+
+/// Validate that all required roles are assigned and relationships are complete
+#[register_custom_op]
+pub struct CbuRoleValidateAllOp;
+
+#[async_trait]
+impl CustomOperation for CbuRoleValidateAllOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+
+    fn verb(&self) -> &'static str {
+        "validate-roles"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Validates all role requirements for a CBU (e.g., feeder needs master)"
+    }
+
+    async fn execute_json(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        pool: &PgPool,
+    ) -> Result<VerbExecutionOutcome> {
+        let cbu_id = uuid::Uuid::parse_str(&json_extract_string(args, "cbu-id")?)?;
+        let cbu = sqlx::query!(
+            r#"SELECT cbu_category, client_type FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
+            cbu_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
+        let mut issues: Vec<String> = Vec::new();
+        let has_director = sqlx::query_scalar!(
+            r#"SELECT EXISTS(
+                SELECT 1 FROM "ob-poc".cbu_entity_roles cer
+                JOIN "ob-poc".roles r ON cer.role_id = r.role_id
+                WHERE cer.cbu_id = $1 AND r.role_category = 'CONTROL'
+            ) as "exists!""#,
+            cbu_id
+        )
+        .fetch_one(pool)
+        .await?;
+        if !has_director {
+            issues.push("No control role (DIRECTOR, MANAGER, etc.) assigned".to_string());
+        }
+        if cbu.client_type.as_deref() == Some("FUND") {
+            let has_manco = sqlx::query_scalar!(
+                r#"SELECT EXISTS(
+                    SELECT 1 FROM "ob-poc".cbu_entity_roles cer
+                    JOIN "ob-poc".roles r ON cer.role_id = r.role_id
+                    WHERE cer.cbu_id = $1 AND r.name IN ('MANAGEMENT_COMPANY', 'INVESTMENT_MANAGER')
+                ) as "exists!""#,
+                cbu_id
+            )
+            .fetch_one(pool)
+            .await?;
+            if !has_manco {
+                issues
+                    .push("Fund CBU requires MANAGEMENT_COMPANY or INVESTMENT_MANAGER".to_string());
+            }
+        }
+        let orphan_ownerships = sqlx::query!(
+            r#"SELECT COUNT(*) as "count!"
+               FROM "ob-poc".entity_relationships er
+               WHERE er.relationship_type = 'ownership'
+               AND NOT EXISTS (
+                   SELECT 1 FROM "ob-poc".cbu_entity_roles cer
+                   WHERE cer.entity_id = er.from_entity_id
+                   AND cer.cbu_id = $1
+               )"#,
+            cbu_id
+        )
+        .fetch_one(pool)
+        .await?;
+        if orphan_ownerships.count > 0 {
+            issues.push(format!(
+                "{} ownership relationships without corresponding role assignments",
+                orphan_ownerships.count
+            ));
+        }
+        let is_valid = issues.is_empty();
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({
+                "cbu_id": cbu_id,
+                "valid": is_valid,
+                "issues": issues,
+                "cbu_category": cbu.cbu_category,
+                "client_type": cbu.client_type
+            }),
+        ))
+    }
+
+    fn is_migrated(&self) -> bool {
+        true
+    }
+}

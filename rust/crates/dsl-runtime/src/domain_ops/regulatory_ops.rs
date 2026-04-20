@@ -6,18 +6,14 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
-
-use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
-use super::CustomOperation;
-use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
-// ── Shared _impl functions (called by both execute and execute_json) ──
+use crate::custom_op::CustomOperation;
+use crate::domain_ops::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
+use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
 
-#[cfg(feature = "database")]
+// ── Shared _impl functions ──
+
 async fn registration_verify_impl(
     entity_id: uuid::Uuid,
     regulator: &str,
@@ -58,7 +54,6 @@ async fn registration_verify_impl(
     }
 }
 
-#[cfg(feature = "database")]
 async fn regulatory_status_check_impl(
     entity_id: uuid::Uuid,
     pool: &PgPool,
@@ -184,15 +179,12 @@ impl CustomOperation for RegistrationVerifyOp {
         "Updates multiple columns atomically and validates registration exists"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let regulator = json_extract_string(args, "regulator")?;
         let method = json_extract_string(args, "method")?;
@@ -212,94 +204,11 @@ impl CustomOperation for RegistrationVerifyOp {
         )
         .await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(
-            registration_id,
-        ))
+        Ok(VerbExecutionOutcome::Uuid(registration_id))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl RegistrationVerifyOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use chrono::NaiveDate;
-        use uuid::Uuid;
-
-        let entity_id_arg = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .ok_or_else(|| anyhow!("entity-id is required"))?;
-
-        let entity_id: Uuid = if let Some(ref_name) = entity_id_arg.value.as_symbol() {
-            ctx.resolve(ref_name)
-                .ok_or_else(|| anyhow!("Unresolved reference @{}", ref_name))?
-        } else if let Some(uuid_val) = entity_id_arg.value.as_uuid() {
-            uuid_val
-        } else if let Some(str_val) = entity_id_arg.value.as_string() {
-            Uuid::parse_str(str_val)
-                .map_err(|_| anyhow!("Invalid UUID format for entity-id: {}", str_val))?
-        } else {
-            return Err(anyhow!("entity-id must be a @reference, UUID, or string"));
-        };
-
-        let regulator = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "regulator")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("regulator is required"))?
-            .to_string();
-
-        let method = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "method")
-            .and_then(|a| a.value.as_string())
-            .ok_or_else(|| anyhow!("method is required"))?
-            .to_string();
-
-        let reference = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "reference")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let expires = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "expires")
-            .and_then(|a| a.value.as_string())
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-
-        let registration_id = registration_verify_impl(
-            entity_id,
-            &regulator,
-            &method,
-            reference.as_deref(),
-            expires,
-            pool,
-        )
-        .await?;
-
-        Ok(ExecutionResult::Uuid(registration_id))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 
@@ -324,63 +233,19 @@ impl CustomOperation for RegulatoryStatusCheckOp {
         "Aggregates multiple registrations and computes derived properties"
     }
 
-
-
-    #[cfg(feature = "database")]
     async fn execute_json(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+    ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let result = regulatory_status_check_impl(entity_id, pool).await?;
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
+        Ok(VerbExecutionOutcome::Record(result))
     }
 
     fn is_migrated(&self) -> bool {
         true
-    }
-}
-
-impl RegulatoryStatusCheckOp {
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        use uuid::Uuid;
-
-        let entity_id_arg = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .ok_or_else(|| anyhow!("entity-id is required"))?;
-
-        let entity_id: Uuid = if let Some(ref_name) = entity_id_arg.value.as_symbol() {
-            ctx.resolve(ref_name)
-                .ok_or_else(|| anyhow!("Unresolved reference @{}", ref_name))?
-        } else if let Some(uuid_val) = entity_id_arg.value.as_uuid() {
-            uuid_val
-        } else if let Some(str_val) = entity_id_arg.value.as_string() {
-            Uuid::parse_str(str_val)
-                .map_err(|_| anyhow!("Invalid UUID format for entity-id: {}", str_val))?
-        } else {
-            return Err(anyhow!("entity-id must be a @reference, UUID, or string"));
-        };
-
-        let result = regulatory_status_check_impl(entity_id, pool).await?;
-        Ok(ExecutionResult::Record(result))
-    }
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow!("Database feature required"))
     }
 }
 

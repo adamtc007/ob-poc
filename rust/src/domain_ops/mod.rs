@@ -29,8 +29,8 @@ mod board_ops;
 mod booking_principal_ops;
 mod bpmn_lite_ops;
 mod capital_ops;
-mod cbu_ops;
-mod cbu_role_ops;
+// Phase 5d — cbu_ops relocated to `dsl-runtime::domain_ops::cbu_ops`
+// Phase 5d — cbu_role_ops relocated to `dsl-runtime::domain_ops::cbu_role_ops`
 mod client_group_ops;
 mod constellation_ops;
 mod control_compute_ops;
@@ -61,14 +61,14 @@ mod partnership_ops;
 mod phrase_ops;
 // Phase 5c — refdata_loader relocated to `dsl-runtime::domain_ops::refdata_loader`
 // Phase 5c — refdata_ops relocated to `dsl-runtime::domain_ops::refdata_ops`
-mod regulatory_ops;
+// Phase 5d — regulatory_ops relocated to `dsl-runtime::domain_ops::regulatory_ops`
 mod remediation_ops;
 mod request_ops;
 // Phase 5c — requirement_ops relocated to `dsl-runtime::domain_ops::requirement_ops`
 mod research_workflow_ops;
 mod resource_ops;
 pub mod rule_evaluator;
-mod screening_ops;
+// Phase 5d — screening_ops relocated to `dsl-runtime::domain_ops::screening_ops`
 mod sem_os_audit_ops;
 // Phase 5a — sem_os_{focus,governance,changeset}_ops relocated to
 // `dsl-runtime::domain_ops::*` consuming `dyn StewardshipDispatch` via
@@ -174,14 +174,8 @@ pub use attribute_ops::{
     AttributeListSinksOp, AttributeListSourcesOp, AttributeTraceLineageOp,
     DocumentCheckExtractionCoverageOp, DocumentListAttributesOp,
 };
-pub use cbu_ops::{
-    CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuInspectOp, CbuLinkStructureOp,
-    CbuListStructureLinksOp,
-};
-pub use cbu_role_ops::{
-    CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOwnershipOp, CbuRoleAssignServiceOp,
-    CbuRoleAssignSignatoryOp, CbuRoleAssignTrustOp, CbuRoleValidateAllOp,
-};
+// Phase 5d — cbu_ops relocated. Types accessed via dsl_runtime::domain_ops::cbu_ops.
+// Phase 5d — cbu_role_ops relocated. Types accessed via dsl_runtime::domain_ops::cbu_role_ops.
 // Phase 4 Slice B Group 6 — document_ops relocated to `dsl-runtime::domain_ops::document_ops`.
 // Registration flows through inventory automatically; external ob-poc code doesn't
 // import these types directly.
@@ -203,9 +197,7 @@ pub use resource_ops::{
     ResourceActivateOp, ResourceCreateOp, ResourceDecommissionOp, ResourceSetAttrOp,
     ResourceSuspendOp, ResourceValidateAttrsOp,
 };
-pub use screening_ops::{
-    ScreeningAdverseMediaOp, ScreeningBulkRefreshOp, ScreeningPepOp, ScreeningSanctionsOp,
-};
+// Phase 5d — screening_ops relocated. Types accessed via dsl_runtime::domain_ops::screening_ops.
 pub use ubo_graph_ops::{
     UboConvergenceSupersedeOp, UboMarkDeceasedOp, UboTransferControlOp, UboWaiveVerificationOp,
 };
