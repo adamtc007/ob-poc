@@ -23,8 +23,8 @@ pub use builtin::load_builtin_state_machine;
 pub use error::{ReducerError, ReducerResult};
 pub use eval::{evaluate_rules, ConditionEvaluator};
 pub use fetch::fetch_slot_overlays;
-pub(crate) use fetch::fetch_slot_overlays_tx;
-pub(crate) use overrides::get_active_override_tx;
+pub use fetch::fetch_slot_overlays_tx;
+pub use overrides::get_active_override_tx;
 pub use overrides::{
     create_override, get_active_override, list_active_overrides, revoke_override,
     CreateOverrideRequest, StateOverride,
@@ -36,7 +36,7 @@ pub use state_machine::{
     ValidatedStateMachine,
 };
 pub use validate::validate_state_machine;
-pub(crate) use verbs::build_eval_scope_tx;
+pub use verbs::build_eval_scope_tx;
 pub use verbs::{
     diagnose_slot, handle_state_blocked_why, handle_state_check_consistency, handle_state_derive,
     handle_state_derive_all, handle_state_diagnose, handle_state_list_overrides,

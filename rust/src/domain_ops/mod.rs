@@ -24,7 +24,8 @@ mod agent_ops;
 mod attribute_ops;
 mod billing_ops;
 mod board_ops;
-mod bods_ops;
+// Phase 4 Slice B Group 3 — bods_ops relocated to `dsl-runtime::domain_ops::bods_ops`
+// alongside the `bods/` module it consumes.
 mod booking_principal_ops;
 mod bpmn_lite_ops;
 mod capital_ops;
@@ -37,7 +38,8 @@ mod control_ops;
 mod deal_ops;
 mod dilution_ops;
 mod discovery_ops;
-mod docs_bundle_ops;
+// Phase 4 Slice B Group 4 — docs_bundle_ops relocated to `dsl-runtime::domain_ops::docs_bundle_ops`
+// alongside the `document_bundles/` module it consumes.
 mod document_ops;
 mod edge_ops;
 pub mod entity_query;
@@ -79,7 +81,8 @@ mod service_pipeline_ops;
 mod session_ops;
 mod shared_atom_ops;
 pub(crate) mod skeleton_build_ops;
-mod state_ops;
+// Phase 4 Slice B Group 9 — state_ops relocated to `dsl-runtime::domain_ops::state_ops`
+// alongside the `state_reducer/` module it consumes.
 #[cfg(feature = "database")]
 pub use skeleton_build_ops::{
     run_coverage_compute, run_graph_validate, run_outreach_plan, run_tollgate_evaluate,
@@ -97,7 +100,8 @@ mod ubo_analysis;
 mod ubo_compute_ops;
 pub mod ubo_graph_ops;
 mod ubo_registry_ops;
-mod verify_ops;
+// Phase 4 Slice B Group 2 — verify_ops relocated to `dsl-runtime::domain_ops::verify_ops`
+// alongside the `verification/` module it consumes.
 mod view_ops;
 
 use anyhow::Result;
@@ -222,11 +226,7 @@ pub use team_ops::TeamTransferMemberOp;
 
 // Access Review operations (complex multi-step transactional operations only)
 
-// BODS operations (UBO discovery via GLEIF + BODS)
-pub use bods_ops::{
-    BodsDiscoverUbosOp, BodsFindByLeiOp, BodsGetStatementOp, BodsImportOp, BodsListOwnershipOp,
-    BodsSyncFromGleifOp,
-};
+// BODS operations relocated to dsl-runtime::domain_ops::bods_ops in Phase 4 Slice B Group 3.
 pub use discovery_ops::{
     DiscoveryAvailableActionsOp, DiscoveryCascadeResearchOp, DiscoveryEntityContextOp,
     DiscoveryEntityRelationshipsOp, DiscoveryInspectDataOp, DiscoverySearchDataOp,

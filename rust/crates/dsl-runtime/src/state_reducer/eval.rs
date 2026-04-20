@@ -22,7 +22,7 @@ impl<'a> ConditionEvaluator<'a> {
     /// # Examples
     /// ```rust
     /// use std::collections::HashMap;
-    /// use ob_poc::state_reducer::{ConditionBody, ConditionEvaluator};
+    /// use dsl_runtime::state_reducer::{ConditionBody, ConditionEvaluator};
     ///
     /// let asts = HashMap::<String, ConditionBody>::new();
     /// let order = Vec::<String>::new();
@@ -42,7 +42,7 @@ impl<'a> ConditionEvaluator<'a> {
     /// # Examples
     /// ```rust
     /// use std::collections::HashMap;
-    /// use ob_poc::state_reducer::{ConditionBody, ConditionEvaluator, ScopeData, SlotOverlayData};
+    /// use dsl_runtime::state_reducer::{ConditionBody, ConditionEvaluator, ScopeData, SlotOverlayData};
     ///
     /// let asts = HashMap::<String, ConditionBody>::new();
     /// let order = Vec::<String>::new();
@@ -212,7 +212,7 @@ impl<'a> ConditionEvaluator<'a> {
 /// # Examples
 /// ```rust
 /// use std::collections::HashMap;
-/// use ob_poc::state_reducer::{evaluate_rules, RuleDef};
+/// use dsl_runtime::state_reducer::{evaluate_rules, RuleDef};
 ///
 /// let rules = vec![RuleDef { state: String::from("ready"), requires: vec![String::from("ok")], excludes: vec![], consistency_check: None }];
 /// let results = HashMap::from([(String::from("ok"), true)]);
@@ -243,7 +243,7 @@ impl ValidatedStateMachine {
     /// # Examples
     /// ```rust
     /// use std::collections::HashMap;
-    /// use ob_poc::state_reducer::{ConditionBody, ScopeData, SlotOverlayData, ValidatedStateMachine};
+    /// use dsl_runtime::state_reducer::{ConditionBody, ScopeData, SlotOverlayData, ValidatedStateMachine};
     ///
     /// let machine = ValidatedStateMachine {
     ///     name: String::from("demo"),

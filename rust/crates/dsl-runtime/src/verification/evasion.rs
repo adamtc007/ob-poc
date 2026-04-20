@@ -14,8 +14,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
 // ============================================================================
@@ -262,7 +260,6 @@ impl EvasionDetector {
     }
 
     /// Analyze a case for evasion signals
-    #[cfg(feature = "database")]
     pub async fn analyze(
         &self,
         pool: &PgPool,
@@ -295,7 +292,6 @@ impl EvasionDetector {
     }
 
     /// Collect metrics from document request history
-    #[cfg(feature = "database")]
     async fn collect_metrics(
         &self,
         pool: &PgPool,

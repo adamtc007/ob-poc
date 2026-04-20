@@ -50,13 +50,17 @@
 // those absolute paths resolve during compilation.
 extern crate self as dsl_runtime;
 
+pub mod bods;
 pub mod crud_executor;
 pub mod custom_op;
+pub mod document_bundles;
 pub mod domain_ops;
 pub mod execution;
 pub mod placeholder;
 pub mod port;
 pub mod registrar;
+pub mod state_reducer;
+pub mod verification;
 
 // Explicit re-exports — do NOT add `pub use module::*`.
 pub use crud_executor::PgCrudExecutor;

@@ -20,7 +20,7 @@ fn is_missing_relation_error(error: &sqlx::Error, relation_name: &str) -> bool {
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::state_reducer::fetch_slot_overlays;
+/// use dsl_runtime::state_reducer::fetch_slot_overlays;
 ///
 /// let _ = fetch_slot_overlays(pool, Uuid::new_v4(), Uuid::new_v4(), None).await?;
 /// # Ok(())
@@ -154,7 +154,7 @@ async fn fetch_slot_overlays_inner(
     Ok(data)
 }
 
-pub(crate) async fn fetch_slot_overlays_tx(
+pub async fn fetch_slot_overlays_tx(
     tx: &mut Transaction<'_, Postgres>,
     cbu_id: Uuid,
     entity_id: Uuid,

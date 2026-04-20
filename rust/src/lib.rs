@@ -100,8 +100,8 @@ pub mod cross_workspace;
 #[cfg(feature = "database")]
 pub mod calibration;
 
-// Verification module - adversarial agent model for KYC
-pub mod verification;
+// Phase 4 Slice B (Group 2) — `verification` module relocated to
+// `dsl-runtime::verification`; consumer `verify_ops` moved alongside it.
 
 // Taxonomy module - generic taxonomy pattern for Product/Instrument domains
 pub mod taxonomy;
@@ -127,9 +127,8 @@ pub mod lookup;
 #[cfg(feature = "database")]
 pub mod gleif;
 
-// BODS integration - Beneficial Ownership Data Standard for UBO discovery
-#[cfg(feature = "database")]
-pub mod bods;
+// Phase 4 Slice B (Group 3) — `bods` module relocated to
+// `dsl-runtime::bods`; consumer `bods_ops` moved alongside it.
 
 // Research macros - LLM + web search for structured discovery with human review
 #[cfg(feature = "database")]
@@ -167,9 +166,8 @@ pub mod journey;
 // Plan Builder — compilation pipeline decomposition (verb classifier, constraint gate, plan assembler)
 pub mod plan_builder;
 
-// Document Bundles - Versioned document requirement sets for structure macros
-#[cfg(feature = "database")]
-pub mod document_bundles;
+// Phase 4 Slice B (Group 4) — `document_bundles` module relocated to
+// `dsl-runtime::document_bundles`; consumer `docs_bundle_ops` moved alongside it.
 
 // Phase 4 Slice B (Group 1) — `placeholder` module relocated to
 // `dsl-runtime::placeholder`; consumer `entity_ops` moved alongside it.
@@ -186,9 +184,8 @@ pub mod sem_reg;
 
 // Constellation — CBU case/structure ownership graph with resolver
 #[cfg(feature = "database")]
-// State Reducer — canonical reducer definitions for constellation/case state
-#[cfg(feature = "database")]
-pub mod state_reducer;
+// Phase 4 Slice B (Group 9) — `state_reducer` module relocated to
+// `dsl-runtime::state_reducer`; consumer `state_ops` moved alongside it.
 
 // SemTaxonomy — replacement discovery/composition contract for utterance handling
 #[cfg(feature = "database")]

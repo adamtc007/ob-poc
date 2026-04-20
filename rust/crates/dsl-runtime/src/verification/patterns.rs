@@ -17,8 +17,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
-
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
 // ============================================================================
@@ -323,7 +321,6 @@ impl PatternDetector {
     }
 
     /// Detect all patterns for a CBU
-    #[cfg(feature = "database")]
     pub async fn detect_all(
         &self,
         pool: &PgPool,
@@ -350,7 +347,6 @@ impl PatternDetector {
     }
 
     /// Detect circular ownership using DFS cycle detection
-    #[cfg(feature = "database")]
     pub async fn detect_circular_ownership(
         &self,
         pool: &PgPool,
@@ -463,7 +459,6 @@ impl PatternDetector {
     }
 
     /// Detect deep layering (chains exceeding threshold)
-    #[cfg(feature = "database")]
     pub async fn detect_layering(
         &self,
         pool: &PgPool,
@@ -540,7 +535,6 @@ impl PatternDetector {
     }
 
     /// Detect nominee usage patterns
-    #[cfg(feature = "database")]
     pub async fn detect_nominee_usage(
         &self,
         pool: &PgPool,
@@ -587,7 +581,6 @@ impl PatternDetector {
     }
 
     /// Detect entities in opacity jurisdictions
-    #[cfg(feature = "database")]
     pub async fn detect_opacity_jurisdictions(
         &self,
         pool: &PgPool,
@@ -638,7 +631,6 @@ impl PatternDetector {
     }
 
     /// Detect ownership gaps (percentages don't sum to 100%)
-    #[cfg(feature = "database")]
     pub async fn detect_ownership_gaps(
         &self,
         pool: &PgPool,
@@ -699,18 +691,6 @@ impl PatternDetector {
 impl Default for PatternDetector {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-// ============================================================================
-// Non-database implementations for testing
-// ============================================================================
-
-#[cfg(not(feature = "database"))]
-impl PatternDetector {
-    /// Detect all patterns (stub for non-database builds)
-    pub fn detect_all_sync(&self, _entities: &[Uuid]) -> Vec<DetectedPattern> {
-        vec![]
     }
 }
 

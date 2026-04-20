@@ -143,7 +143,7 @@ impl AggResult {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::state_reducer::{AggResult, CompareOp, Literal};
+    /// use dsl_runtime::state_reducer::{AggResult, CompareOp, Literal};
     ///
     /// assert!(AggResult::Count(2).compare(CompareOp::Gt, &Literal::Num(1.0)));
     /// ```
@@ -159,7 +159,7 @@ impl AggResult {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::state_reducer::AggResult;
+    /// use dsl_runtime::state_reducer::AggResult;
     ///
     /// assert!(AggResult::Count(1).as_bool());
     /// assert!(!AggResult::Count(0).as_bool());
@@ -250,7 +250,7 @@ impl EvalScope {
     ///
     /// # Examples
     /// ```rust
-    /// use ob_poc::state_reducer::EvalScope;
+    /// use dsl_runtime::state_reducer::EvalScope;
     ///
     /// let scope = EvalScope::default();
     /// let json = scope.as_scope_data();

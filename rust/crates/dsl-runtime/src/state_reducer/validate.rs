@@ -12,7 +12,7 @@ use super::state_machine::{OverlaySourceDef, StateMachineDefinition, ValidatedSt
 /// # Examples
 /// ```rust
 /// use std::collections::HashMap;
-/// use ob_poc::state_reducer::{validate_state_machine, ConditionDef, ReducerDef, RuleDef, StateMachineDefinition};
+/// use dsl_runtime::state_reducer::{validate_state_machine, ConditionDef, ReducerDef, RuleDef, StateMachineDefinition};
 ///
 /// let definition = StateMachineDefinition {
 ///     state_machine: String::from("demo"),

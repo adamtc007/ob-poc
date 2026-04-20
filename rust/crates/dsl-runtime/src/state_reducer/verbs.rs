@@ -22,9 +22,9 @@ use super::{fetch_slot_overlays, ValidatedStateMachine};
 ///
 /// # Examples
 /// ```rust,no_run
-/// # async fn demo(pool: &sqlx::PgPool, sm: &ob_poc::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
+/// # async fn demo(pool: &sqlx::PgPool, sm: &dsl_runtime::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::state_reducer::handle_state_derive;
+/// use dsl_runtime::state_reducer::handle_state_derive;
 ///
 /// let _ = handle_state_derive(
 ///     pool,
@@ -64,9 +64,9 @@ pub async fn handle_state_derive(
 ///
 /// # Examples
 /// ```rust,no_run
-/// # async fn demo(pool: &sqlx::PgPool, sm: &ob_poc::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
+/// # async fn demo(pool: &sqlx::PgPool, sm: &dsl_runtime::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::state_reducer::handle_state_diagnose;
+/// use dsl_runtime::state_reducer::handle_state_diagnose;
 ///
 /// let _ = handle_state_diagnose(
 ///     pool,
@@ -104,9 +104,9 @@ pub async fn handle_state_diagnose(
 ///
 /// # Examples
 /// ```rust,no_run
-/// # async fn demo(pool: &sqlx::PgPool, sm: &ob_poc::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
+/// # async fn demo(pool: &sqlx::PgPool, sm: &dsl_runtime::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::state_reducer::handle_state_derive_all;
+/// use dsl_runtime::state_reducer::handle_state_derive_all;
 ///
 /// let _results = handle_state_derive_all(pool, Uuid::new_v4(), None, sm).await?;
 /// # Ok(())
@@ -135,9 +135,9 @@ pub async fn handle_state_derive_all(
 ///
 /// # Examples
 /// ```rust,no_run
-/// # async fn demo(pool: &sqlx::PgPool, sm: &ob_poc::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
+/// # async fn demo(pool: &sqlx::PgPool, sm: &dsl_runtime::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::state_reducer::handle_state_blocked_why;
+/// use dsl_runtime::state_reducer::handle_state_blocked_why;
 ///
 /// let _ = handle_state_blocked_why(
 ///     pool,
@@ -191,9 +191,9 @@ pub async fn handle_state_blocked_why(
 ///
 /// # Examples
 /// ```rust,no_run
-/// # async fn demo(pool: &sqlx::PgPool, sm: &ob_poc::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
+/// # async fn demo(pool: &sqlx::PgPool, sm: &dsl_runtime::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::state_reducer::handle_state_check_consistency;
+/// use dsl_runtime::state_reducer::handle_state_check_consistency;
 ///
 /// let _warnings = handle_state_check_consistency(pool, Uuid::new_v4(), None, sm).await?;
 /// # Ok(())
@@ -239,9 +239,9 @@ pub async fn handle_state_check_consistency(
 ///
 /// # Examples
 /// ```rust,no_run
-/// # async fn demo(pool: &sqlx::PgPool, sm: &ob_poc::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
+/// # async fn demo(pool: &sqlx::PgPool, sm: &dsl_runtime::state_reducer::ValidatedStateMachine) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::state_reducer::handle_state_override;
+/// use dsl_runtime::state_reducer::handle_state_override;
 ///
 /// let _ = handle_state_override(
 ///     pool,
@@ -311,7 +311,7 @@ pub async fn handle_state_override(
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::state_reducer::handle_state_revoke_override;
+/// use dsl_runtime::state_reducer::handle_state_revoke_override;
 ///
 /// handle_state_revoke_override(pool, Uuid::new_v4(), "operator", "superseded").await?;
 /// # Ok(())
@@ -332,7 +332,7 @@ pub async fn handle_state_revoke_override(
 /// ```rust,no_run
 /// # async fn demo(pool: &sqlx::PgPool) -> anyhow::Result<()> {
 /// use uuid::Uuid;
-/// use ob_poc::state_reducer::handle_state_list_overrides;
+/// use dsl_runtime::state_reducer::handle_state_list_overrides;
 ///
 /// let _ = handle_state_list_overrides(pool, Uuid::new_v4()).await?;
 /// # Ok(())
@@ -350,7 +350,7 @@ pub async fn handle_state_list_overrides(
 /// # Examples
 /// ```rust
 /// use std::collections::HashMap;
-/// use ob_poc::state_reducer::{load_builtin_state_machine, reduce_slot, ScopeData, SlotOverlayData};
+/// use dsl_runtime::state_reducer::{load_builtin_state_machine, reduce_slot, ScopeData, SlotOverlayData};
 ///
 /// let machine = load_builtin_state_machine("entity_kyc_lifecycle").unwrap();
 /// let overlays = SlotOverlayData {
@@ -396,7 +396,7 @@ pub fn reduce_slot(
 /// ```rust
 /// use std::collections::HashMap;
 /// use uuid::Uuid;
-/// use ob_poc::state_reducer::{diagnose_slot, load_builtin_state_machine, ScopeData, SlotOverlayData};
+/// use dsl_runtime::state_reducer::{diagnose_slot, load_builtin_state_machine, ScopeData, SlotOverlayData};
 ///
 /// let machine = load_builtin_state_machine("entity_kyc_lifecycle").unwrap();
 /// let overlays = SlotOverlayData {
@@ -522,7 +522,7 @@ pub(crate) async fn build_eval_scope(
     Ok(scope)
 }
 
-pub(crate) async fn build_eval_scope_tx(
+pub async fn build_eval_scope_tx(
     tx: &mut Transaction<'_, Postgres>,
     cbu_id: Uuid,
     case_id: Option<Uuid>,

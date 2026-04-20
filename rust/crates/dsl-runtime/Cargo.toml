@@ -43,6 +43,12 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # content hashing of canonicalised payloads.
 sha2 = "0.10"
 hex = "0.4"
+# Phase 4 Slice B Group 4 — document_bundles registry loads YAML from disk.
+serde_yaml = "0.9"
+# Phase 4 Slice B Group 9 — state_reducer uses nom for its eval-expression parser
+# and thiserror for its ReducerError enum.
+nom = "7"
+thiserror = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
