@@ -30,14 +30,20 @@ use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 pub mod attribute;
+pub mod audit;
+pub mod changeset;
 pub mod constellation;
+pub mod focus;
+pub mod governance;
 pub mod nav;
 pub mod pack_answer;
 pub mod pack_select;
 pub mod phrase;
 pub mod registry;
+pub mod registry_ops;
 pub mod service_pipeline;
 pub mod session;
+pub mod stewardship_helper;
 pub mod view;
 
 pub use registry::SemOsVerbOpRegistry;
@@ -151,6 +157,76 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(service_pipeline::PipelineFull));
     registry.register(Arc::new(service_pipeline::ServiceResourceCheckAttributeGaps));
     registry.register(Arc::new(service_pipeline::ServiceResourceSyncDefinitions));
+
+    // Phase B slice #6: sem_os_* stewardship-dispatch family
+    // (focus / governance / changeset / audit / registry_ops).
+
+    // focus (6)
+    registry.register(Arc::new(focus::Get));
+    registry.register(Arc::new(focus::Set));
+    registry.register(Arc::new(focus::Render));
+    registry.register(Arc::new(focus::Viewport));
+    registry.register(Arc::new(focus::Diff));
+    registry.register(Arc::new(focus::CaptureManifest));
+
+    // governance (9)
+    registry.register(Arc::new(governance::GatePrecheck));
+    registry.register(Arc::new(governance::SubmitForReview));
+    registry.register(Arc::new(governance::RecordReview));
+    registry.register(Arc::new(governance::Validate));
+    registry.register(Arc::new(governance::DryRun));
+    registry.register(Arc::new(governance::PlanPublish));
+    registry.register(Arc::new(governance::Publish));
+    registry.register(Arc::new(governance::PublishBatch));
+    registry.register(Arc::new(governance::Rollback));
+
+    // changeset (14)
+    registry.register(Arc::new(changeset::Compose));
+    registry.register(Arc::new(changeset::AddItem));
+    registry.register(Arc::new(changeset::RemoveItem));
+    registry.register(Arc::new(changeset::RefineItem));
+    registry.register(Arc::new(changeset::Suggest));
+    registry.register(Arc::new(changeset::ApplyTemplate));
+    registry.register(Arc::new(changeset::AttachBasis));
+    registry.register(Arc::new(changeset::ValidateEdit));
+    registry.register(Arc::new(changeset::CrossReference));
+    registry.register(Arc::new(changeset::ImpactAnalysis));
+    registry.register(Arc::new(changeset::ResolveConflict));
+    registry.register(Arc::new(changeset::Get));
+    registry.register(Arc::new(changeset::Diff));
+    registry.register(Arc::new(changeset::List));
+
+    // audit (8)
+    registry.register(Arc::new(audit::CreatePlan));
+    registry.register(Arc::new(audit::AddPlanStep));
+    registry.register(Arc::new(audit::ValidatePlan));
+    registry.register(Arc::new(audit::ExecutePlanStep));
+    registry.register(Arc::new(audit::RecordDecision));
+    registry.register(Arc::new(audit::RecordEscalation));
+    registry.register(Arc::new(audit::RecordDisambiguation));
+    registry.register(Arc::new(audit::RecordObservation));
+
+    // registry (20 = 17 macros + 2 polymorphic + 1 direct SQL)
+    registry.register(Arc::new(registry_ops::Search));
+    registry.register(Arc::new(registry_ops::ResolveContext));
+    registry.register(Arc::new(registry_ops::VerbSurface));
+    registry.register(Arc::new(registry_ops::AttributeProducers));
+    registry.register(Arc::new(registry_ops::Lineage));
+    registry.register(Arc::new(registry_ops::RegulationTrace));
+    registry.register(Arc::new(registry_ops::TaxonomyTree));
+    registry.register(Arc::new(registry_ops::TaxonomyMembers));
+    registry.register(Arc::new(registry_ops::Classify));
+    registry.register(Arc::new(registry_ops::DescribeView));
+    registry.register(Arc::new(registry_ops::ApplyView));
+    registry.register(Arc::new(registry_ops::DescribePolicy));
+    registry.register(Arc::new(registry_ops::CoverageReport));
+    registry.register(Arc::new(registry_ops::EvidenceFreshness));
+    registry.register(Arc::new(registry_ops::EvidenceGaps));
+    registry.register(Arc::new(registry_ops::SnapshotHistory));
+    registry.register(Arc::new(registry_ops::SnapshotDiff));
+    registry.register(Arc::new(registry_ops::DescribeObject));
+    registry.register(Arc::new(registry_ops::ListObjects));
+    registry.register(Arc::new(registry_ops::ActiveManifest));
 
     registry
 }

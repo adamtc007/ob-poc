@@ -73,12 +73,12 @@ pub mod resource_ops;
 pub mod screening_ops;
 pub mod research_normalize_ops;
 pub mod research_workflow_ops;
-pub mod sem_os_audit_ops;
-pub mod sem_os_changeset_ops;
-pub mod sem_os_focus_ops;
-pub mod sem_os_governance_ops;
+// Phase 5c-migrate Phase B slice #6: sem_os_audit_ops → `sem_os_postgres::ops::audit`.
+// Phase 5c-migrate Phase B slice #6: sem_os_changeset_ops → `sem_os_postgres::ops::changeset`.
+// Phase 5c-migrate Phase B slice #6: sem_os_focus_ops → `sem_os_postgres::ops::focus`.
+// Phase 5c-migrate Phase B slice #6: sem_os_governance_ops → `sem_os_postgres::ops::governance`.
 pub mod sem_os_maintenance_ops;
-pub mod sem_os_registry_ops;
+// Phase 5c-migrate Phase B slice #6: sem_os_registry_ops → `sem_os_postgres::ops::registry_ops`.
 pub mod sem_os_schema_ops;
 pub mod semantic_ops;
 // Phase 5c-migrate Phase B slice #5 (2026-04-21): service_pipeline_ops
