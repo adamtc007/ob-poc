@@ -37,6 +37,7 @@ pub mod changeset;
 pub mod constellation;
 pub mod control;
 pub mod control_compute;
+pub mod coverage_compute;
 pub mod docs_bundle;
 pub mod economic_exposure;
 pub mod edge;
@@ -457,6 +458,10 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #34: control.compute-controllers (remaining
     // legacy control op — KYC case controller aggregation).
     registry.register(Arc::new(control_compute::ComputeControllers));
+
+    // Phase B slice #35: coverage.compute (per-prong UBO evidence
+    // coverage + gap ID generation + tollgate-blocking annotation).
+    registry.register(Arc::new(coverage_compute::Compute));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

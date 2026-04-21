@@ -772,8 +772,9 @@ mod tests {
         assert!(registry.has("tollgate", "get-metrics"));
         assert!(registry.has("tollgate", "override"));
         assert!(registry.has("tollgate", "get-decision-readiness"));
-        // Coverage computation (KYC prong analysis)
-        assert!(registry.has("coverage", "compute"));
+        // Phase 5c-migrate Phase B slice #35: coverage.compute moved to
+        // `sem_os_postgres::ops::coverage_compute::Compute`.
+        assert!(!registry.has("coverage", "compute"));
         // KYC Control Enhancement: Unified control operations
         // Phase 5c-migrate Phase B slices #33 + #34: all control ops
         // moved to `sem_os_postgres::ops::{control,control_compute}::*`.
