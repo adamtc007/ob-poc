@@ -665,7 +665,9 @@ mod tests {
         assert!(registry.has("kyc-case", "summarize"));
         assert!(registry.has("entity-workstream", "state"));
         // UBO chain computation (Phase 2.3)
-        assert!(registry.has("ubo", "compute-chains"));
+        // Phase 5c-migrate Phase B slice #48: ubo.compute-chains moved to
+        // `sem_os_postgres::ops::ubo_compute::ComputeChains`.
+        assert!(!registry.has("ubo", "compute-chains"));
         // UBO removal operations (Phase 7)
         assert!(registry.has("ubo", "mark-deceased"));
         assert!(registry.has("ubo", "convergence-supersede"));

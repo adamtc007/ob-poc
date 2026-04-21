@@ -83,6 +83,7 @@ pub mod tollgate;
 pub mod trading_matrix;
 pub mod trust;
 pub mod ubo_analysis;
+pub mod ubo_compute;
 pub mod ubo_registry;
 pub mod verify;
 pub mod view;
@@ -577,6 +578,13 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(verify::GetStatus));
     registry.register(Arc::new(verify::VerifyAgainstRegistry));
     registry.register(Arc::new(verify::Assert));
+
+    // Phase B slice #48: ubo.compute-chains / snapshot.capture /
+    // snapshot.diff — in-memory ownership graph + JSONB snapshot
+    // persistence with SHA-256 code hash.
+    registry.register(Arc::new(ubo_compute::ComputeChains));
+    registry.register(Arc::new(ubo_compute::SnapshotCapture));
+    registry.register(Arc::new(ubo_compute::SnapshotDiff));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

@@ -98,7 +98,7 @@ pub mod trading_profile_ca_ops;
 // Phase 5c-migrate Phase B slice #5 (2026-04-21): view_ops relocated to
 // `sem_os_postgres::ops::view::*`.
 // Phase 5c-migrate Phase B slice #39: ubo_analysis → `sem_os_postgres::ops::ubo_analysis`.
-pub mod ubo_compute_ops;
+// Phase 5c-migrate Phase B slice #48: ubo_compute_ops → `sem_os_postgres::ops::ubo_compute`.
 pub mod ubo_graph_ops;
 // Phase 5c-migrate Phase B slice #24: ubo_registry_ops → `sem_os_postgres::ops::ubo_registry`.
 // Phase 5c-migrate Phase B slice #47: verify_ops → `sem_os_postgres::ops::verify`.
