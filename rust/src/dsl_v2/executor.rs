@@ -48,7 +48,7 @@ use super::submission::{DslSubmission, SubmissionError, SubmissionLimits};
 #[cfg(feature = "database")]
 use crate::domain_ops::CustomOperationRegistry;
 #[cfg(feature = "database")]
-use crate::domain_ops::{verify_plugin_verb_coverage, verify_plugin_verb_coverage_strict};
+use crate::domain_ops::verify_plugin_verb_coverage;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -1174,8 +1174,21 @@ impl DslExecutor {
     /// ```
     #[cfg(feature = "database")]
     pub fn new(pool: PgPool) -> Self {
+        // Phase 5c-migrate Phase B: the authoritative strict coverage check
+        // runs in ob-poc-web::main after both the legacy `CustomOperationRegistry`
+        // and the `SemOsVerbOpRegistry` are built. This constructor only logs a
+        // soft warning for missing handlers — the ob-poc-web check panics on
+        // real gaps with full visibility into both registries.
         let custom_ops = CustomOperationRegistry::new();
-        verify_plugin_verb_coverage_strict(&custom_ops);
+        let legacy_coverage =
+            verify_plugin_verb_coverage(&custom_ops, &std::collections::HashSet::new());
+        if !legacy_coverage.yaml_missing_op.is_empty() {
+            tracing::debug!(
+                count = legacy_coverage.yaml_missing_op.len(),
+                "DslExecutor::new: YAML plugin verbs not yet in legacy registry \
+                 (expected if SemOS has taken them over); ob-poc-web does the authoritative check"
+            );
+        }
 
         Self {
             generic_executor: GenericCrudExecutor::new(pool.clone()),
@@ -1218,9 +1231,17 @@ impl DslExecutor {
     /// let _ = executor.verify_registry_coverage();
     /// # }
     /// ```
+    /// Borrow the legacy `CustomOperationRegistry` this executor was built
+    /// with. Used by the combined coverage test in the same module.
+    #[cfg(feature = "database")]
+    pub fn custom_ops_ref(&self) -> &CustomOperationRegistry {
+        &self.custom_ops
+    }
+
     #[cfg(feature = "database")]
     pub fn verify_registry_coverage(&self) -> std::result::Result<(), Vec<String>> {
-        let result = verify_plugin_verb_coverage(&self.custom_ops);
+        let result =
+            verify_plugin_verb_coverage(&self.custom_ops, &std::collections::HashSet::new());
         if result.yaml_missing_op.is_empty() {
             Ok(())
         } else {
@@ -3070,6 +3091,13 @@ mod tests {
     #[cfg(feature = "database")]
     #[tokio::test]
     async fn test_executor_registry_coverage_is_clean() {
+        // Post Phase 5c-migrate Phase B: some plugin verbs live in the
+        // `SemOsVerbOpRegistry` rather than the legacy `CustomOperationRegistry`
+        // the executor holds. `DslExecutor::verify_registry_coverage()` sees
+        // only legacy ops and will report SemOS-migrated verbs as missing —
+        // that's the isolated-view it's meant to expose. For the combined
+        // coverage test, we call the free function with both sources.
+        use crate::domain_ops::verify_plugin_verb_coverage;
         use sqlx::postgres::PgPoolOptions;
 
         let pool = PgPoolOptions::new()
@@ -3077,6 +3105,17 @@ mod tests {
             .connect_lazy("postgres://localhost/nonexistent")
             .expect("lazy pool creation should not fail");
         let executor = DslExecutor::new(pool);
-        assert_eq!(executor.verify_registry_coverage(), Ok(()));
+
+        let sem_os_fqns: std::collections::HashSet<String> =
+            sem_os_postgres::ops::build_registry()
+                .manifest()
+                .into_iter()
+                .collect();
+        let result = verify_plugin_verb_coverage(executor.custom_ops_ref(), &sem_os_fqns);
+        assert!(
+            result.yaml_missing_op.is_empty(),
+            "YAML plugin verbs missing from both registries: {:?}",
+            result.yaml_missing_op
+        );
     }
 }

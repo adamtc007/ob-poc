@@ -451,36 +451,37 @@ impl PluginVerbCoverageResult {
     }
 }
 
-/// Verify all YAML plugin verbs have corresponding registered CustomOps.
+/// Verify all YAML plugin verbs have a registered handler.
 ///
 /// This function ensures the system is consistent:
-/// - Every YAML verb with `behavior: plugin` MUST have a registered CustomOp
-/// - CustomOps without YAML definitions are warned about (orphaned ops)
+/// - Every YAML verb with `behavior: plugin` MUST have a handler — either in
+///   the legacy [`CustomOperationRegistry`] or in the `SemOsVerbOpRegistry`
+///   (passed as `sem_os_fqns`).
+/// - Legacy `CustomOperation` ops without YAML definitions are warned about
+///   (orphaned ops).
 ///
 /// # Arguments
-/// * `custom_ops` - The CustomOperationRegistry to verify against
+/// * `custom_ops` - The legacy [`CustomOperationRegistry`] from dsl-runtime.
+/// * `sem_os_fqns` - FQNs registered in `sem_os_postgres::SemOsVerbOpRegistry`
+///   (pass `&HashSet::new()` if only the legacy registry matters, e.g. unit
+///   tests that don't construct a SemOS registry).
+///
+/// Phase 5c-migrate Phase B threads the SemOS manifest through this check so
+/// verbs re-implemented in `sem_os_postgres::ops` don't show up as
+/// `yaml_missing_op` once their legacy `CustomOperation` file is deleted.
 ///
 /// # Returns
-/// A `PluginVerbCoverageResult` with coverage details
-///
-/// # Usage
-/// Call this at startup after both registries are initialized:
-/// ```ignore
-/// let registry = CustomOperationRegistry::new();
-/// let result = verify_plugin_verb_coverage(&registry);
-/// if !result.is_ok() {
-///     panic!("Plugin verb coverage check failed: {:?}", result.yaml_missing_op);
-/// }
-/// ```
+/// A `PluginVerbCoverageResult` with coverage details.
 pub fn verify_plugin_verb_coverage(
     custom_ops: &CustomOperationRegistry,
+    sem_os_fqns: &std::collections::HashSet<String>,
 ) -> PluginVerbCoverageResult {
     use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
     use std::collections::HashSet;
 
     let mut result = PluginVerbCoverageResult::default();
 
-    // Track which ops are referenced by YAML
+    // Track which legacy ops are referenced by YAML
     let mut referenced_ops: HashSet<(String, String)> = HashSet::new();
 
     // Check all YAML verbs with behavior: plugin
@@ -488,17 +489,22 @@ pub fn verify_plugin_verb_coverage(
     for verb in runtime_reg.all_verbs() {
         if let RuntimeBehavior::Plugin(_handler) = &verb.behavior {
             let key = (verb.domain.clone(), verb.verb.clone());
+            let fqn = format!("{}.{}", verb.domain, verb.verb);
 
             if custom_ops.has(&verb.domain, &verb.verb) {
                 result.covered.push(key.clone());
                 referenced_ops.insert(key);
+            } else if sem_os_fqns.contains(&fqn) {
+                // Satisfied by `SemOsVerbOpRegistry` — migrated out of
+                // dsl-runtime, still fully covered.
+                result.covered.push(key);
             } else {
                 result.yaml_missing_op.push(key);
             }
         }
     }
 
-    // Find ops that aren't referenced by any YAML plugin verb
+    // Find legacy ops that aren't referenced by any YAML plugin verb
     for (domain, verb, _rationale) in custom_ops.list() {
         let key = (domain.to_string(), verb.to_string());
         if !referenced_ops.contains(&key) {
@@ -516,14 +522,20 @@ pub fn verify_plugin_verb_coverage(
 
 /// Verify plugin verb coverage and panic on fatal mismatches.
 ///
-/// This is the strict version that should be called at startup.
-/// - Panics if any YAML plugin verb is missing a registered CustomOp
-/// - Logs warnings for orphaned CustomOps (ops without YAML definitions)
+/// This is the strict version, called once at host startup.
+/// - Panics if any YAML plugin verb is missing a handler in **either**
+///   `custom_ops` or `sem_os_fqns`.
+/// - Logs warnings for orphaned legacy `CustomOperation` ops (registered
+///   without a YAML plugin definition).
 ///
 /// # Panics
-/// Panics if any YAML plugin verb has no corresponding registered CustomOp.
-pub fn verify_plugin_verb_coverage_strict(custom_ops: &CustomOperationRegistry) {
-    let result = verify_plugin_verb_coverage(custom_ops);
+/// Panics if any YAML plugin verb has no corresponding handler in either
+/// registry.
+pub fn verify_plugin_verb_coverage_strict(
+    custom_ops: &CustomOperationRegistry,
+    sem_os_fqns: &std::collections::HashSet<String>,
+) {
+    let result = verify_plugin_verb_coverage(custom_ops, sem_os_fqns);
 
     // Log warnings for orphaned ops (not fatal, but should be cleaned up)
     for (domain, verb) in &result.op_missing_yaml {
@@ -843,9 +855,17 @@ mod tests {
 
     #[test]
     fn test_plugin_verb_coverage() {
-        // This test verifies that all YAML plugin verbs have registered CustomOps
+        // Every YAML plugin verb must have a handler in EITHER the legacy
+        // `CustomOperationRegistry` OR the `SemOsVerbOpRegistry` produced by
+        // `sem_os_postgres::ops::build_registry()`. The factory is the single
+        // source of truth for migrated FQNs — each Phase B slice extends it
+        // in the same commit that deletes the corresponding dsl-runtime file.
         let registry = CustomOperationRegistry::new();
-        let result = super::verify_plugin_verb_coverage(&registry);
+        let sem_os_fqns: std::collections::HashSet<String> = sem_os_postgres::ops::build_registry()
+            .manifest()
+            .into_iter()
+            .collect();
+        let result = super::verify_plugin_verb_coverage(&registry, &sem_os_fqns);
 
         // Print diagnostic info for debugging
         if !result.yaml_missing_op.is_empty() {
@@ -911,9 +931,12 @@ mod tests {
         // Manco ops
         assert!(registry.has("manco", "book.summary"));
 
-        // Pack operations (Journey Pack lifecycle)
-        assert!(registry.has("pack", "select"));
-        assert!(registry.has("pack", "answer"));
+        // Pack operations migrated to `sem_os_postgres::ops::{pack_select,
+        // pack_answer}` (Phase 5c-migrate Phase B slice #1, 2026-04-21).
+        // Legacy `pack_ops.rs` deleted — expect NO pack entries in the
+        // legacy registry.
+        assert!(!registry.has("pack", "select"));
+        assert!(!registry.has("pack", "answer"));
         // Booking principal operations
         assert!(registry.has("legal-entity", "create"));
         assert!(registry.has("legal-entity", "update"));

@@ -52,7 +52,9 @@ pub mod observation_ops;
 pub mod outreach_ops;
 pub mod outreach_plan_ops;
 pub mod ownership_ops;
-pub mod pack_ops;
+// Phase 5c-migrate Phase B slice #1 (2026-04-21): pack_ops relocated to
+// `sem_os_postgres::ops::{pack_select,pack_answer}` as YAML-first
+// re-implementations; legacy file deleted.
 pub mod partnership_ops;
 pub mod phrase_ops;
 pub mod refdata_loader;

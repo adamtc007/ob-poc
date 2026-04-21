@@ -29,10 +29,28 @@ use async_trait::async_trait;
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
+pub mod pack_answer;
 pub mod pack_select;
 pub mod registry;
 
 pub use registry::SemOsVerbOpRegistry;
+
+/// Build the canonical [`SemOsVerbOpRegistry`] with every op currently
+/// registered in this module tree. Called from `ob-poc-web::main` at
+/// startup AND from `ob-poc` coverage tests, so the FQN set stays in
+/// sync automatically — any op added here becomes covered without
+/// touching the tests.
+pub fn build_registry() -> SemOsVerbOpRegistry {
+    use std::sync::Arc;
+
+    let mut registry = SemOsVerbOpRegistry::empty();
+
+    // Phase B slice #1: pack domain (commit landing this slice).
+    registry.register(Arc::new(pack_select::PackSelect));
+    registry.register(Arc::new(pack_answer::PackAnswer));
+
+    registry
+}
 
 /// Plugin verb operation executed under a Sequencer-owned transaction scope.
 ///

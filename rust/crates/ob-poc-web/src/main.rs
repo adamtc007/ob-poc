@@ -991,19 +991,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             use dsl_runtime::PgCrudExecutor;
             use ob_poc::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
-            use sem_os_postgres::SemOsVerbOpRegistry;
             use std::sync::Arc;
 
-            // SemOS-first op registry (Phase A: smoke-test only — pack.select).
-            // Phase B slices add more ops one domain at a time.
-            let mut sem_os_ops = SemOsVerbOpRegistry::empty();
-            sem_os_ops.register(Arc::new(sem_os_postgres::ops::pack_select::PackSelect));
-            let sem_os_ops = Arc::new(sem_os_ops);
+            // SemOS-first op registry (Phase A smoke test + Phase B slices).
+            // Each Phase B commit adds a new op inside
+            // `sem_os_postgres::ops::build_registry()`. The test suite uses
+            // the same factory, so FQN coverage stays automatic.
+            let sem_os_ops = Arc::new(sem_os_postgres::ops::build_registry());
             tracing::info!(
                 registered_ops = sem_os_ops.len(),
                 fqns = ?sem_os_ops.manifest(),
                 "SemOsVerbOpRegistry initialised"
             );
+
+            // Authoritative strict coverage check — runs after both registries
+            // exist so verbs served by either one count as covered. A missing
+            // handler here is fatal (panics) because the host promised YAML
+            // behaviour it can't deliver.
+            {
+                use dsl_runtime::CustomOperationRegistry;
+                use ob_poc::domain_ops::verify_plugin_verb_coverage_strict;
+                use std::collections::HashSet;
+
+                let sem_os_fqns: HashSet<String> =
+                    sem_os_ops.manifest().into_iter().collect();
+                let legacy_ops = CustomOperationRegistry::new();
+                verify_plugin_verb_coverage_strict(&legacy_ops, &sem_os_fqns);
+            }
 
             let verb_executor = ObPocVerbExecutor::from_pool_with_services(
                 pool.clone(),
