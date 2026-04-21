@@ -85,7 +85,7 @@ pub mod research_workflow_ops;
 // relocated to `sem_os_postgres::ops::service_pipeline::*`.
 // Phase 5c-migrate Phase B slice #5 (2026-04-21): session_ops relocated to
 // `sem_os_postgres::ops::session::*`.
-pub mod shared_atom_ops;
+// Phase 5c-migrate Phase B slice #22: shared_atom_ops → `sem_os_postgres::ops::shared_atom`.
 pub mod skeleton_build_ops;
 // Phase 5c-migrate Phase B slice #21: state_ops → `sem_os_postgres::ops::state`.
 // Phase 5c-migrate Phase B slice #10: team_ops → `sem_os_postgres::ops::team`.

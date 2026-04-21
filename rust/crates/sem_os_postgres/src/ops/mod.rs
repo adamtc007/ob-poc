@@ -55,6 +55,7 @@ pub mod schema;
 pub mod screening;
 pub mod semantic;
 pub mod service_pipeline;
+pub mod shared_atom;
 pub mod session;
 pub mod state;
 pub mod stewardship_helper;
@@ -329,6 +330,17 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(state::Override));
     registry.register(Arc::new(state::RevokeOverride));
     registry.register(Arc::new(state::ListOverrides));
+
+    // Phase B slice #22: shared-atom domain (8 plugin verbs — atom
+    // registry + lifecycle FSM + cross-workspace replay).
+    registry.register(Arc::new(shared_atom::Register));
+    registry.register(Arc::new(shared_atom::Activate));
+    registry.register(Arc::new(shared_atom::Deprecate));
+    registry.register(Arc::new(shared_atom::Retire));
+    registry.register(Arc::new(shared_atom::List));
+    registry.register(Arc::new(shared_atom::ListConsumers));
+    registry.register(Arc::new(shared_atom::ReplayConstellation));
+    registry.register(Arc::new(shared_atom::AcknowledgeSharedUpdate));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
