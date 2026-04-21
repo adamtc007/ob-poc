@@ -1,51 +1,41 @@
-//! Board Operations - Board composition and control analysis
+//! Board domain verbs (1 plugin verb) — SemOS-side YAML-first
+//! re-implementation of the plugin subset of
+//! `rust/config/verbs/kyc/board.yaml`.
 //!
-//! Plugin handlers for board.yaml verbs that require custom logic.
+//! `board.analyze-control` aggregates board appointments by
+//! appointer, surfaces majority-controllers, joins appointment
+//! rights, and classifies the control regime (single / joint /
+//! diffuse). Every other verb in the domain is `behavior: crud`.
+
+use std::collections::HashMap;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
-use serde_json::json;
-use sqlx::PgPool;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::json_get_required_uuid;
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::domain_ops::helpers::json_get_required_uuid;
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-// ============================================================================
-// BoardAnalyzeControlOp - Analyze who controls a board through appointments
-// ============================================================================
+use super::SemOsVerbOp;
 
-/// Analyzes board composition to determine who controls an entity through
-/// board appointments, removal rights, and veto powers.
-#[register_custom_op]
-pub struct BoardAnalyzeControlOp;
+pub struct AnalyzeControl;
 
 #[async_trait]
-impl CustomOperation for BoardAnalyzeControlOp {
-    fn domain(&self) -> &'static str {
-        "board"
+impl SemOsVerbOp for AnalyzeControl {
+    fn fqn(&self) -> &str {
+        "board.analyze-control"
     }
-
-    fn verb(&self) -> &'static str {
-        "analyze-control"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Board control analysis requires aggregating appointments by appointer, checking appointment rights, and determining majority control"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_get_required_uuid(args, "entity-id")?;
 
-        // Get all current board compositions
-        let appointments: Vec<(
+        type BoardRow = (
             Uuid,
             Uuid,
             String,
@@ -55,7 +45,9 @@ impl CustomOperation for BoardAnalyzeControlOp {
             Option<String>,
             Option<chrono::NaiveDate>,
             bool,
-        )> = sqlx::query_as(
+        );
+
+        let appointments: Vec<BoardRow> = sqlx::query_as(
             r#"
             SELECT
                 bc.id,
@@ -80,15 +72,12 @@ impl CustomOperation for BoardAnalyzeControlOp {
             "#,
         )
         .bind(entity_id)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
         let total_board_size = appointments.len();
 
-        // Aggregate by appointer
-        let mut appointer_counts: std::collections::HashMap<String, (String, i32)> =
-            std::collections::HashMap::new();
-
+        let mut appointer_counts: HashMap<String, (String, i32)> = HashMap::new();
         for (_, _, _, _, _, appointer_id, appointer_name, _, _) in &appointments {
             if let Some(appt_id) = appointer_id {
                 let key = appt_id.to_string();
@@ -99,7 +88,6 @@ impl CustomOperation for BoardAnalyzeControlOp {
             }
         }
 
-        // Check appointment rights
         let appointment_rights: Vec<(Uuid, String, String, Option<i32>)> = sqlx::query_as(
             r#"
             SELECT
@@ -116,17 +104,16 @@ impl CustomOperation for BoardAnalyzeControlOp {
             "#,
         )
         .bind(entity_id)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
-        // Determine who has majority control
         let majority_threshold = if total_board_size > 0 {
             (total_board_size as f64 / 2.0).ceil() as i32
         } else {
             1
         };
-        let mut controllers: Vec<serde_json::Value> = Vec::new();
 
+        let mut controllers: Vec<Value> = Vec::new();
         for (appointer_id, (appointer_name, count)) in &appointer_counts {
             if *count >= majority_threshold {
                 controllers.push(json!({
@@ -134,13 +121,14 @@ impl CustomOperation for BoardAnalyzeControlOp {
                     "controller_name": appointer_name,
                     "appointments": count,
                     "has_majority": true,
-                    "control_strength": if total_board_size > 0 { (*count as f64) / (total_board_size as f64) } else { 0.0 }
+                    "control_strength": if total_board_size > 0 {
+                        (*count as f64) / (total_board_size as f64)
+                    } else { 0.0 }
                 }));
             }
         }
 
-        // Build analysis result
-        let board_members: Vec<serde_json::Value> = appointments
+        let board_members: Vec<Value> = appointments
             .iter()
             .map(
                 |(
@@ -162,20 +150,20 @@ impl CustomOperation for BoardAnalyzeControlOp {
                         "role_name": role_name,
                         "appointer_id": appointer_id.map(|id| id.to_string()),
                         "appointer_name": appointer_name,
-                        "appointed_at": appointed_at.map(|d| d.to_string())
+                        "appointed_at": appointed_at.map(|d| d.to_string()),
                     })
                 },
             )
             .collect();
 
-        let rights: Vec<serde_json::Value> = appointment_rights
+        let rights: Vec<Value> = appointment_rights
             .iter()
             .map(|(holder_id, holder_name, right_type, max_appts)| {
                 json!({
                     "holder_id": holder_id.to_string(),
                     "holder_name": holder_name,
                     "right_type": right_type,
-                    "max_appointments": max_appts
+                    "max_appointments": max_appts,
                 })
             })
             .collect();
@@ -190,7 +178,9 @@ impl CustomOperation for BoardAnalyzeControlOp {
                     "appointer_id": k,
                     "appointer_name": n,
                     "appointments": c,
-                    "percentage": if total_board_size > 0 { *c as f64 / total_board_size as f64 * 100.0 } else { 0.0 }
+                    "percentage": if total_board_size > 0 {
+                        *c as f64 / total_board_size as f64 * 100.0
+                    } else { 0.0 }
                 })
             }).collect::<Vec<_>>(),
             "appointment_rights": rights,
@@ -198,26 +188,9 @@ impl CustomOperation for BoardAnalyzeControlOp {
             "control_type": if controllers.len() == 1 { "single" }
                            else if controllers.len() > 1 { "joint" }
                            else { "diffuse" },
-            "analysis_timestamp": chrono::Utc::now().to_rfc3339()
+            "analysis_timestamp": chrono::Utc::now().to_rfc3339(),
         });
 
         Ok(VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_board_analyze_control_metadata() {
-        let op = BoardAnalyzeControlOp;
-        assert_eq!(op.domain(), "board");
-        assert_eq!(op.verb(), "analyze-control");
-        assert!(!op.rationale().is_empty());
     }
 }

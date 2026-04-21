@@ -32,6 +32,7 @@ use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 pub mod affinity;
 pub mod attribute;
 pub mod audit;
+pub mod board;
 pub mod changeset;
 pub mod constellation;
 pub mod docs_bundle;
@@ -288,6 +289,10 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // 2 plugin verbs — record-response + list-overdue).
     registry.register(Arc::new(outreach::RecordResponse));
     registry.register(Arc::new(outreach::ListOverdue));
+
+    // Phase B slice #17: board domain (direct-sqlx, 1 plugin verb —
+    // analyze-control).
+    registry.register(Arc::new(board::AnalyzeControl));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
