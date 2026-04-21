@@ -1,27 +1,44 @@
-//! Capital Structure Operations
+//! Capital structure verbs (14 plugin verbs) — YAML-first re-implementation of
+//! `capital.*` from `rust/config/verbs/capital.yaml`.
 //!
-//! Plugin handlers for corporate capital structure management.
-//! Extends Clearstream-style registry with corporate share semantics.
-//!
-//! ## Rationale
-//! These operations require custom code because they involve:
-//! - Multi-table transactions (share classes + holdings + movements)
-//! - Reconciliation logic (SUM(holdings) = issued_shares)
-//! - Ownership chain traversal with multiplicative percentages
+//! Ops:
+//! - `capital.transfer` — atomic transfer of units between holdings + paired
+//!   transfer_out / transfer_in movement records
+//! - `capital.reconcile` — verify SUM(holdings) = issued_shares, aggregate
+//!   voting + economic percentages per shareholder
+//! - `capital.get-ownership-chain` — recursive CTE over
+//!   `entity_relationships` with multiplicative cumulative percentages
+//! - `capital.issue-shares` — raise issued count against authorized cap
+//! - `capital.cancel-shares` — reduce issued count within unallocated headroom
+//! - `capital.share-class.create` — multi-table share class setup
+//!   (share_classes + share_class_identifiers + share_class_supply)
+//! - `capital.share-class.get-supply` — SQL-function-backed as-of supply
+//! - `capital.issue.initial` — first issuance event + supply row for a share
+//!   class (rejects if a prior EFFECTIVE event exists)
+//! - `capital.issue.new` — subsequent issuance with running supply rollup
+//! - `capital.split` — SERIALIZABLE stock split with advisory lock + idempotency
+//!   key, adjusting supply, holdings, and dilution instruments atomically
+//! - `capital.buyback` — move units from outstanding to treasury
+//! - `capital.cancel` — permanent issued-supply reduction
+//! - `capital.cap-table` — aggregated per-share-class + per-holder positions
+//! - `capital.holders` — control-position listing with optional pct floor
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
-use serde_json::json;
+use chrono::NaiveDate;
+use serde_json::{json, Value};
+use sqlx::Row;
+use std::collections::HashMap;
 use uuid::Uuid;
 
-use sqlx::PgPool;
-
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::{
-    json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt, json_get_required_uuid,
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_int, json_extract_string, json_extract_string_opt, json_extract_uuid,
+    json_extract_uuid_opt, json_get_required_uuid,
 };
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+
+use super::SemOsVerbOp;
 
 // ============================================================================
 // Row Structs (replacing anonymous tuples for FromRow)
@@ -41,32 +58,32 @@ struct ShareClassSupplyRow {
     as_of_date: chrono::NaiveDate,
 }
 
-/// Transfer shares between shareholders
-#[register_custom_op]
-pub struct CapitalTransferOp;
+#[derive(Debug)]
+struct ShareholderInfo {
+    entity_id: Uuid,
+    total_units: rust_decimal::Decimal,
+    total_voting_rights: rust_decimal::Decimal,
+    share_classes: Vec<Value>,
+}
+
+// ============================================================================
+// capital.transfer
+// ============================================================================
+
+pub struct Transfer;
 
 #[async_trait]
-impl CustomOperation for CapitalTransferOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for Transfer {
+    fn fqn(&self) -> &str {
+        "capital.transfer"
     }
 
-    fn verb(&self) -> &'static str {
-        "transfer"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Share transfers require atomic updates to multiple holdings and movement records"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_string;
-
         let share_class_id = json_get_required_uuid(args, "share-class-id")?;
         let from_entity_id = json_get_required_uuid(args, "from-entity-id")?;
         let to_entity_id = json_get_required_uuid(args, "to-entity-id")?;
@@ -78,8 +95,6 @@ impl CustomOperation for CapitalTransferOp {
         let price_per_unit: Option<rust_decimal::Decimal> =
             json_extract_string_opt(args, "price-per-unit").and_then(|s| s.parse().ok());
 
-        let mut tx = pool.begin().await?;
-
         let source_holding: Option<(Uuid, rust_decimal::Decimal)> = sqlx::query_as(
             r#"
             SELECT id, units FROM "ob-poc".holdings
@@ -88,7 +103,7 @@ impl CustomOperation for CapitalTransferOp {
         )
         .bind(share_class_id)
         .bind(from_entity_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(scope.executor())
         .await?;
 
         let (source_holding_id, source_units) =
@@ -110,7 +125,7 @@ impl CustomOperation for CapitalTransferOp {
         )
         .bind(share_class_id)
         .bind(to_entity_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(scope.executor())
         .await?;
 
         let target_holding_id = if let Some((id, _)) = target_holding {
@@ -125,7 +140,7 @@ impl CustomOperation for CapitalTransferOp {
             )
             .bind(share_class_id)
             .bind(to_entity_id)
-            .fetch_one(&mut *tx)
+            .fetch_one(scope.executor())
             .await?;
             new_id.0
         };
@@ -135,7 +150,7 @@ impl CustomOperation for CapitalTransferOp {
         )
         .bind(units)
         .bind(source_holding_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         sqlx::query(
@@ -143,7 +158,7 @@ impl CustomOperation for CapitalTransferOp {
         )
         .bind(units)
         .bind(target_holding_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         let amount = price_per_unit.map(|p| p * units);
@@ -163,7 +178,7 @@ impl CustomOperation for CapitalTransferOp {
         .bind(amount)
         .bind(&transfer_date)
         .bind(&reference)
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
 
         let _transfer_in_id: (Uuid,) = sqlx::query_as(
@@ -182,44 +197,30 @@ impl CustomOperation for CapitalTransferOp {
         .bind(amount)
         .bind(&transfer_date)
         .bind(&reference)
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
 
-        tx.commit().await?;
-
-        Ok(VerbExecutionOutcome::Uuid(
-            transfer_out_id.0,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(transfer_out_id.0))
     }
 }
 
-/// Reconcile capital structure - verify SUM(holdings) = issued_shares
-#[register_custom_op]
-pub struct CapitalReconcileOp;
+// ============================================================================
+// capital.reconcile
+// ============================================================================
+
+pub struct Reconcile;
 
 #[async_trait]
-impl CustomOperation for CapitalReconcileOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for Reconcile {
+    fn fqn(&self) -> &str {
+        "capital.reconcile"
     }
 
-    fn verb(&self) -> &'static str {
-        "reconcile"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Reconciliation requires aggregation across holdings and computation of ownership/voting percentages"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_get_required_uuid(args, "entity-id")?;
 
@@ -231,13 +232,12 @@ impl CustomOperation for CapitalReconcileOp {
             "#,
         )
         .bind(entity_id)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
         let mut total_issued: i64 = 0;
         let mut total_allocated: rust_decimal::Decimal = rust_decimal::Decimal::ZERO;
-        let mut shareholders_map: std::collections::HashMap<Uuid, ShareholderInfo> =
-            std::collections::HashMap::new();
+        let mut shareholders_map: HashMap<Uuid, ShareholderInfo> = HashMap::new();
 
         for (class_id, class_name, issued, voting_per_share) in &share_classes {
             total_issued += issued;
@@ -250,7 +250,7 @@ impl CustomOperation for CapitalReconcileOp {
                 "#,
             )
             .bind(class_id)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?;
 
             for (investor_id, units) in holdings {
@@ -282,7 +282,7 @@ impl CustomOperation for CapitalReconcileOp {
             .map(|(_, _, issued, voting)| rust_decimal::Decimal::from(*issued) * voting)
             .sum();
 
-        let shareholders: Vec<serde_json::Value> = shareholders_map
+        let shareholders: Vec<Value> = shareholders_map
             .values()
             .map(|info| {
                 let ownership_pct = if total_issued_dec > rust_decimal::Decimal::ZERO {
@@ -311,53 +311,33 @@ impl CustomOperation for CapitalReconcileOp {
         let unallocated = total_issued_dec - total_allocated;
         let is_reconciled = unallocated == rust_decimal::Decimal::ZERO;
 
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "is_reconciled": is_reconciled,
-                "issued_shares": total_issued,
-                "allocated_shares": total_allocated.to_string(),
-                "unallocated_shares": unallocated.to_string(),
-                "shareholders": shareholders
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(json!({
+            "is_reconciled": is_reconciled,
+            "issued_shares": total_issued,
+            "allocated_shares": total_allocated.to_string(),
+            "unallocated_shares": unallocated.to_string(),
+            "shareholders": shareholders
+        })))
     }
 }
 
-#[derive(Debug)]
-struct ShareholderInfo {
-    entity_id: Uuid,
-    total_units: rust_decimal::Decimal,
-    total_voting_rights: rust_decimal::Decimal,
-    share_classes: Vec<serde_json::Value>,
-}
+// ============================================================================
+// capital.get-ownership-chain
+// ============================================================================
 
-/// Get ownership chain with multiplicative percentages
-#[register_custom_op]
-pub struct CapitalOwnershipChainOp;
+pub struct GetOwnershipChain;
 
 #[async_trait]
-impl CustomOperation for CapitalOwnershipChainOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for GetOwnershipChain {
+    fn fqn(&self) -> &str {
+        "capital.get-ownership-chain"
     }
 
-    fn verb(&self) -> &'static str {
-        "get-ownership-chain"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Ownership chain traversal requires recursive graph walking with multiplicative percentage calculation"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_get_required_uuid(args, "entity-id")?;
         let min_pct: rust_decimal::Decimal = json_extract_string_opt(args, "min-ownership-pct")
@@ -406,10 +386,10 @@ impl CustomOperation for CapitalOwnershipChainOp {
         )
         .bind(entity_id)
         .bind(min_pct)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
-        let chain_data: Vec<serde_json::Value> = chains
+        let chain_data: Vec<Value> = chains
             .iter()
             .map(|(owner_id, owner_name, path, pct, depth)| {
                 json!({
@@ -422,42 +402,28 @@ impl CustomOperation for CapitalOwnershipChainOp {
             })
             .collect();
 
-        Ok(VerbExecutionOutcome::RecordSet(
-            chain_data,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(chain_data))
     }
 }
 
-/// Issue additional shares
-#[register_custom_op]
-pub struct CapitalIssueSharesOp;
+// ============================================================================
+// capital.issue-shares
+// ============================================================================
+
+pub struct IssueShares;
 
 #[async_trait]
-impl CustomOperation for CapitalIssueSharesOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for IssueShares {
+    fn fqn(&self) -> &str {
+        "capital.issue-shares"
     }
 
-    fn verb(&self) -> &'static str {
-        "issue-shares"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Share issuance requires validation against authorized shares and audit trail"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_string;
-
         let share_class_id = json_get_required_uuid(args, "share-class-id")?;
         let additional_shares: i64 = json_extract_string(args, "additional-shares")?
             .parse()
@@ -467,7 +433,7 @@ impl CustomOperation for CapitalIssueSharesOp {
             r#"SELECT issued_shares, authorized_shares FROM "ob-poc".share_classes WHERE id = $1"#,
         )
         .bind(share_class_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
 
         let (current_issued, authorized) =
@@ -491,45 +457,31 @@ impl CustomOperation for CapitalIssueSharesOp {
         )
         .bind(new_issued)
         .bind(share_class_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
-/// Cancel/buyback shares
-#[register_custom_op]
-pub struct CapitalCancelSharesOp;
+// ============================================================================
+// capital.cancel-shares
+// ============================================================================
+
+pub struct CancelShares;
 
 #[async_trait]
-impl CustomOperation for CapitalCancelSharesOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for CancelShares {
+    fn fqn(&self) -> &str {
+        "capital.cancel-shares"
     }
 
-    fn verb(&self) -> &'static str {
-        "cancel-shares"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Share cancellation requires validation that cancelled <= unallocated and audit trail"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_string;
-
         let share_class_id = json_get_required_uuid(args, "share-class-id")?;
         let shares_to_cancel: i64 = json_extract_string(args, "shares-to-cancel")?
             .parse()
@@ -538,7 +490,7 @@ impl CustomOperation for CapitalCancelSharesOp {
         let share_class: Option<(i64,)> =
             sqlx::query_as(r#"SELECT issued_shares FROM "ob-poc".share_classes WHERE id = $1"#)
                 .bind(share_class_id)
-                .fetch_optional(pool)
+                .fetch_optional(scope.executor())
                 .await?;
 
         let (current_issued,) = share_class.ok_or_else(|| anyhow!("Share class not found"))?;
@@ -547,7 +499,7 @@ impl CustomOperation for CapitalCancelSharesOp {
             r#"SELECT COALESCE(SUM(units), 0) FROM "ob-poc".holdings WHERE share_class_id = $1 AND status = 'active'"#,
         )
         .bind(share_class_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         let allocated_i64: i64 = allocated
@@ -574,51 +526,31 @@ impl CustomOperation for CapitalCancelSharesOp {
         )
         .bind(new_issued)
         .bind(share_class_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
 // ============================================================================
-// New Operations for Capital Structure & Ownership Model (Migration 013)
+// capital.share-class.create
 // ============================================================================
 
-use chrono::NaiveDate;
-
-/// Create a new share class for an issuer
-#[register_custom_op]
-pub struct CapitalShareClassCreateOp;
+pub struct ShareClassCreate;
 
 #[async_trait]
-impl CustomOperation for CapitalShareClassCreateOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for ShareClassCreate {
+    fn fqn(&self) -> &str {
+        "capital.share-class.create"
     }
 
-    fn verb(&self) -> &'static str {
-        "share-class.create"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Share class creation requires multi-table setup: share_classes, identifiers, supply"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_string;
-
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let name = json_extract_string(args, "name")?;
         let instrument_kind = json_extract_string(args, "instrument-kind")?;
@@ -644,14 +576,12 @@ impl CustomOperation for CapitalShareClassCreateOp {
             r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL)"#,
         )
         .bind(issuer_entity_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if !issuer_exists {
             return Err(anyhow!("Issuer entity {} not found", issuer_entity_id));
         }
-
-        let mut tx = pool.begin().await?;
 
         let share_class_id: Uuid = sqlx::query_scalar(
             r#"
@@ -671,7 +601,7 @@ impl CustomOperation for CapitalShareClassCreateOp {
         .bind(economic_per_unit)
         .bind(&currency)
         .bind(authorized_units)
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
 
         let internal_ref = format!("SC-{}", &share_class_id.to_string()[..8]);
@@ -684,7 +614,7 @@ impl CustomOperation for CapitalShareClassCreateOp {
         )
         .bind(share_class_id)
         .bind(&internal_ref)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         sqlx::query(
@@ -696,44 +626,30 @@ impl CustomOperation for CapitalShareClassCreateOp {
         )
         .bind(share_class_id)
         .bind(authorized_units)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
-        tx.commit().await?;
-
-        Ok(VerbExecutionOutcome::Uuid(
-            share_class_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(share_class_id))
     }
 }
 
-/// Get current supply state for a share class
-#[register_custom_op]
-pub struct CapitalShareClassGetSupplyOp;
+// ============================================================================
+// capital.share-class.get-supply
+// ============================================================================
+
+pub struct ShareClassGetSupply;
 
 #[async_trait]
-impl CustomOperation for CapitalShareClassGetSupplyOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for ShareClassGetSupply {
+    fn fqn(&self) -> &str {
+        "capital.share-class.get-supply"
     }
 
-    fn verb(&self) -> &'static str {
-        "share-class.get-supply"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Supply computation uses SQL function for as-of date handling"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
         let as_of: NaiveDate = json_extract_string_opt(args, "as-of")
@@ -744,57 +660,43 @@ impl CustomOperation for CapitalShareClassGetSupplyOp {
             sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_share_class_supply_at($1, $2)"#)
                 .bind(share_class_id)
                 .bind(as_of)
-                .fetch_optional(pool)
+                .fetch_optional(scope.executor())
                 .await?;
 
         match supply {
-            Some(row) => Ok(VerbExecutionOutcome::Record(
-                json!({
-                    "share_class_id": share_class_id,
-                    "authorized_units": row.authorized_units.map(|d| d.to_string()),
-                    "issued_units": row.issued_units.to_string(),
-                    "outstanding_units": row.outstanding_units.to_string(),
-                    "treasury_units": row.treasury_units.to_string(),
-                    "total_votes": row.total_votes.to_string(),
-                    "total_economic": row.total_economic.to_string(),
-                    "as_of_date": row.as_of_date.to_string()
-                }),
-            )),
+            Some(row) => Ok(VerbExecutionOutcome::Record(json!({
+                "share_class_id": share_class_id,
+                "authorized_units": row.authorized_units.map(|d| d.to_string()),
+                "issued_units": row.issued_units.to_string(),
+                "outstanding_units": row.outstanding_units.to_string(),
+                "treasury_units": row.treasury_units.to_string(),
+                "total_votes": row.total_votes.to_string(),
+                "total_economic": row.total_economic.to_string(),
+                "as_of_date": row.as_of_date.to_string()
+            }))),
             None => Err(anyhow!("Share class {} not found", share_class_id)),
         }
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Initial issuance of shares (incorporation/fund launch)
-#[register_custom_op]
-pub struct CapitalIssueInitialOp;
+// ============================================================================
+// capital.issue.initial
+// ============================================================================
+
+pub struct IssueInitial;
 
 #[async_trait]
-impl CustomOperation for CapitalIssueInitialOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for IssueInitial {
+    fn fqn(&self) -> &str {
+        "capital.issue.initial"
     }
 
-    fn verb(&self) -> &'static str {
-        "issue.initial"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Initial issuance creates event record and updates supply atomically"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_string;
-
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
         let units: rust_decimal::Decimal = json_extract_string(args, "units")?
             .parse()
@@ -810,7 +712,7 @@ impl CustomOperation for CapitalIssueInitialOp {
             r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
         )
         .bind(share_class_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?
         .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
@@ -818,7 +720,7 @@ impl CustomOperation for CapitalIssueInitialOp {
             r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".issuance_events WHERE share_class_id = $1 AND status = 'EFFECTIVE')"#,
         )
         .bind(share_class_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if prior_exists {
@@ -827,8 +729,6 @@ impl CustomOperation for CapitalIssueInitialOp {
                 share_class_id
             ));
         }
-
-        let mut tx = pool.begin().await?;
 
         let event_id: Uuid = sqlx::query_scalar(
             r#"
@@ -845,7 +745,7 @@ impl CustomOperation for CapitalIssueInitialOp {
         .bind(price_per_unit)
         .bind(effective_date)
         .bind(&board_resolution_ref)
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
@@ -864,51 +764,37 @@ impl CustomOperation for CapitalIssueInitialOp {
         .bind(units)
         .bind(effective_date)
         .bind(event_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         sqlx::query(r#"UPDATE "ob-poc".share_classes SET issued_shares = $2 WHERE id = $1"#)
             .bind(share_class_id)
             .bind(units)
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await?;
-
-        tx.commit().await?;
 
         Ok(VerbExecutionOutcome::Uuid(event_id))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Subsequent issuance (capital raise)
-#[register_custom_op]
-pub struct CapitalIssueNewOp;
+// ============================================================================
+// capital.issue.new
+// ============================================================================
+
+pub struct IssueNew;
 
 #[async_trait]
-impl CustomOperation for CapitalIssueNewOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for IssueNew {
+    fn fqn(&self) -> &str {
+        "capital.issue.new"
     }
 
-    fn verb(&self) -> &'static str {
-        "issue.new"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "New issuance adds to existing supply with event audit trail"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_string;
-
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
         let units: rust_decimal::Decimal = json_extract_string(args, "units")?
             .parse()
@@ -932,15 +818,13 @@ impl CustomOperation for CapitalIssueNewOp {
             "#,
         )
         .bind(share_class_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
 
         let (issuer_entity_id, current_issued) =
             share_info.ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
         let new_issued = current_issued.unwrap_or(rust_decimal::Decimal::ZERO) + units;
-
-        let mut tx = pool.begin().await?;
 
         let event_id: Uuid = sqlx::query_scalar(
             r#"
@@ -957,7 +841,7 @@ impl CustomOperation for CapitalIssueNewOp {
         .bind(price_per_unit)
         .bind(effective_date)
         .bind(&board_resolution_ref)
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
@@ -976,51 +860,38 @@ impl CustomOperation for CapitalIssueNewOp {
         .bind(new_issued)
         .bind(effective_date)
         .bind(event_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
-
-        tx.commit().await?;
 
         Ok(VerbExecutionOutcome::Uuid(event_id))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Stock split with full transactional safety
+// ============================================================================
+// capital.split
+// ============================================================================
+
+/// Stock split with full transactional safety.
 ///
 /// Safety features:
-/// 1. SERIALIZABLE isolation - prevents concurrent reads seeing stale data
-/// 2. Advisory lock on share_class_id - serializes all splits on same class
-/// 3. Idempotency key - prevents duplicate application on retry
-/// 4. Single transaction - all-or-nothing for holdings, supply, and dilution instruments
-#[register_custom_op]
-pub struct CapitalSplitOp;
+/// 1. SERIALIZABLE isolation — prevents concurrent reads seeing stale data
+/// 2. Advisory lock on share_class_id — serializes all splits on same class
+/// 3. Idempotency key — prevents duplicate application on retry
+/// 4. Single transaction — all-or-nothing for holdings, supply, and dilution instruments
+pub struct Split;
 
 #[async_trait]
-impl CustomOperation for CapitalSplitOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for Split {
+    fn fqn(&self) -> &str {
+        "capital.split"
     }
 
-    fn verb(&self) -> &'static str {
-        "split"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Stock splits require ratio-based supply adjustment and holdings update"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_int;
-
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
         let ratio_from: i32 = json_extract_int(args, "ratio-from")? as i32;
         let ratio_to: i32 = json_extract_int(args, "ratio-to")? as i32;
@@ -1043,7 +914,7 @@ impl CustomOperation for CapitalSplitOp {
             r#"SELECT event_id FROM "ob-poc".issuance_events WHERE idempotency_key = $1"#,
         )
         .bind(&idempotency_key)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
 
         if let Some(event_id) = existing {
@@ -1054,22 +925,21 @@ impl CustomOperation for CapitalSplitOp {
             r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
         )
         .bind(share_class_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?
         .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
-        let mut tx = pool.begin().await?;
         sqlx::query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await?;
 
         let lock_id: i64 = sqlx::query_scalar(r#"SELECT "ob-poc".uuid_to_lock_id($1)"#)
             .bind(share_class_id)
-            .fetch_one(&mut *tx)
+            .fetch_one(scope.executor())
             .await?;
         sqlx::query("SELECT pg_advisory_xact_lock($1)")
             .bind(lock_id)
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await?;
 
         let current_issued: Option<rust_decimal::Decimal> = sqlx::query_scalar(
@@ -1080,7 +950,7 @@ impl CustomOperation for CapitalSplitOp {
             "#,
         )
         .bind(share_class_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(scope.executor())
         .await?;
 
         let issued = current_issued
@@ -1111,7 +981,7 @@ impl CustomOperation for CapitalSplitOp {
         .bind(effective_date)
         .bind(record_date)
         .bind(&idempotency_key)
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
@@ -1130,7 +1000,7 @@ impl CustomOperation for CapitalSplitOp {
         .bind(share_class_id)
         .bind(multiplier)
         .bind(event_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         sqlx::query(
@@ -1144,7 +1014,7 @@ impl CustomOperation for CapitalSplitOp {
         )
         .bind(share_class_id)
         .bind(multiplier)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         sqlx::query(
@@ -1158,45 +1028,31 @@ impl CustomOperation for CapitalSplitOp {
         )
         .bind(share_class_id)
         .bind(multiplier)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
-
-        tx.commit().await?;
 
         Ok(VerbExecutionOutcome::Uuid(event_id))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Share buyback into treasury
-#[register_custom_op]
-pub struct CapitalBuybackOp;
+// ============================================================================
+// capital.buyback
+// ============================================================================
+
+pub struct Buyback;
 
 #[async_trait]
-impl CustomOperation for CapitalBuybackOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for Buyback {
+    fn fqn(&self) -> &str {
+        "capital.buyback"
     }
 
-    fn verb(&self) -> &'static str {
-        "buyback"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Buyback moves shares to treasury with event audit trail"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_string;
-
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
         let units: rust_decimal::Decimal = json_extract_string(args, "units")?
             .parse()
@@ -1212,13 +1068,11 @@ impl CustomOperation for CapitalBuybackOp {
             r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
         )
         .bind(share_class_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?
         .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
         let total_amount = units * price_per_unit;
-
-        let mut tx = pool.begin().await?;
 
         let event_id: Uuid = sqlx::query_scalar(
             r#"
@@ -1235,7 +1089,7 @@ impl CustomOperation for CapitalBuybackOp {
         .bind(price_per_unit)
         .bind(total_amount)
         .bind(effective_date)
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
@@ -1247,50 +1101,36 @@ impl CustomOperation for CapitalBuybackOp {
                 updated_at = now()
             WHERE share_class_id = $1
               AND as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = $1)
-            "#
+            "#,
         )
         .bind(share_class_id)
         .bind(units)
         .bind(event_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
-
-        tx.commit().await?;
 
         Ok(VerbExecutionOutcome::Uuid(event_id))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Permanent share cancellation
-#[register_custom_op]
-pub struct CapitalCancelOp;
+// ============================================================================
+// capital.cancel
+// ============================================================================
+
+pub struct Cancel;
 
 #[async_trait]
-impl CustomOperation for CapitalCancelOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for Cancel {
+    fn fqn(&self) -> &str {
+        "capital.cancel"
     }
 
-    fn verb(&self) -> &'static str {
-        "cancel"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Share cancellation reduces issued supply permanently"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_string;
-
         let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
         let units: rust_decimal::Decimal = json_extract_string(args, "units")?
             .parse()
@@ -1304,11 +1144,9 @@ impl CustomOperation for CapitalCancelOp {
             r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
         )
         .bind(share_class_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?
         .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
-
-        let mut tx = pool.begin().await?;
 
         let event_id: Uuid = sqlx::query_scalar(
             r#"
@@ -1324,7 +1162,7 @@ impl CustomOperation for CapitalCancelOp {
         .bind(units)
         .bind(effective_date)
         .bind(&reason)
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
@@ -1336,47 +1174,35 @@ impl CustomOperation for CapitalCancelOp {
                 updated_at = now()
             WHERE share_class_id = $1
               AND as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = $1)
-            "#
+            "#,
         )
         .bind(share_class_id)
         .bind(units)
         .bind(event_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
-
-        tx.commit().await?;
 
         Ok(VerbExecutionOutcome::Uuid(event_id))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Get full cap table for an issuer
-#[register_custom_op]
-pub struct CapitalCapTableOp;
+// ============================================================================
+// capital.cap-table
+// ============================================================================
+
+pub struct CapTable;
 
 #[async_trait]
-impl CustomOperation for CapitalCapTableOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for CapTable {
+    fn fqn(&self) -> &str {
+        "capital.cap-table"
     }
 
-    fn verb(&self) -> &'static str {
-        "cap-table"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Cap table aggregates across share classes with control computation"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of: NaiveDate = json_extract_string_opt(args, "as-of")
@@ -1389,7 +1215,7 @@ impl CustomOperation for CapitalCapTableOp {
             r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL"#,
         )
         .bind(issuer_entity_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?
         .ok_or_else(|| anyhow!("Issuer entity {} not found", issuer_entity_id))?;
 
@@ -1406,16 +1232,15 @@ impl CustomOperation for CapitalCapTableOp {
         )
         .bind(issuer_entity_id)
         .bind(as_of)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
-        use sqlx::Row;
         let holder_rows =
             sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
                 .bind(issuer_entity_id)
                 .bind(as_of)
                 .bind(&basis)
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?;
 
         let total_votes: rust_decimal::Decimal = share_classes
@@ -1427,7 +1252,7 @@ impl CustomOperation for CapitalCapTableOp {
             .map(|(_, _, _, issued, _)| *issued)
             .sum();
 
-        let share_class_data: Vec<serde_json::Value> = share_classes.iter()
+        let share_class_data: Vec<Value> = share_classes.iter()
             .map(|(id, name, kind, issued, votes_per)| {
                 let class_votes = issued * votes_per;
                 json!({
@@ -1444,7 +1269,7 @@ impl CustomOperation for CapitalCapTableOp {
             })
             .collect();
 
-        let holder_data: Vec<serde_json::Value> = holder_rows
+        let holder_data: Vec<Value> = holder_rows
             .iter()
             .map(|row| {
                 json!({
@@ -1464,48 +1289,36 @@ impl CustomOperation for CapitalCapTableOp {
             })
             .collect();
 
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "issuer_entity_id": issuer_entity_id,
-                "issuer_name": issuer_name,
-                "as_of_date": as_of.to_string(),
-                "basis": basis,
-                "share_classes": share_class_data,
-                "holders": holder_data,
-                "total_votes": total_votes.to_string(),
-                "total_economic": total_economic.to_string()
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(json!({
+            "issuer_entity_id": issuer_entity_id,
+            "issuer_name": issuer_name,
+            "as_of_date": as_of.to_string(),
+            "basis": basis,
+            "share_classes": share_class_data,
+            "holders": holder_data,
+            "total_votes": total_votes.to_string(),
+            "total_economic": total_economic.to_string()
+        })))
     }
 }
 
-/// List all holders for an issuer with ownership percentages
-#[register_custom_op]
-pub struct CapitalHoldersOp;
+// ============================================================================
+// capital.holders
+// ============================================================================
+
+pub struct Holders;
 
 #[async_trait]
-impl CustomOperation for CapitalHoldersOp {
-    fn domain(&self) -> &'static str {
-        "capital"
+impl SemOsVerbOp for Holders {
+    fn fqn(&self) -> &str {
+        "capital.holders"
     }
 
-    fn verb(&self) -> &'static str {
-        "holders"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Holder listing uses control position function for computed fields"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of: NaiveDate = json_extract_string_opt(args, "as-of")
@@ -1514,15 +1327,14 @@ impl CustomOperation for CapitalHoldersOp {
         let min_pct: Option<rust_decimal::Decimal> =
             json_extract_string_opt(args, "min-pct").and_then(|s| s.parse().ok());
 
-        use sqlx::Row;
         let holder_rows =
             sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, 'VOTES')"#)
                 .bind(issuer_entity_id)
                 .bind(as_of)
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?;
 
-        let filtered: Vec<serde_json::Value> = holder_rows
+        let filtered: Vec<Value> = holder_rows
             .iter()
             .filter(|row| {
                 let voting_pct: rust_decimal::Decimal = row.get("voting_pct");
@@ -1546,12 +1358,6 @@ impl CustomOperation for CapitalHoldersOp {
             })
             .collect();
 
-        Ok(VerbExecutionOutcome::RecordSet(
-            filtered,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(filtered))
     }
 }

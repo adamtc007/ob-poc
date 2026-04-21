@@ -36,6 +36,7 @@ pub mod attribute;
 pub mod audit;
 pub mod billing;
 pub mod board;
+pub mod capital;
 pub mod bods;
 pub mod cbu_role;
 pub mod changeset;
@@ -636,6 +637,27 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #65: capital.* (14 plugin verbs — share-class
+    // lifecycle, transfer, reconcile, ownership chain, issue/cancel,
+    // split, buyback, cap-table, holders). Every multi-statement op
+    // now rides the ambient Sequencer txn — legacy per-op pool.begin()
+    // dropped. Split retains its SET TRANSACTION ISOLATION LEVEL
+    // SERIALIZABLE inside the ambient transaction.
+    registry.register(Arc::new(capital::Transfer));
+    registry.register(Arc::new(capital::Reconcile));
+    registry.register(Arc::new(capital::GetOwnershipChain));
+    registry.register(Arc::new(capital::IssueShares));
+    registry.register(Arc::new(capital::CancelShares));
+    registry.register(Arc::new(capital::ShareClassCreate));
+    registry.register(Arc::new(capital::ShareClassGetSupply));
+    registry.register(Arc::new(capital::IssueInitial));
+    registry.register(Arc::new(capital::IssueNew));
+    registry.register(Arc::new(capital::Split));
+    registry.register(Arc::new(capital::Buyback));
+    registry.register(Arc::new(capital::Cancel));
+    registry.register(Arc::new(capital::CapTable));
+    registry.register(Arc::new(capital::Holders));
 
     // Phase B slice #64: agent.* (20 plugin verbs — lifecycle
     // (start/pause/resume/stop), checkpoints (confirm/reject/select),

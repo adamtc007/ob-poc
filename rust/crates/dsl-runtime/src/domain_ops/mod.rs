@@ -22,7 +22,7 @@ pub mod affinity_graph_cache;
 // Phase 5c-migrate Phase B slice #17: board_ops → `sem_os_postgres::ops::board`.
 // Phase 5c-migrate Phase B slice #37: bods_ops → `sem_os_postgres::ops::bods`.
 // Phase 5c-migrate Phase B slice #35: coverage_compute_ops → `sem_os_postgres::ops::coverage_compute`.
-pub mod capital_ops;
+// Phase 5c-migrate Phase B slice #65: capital_ops → `sem_os_postgres::ops::capital`.
 pub mod cbu_ops;
 // Phase 5c-migrate Phase B slice #53: cbu_role_ops → `sem_os_postgres::ops::cbu_role`.
 pub mod client_group_ops;

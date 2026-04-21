@@ -739,22 +739,22 @@ mod tests {
         assert!(!registry.has("session", "start"));
         assert!(!registry.has("session", "load-universe"));
 
-        // KYC Control Enhancement: Capital operations
-        assert!(registry.has("capital", "transfer"));
-        assert!(registry.has("capital", "reconcile"));
-        assert!(registry.has("capital", "get-ownership-chain"));
-        assert!(registry.has("capital", "issue-shares"));
-        assert!(registry.has("capital", "cancel-shares"));
-        // Capital Structure & Ownership Model operations (Migration 013)
-        assert!(registry.has("capital", "share-class.create"));
-        assert!(registry.has("capital", "share-class.get-supply"));
-        assert!(registry.has("capital", "issue.initial"));
-        assert!(registry.has("capital", "issue.new"));
-        assert!(registry.has("capital", "split"));
-        assert!(registry.has("capital", "buyback"));
-        assert!(registry.has("capital", "cancel"));
-        assert!(registry.has("capital", "cap-table"));
-        assert!(registry.has("capital", "holders"));
+        // Phase 5c-migrate Phase B slice #65: capital_ops moved to
+        // `sem_os_postgres::ops::capital::*`.
+        assert!(!registry.has("capital", "transfer"));
+        assert!(!registry.has("capital", "reconcile"));
+        assert!(!registry.has("capital", "get-ownership-chain"));
+        assert!(!registry.has("capital", "issue-shares"));
+        assert!(!registry.has("capital", "cancel-shares"));
+        assert!(!registry.has("capital", "share-class.create"));
+        assert!(!registry.has("capital", "share-class.get-supply"));
+        assert!(!registry.has("capital", "issue.initial"));
+        assert!(!registry.has("capital", "issue.new"));
+        assert!(!registry.has("capital", "split"));
+        assert!(!registry.has("capital", "buyback"));
+        assert!(!registry.has("capital", "cancel"));
+        assert!(!registry.has("capital", "cap-table"));
+        assert!(!registry.has("capital", "holders"));
         // Dilution instrument operations
         // Phase 5c-migrate Phase B slice #59: dilution_ops moved to
         // `sem_os_postgres::ops::dilution::*`.
