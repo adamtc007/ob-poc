@@ -55,7 +55,7 @@ pub mod lifecycle_ops;
 // file deleted.
 // Phase 5c-migrate Phase B slice #36: observation_ops → `sem_os_postgres::ops::observation`.
 // Phase 5c-migrate Phase B slice #16: outreach_ops → `sem_os_postgres::ops::outreach`.
-pub mod outreach_plan_ops;
+// Phase 5c-migrate Phase B slice #41: outreach_plan_ops → `sem_os_postgres::ops::outreach_plan`.
 pub mod ownership_ops;
 // Phase 5c-migrate Phase B slice #1 (2026-04-21): pack_ops relocated to
 // `sem_os_postgres::ops::{pack_select,pack_answer}` as YAML-first

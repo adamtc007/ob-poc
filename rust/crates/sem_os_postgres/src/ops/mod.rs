@@ -54,6 +54,7 @@ pub mod matrix_overlay;
 pub mod nav;
 pub mod observation;
 pub mod outreach;
+pub mod outreach_plan;
 pub mod pack_answer;
 pub mod pack_select;
 pub mod phrase;
@@ -511,6 +512,10 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(evidence::MarkVerified));
     registry.register(Arc::new(evidence::MarkRejected));
     registry.register(Arc::new(evidence::MarkWaived));
+
+    // Phase B slice #41: research.outreach.plan-generate (gap→doc
+    // mapping + prioritised per-entity bundling).
+    registry.register(Arc::new(outreach_plan::PlanGenerate));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
