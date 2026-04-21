@@ -619,14 +619,15 @@ mod tests {
         assert!(registry.has("cbu", "add-product"));
         assert!(registry.has("cbu", "inspect"));
         assert!(registry.has("cbu", "delete-cascade"));
-        // CBU Role operations (Role Taxonomy V2)
-        assert!(registry.has("cbu", "assign-ownership"));
-        assert!(registry.has("cbu", "assign-control"));
-        assert!(registry.has("cbu", "assign-trust-role"));
-        assert!(registry.has("cbu", "assign-fund-role"));
-        assert!(registry.has("cbu", "assign-service-provider"));
-        assert!(registry.has("cbu", "assign-signatory"));
-        assert!(registry.has("cbu", "validate-roles"));
+        // Phase 5c-migrate Phase B slice #53: cbu_role_ops moved to
+        // `sem_os_postgres::ops::cbu_role::*`.
+        assert!(!registry.has("cbu", "assign-ownership"));
+        assert!(!registry.has("cbu", "assign-control"));
+        assert!(!registry.has("cbu", "assign-trust-role"));
+        assert!(!registry.has("cbu", "assign-fund-role"));
+        assert!(!registry.has("cbu", "assign-service-provider"));
+        assert!(!registry.has("cbu", "assign-signatory"));
+        assert!(!registry.has("cbu", "validate-roles"));
         // Phase 5c-migrate Phase B slice #26: trading-matrix ops moved to
         // `sem_os_postgres::ops::trading_matrix::*`.
         assert!(!registry.has("investment-manager", "find-for-trade"));

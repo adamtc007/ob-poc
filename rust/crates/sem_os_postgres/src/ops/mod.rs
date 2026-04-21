@@ -35,6 +35,7 @@ pub mod attribute;
 pub mod audit;
 pub mod board;
 pub mod bods;
+pub mod cbu_role;
 pub mod changeset;
 pub mod constellation;
 pub mod control;
@@ -624,6 +625,16 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #53: cbu-specialist-roles (7 plugin verbs —
+    // dual-write into cbu_entity_roles + entity_relationships edge).
+    registry.register(Arc::new(cbu_role::AssignOwnership));
+    registry.register(Arc::new(cbu_role::AssignControl));
+    registry.register(Arc::new(cbu_role::AssignTrustRole));
+    registry.register(Arc::new(cbu_role::AssignFundRole));
+    registry.register(Arc::new(cbu_role::AssignServiceProvider));
+    registry.register(Arc::new(cbu_role::AssignSignatory));
+    registry.register(Arc::new(cbu_role::ValidateRoles));
 
     // Phase B slice #52: trading-profile.ca.* (11 plugin verbs — matrix
     // JSONB mutations via TradingProfileDocument service trait).

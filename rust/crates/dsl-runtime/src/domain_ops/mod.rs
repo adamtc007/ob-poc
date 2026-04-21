@@ -24,7 +24,7 @@ pub mod billing_ops;
 // Phase 5c-migrate Phase B slice #35: coverage_compute_ops → `sem_os_postgres::ops::coverage_compute`.
 pub mod capital_ops;
 pub mod cbu_ops;
-pub mod cbu_role_ops;
+// Phase 5c-migrate Phase B slice #53: cbu_role_ops → `sem_os_postgres::ops::cbu_role`.
 pub mod client_group_ops;
 // Phase 5c-migrate Phase B slice #3 (2026-04-21): constellation_ops
 // relocated to `sem_os_postgres::ops::constellation::*` as YAML-first
