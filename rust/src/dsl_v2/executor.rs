@@ -1547,11 +1547,60 @@ async fn dispatch_plugin_via_execute_json(
     // 2. Convert VerbCall args → JSON.
     let args = adapter::verb_call_to_json(vc);
 
-    // 3. Dispatch.
-    let outcome = op
-        .execute_json(&args, &mut sem_ctx, pool)
-        .await
-        .map_err(|e| anyhow!("execute_json({}.{}) failed: {}", op.domain(), op.verb(), e))?;
+    // 3. Dispatch — scoped path (5c-migrate) or legacy pool path.
+    //
+    // Ops that have migrated to `execute_scoped` flip `requires_scope()` to
+    // `true`. The dispatcher opens a `PgTransactionScope` around the call
+    // and commits on Ok / rolls back on Err. Until every op has migrated,
+    // unmigrated ops keep taking `&PgPool` through `execute_json`.
+    let outcome = if op.requires_scope() {
+        use crate::sequencer_tx::PgTransactionScope;
+        use dsl_runtime::tx::TransactionScope;
+
+        let mut scope = PgTransactionScope::begin(pool).await.map_err(|e| {
+            anyhow!(
+                "execute_scoped({}.{}): begin txn failed: {}",
+                op.domain(),
+                op.verb(),
+                e
+            )
+        })?;
+        let scope_dyn: &mut dyn TransactionScope = &mut scope;
+        let outcome_result = op.execute_scoped(&args, &mut sem_ctx, scope_dyn).await;
+        match outcome_result {
+            Ok(outcome) => {
+                scope.commit().await.map_err(|e| {
+                    anyhow!(
+                        "execute_scoped({}.{}): commit failed: {}",
+                        op.domain(),
+                        op.verb(),
+                        e
+                    )
+                })?;
+                outcome
+            }
+            Err(e) => {
+                if let Err(rollback_err) = scope.rollback().await {
+                    tracing::warn!(
+                        domain = op.domain(),
+                        verb = op.verb(),
+                        %rollback_err,
+                        "execute_scoped rollback failed after op error"
+                    );
+                }
+                return Err(anyhow!(
+                    "execute_scoped({}.{}) failed: {}",
+                    op.domain(),
+                    op.verb(),
+                    e
+                ));
+            }
+        }
+    } else {
+        op.execute_json(&args, &mut sem_ctx, pool)
+            .await
+            .map_err(|e| anyhow!("execute_json({}.{}) failed: {}", op.domain(), op.verb(), e))?
+    };
 
     // 4. Sync sem_ctx mutations back into the caller's ExecutionContext.
     for (name, uuid) in &sem_ctx.symbols {

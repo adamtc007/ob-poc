@@ -8,12 +8,17 @@
 //!
 //! # Single-path discipline
 //!
-//! The trait exposes one execution method: `execute_json`. Legacy
-//! `execute(&VerbCall, &mut ExecutionContext, &PgPool)` moved out of the trait
-//! in Slice D-quick and now lives on per-op inherent impls; Slice C-native
-//! rewrites those call sites and deletes the inherent bodies altogether.
-//! `execute_in_tx` dropped entirely — no op overrode it; plugins are
-//! non-transactional until Slice F (VerbExecutionPort + `crate::tx::TransactionScope`).
+//! The trait exposes two parallel execution methods during the Phase 5c-migrate
+//! roll-out: the legacy `execute_json(pool: &PgPool)` and the new
+//! `execute_scoped(scope: &mut dyn TransactionScope)`. Ops opt into the scoped
+//! path by overriding `execute_scoped` and flipping `requires_scope() -> true`;
+//! the dispatcher routes on that bit. Once every op has migrated, the legacy
+//! method and the predicate are deleted, leaving a single scope-owned path.
+//!
+//! Legacy `execute(&VerbCall, &mut ExecutionContext, &PgPool)` moved out of
+//! the trait in Slice D-quick and now lives on per-op inherent impls; Slice
+//! C-native rewrites those call sites and deletes the inherent bodies
+//! altogether. `execute_in_tx` dropped entirely — no op overrode it.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -23,6 +28,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use crate::tx::TransactionScope;
 
 /// Trait for custom operations that cannot be expressed as data-driven verbs.
 ///
@@ -42,15 +48,54 @@ pub trait CustomOperation: Send + Sync {
 
     /// Execute the op against JSON args and a `VerbExecutionContext`.
     ///
-    /// The single execution contract on this trait. Callers dispatch
-    /// through this via `DslExecutor::dispatch_plugin_via_execute_json`
-    /// or `VerbExecutionPort::execute_verb`.
+    /// Legacy pool-owning path. Ops that still implement this are pre-5c;
+    /// the dispatcher calls this when `requires_scope() == false`.
+    ///
+    /// Default impl bails so ops that have migrated to `execute_scoped` can
+    /// omit this one. When every op has migrated the trait method itself
+    /// goes away.
     async fn execute_json(
         &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<VerbExecutionOutcome>;
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<VerbExecutionOutcome> {
+        anyhow::bail!(
+            "op {}.{} did not implement execute_json; if it implements execute_scoped, \
+             requires_scope() must return true so the dispatcher routes through the scoped path",
+            self.domain(),
+            self.verb()
+        )
+    }
+
+    /// Execute the op under a Sequencer-owned transaction scope.
+    ///
+    /// Post-5c-migrate path. Ops opt in by overriding this method and
+    /// returning `true` from [`Self::requires_scope`]. The dispatcher wraps
+    /// the call with a `PgTransactionScope::begin` / `commit` / `rollback`
+    /// cycle so the whole op runs inside one txn and any failure rolls back.
+    ///
+    /// Default impl bails so non-migrated ops can omit this override.
+    async fn execute_scoped(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        anyhow::bail!(
+            "op {}.{} did not implement execute_scoped; dispatcher should have routed through \
+             execute_json (requires_scope() returned true but no scoped impl was provided)",
+            self.domain(),
+            self.verb()
+        )
+    }
+
+    /// Dispatch switch: `true` routes through `execute_scoped` under a
+    /// Sequencer-owned txn; `false` (default) routes through `execute_json`
+    /// with a raw `&PgPool`. Flipped per-op during Phase 5c-migrate.
+    fn requires_scope(&self) -> bool {
+        false
+    }
 
     /// True iff this op's `execute_json` body is native (does not thunk
     /// through a legacy inherent `execute` method). Retained for telemetry

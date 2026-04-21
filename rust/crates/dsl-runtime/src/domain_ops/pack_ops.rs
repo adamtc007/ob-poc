@@ -3,16 +3,27 @@
 //! `pack.select` and `pack.answer` record pack context on the runbook so all
 //! session state can be reconstructed by folding over runbook entries
 //! (Invariant I-1 — see `rust/docs/INVARIANT-VERIFICATION.md`).
+//!
+//! # Phase 5c-migrate — first scoped slice
+//!
+//! These two ops are the pilot for the `execute_scoped` migration path
+//! (see `crate::custom_op::CustomOperation` docs). They perform no database
+//! I/O, so the signature change is YAML-faithful: the verb contract in
+//! `config/verbs/pack.yaml` is unchanged, only the Rust dispatch shape
+//! moves from `&PgPool` to `&mut dyn TransactionScope`. The scope handle is
+//! accepted but unused here — the Sequencer opens and commits an empty txn,
+//! which is safe and matches what will happen for every scoped op until the
+//! broader 5c-migrate rollout is complete.
 
 use anyhow::Result;
 use async_trait::async_trait;
 use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 
 use crate::custom_op::CustomOperation;
 use crate::domain_ops::helpers::{json_extract_string, json_extract_string_opt};
 use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use crate::tx::TransactionScope;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackSelectResult {
@@ -48,11 +59,11 @@ impl CustomOperation for PackSelectOp {
         "Records pack selection on the runbook so session state is derivable from runbook fold"
     }
 
-    async fn execute_json(
+    async fn execute_scoped(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _pool: &PgPool,
+        _scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let pack_id = json_extract_string(args, "pack-id")?;
         let pack_version =
@@ -69,6 +80,10 @@ impl CustomOperation for PackSelectOp {
         };
 
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
+    }
+
+    fn requires_scope(&self) -> bool {
+        true
     }
 
     fn is_migrated(&self) -> bool {
@@ -93,11 +108,11 @@ impl CustomOperation for PackAnswerOp {
         "Records pack Q&A answers on the runbook so accumulated answers are derivable from fold"
     }
 
-    async fn execute_json(
+    async fn execute_scoped(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _pool: &PgPool,
+        _scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let field = json_extract_string(args, "field")?;
         let value = json_extract_string(args, "value")?;
@@ -111,6 +126,10 @@ impl CustomOperation for PackAnswerOp {
         };
 
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
+    }
+
+    fn requires_scope(&self) -> bool {
+        true
     }
 
     fn is_migrated(&self) -> bool {
