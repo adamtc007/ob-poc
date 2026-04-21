@@ -3672,71 +3672,94 @@ impl ReplOrchestratorV2 {
         // VerbSearchIntentMatcher → HybridVerbSearcher::search() via the Phase 3
         // allowed_verbs parameter. REPL matching is fail-closed: if Sem OS is
         // unavailable, the allowed set is empty.
-        let mut sem_os_fingerprint: Option<String> = None;
-        let mut sem_os_pruned_count: usize = 0;
-        if let Some(ref client) = self.sem_os_client {
-            let actor = crate::policy::ActorResolver::from_env();
-            let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
-                client.as_ref(),
-                &actor,
-                Some(session.id),
-            )
-            .await;
-            session.pending_sem_os_envelope = Some(envelope.clone());
-            let phase2 =
-                Phase2Service::evaluate(session.pending_lookup_result.clone(), Some(envelope));
-            let phase2_legal_verbs = phase2.legal_verbs_or_empty.clone();
+        // Stage 4 — verb surface disclosure (Phase 5b-deep typed
+        // contract). The surface composition depends on whether
+        // SemOS is available + whether a pack is active. We resolve
+        // the envelope (async) here, then hand the four-case surface
+        // shape to the typed `VerbSurfaceComposition::run` for
+        // deterministic output construction.
+        let composition: crate::sequencer_stages::VerbSurfaceComposition =
+            if let Some(ref client) = self.sem_os_client {
+                let actor = crate::policy::ActorResolver::from_env();
+                let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
+                    client.as_ref(),
+                    &actor,
+                    Some(session.id),
+                )
+                .await;
+                session.pending_sem_os_envelope = Some(envelope.clone());
+                let phase2 = Phase2Service::evaluate(
+                    session.pending_lookup_result.clone(),
+                    Some(envelope),
+                );
 
-            if phase2.is_deny_all {
-                tracing::warn!(
-                    session_id = %session.id,
-                    "REPL: Sem OS deny-all — verb search will return empty"
-                );
-                match_ctx.allowed_verbs = Some(phase2_legal_verbs.clone());
-            }
-
-            if !phase2.is_available {
-                tracing::warn!(
-                    session_id = %session.id,
-                    "REPL: Sem OS unavailable — blocking unconstrained verb matching"
-                );
-                match_ctx.allowed_verbs = Some(std::collections::HashSet::new());
-            } else {
-                sem_os_fingerprint = phase2.fingerprint();
-                sem_os_pruned_count = phase2.pruned_verb_count();
-                match_ctx.allowed_verbs = Some(phase2_legal_verbs);
-                tracing::debug!(
-                    session_id = %session.id,
-                    allowed_count = phase2.legal_verb_count(),
-                    fingerprint = ?phase2.fingerprint(),
-                    pruned_count = sem_os_pruned_count,
-                    "REPL: Sem OS pre-constraint applied to MatchContext"
-                );
-            }
-        } else {
-            // SemOS unavailable — fall back to pack-level verb governance.
-            // If a pack is active, its allowed_verbs becomes the constraint.
-            // This maintains the fail-closed principle (no unconstrained search)
-            // while allowing the REPL to function without SemOS in dev/test.
-            if let Some(ref pack) = session.staged_pack {
-                let pack_verbs: std::collections::HashSet<String> =
-                    pack.allowed_verbs.iter().cloned().collect();
+                if !phase2.is_available {
+                    tracing::warn!(
+                        session_id = %session.id,
+                        "REPL: Sem OS unavailable — blocking unconstrained verb matching"
+                    );
+                    crate::sequencer_stages::VerbSurfaceComposition::SemOsUnavailableNoPack
+                } else if phase2.is_deny_all {
+                    tracing::warn!(
+                        session_id = %session.id,
+                        "REPL: Sem OS deny-all — verb search will return empty"
+                    );
+                    crate::sequencer_stages::VerbSurfaceComposition::SemOsDenyAll {
+                        legal_verbs: phase2
+                            .legal_verbs_or_empty
+                            .clone()
+                            .into_iter()
+                            .collect(),
+                    }
+                } else {
+                    crate::sequencer_stages::VerbSurfaceComposition::SemOsAvailable {
+                        legal_verbs: phase2
+                            .legal_verbs_or_empty
+                            .clone()
+                            .into_iter()
+                            .collect(),
+                        fingerprint: phase2.fingerprint(),
+                        pruned_count: phase2.pruned_verb_count(),
+                    }
+                }
+            } else if let Some(ref pack) = session.staged_pack {
                 tracing::info!(
                     session_id = %session.id,
                     pack_id = %pack.id,
-                    verb_count = pack_verbs.len(),
+                    verb_count = pack.allowed_verbs.len(),
                     "REPL: SemOS unavailable — using pack allowed_verbs as constraint"
                 );
-                match_ctx.allowed_verbs = Some(pack_verbs);
+                session.pending_sem_os_envelope = None;
+                crate::sequencer_stages::VerbSurfaceComposition::SemOsUnavailableWithPack {
+                    pack_id: pack.id.to_string(),
+                    pack_verbs: pack.allowed_verbs.iter().cloned().collect(),
+                }
             } else {
                 tracing::warn!(
                     session_id = %session.id,
                     "REPL: SemOS unavailable and no pack active — blocking verb matching"
                 );
-                match_ctx.allowed_verbs = Some(std::collections::HashSet::new());
-            }
-            session.pending_sem_os_envelope = None;
-        }
+                session.pending_sem_os_envelope = None;
+                crate::sequencer_stages::VerbSurfaceComposition::SemOsUnavailableNoPack
+            };
+
+        let surface = composition.run();
+        let sem_os_fingerprint = if surface.fingerprint.is_empty() {
+            None
+        } else {
+            Some(surface.fingerprint.clone())
+        };
+        let sem_os_pruned_count = surface.pruned_count;
+        let allowed_set: std::collections::HashSet<String> =
+            surface.allowed_verbs.iter().cloned().collect();
+        tracing::debug!(
+            session_id = %session.id,
+            allowed_count = allowed_set.len(),
+            fingerprint = ?sem_os_fingerprint,
+            pruned_count = sem_os_pruned_count,
+            "REPL: Stage 4 surface composed"
+        );
+        match_ctx.allowed_verbs = Some(allowed_set);
 
         if let Some(response) = self.phase2_gate_response(session) {
             return response;

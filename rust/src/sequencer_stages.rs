@@ -188,11 +188,86 @@ pub struct StateNodeRef {
 // ─── Stage 4 — Verb surface disclosure ────────────────────────────────────────
 
 /// Stage 4 input: state nodes from stage 3 + session actor.
+///
+/// **Note:** The orchestrator today derives the surface from the
+/// SemOS context envelope (Phase 2 evaluation) plus a pack fallback,
+/// not raw state nodes. The state-nodes shape here is the spec's
+/// idealised view that only becomes the operative input once
+/// Stage 3 is extracted as its own typed call. For the practical
+/// shape used by the current orchestrator, see
+/// [`VerbSurfaceComposition::run`].
 #[derive(Debug, Clone)]
 pub struct VerbSurfaceInput {
     pub trace_id: TraceId,
     pub session_id: Uuid,
     pub state_nodes: Vec<StateNodeRef>,
+}
+
+/// Practical Stage 4 input — the surface composition the orchestrator
+/// actually has at the moment it needs to call Stage 4. Exhaustively
+/// enumerates the four cases the §8.6 mapping calls out for the
+/// `InPack` tollgate.
+#[derive(Debug, Clone)]
+pub enum VerbSurfaceComposition {
+    /// SemOS responded; Phase 2 evaluation produced a non-empty legal
+    /// verb set. Carries the fingerprint and pruned count for the
+    /// determinism harness.
+    SemOsAvailable {
+        legal_verbs: Vec<String>,
+        fingerprint: Option<String>,
+        pruned_count: usize,
+    },
+    /// SemOS responded but with a deny-all verdict. The surface is
+    /// the (typically empty) verb set the deny-all envelope still
+    /// permits — usually safe-harbor verbs.
+    SemOsDenyAll {
+        legal_verbs: Vec<String>,
+    },
+    /// SemOS unavailable AND a pack is active — fall back to the
+    /// pack's `allowed_verbs` so the REPL stays usable in dev/test.
+    SemOsUnavailableWithPack {
+        pack_id: String,
+        pack_verbs: Vec<String>,
+    },
+    /// SemOS unavailable AND no pack active — fail closed: empty
+    /// surface.
+    SemOsUnavailableNoPack,
+}
+
+impl VerbSurfaceComposition {
+    /// Pure transform: compose the typed Stage 4 output from whatever
+    /// surface the orchestrator currently has. Mirrors the inline
+    /// allowed_verbs / fingerprint / pruned_count construction in
+    /// `ReplOrchestratorV2::handle_in_pack` so the determinism
+    /// harness can pin per-fixture surface bytes.
+    pub fn run(self) -> VerbSurfaceOutput {
+        match self {
+            Self::SemOsAvailable {
+                legal_verbs,
+                fingerprint,
+                pruned_count,
+            } => VerbSurfaceOutput {
+                allowed_verbs: legal_verbs,
+                fingerprint: fingerprint.unwrap_or_default(),
+                pruned_count,
+            },
+            Self::SemOsDenyAll { legal_verbs } => VerbSurfaceOutput {
+                allowed_verbs: legal_verbs,
+                fingerprint: String::new(),
+                pruned_count: 0,
+            },
+            Self::SemOsUnavailableWithPack { pack_verbs, .. } => VerbSurfaceOutput {
+                allowed_verbs: pack_verbs,
+                fingerprint: String::new(),
+                pruned_count: 0,
+            },
+            Self::SemOsUnavailableNoPack => VerbSurfaceOutput {
+                allowed_verbs: Vec::new(),
+                fingerprint: String::new(),
+                pruned_count: 0,
+            },
+        }
+    }
 }
 
 /// Stage 4 output: candidate verb set (5–60 verbs typical) plus
@@ -454,5 +529,48 @@ mod tests {
             EnvelopeVersion::CURRENT,
         );
         assert!(output.utterance_hash.is_none());
+    }
+
+    #[test]
+    fn stage_4_sem_os_available_passes_through_legal_verbs() {
+        let comp = VerbSurfaceComposition::SemOsAvailable {
+            legal_verbs: vec!["cbu.create".into(), "cbu.read".into()],
+            fingerprint: Some("v1:abc123".into()),
+            pruned_count: 17,
+        };
+        let out = comp.run();
+        assert_eq!(out.allowed_verbs.len(), 2);
+        assert!(out.allowed_verbs.iter().any(|v| v == "cbu.create"));
+        assert_eq!(out.fingerprint, "v1:abc123");
+        assert_eq!(out.pruned_count, 17);
+    }
+
+    #[test]
+    fn stage_4_sem_os_deny_all_drops_fingerprint_and_pruned_count() {
+        let comp = VerbSurfaceComposition::SemOsDenyAll {
+            legal_verbs: vec!["session.info".into()],
+        };
+        let out = comp.run();
+        assert_eq!(out.allowed_verbs, vec!["session.info".to_string()]);
+        assert!(out.fingerprint.is_empty(), "deny-all has no fingerprint");
+        assert_eq!(out.pruned_count, 0);
+    }
+
+    #[test]
+    fn stage_4_pack_fallback_uses_pack_verbs() {
+        let comp = VerbSurfaceComposition::SemOsUnavailableWithPack {
+            pack_id: "book-setup".into(),
+            pack_verbs: vec!["cbu.create".into(), "structure.setup".into()],
+        };
+        let out = comp.run();
+        assert_eq!(out.allowed_verbs.len(), 2);
+        assert!(out.allowed_verbs.contains(&"structure.setup".into()));
+    }
+
+    #[test]
+    fn stage_4_no_sem_os_no_pack_fails_closed() {
+        let out = VerbSurfaceComposition::SemOsUnavailableNoPack.run();
+        assert!(out.allowed_verbs.is_empty(), "fail-closed: empty surface");
+        assert_eq!(out.pruned_count, 0);
     }
 }

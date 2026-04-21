@@ -235,6 +235,122 @@ mod integration {
         Ok(())
     }
 
+    /// Replay-safety gate (spec §10.4): "drainer replay-safe test
+    /// passes — kill mid-stream, restart, all effects delivered
+    /// exactly-semantically-once via idempotency key".
+    ///
+    /// Models a worker crash by inserting a row in `processing` with
+    /// `claimed_at` already older than `claim_timeout`, then starts
+    /// a fresh drainer instance. The drainer's stale-claim recycler
+    /// MUST reset the row to `pending` and the new drainer MUST
+    /// re-process it cleanly. Combined with the
+    /// `(idempotency_key, effect_kind)` UNIQUE constraint, this
+    /// gives at-least-once delivery + once-observable side effect.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore]
+    async fn drainer_recovers_stale_claim_after_simulated_worker_crash() -> Result<()> {
+        let pool = pool().await?;
+        let idempotency_key = format!("test-replay:{}", Uuid::new_v4());
+
+        // Step 1 — worker A claims a row, then crashes mid-process
+        // (simulated by directly inserting in `processing` state with
+        // a claimed_at timestamp older than the recycler's timeout).
+        let id = Uuid::new_v4();
+        let trace_id = Uuid::new_v4();
+        sqlx::query(
+            r#"
+            INSERT INTO public.outbox
+                (id, trace_id, envelope_version, effect_kind, payload,
+                 idempotency_key, status, claimed_by, claimed_at, attempts)
+            VALUES
+                ($1, $2, 1, 'narrate', '{}'::jsonb, $3,
+                 'processing', 'crashed-worker-A',
+                 NOW() - INTERVAL '10 minutes', 1)
+            "#,
+        )
+        .bind(id)
+        .bind(trace_id)
+        .bind(&idempotency_key)
+        .execute(&pool)
+        .await?;
+
+        // Step 2 — confirm a duplicate insert with the same
+        // idempotency key is silently rejected (idempotency
+        // contract).
+        let dup_result = sqlx::query(
+            r#"
+            INSERT INTO public.outbox
+                (id, trace_id, envelope_version, effect_kind, payload,
+                 idempotency_key, status)
+            VALUES
+                ($1, $2, 1, 'narrate', '{"second":true}'::jsonb,
+                 $3, 'pending')
+            ON CONFLICT (idempotency_key, effect_kind) DO NOTHING
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(Uuid::new_v4())
+        .bind(&idempotency_key)
+        .execute(&pool)
+        .await?;
+        assert_eq!(
+            dup_result.rows_affected(),
+            0,
+            "duplicate insert must dedupe at the (idempotency_key, effect_kind) UNIQUE"
+        );
+
+        // Step 3 — worker B starts. Its recycler resets the stale
+        // claim → pending; its claim cycle re-claims; consumer marks
+        // done.
+        let consumer = Arc::new(RecordingConsumer::new(
+            OutboxEffectKind::Narrate,
+            "test-replay-worker-B",
+            OutboxProcessOutcome::Done,
+        ));
+        let mut config = fast_config();
+        // Keep claim_timeout below the inserted -10min stamp so the
+        // recycler picks the row up immediately on the first cycle.
+        config.claim_timeout = Duration::from_secs(60);
+        let mut drainer = OutboxDrainerImpl::new(pool.clone(), config);
+        drainer.register(consumer.clone())?;
+        let handle = drainer.spawn();
+
+        let pool_clone = pool.clone();
+        let observed = wait_for(Duration::from_secs(5), || async {
+            matches!(
+                fetch_status(&pool_clone, id).await,
+                Ok((s, _, _)) if s == "done"
+            )
+        })
+        .await;
+        assert!(observed, "row not reprocessed within 5s after stale-claim recovery");
+
+        // Worker B's consumer must have seen the row exactly once;
+        // the stale-claim recycle path adds no extra invocations.
+        let calls = consumer.observed.lock().await.clone();
+        assert_eq!(
+            calls,
+            vec![id],
+            "consumer should observe exactly one re-process call"
+        );
+
+        // attempts column reflects at-least-once: worker A's pre-
+        // crash claim left attempts=1; worker B's re-claim makes 2.
+        let (status, attempts, _) = fetch_status(&pool, id).await?;
+        assert_eq!(status, "done");
+        assert_eq!(
+            attempts, 2,
+            "attempts records the at-least-once delivery surface; observable side effect remains once via idempotency_key"
+        );
+
+        sqlx::query("DELETE FROM public.outbox WHERE id = $1")
+            .bind(id)
+            .execute(&pool)
+            .await?;
+        handle.shutdown().await;
+        Ok(())
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[ignore]
     async fn drainer_skips_rows_without_a_registered_consumer() -> Result<()> {
@@ -243,10 +359,12 @@ mod integration {
         // effect_kind has no consumer in this drainer is left untouched
         // (status='pending') for another drainer instance to handle.
         let pool = pool().await?;
-        // Use Narrate so the row's effect_kind is unique to this test.
+        // Use MaintenanceSpawn so the row's effect_kind is unique to
+        // this test (Narrate is used by the parallel replay-safety
+        // test; ExternalNotify is the foreign-consumer kind below).
         let id = enqueue(
             &pool,
-            "narrate",
+            "maintenance_spawn",
             &format!("test-no-consumer:{}", Uuid::new_v4()),
             json!({}),
         )
