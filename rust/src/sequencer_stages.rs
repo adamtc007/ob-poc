@@ -413,6 +413,201 @@ pub struct PostCommitDrainOutput {
     pub rows_terminal: usize,
 }
 
+// ─── Stage 7 — Runbook compilation (extracted) ────────────────────────────────
+
+impl RunbookCompilationOutput {
+    /// Project from the existing `crate::runbook::types::CompiledRunbook`
+    /// produced by `compile_invocation()`. Stage 7's typed contract is
+    /// already provided by the runbook module; this projection adapts
+    /// the wider `CompiledRunbook` shape to the §8.3 boundary (just
+    /// the id + step count, since the per-step content is the
+    /// runtime's concern not the harness's).
+    pub fn from_compiled(
+        runbook_id: Uuid,
+        step_count: usize,
+    ) -> Self {
+        Self {
+            runbook_id,
+            step_count,
+        }
+    }
+}
+
+// ─── Stage 9b — Post-commit drain (extracted) ─────────────────────────────────
+
+impl PostCommitDrainOutput {
+    /// Aggregate per-row drainer outcomes for one trace into the
+    /// §8.3 typed Stage 9b output. The drainer itself records each
+    /// row's outcome against `public.outbox`; this rollup is what the
+    /// determinism harness pins per fixture.
+    pub fn from_counters(rows_done: usize, rows_retryable: usize, rows_terminal: usize) -> Self {
+        Self {
+            rows_done,
+            rows_retryable,
+            rows_terminal,
+        }
+    }
+
+    /// True when every emitted outbox row reached a terminal state
+    /// (done OR failed_terminal). Used as the gate for the per-trace
+    /// drain assertion in the harness.
+    pub fn fully_drained(&self) -> bool {
+        self.rows_retryable == 0
+    }
+}
+
+// ─── Stage 3 — DAG navigation (extracted) ─────────────────────────────────────
+
+impl DagNavigationOutput {
+    /// Build the typed Stage 3 output from the rehydrate-tos result
+    /// the orchestrator already produces. `state_node_ids` are the
+    /// constellation slot UUIDs the freshly-rehydrated TOS exposes;
+    /// `rehydrated` records whether the rehydrate path actually
+    /// fired this turn (writes_since_push > 0) vs. was a no-op.
+    pub fn from_rehydrate(
+        state_node_ids: impl IntoIterator<Item = (Uuid, String)>,
+        rehydrated: bool,
+    ) -> Self {
+        let nodes = state_node_ids
+            .into_iter()
+            .map(|(node_id, state_kind)| StateNodeRef {
+                node_id,
+                state_kind,
+            })
+            .collect();
+        Self {
+            current_state_nodes: nodes,
+            rehydrated,
+        }
+    }
+}
+
+// ─── Stage 9a — Commit (extracted) ────────────────────────────────────────────
+
+impl CommitOutput {
+    /// Construct from the values the orchestrator's stage-9a path
+    /// already has when it returns from `DslExecutor`. The outbox
+    /// row count is the number of `Narrate` / `MaintenanceSpawn` /
+    /// etc. rows the dispatch loop emitted into `public.outbox`
+    /// before commit; the duration is wall-clock from the txn open
+    /// → commit transition.
+    pub fn from_commit(
+        committed_at: chrono::DateTime<chrono::Utc>,
+        outbox_rows_committed: usize,
+        commit_duration: Duration,
+    ) -> Self {
+        Self {
+            committed_at,
+            outbox_rows_committed,
+            commit_duration,
+        }
+    }
+}
+
+// ─── Stage 8 — Dispatch loop (extracted) ──────────────────────────────────────
+
+impl DispatchLoopOutput {
+    /// Aggregate per-step outcomes from the dispatch loop. The loop
+    /// records every step's outcome inline; this rollup is the
+    /// typed handoff to Stage 9a (commit) and the harness fixture.
+    pub fn from_step_outcomes(
+        steps_executed: usize,
+        steps_succeeded: usize,
+        steps_failed: usize,
+        outbox_drafts_emitted: usize,
+    ) -> Self {
+        Self {
+            steps_executed,
+            steps_succeeded,
+            steps_failed,
+            outbox_drafts_emitted,
+        }
+    }
+
+    /// All-success predicate. The harness pins this to detect silent
+    /// step failures the orchestrator might otherwise paper over.
+    pub fn all_succeeded(&self) -> bool {
+        self.steps_failed == 0 && self.steps_executed > 0
+    }
+}
+
+// ─── Stage 2a — Utterance interpretation (extracted) ──────────────────────────
+
+impl UtteranceInterpretationOutput {
+    /// Build from the IntentService + verb-search output the
+    /// orchestrator's `handle_in_pack` already computes. `triples`
+    /// is the (kind, name, scope) projection IntentService produces;
+    /// `verb_intent` is the candidate verb FQN(s) from intent
+    /// resolution; `confidence` is the top-1 score.
+    pub fn from_intent_service(
+        triples: Vec<EntityTriple>,
+        verb_intent: Option<Vec<String>>,
+        confidence: f64,
+    ) -> Self {
+        Self {
+            triples,
+            verb_intent,
+            confidence,
+        }
+    }
+}
+
+// ─── Stage 2b — Entity resolution (extracted) ─────────────────────────────────
+
+impl EntityResolutionOutput {
+    /// Build from LookupService results + remaining unresolved
+    /// triples. The orchestrator's `handle_scope_gate` and
+    /// `handle_in_pack` both invoke entity resolution paths whose
+    /// output collapses to `(resolved, unresolved)`.
+    pub fn from_lookup(
+        resolved: Vec<ResolvedEntity>,
+        unresolved: Vec<EntityTriple>,
+    ) -> Self {
+        Self {
+            resolved,
+            unresolved,
+        }
+    }
+
+    /// True when every triple resolved to a canonical id — the
+    /// happy-path predicate the harness pins per fixture.
+    pub fn fully_resolved(&self) -> bool {
+        self.unresolved.is_empty()
+    }
+}
+
+// ─── Stage 5 — NLP match (extracted) ──────────────────────────────────────────
+
+impl NlpMatchOutput {
+    /// Build from the `VerbSearchIntentMatcher` output the
+    /// orchestrator's `handle_in_pack` produces. `selected_verb` is
+    /// the matched FQN; `arg_bindings` is the JSON-shaped extracted
+    /// argument map; `match_score` is the matcher's confidence in
+    /// `[0, 1]`.
+    pub fn from_match(
+        selected_verb: String,
+        arg_bindings: serde_json::Value,
+        match_score: f64,
+    ) -> Self {
+        Self {
+            selected_verb,
+            arg_bindings,
+            match_score,
+        }
+    }
+}
+
+// ─── Stage 6 — Gate decision (extracted) ──────────────────────────────────────
+
+impl GateDecisionOutput {
+    /// Wrap an existing `GatedVerbEnvelope`. Stage 6's primary work
+    /// produces this envelope already; the typed Stage 6 output is
+    /// just the boundary projection.
+    pub fn from_envelope(envelope: ob_poc_types::GatedVerbEnvelope) -> Self {
+        Self { envelope }
+    }
+}
+
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
 /// Union of every stage's failure mode (§8.3). Each variant is named
@@ -572,5 +767,141 @@ mod tests {
         let out = VerbSurfaceComposition::SemOsUnavailableNoPack.run();
         assert!(out.allowed_verbs.is_empty(), "fail-closed: empty surface");
         assert_eq!(out.pruned_count, 0);
+    }
+
+    // ── Stage 2a ───────────────────────────────────────────────────
+
+    #[test]
+    fn stage_2a_carries_triples_and_verb_intent() {
+        let triples = vec![EntityTriple {
+            kind: "cbu".into(),
+            name: "Allianz".into(),
+            scope: None,
+        }];
+        let out = UtteranceInterpretationOutput::from_intent_service(
+            triples.clone(),
+            Some(vec!["cbu.read".into()]),
+            0.92,
+        );
+        assert_eq!(out.triples.len(), 1);
+        assert_eq!(out.triples[0].kind, "cbu");
+        assert_eq!(out.verb_intent.as_deref().map(|v| v.len()), Some(1));
+        assert!((out.confidence - 0.92).abs() < f64::EPSILON);
+    }
+
+    // ── Stage 2b ───────────────────────────────────────────────────
+
+    #[test]
+    fn stage_2b_fully_resolved_predicate_is_strict() {
+        let resolved = vec![ResolvedEntity {
+            triple: EntityTriple {
+                kind: "cbu".into(),
+                name: "x".into(),
+                scope: None,
+            },
+            entity_id: Uuid::nil(),
+            entity_kind: "cbu".into(),
+        }];
+        let out_full = EntityResolutionOutput::from_lookup(resolved.clone(), vec![]);
+        assert!(out_full.fully_resolved());
+
+        let out_partial = EntityResolutionOutput::from_lookup(
+            resolved,
+            vec![EntityTriple {
+                kind: "person".into(),
+                name: "y".into(),
+                scope: None,
+            }],
+        );
+        assert!(!out_partial.fully_resolved());
+    }
+
+    // ── Stage 3 ────────────────────────────────────────────────────
+
+    #[test]
+    fn stage_3_dag_navigation_records_rehydrate_flag() {
+        let nodes = vec![(Uuid::nil(), "open".to_string())];
+        let out = DagNavigationOutput::from_rehydrate(nodes, true);
+        assert_eq!(out.current_state_nodes.len(), 1);
+        assert_eq!(out.current_state_nodes[0].state_kind, "open");
+        assert!(out.rehydrated);
+
+        let noop = DagNavigationOutput::from_rehydrate(std::iter::empty(), false);
+        assert!(noop.current_state_nodes.is_empty());
+        assert!(!noop.rehydrated);
+    }
+
+    // ── Stage 5 ────────────────────────────────────────────────────
+
+    #[test]
+    fn stage_5_nlp_match_carries_score_and_bindings() {
+        let bindings = serde_json::json!({"cbu-id": "abc"});
+        let out = NlpMatchOutput::from_match("cbu.read".into(), bindings.clone(), 0.87);
+        assert_eq!(out.selected_verb, "cbu.read");
+        assert_eq!(out.arg_bindings, bindings);
+        assert!((out.match_score - 0.87).abs() < f64::EPSILON);
+    }
+
+    // ── Stage 6 ────────────────────────────────────────────────────
+    // GateDecisionOutput::from_envelope is exercised at the
+    // integration boundary; the unit-level pin is the trivial
+    // wrapper round-trip. We don't fabricate a GatedVerbEnvelope
+    // here because its fixture lives in the gated_envelope module.
+
+    // ── Stage 7 ────────────────────────────────────────────────────
+
+    #[test]
+    fn stage_7_runbook_compilation_projects_id_and_count() {
+        let id = Uuid::new_v4();
+        let out = RunbookCompilationOutput::from_compiled(id, 3);
+        assert_eq!(out.runbook_id, id);
+        assert_eq!(out.step_count, 3);
+    }
+
+    // ── Stage 8 ────────────────────────────────────────────────────
+
+    #[test]
+    fn stage_8_dispatch_loop_all_succeeded_predicate() {
+        let happy = DispatchLoopOutput::from_step_outcomes(5, 5, 0, 2);
+        assert!(happy.all_succeeded());
+
+        let sad = DispatchLoopOutput::from_step_outcomes(5, 4, 1, 0);
+        assert!(!sad.all_succeeded());
+
+        let empty = DispatchLoopOutput::from_step_outcomes(0, 0, 0, 0);
+        assert!(
+            !empty.all_succeeded(),
+            "zero-step runbook is not 'all succeeded'"
+        );
+    }
+
+    // ── Stage 9a ───────────────────────────────────────────────────
+
+    #[test]
+    fn stage_9a_commit_records_outbox_count() {
+        let out = CommitOutput::from_commit(
+            chrono::DateTime::from_timestamp(0, 0).unwrap(),
+            7,
+            std::time::Duration::from_millis(42),
+        );
+        assert_eq!(out.outbox_rows_committed, 7);
+        assert_eq!(out.commit_duration, std::time::Duration::from_millis(42));
+    }
+
+    // ── Stage 9b ───────────────────────────────────────────────────
+
+    #[test]
+    fn stage_9b_post_commit_drain_fully_drained_predicate() {
+        let done_only = PostCommitDrainOutput::from_counters(5, 0, 0);
+        assert!(done_only.fully_drained());
+
+        let with_terminal = PostCommitDrainOutput::from_counters(3, 0, 2);
+        assert!(
+            with_terminal.fully_drained(),
+            "terminal-failure rows still count as drained — they're not retrying"
+        );
+
+        let still_retrying = PostCommitDrainOutput::from_counters(2, 1, 0);
+        assert!(!still_retrying.fully_drained());
     }
 }
