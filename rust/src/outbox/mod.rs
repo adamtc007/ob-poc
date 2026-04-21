@@ -44,7 +44,10 @@
 mod consumer;
 mod drainer;
 mod maintenance_spawn;
+mod narrate;
+pub mod narration_emit;
 
 pub use consumer::AsyncOutboxConsumer;
 pub use drainer::{OutboxDrainerImpl, OutboxDrainerConfig, OutboxDrainerHandle};
 pub use maintenance_spawn::MaintenanceSpawnConsumer;
+pub use narrate::NarrateConsumer;

@@ -743,10 +743,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // graceful-shutdown path if we ever add one.
     let _outbox_drainer_handle = {
         use ob_poc::outbox::{
-            MaintenanceSpawnConsumer, OutboxDrainerConfig, OutboxDrainerImpl,
+            MaintenanceSpawnConsumer, NarrateConsumer, OutboxDrainerConfig, OutboxDrainerImpl,
         };
         let mut drainer = OutboxDrainerImpl::new(pool.clone(), OutboxDrainerConfig::default());
         drainer.register(Arc::new(MaintenanceSpawnConsumer::new()))?;
+        // Phase 5e-narration-cutover: NarrateConsumer drains rows the
+        // orchestrator emits after each turn that produced narration.
+        // Transitional log-only sink today; future WebSocket push
+        // path lands here.
+        drainer.register(Arc::new(NarrateConsumer::new()))?;
         tracing::info!("OutboxDrainer: spawning background task");
         drainer.spawn()
     };

@@ -965,6 +965,39 @@ impl ReplOrchestratorV2 {
                                 .map(|s| s.verb_fqn.clone())
                                 .collect();
                             if narration.has_content() {
+                                // Phase 5e-narration-cutover: dual-
+                                // write — also emit a Narrate row so
+                                // the outbox drainer carries the
+                                // canonical post-commit narration
+                                // delivery. The inline attach below
+                                // remains the synchronous path for
+                                // the existing UI; the outbox row is
+                                // the future async push channel.
+                                #[cfg(feature = "database")]
+                                if let Some(pool) = self.pool() {
+                                    if let Ok(narration_value) =
+                                        serde_json::to_value(&narration)
+                                    {
+                                        let trace_id = ob_poc_types::TraceId(
+                                            stage_1_receipt.trace_id.0,
+                                        );
+                                        let _ =
+                                            crate::outbox::narration_emit::emit_narration_outbox(
+                                                pool,
+                                                session_id,
+                                                trace_id,
+                                                Some(&ws_key),
+                                                &narration_value,
+                                            )
+                                            .await
+                                            .map_err(|e| {
+                                                tracing::warn!(
+                                                    error = %e,
+                                                    "narrate outbox emit failed (non-fatal)"
+                                                );
+                                            });
+                                    }
+                                }
                                 response.narration = Some(narration);
                             }
                         }
