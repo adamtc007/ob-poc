@@ -909,6 +909,40 @@ impl ReplOrchestratorV2 {
                     if let Ok(hydrated) = self.rehydrate_tos(pool, session).await {
                         session.hydrate_tos(hydrated);
                     }
+
+                    // Stage 3 — DAG navigation (Phase 5b-deep typed
+                    // contract). Project the post-rehydrate slot
+                    // node ids onto the §8.3 boundary so the
+                    // determinism harness can pin the rehydrated
+                    // surface per fixture.
+                    if let Some(tos) = session.workspace_stack.last() {
+                        let nodes: Vec<(uuid::Uuid, String)> = tos
+                            .hydrated_state
+                            .as_ref()
+                            .and_then(|hs| hs.hydrated_constellation.as_ref())
+                            .map(|c| {
+                                c.slots
+                                    .iter()
+                                    .map(|s| {
+                                        (
+                                            s.record_id.or(s.entity_id).unwrap_or_default(),
+                                            s.effective_state.clone(),
+                                        )
+                                    })
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        let stage_3 =
+                            crate::sequencer_stages::DagNavigationOutput::from_rehydrate(
+                                nodes, true,
+                            );
+                        tracing::debug!(
+                            session_id = %session.id,
+                            node_count = stage_3.current_state_nodes.len(),
+                            rehydrated = stage_3.rehydrated,
+                            "Stage 3 — DAG rehydrated"
+                        );
+                    }
                 }
             }
         }
@@ -3664,7 +3698,47 @@ impl ReplOrchestratorV2 {
         let context_stack = self.build_context_stack(session);
 
         if let Some(lookup_service) = &self.lookup_service {
-            session.pending_lookup_result = Some(lookup_service.analyze(content, 5).await);
+            let result = lookup_service.analyze(content, 5).await;
+
+            // Stage 2b — entity resolution (Phase 5b-deep typed
+            // contract). Project the LookupService result onto the
+            // §8.3 boundary: `resolved` carries the entity hits with
+            // their canonical id + kind; `unresolved` is empty here
+            // because LookupService doesn't track misses on its own
+            // (the orchestrator's downstream handlers attribute
+            // unresolved triples).
+            let resolved: Vec<crate::sequencer_stages::ResolvedEntity> = result
+                .entities
+                .iter()
+                .filter_map(|e| {
+                    // EntityResolution carries multiple candidates;
+                    // pick the selected winner if any, otherwise the
+                    // top candidate.
+                    let selected_id = e.selected;
+                    let top = e.candidates.first()?;
+                    Some(crate::sequencer_stages::ResolvedEntity {
+                        triple: crate::sequencer_stages::EntityTriple {
+                            kind: top.entity_kind.clone(),
+                            name: top.canonical_name.clone(),
+                            scope: None,
+                        },
+                        entity_id: selected_id.unwrap_or(top.entity_id),
+                        entity_kind: top.entity_kind.clone(),
+                    })
+                })
+                .collect();
+            let stage_2b = crate::sequencer_stages::EntityResolutionOutput::from_lookup(
+                resolved,
+                Vec::new(),
+            );
+            tracing::debug!(
+                session_id = %session.id,
+                resolved_count = stage_2b.resolved.len(),
+                fully_resolved = stage_2b.fully_resolved(),
+                "Stage 2b — entities resolved"
+            );
+
+            session.pending_lookup_result = Some(result);
         }
 
         // Phase 4 CCIR: Resolve SemOsContextEnvelope and pre-constrain verb search.
@@ -3772,6 +3846,71 @@ impl ReplOrchestratorV2 {
                 .await
             {
                 Ok(outcome) => {
+                    // Stage 2a — utterance interpretation (Phase
+                    // 5b-deep typed contract). Project the
+                    // IntentService outcome onto the §8.3 boundary.
+                    // verb_intent is the shortlisted verb FQNs;
+                    // confidence is the top match score.
+                    let (verb_intent, confidence) = match &outcome {
+                        crate::repl::intent_service::VerbMatchOutcome::Matched {
+                            verb,
+                            confidence,
+                            ..
+                        } => (Some(vec![verb.clone()]), *confidence as f64),
+                        crate::repl::intent_service::VerbMatchOutcome::Ambiguous {
+                            candidates,
+                            ..
+                        } => (
+                            Some(candidates.iter().map(|c| c.verb_fqn.clone()).collect()),
+                            candidates
+                                .first()
+                                .map(|c| c.score as f64)
+                                .unwrap_or(0.0),
+                        ),
+                        _ => (None, 0.0),
+                    };
+                    let stage_2a =
+                        crate::sequencer_stages::UtteranceInterpretationOutput::from_intent_service(
+                            // Triples extraction lives in the
+                            // intent service today; expose only
+                            // the verb-intent + confidence at this
+                            // boundary until 2b is fully extracted.
+                            Vec::new(),
+                            verb_intent.clone(),
+                            confidence,
+                        );
+                    tracing::debug!(
+                        session_id = %session.id,
+                        verb_intent_count = stage_2a.verb_intent.as_ref().map(|v| v.len()).unwrap_or(0),
+                        confidence = stage_2a.confidence,
+                        "Stage 2a — utterance interpreted"
+                    );
+
+                    // Stage 5 — NLP match (Phase 5b-deep typed
+                    // contract). When the matcher converged on a
+                    // single verb, project the (verb, score) to
+                    // the §8.3 boundary. Ambiguous / NoMatch /
+                    // contextual paths skip the Stage 5 emission
+                    // because there's no selected verb.
+                    if let crate::repl::intent_service::VerbMatchOutcome::Matched {
+                        verb,
+                        confidence,
+                        ..
+                    } = &outcome
+                    {
+                        let stage_5 = crate::sequencer_stages::NlpMatchOutput::from_match(
+                            verb.clone(),
+                            serde_json::Value::Object(serde_json::Map::new()),
+                            *confidence as f64,
+                        );
+                        tracing::debug!(
+                            session_id = %session.id,
+                            selected_verb = %stage_5.selected_verb,
+                            match_score = stage_5.match_score,
+                            "Stage 5 — verb matched"
+                        );
+                    }
+
                     return self.handle_intent_service_outcome(
                         session,
                         content,
@@ -5440,6 +5579,46 @@ impl ReplOrchestratorV2 {
             let summary = self.runbook_summary(session);
             let succeeded = results.iter().filter(|r| r.success).count();
             let failed = results.iter().filter(|r| !r.success).count();
+
+            // Stage 8 — dispatch loop (Phase 5b-deep typed contract).
+            // Aggregate per-step outcomes for the harness fixture.
+            // outbox_drafts_emitted is 0 today — Phase 5e foundation
+            // hasn't yet plumbed per-step outbox writes through this
+            // boundary; the count will land when Phase 5c-migrate
+            // hoists txn ownership into the Sequencer.
+            let stage_8 = crate::sequencer_stages::DispatchLoopOutput::from_step_outcomes(
+                results.len(),
+                succeeded,
+                failed,
+                0,
+            );
+            tracing::debug!(
+                session_id = %session.id,
+                runbook_id = %runbook_id,
+                steps_executed = stage_8.steps_executed,
+                steps_succeeded = stage_8.steps_succeeded,
+                steps_failed = stage_8.steps_failed,
+                all_succeeded = stage_8.all_succeeded(),
+                "Stage 8 — dispatch loop complete"
+            );
+
+            // Stage 9a — commit (Phase 5b-deep typed contract).
+            // Shadowed at the closest analog: per-runbook completion.
+            // The real commit boundary lives inside DslExecutor today
+            // — Phase 5c-migrate hoists it into the Sequencer at
+            // which point this shadow becomes the actual stage-9a
+            // call site.
+            let stage_9a = crate::sequencer_stages::CommitOutput::from_commit(
+                chrono::Utc::now(),
+                0, // outbox row count — see stage 8 note
+                std::time::Duration::ZERO,
+            );
+            tracing::debug!(
+                session_id = %session.id,
+                runbook_id = %runbook_id,
+                outbox_rows_committed = stage_9a.outbox_rows_committed,
+                "Stage 9a — runbook completion (shadow until Phase 5c-migrate)"
+            );
             let failure_details = if failed > 0 {
                 let details = results
                     .iter()
@@ -6028,6 +6207,21 @@ impl ReplOrchestratorV2 {
 
         match response {
             crate::runbook::OrchestratorResponse::Compiled(summary) => {
+                // Stage 7 — runbook compilation (Phase 5b-deep typed
+                // contract). Project the runbook id + step count
+                // onto the §8.3 boundary; the determinism harness
+                // pins this output per fixture to detect drift in
+                // the compiler's per-step output.
+                let stage_7 = crate::sequencer_stages::RunbookCompilationOutput::from_compiled(
+                    summary.compiled_runbook_id.0,
+                    summary.step_count,
+                );
+                tracing::debug!(
+                    session_id = %session.id,
+                    runbook_id = %stage_7.runbook_id,
+                    step_count = stage_7.step_count,
+                    "Stage 7 — runbook compiled"
+                );
                 entry.compiled_runbook_id = Some(summary.compiled_runbook_id);
                 if let Some(ref runbook) = summary.compiled_runbook {
                     if let Some(first_step) = runbook.steps.first() {

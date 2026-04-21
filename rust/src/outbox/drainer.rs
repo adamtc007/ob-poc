@@ -127,8 +127,50 @@ impl OutboxDrainerImpl {
                 }
             };
 
+            let cycle_count = claimed.len();
+            let mut cycle_done = 0usize;
+            let mut cycle_retryable = 0usize;
+            let mut cycle_terminal = 0usize;
             for row in claimed {
+                let id = row.id;
                 self.process_row(row).await;
+                // Re-read the row's terminal status to bucket. The
+                // drainer's status-update path is already idempotent;
+                // this read just classifies for the per-cycle Stage
+                // 9b rollup below.
+                if let Ok(row) = sqlx::query_scalar::<_, String>(
+                    "SELECT status FROM public.outbox WHERE id = $1",
+                )
+                .bind(id)
+                .fetch_one(&self.pool)
+                .await
+                {
+                    match row.as_str() {
+                        "done" => cycle_done += 1,
+                        "failed_retryable" => cycle_retryable += 1,
+                        "failed_terminal" => cycle_terminal += 1,
+                        _ => {}
+                    }
+                }
+            }
+
+            // Stage 9b — post-commit drain (Phase 5b-deep typed
+            // contract). Per-cycle rollup; per-trace aggregation
+            // arrives once dispatch-side Stage 9a tags rows with the
+            // trace anchor.
+            if cycle_count > 0 {
+                let stage_9b = crate::sequencer_stages::PostCommitDrainOutput::from_counters(
+                    cycle_done,
+                    cycle_retryable,
+                    cycle_terminal,
+                );
+                tracing::debug!(
+                    rows_done = stage_9b.rows_done,
+                    rows_retryable = stage_9b.rows_retryable,
+                    rows_terminal = stage_9b.rows_terminal,
+                    fully_drained = stage_9b.fully_drained(),
+                    "Stage 9b — drainer cycle summary"
+                );
             }
 
             // Wait poll_interval OR until shutdown is requested.
