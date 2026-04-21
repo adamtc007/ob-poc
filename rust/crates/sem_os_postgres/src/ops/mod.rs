@@ -77,6 +77,7 @@ pub mod team;
 pub mod temporal;
 pub mod tollgate;
 pub mod trading_matrix;
+pub mod trust;
 pub mod ubo_analysis;
 pub mod ubo_registry;
 pub mod view;
@@ -516,6 +517,11 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #41: research.outreach.plan-generate (gap→doc
     // mapping + prioritised per-entity bundling).
     registry.register(Arc::new(outreach_plan::PlanGenerate));
+
+    // Phase B slice #42: trust.analyze-control / identify-ubos / classify.
+    registry.register(Arc::new(trust::AnalyzeControl));
+    registry.register(Arc::new(trust::IdentifyUbos));
+    registry.register(Arc::new(trust::Classify));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

@@ -762,9 +762,11 @@ mod tests {
         // `sem_os_postgres::ops::board::AnalyzeControl`.
         assert!(!registry.has("board", "analyze-control"));
         // KYC Control Enhancement: Trust operations
-        assert!(registry.has("trust", "analyze-control"));
-        assert!(registry.has("trust", "identify-ubos"));
-        assert!(registry.has("trust", "classify"));
+        // Phase 5c-migrate Phase B slice #42: trust ops moved to
+        // `sem_os_postgres::ops::trust::*`.
+        assert!(!registry.has("trust", "analyze-control"));
+        assert!(!registry.has("trust", "identify-ubos"));
+        assert!(!registry.has("trust", "classify"));
         // KYC Control Enhancement: Partnership operations
         assert!(registry.has("partnership", "record-contribution"));
         assert!(registry.has("partnership", "record-distribution"));
