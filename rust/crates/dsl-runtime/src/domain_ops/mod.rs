@@ -25,7 +25,9 @@ pub mod capital_ops;
 pub mod cbu_ops;
 pub mod cbu_role_ops;
 pub mod client_group_ops;
-pub mod constellation_ops;
+// Phase 5c-migrate Phase B slice #3 (2026-04-21): constellation_ops
+// relocated to `sem_os_postgres::ops::constellation::*` as YAML-first
+// re-implementations; legacy file deleted.
 pub mod control_compute_ops;
 pub mod control_ops;
 pub mod custody;

@@ -29,6 +29,7 @@ use async_trait::async_trait;
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
+pub mod constellation;
 pub mod nav;
 pub mod pack_answer;
 pub mod pack_select;
@@ -58,6 +59,10 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(nav::SetLens));
     registry.register(Arc::new(nav::HistoryBack));
     registry.register(Arc::new(nav::HistoryForward));
+
+    // Phase B slice #3: constellation domain (service-dispatch Category D).
+    registry.register(Arc::new(constellation::Hydrate));
+    registry.register(Arc::new(constellation::Summary));
 
     registry
 }
