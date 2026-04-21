@@ -30,7 +30,7 @@ pub mod client_group_ops;
 // relocated to `sem_os_postgres::ops::constellation::*` as YAML-first
 // re-implementations; legacy file deleted.
 pub mod control_compute_ops;
-pub mod control_ops;
+// Phase 5c-migrate Phase B slice #33: control_ops → `sem_os_postgres::ops::control`.
 pub mod custody;
 pub mod deal_ops;
 pub mod dilution_ops;

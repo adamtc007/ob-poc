@@ -35,6 +35,7 @@ pub mod audit;
 pub mod board;
 pub mod changeset;
 pub mod constellation;
+pub mod control;
 pub mod docs_bundle;
 pub mod economic_exposure;
 pub mod edge;
@@ -437,6 +438,20 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(temporal::RelationshipHistory));
     registry.register(Arc::new(temporal::EntityHistory));
     registry.register(Arc::new(temporal::CompareOwnership));
+
+    // Phase B slice #33: control domain (11 plugin verbs — graph-level
+    // analysis + board-controller lifecycle + import stubs).
+    registry.register(Arc::new(control::ControlAnalyze));
+    registry.register(Arc::new(control::ControlBuildGraph));
+    registry.register(Arc::new(control::ControlIdentifyUbos));
+    registry.register(Arc::new(control::ControlTraceChain));
+    registry.register(Arc::new(control::ControlReconcileOwnership));
+    registry.register(Arc::new(control::ShowBoardController));
+    registry.register(Arc::new(control::RecomputeBoardController));
+    registry.register(Arc::new(control::SetBoardController));
+    registry.register(Arc::new(control::ClearBoardControllerOverride));
+    registry.register(Arc::new(control::ImportPscRegister));
+    registry.register(Arc::new(control::ImportGleifControl));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
