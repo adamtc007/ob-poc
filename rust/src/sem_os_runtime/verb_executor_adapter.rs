@@ -27,15 +27,23 @@ use dsl_core::ast::{Argument, AstNode, Literal, Span, VerbCall};
 /// Adapter implementing the SemOS execution port over ob-poc's DslExecutor.
 ///
 /// Routes verb execution based on contract behavior:
-/// - **CRUD** → `CrudExecutionPort` when available, otherwise DslExecutor fallback
-/// - **Plugin** → DslExecutor (CustomOperationRegistry)
-/// - **GraphQuery/Durable** → DslExecutor
+/// - **SemOS-native** → `SemOsVerbOpRegistry` lookup (Phase 5c-migrate Phase A).
+///   Takes precedence over all other paths once a verb is registered here.
+/// - **CRUD** → `CrudExecutionPort` when available, otherwise DslExecutor fallback.
+/// - **Plugin** → DslExecutor (`CustomOperationRegistry`, legacy).
+/// - **GraphQuery/Durable** → DslExecutor.
 pub struct ObPocVerbExecutor {
     executor: Arc<DslExecutor>,
     /// Optional SemOS-native CRUD executor. When set, CRUD verbs bypass
     /// the GenericCrudExecutor and route through the SemOS contract.
     /// Set via `with_crud_port()`. None = all verbs go through DslExecutor.
     crud_port: Option<Arc<dyn dsl_runtime::CrudExecutionPort>>,
+    /// Optional SemOS-native verb op registry. Populated with re-implemented
+    /// plugin ops (YAML-first, living in `sem_os_postgres::ops::*`). When
+    /// present and the FQN is registered, the op executes inside a
+    /// `PgTransactionScope`; otherwise the dispatcher falls through to the
+    /// legacy path so unmigrated verbs keep working during the migration.
+    sem_os_ops: Option<Arc<sem_os_postgres::SemOsVerbOpRegistry>>,
 }
 
 impl ObPocVerbExecutor {
@@ -43,6 +51,7 @@ impl ObPocVerbExecutor {
         Self {
             executor,
             crud_port: None,
+            sem_os_ops: None,
         }
     }
 
@@ -57,6 +66,7 @@ impl ObPocVerbExecutor {
         Self {
             executor: Arc::new(DslExecutor::new(pool)),
             crud_port: None,
+            sem_os_ops: None,
         }
     }
 
@@ -73,6 +83,7 @@ impl ObPocVerbExecutor {
         Self {
             executor: Arc::new(DslExecutor::new(pool).with_services(services)),
             crud_port: None,
+            sem_os_ops: None,
         }
     }
 
@@ -85,6 +96,23 @@ impl ObPocVerbExecutor {
         port: Arc<dyn dsl_runtime::CrudExecutionPort>,
     ) -> Self {
         self.crud_port = Some(port);
+        self
+    }
+
+    /// Attach a SemOS-native verb op registry.
+    ///
+    /// When set, verb dispatch consults the registry first. If the FQN is
+    /// present, the op runs inside a `PgTransactionScope` (commit on `Ok`,
+    /// rollback on `Err`). Absent FQNs fall through to the legacy dispatch
+    /// chain (CRUD fast-path, then `DslExecutor`).
+    ///
+    /// Phase A of the 5c-migrate relocation wires this with an empty
+    /// registry; Phase B populates it one verb at a time.
+    pub fn with_sem_os_ops(
+        mut self,
+        ops: Arc<sem_os_postgres::SemOsVerbOpRegistry>,
+    ) -> Self {
+        self.sem_os_ops = Some(ops);
         self
     }
 }
@@ -122,8 +150,88 @@ impl VerbExecutionPort for ObPocVerbExecutor {
             verb_fqn,
             behavior = behavior_label,
             has_crud_port = self.crud_port.is_some(),
+            has_sem_os_ops = self.sem_os_ops.is_some(),
             "VerbExecutionPort: routing verb"
         );
+
+        // 2.5. SemOS-native fast path — Phase A of the 5c-migrate plugin relocation.
+        //      If the verb FQN is registered in `SemOsVerbOpRegistry`, open a
+        //      `PgTransactionScope`, invoke the op, commit on Ok / rollback on Err.
+        //      Unregistered FQNs fall through; legacy CustomOperation dispatch still
+        //      handles them. When every plugin op has migrated, the fallback branch
+        //      and the `CustomOperation` trait itself are deleted.
+        if let Some(ref ops) = self.sem_os_ops {
+            if let Some(op) = ops.get(verb_fqn) {
+                use crate::sequencer_tx::PgTransactionScope;
+                use dsl_runtime::tx::TransactionScope;
+
+                let pool = self.executor.pool();
+                let mut scope = PgTransactionScope::begin(pool).await.map_err(|e| {
+                    SemOsError::Internal(anyhow::anyhow!(
+                        "sem_os_ops({}): begin txn failed: {}",
+                        verb_fqn,
+                        e
+                    ))
+                })?;
+
+                let pre_symbols = ctx.symbols.clone();
+                let pre_symbol_types = ctx.symbol_types.clone();
+
+                let exec_result: Result<VerbExecutionOutcome, anyhow::Error> = {
+                    let scope_dyn: &mut dyn TransactionScope = &mut scope;
+                    op.execute(&args, ctx, scope_dyn).await
+                };
+
+                match exec_result {
+                    Ok(outcome) => {
+                        scope.commit().await.map_err(|e| {
+                            SemOsError::Internal(anyhow::anyhow!(
+                                "sem_os_ops({}): commit failed: {}",
+                                verb_fqn,
+                                e
+                            ))
+                        })?;
+
+                        let mut new_bindings = std::collections::HashMap::new();
+                        let mut new_binding_types = std::collections::HashMap::new();
+                        for (name, uuid) in &ctx.symbols {
+                            if pre_symbols.get(name) != Some(uuid) {
+                                new_bindings.insert(name.clone(), *uuid);
+                            }
+                        }
+                        for (name, ty) in &ctx.symbol_types {
+                            if pre_symbol_types.get(name) != Some(ty) {
+                                new_binding_types.insert(name.clone(), ty.clone());
+                            }
+                        }
+
+                        return Ok(VerbExecutionResult {
+                            outcome,
+                            side_effects: VerbSideEffects {
+                                new_bindings,
+                                new_binding_types,
+                                platform_state: serde_json::Value::Null,
+                            },
+                            ..Default::default()
+                        });
+                    }
+                    Err(e) => {
+                        if let Err(rollback_err) = scope.rollback().await {
+                            tracing::warn!(
+                                verb_fqn,
+                                %rollback_err,
+                                "sem_os_ops rollback failed after op error"
+                            );
+                        }
+                        return Err(SemOsError::Internal(anyhow::anyhow!(
+                            "sem_os_ops({}) failed: {}",
+                            verb_fqn,
+                            e
+                        )));
+                    }
+                }
+            }
+        }
 
         // 3. CRUD fast path — route through CrudExecutionPort when available
         if is_crud {

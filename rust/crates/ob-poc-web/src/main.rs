@@ -978,23 +978,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_runbook_store(runbook_store)
             .with_orchestrated_verbs(orchestrated_verbs);
 
-        // Wire the VerbExecutionPort — CRUD verbs route through the
-        // dsl-runtime-native PgCrudExecutor, plugin verbs fall through
-        // to DslExecutor via the adapter.
+        // Wire the VerbExecutionPort — lookup order:
+        //   1. SemOsVerbOpRegistry (Phase 5c-migrate Phase A — YAML-first
+        //      re-implementations of plugin ops live here; populated as
+        //      Phase B migrates each domain).
+        //   2. PgCrudExecutor (dsl-runtime-native CRUD fast path).
+        //   3. DslExecutor (legacy CustomOperation registry + everything
+        //      else; disappears when every op has migrated to sem_os).
         //
         // Phase 3 (three-plane architecture v0.3 §13): PgCrudExecutor
         // relocated from sem_os_postgres to dsl-runtime.
         {
             use dsl_runtime::PgCrudExecutor;
             use ob_poc::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
+            use sem_os_postgres::SemOsVerbOpRegistry;
+            use std::sync::Arc;
+
+            // SemOS-first op registry (Phase A: smoke-test only — pack.select).
+            // Phase B slices add more ops one domain at a time.
+            let mut sem_os_ops = SemOsVerbOpRegistry::empty();
+            sem_os_ops.register(Arc::new(sem_os_postgres::ops::pack_select::PackSelect));
+            let sem_os_ops = Arc::new(sem_os_ops);
+            tracing::info!(
+                registered_ops = sem_os_ops.len(),
+                fqns = ?sem_os_ops.manifest(),
+                "SemOsVerbOpRegistry initialised"
+            );
 
             let verb_executor = ObPocVerbExecutor::from_pool_with_services(
                 pool.clone(),
                 service_registry.clone(),
             )
-            .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())));
+            .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())))
+            .with_sem_os_ops(sem_os_ops);
             orchestrator = orchestrator.with_verb_execution_port(Arc::new(verb_executor));
-            tracing::info!("VerbExecutionPort wired with dsl_runtime::PgCrudExecutor");
+            tracing::info!("VerbExecutionPort wired with SemOsVerbOpRegistry + PgCrudExecutor");
         }
 
         // Wire the V2 executor that supports parking (WorkflowDispatcher or RealDslExecutor)
