@@ -17,7 +17,7 @@ pub mod agent_ops;
 // to `sem_os_postgres::ops::attribute::*`.
 pub mod batch_control_ops;
 pub mod affinity_graph_cache;
-pub mod affinity_ops;
+// Phase 5c-migrate Phase B slice #9: affinity_ops → `sem_os_postgres::ops::affinity`.
 pub mod billing_ops;
 pub mod board_ops;
 pub mod bods_ops;

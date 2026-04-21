@@ -1,25 +1,21 @@
-//! Affinity navigation CustomOps — 6 `registry.*` verbs.
+//! Affinity navigation verbs — SemOS-side YAML-first re-implementation.
 //!
-//! Implements the YAML contracts in
-//! `rust/config/verbs/sem-reg/registry.yaml` for:
-//!  - registry.verbs-for-table       (AffinityVerbsForTableOp)
-//!  - registry.verbs-for-attribute   (AffinityVerbsForAttributeOp)
-//!  - registry.data-for-verb         (AffinityDataForVerbOp)
-//!  - registry.adjacent-verbs        (AffinityAdjacentVerbsOp)
-//!  - registry.governance-gaps       (AffinityGovernanceGapsOp)
-//!  - registry.discover-dsl          (AffinityDiscoverDslOp)
+//! Six `registry.*` verbs querying the active `AffinityGraph` (loaded
+//! via `dsl_runtime::domain_ops::affinity_graph_cache`): verbs-for-table,
+//! verbs-for-attribute, data-for-verb, adjacent-verbs, governance-gaps,
+//! discover-dsl. The discover-dsl op additionally resolves CCIR scope
+//! via [`SemOsContextResolver`]. YAML contracts in
+//! `config/verbs/sem-reg/registry.yaml`.
 //!
-//! All six ops query the active `AffinityGraph` (loaded from
-//! `sem_reg.snapshots` via [`affinity_graph_cache`]); the discover-dsl
-//! op additionally resolves CCIR context via the
-//! [`SemOsContextResolver`] trait to scope candidate verbs.
+//! `affinity_graph_cache` lives in `dsl-runtime::domain_ops` — reused
+//! here (public helper). It will be relocated alongside the final
+//! cleanup slice that tears down the legacy tree.
+
+use std::collections::HashSet;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
-use std::collections::HashSet;
 use uuid::Uuid;
 
 use sem_os_core::abac::ActorContext;
@@ -31,13 +27,15 @@ use sem_os_core::principal::Principal;
 use sem_os_core::types::Classification;
 use sem_os_core::verb_contract::VerbContractBody;
 
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::affinity_graph_cache::load_affinity_graph_cached;
-use crate::domain_ops::helpers::{
-    json_extract_int_opt, json_extract_string, json_extract_string_opt,
+use dsl_runtime::domain_ops::affinity_graph_cache::load_affinity_graph_cached;
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
 };
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
-use crate::service_traits::SemOsContextResolver;
+use dsl_runtime::service_traits::SemOsContextResolver;
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+
+use super::SemOsVerbOp;
 
 // ── Result types ──────────────────────────────────────────────────────────────
 
@@ -105,7 +103,7 @@ pub struct GovernanceGapsResult {
     pub read_before_write_attributes: Vec<String>,
 }
 
-// ── Filter enums (parsed from YAML string args) ───────────────────────────────
+// ── Filter enums ──────────────────────────────────────────────────────────────
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum AttributeDirection {
@@ -160,14 +158,20 @@ impl GapType {
     }
 }
 
-// ── Shared loaders ────────────────────────────────────────────────────────────
+fn gap_includes(filter: &GapType, kind: GapType) -> bool {
+    matches!(filter, GapType::All) || *filter == kind
+}
 
-async fn load_active_verb_contracts(pool: &PgPool) -> Result<Vec<VerbContractBody>> {
+// ── Shared loaders / mappers ──────────────────────────────────────────────────
+
+async fn load_active_verb_contracts(
+    scope: &mut dyn TransactionScope,
+) -> Result<Vec<VerbContractBody>> {
     let rows = sqlx::query_as::<_, (serde_json::Value,)>(
         "SELECT definition FROM sem_reg.snapshots \
          WHERE status = 'active' AND object_type::text = 'verb_contract'",
     )
-    .fetch_all(pool)
+    .fetch_all(scope.executor())
     .await?;
     Ok(rows
         .into_iter()
@@ -201,34 +205,24 @@ fn map_data_affinity(da: sem_os_core::affinity::DataAffinity) -> DataAffinityRow
 
 // ── registry.verbs-for-table ──────────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct AffinityVerbsForTableOp;
+pub struct VerbsForTable;
 
 #[async_trait]
-impl CustomOperation for AffinityVerbsForTableOp {
-    fn domain(&self) -> &'static str {
-        "registry"
+impl SemOsVerbOp for VerbsForTable {
+    fn fqn(&self) -> &str {
+        "registry.verbs-for-table"
     }
-    fn verb(&self) -> &'static str {
-        "verbs-for-table"
-    }
-    fn rationale(&self) -> &'static str {
-        "Queries the AffinityGraph for all verbs touching a physical database table"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let schema_name = json_extract_string(args, "schema-name")?;
         let table_name = json_extract_string(args, "table-name")?;
-        let include_lookups =
-            crate::domain_ops::helpers::json_extract_bool_opt(args, "include-lookups")
-                .unwrap_or(true);
+        let include_lookups = json_extract_bool_opt(args, "include-lookups").unwrap_or(true);
 
-        let graph = load_affinity_graph_cached(pool).await?;
+        let graph = load_affinity_graph_cached(scope.pool()).await?;
         let verbs = graph
             .verbs_for_table(&schema_name, &table_name)
             .into_iter()
@@ -246,41 +240,28 @@ impl CustomOperation for AffinityVerbsForTableOp {
             },
         )?))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // ── registry.verbs-for-attribute ──────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct AffinityVerbsForAttributeOp;
+pub struct VerbsForAttribute;
 
 #[async_trait]
-impl CustomOperation for AffinityVerbsForAttributeOp {
-    fn domain(&self) -> &'static str {
-        "registry"
+impl SemOsVerbOp for VerbsForAttribute {
+    fn fqn(&self) -> &str {
+        "registry.verbs-for-attribute"
     }
-    fn verb(&self) -> &'static str {
-        "verbs-for-attribute"
-    }
-    fn rationale(&self) -> &'static str {
-        "Queries the AffinityGraph for all verbs producing or consuming a given attribute"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        // YAML contract names the arg `attribute-fqn`; legacy callers used `attr-fqn`.
         let attribute_fqn = json_extract_string(args, "attribute-fqn")
             .or_else(|_| json_extract_string(args, "attr-fqn"))?;
         let direction = AttributeDirection::from_arg(json_extract_string_opt(args, "direction"))?;
 
-        let graph = load_affinity_graph_cached(pool).await?;
+        let graph = load_affinity_graph_cached(scope.pool()).await?;
         let verbs = graph
             .verbs_for_attribute(&attribute_fqn)
             .into_iter()
@@ -295,41 +276,29 @@ impl CustomOperation for AffinityVerbsForAttributeOp {
             },
         )?))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // ── registry.data-for-verb ────────────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct AffinityDataForVerbOp;
+pub struct DataForVerb;
 
 #[async_trait]
-impl CustomOperation for AffinityDataForVerbOp {
-    fn domain(&self) -> &'static str {
-        "registry"
+impl SemOsVerbOp for DataForVerb {
+    fn fqn(&self) -> &str {
+        "registry.data-for-verb"
     }
-    fn verb(&self) -> &'static str {
-        "data-for-verb"
-    }
-    fn rationale(&self) -> &'static str {
-        "Queries the AffinityGraph for all data assets touched by a verb, with optional transitive footprint"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let verb_fqn = json_extract_string(args, "verb-fqn")?;
         let depth = json_extract_int_opt(args, "depth")
             .map(|d| d as u32)
             .unwrap_or(1);
 
-        let graph = load_affinity_graph_cached(pool).await?;
+        let graph = load_affinity_graph_cached(scope.pool()).await?;
         let data_assets = graph
             .data_for_verb(&verb_fqn)
             .into_iter()
@@ -355,41 +324,29 @@ impl CustomOperation for AffinityDataForVerbOp {
             },
         )?))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // ── registry.adjacent-verbs ───────────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct AffinityAdjacentVerbsOp;
+pub struct AdjacentVerbs;
 
 #[async_trait]
-impl CustomOperation for AffinityAdjacentVerbsOp {
-    fn domain(&self) -> &'static str {
-        "registry"
+impl SemOsVerbOp for AdjacentVerbs {
+    fn fqn(&self) -> &str {
+        "registry.adjacent-verbs"
     }
-    fn verb(&self) -> &'static str {
-        "adjacent-verbs"
-    }
-    fn rationale(&self) -> &'static str {
-        "Queries the AffinityGraph for verbs sharing data dependencies with a given verb"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let verb_fqn = json_extract_string(args, "verb-fqn")?;
         let min_overlap = json_extract_int_opt(args, "min-overlap")
             .unwrap_or(1)
             .max(1) as usize;
 
-        let graph = load_affinity_graph_cached(pool).await?;
+        let graph = load_affinity_graph_cached(scope.pool()).await?;
         let adjacent = graph
             .adjacent_verbs(&verb_fqn)
             .into_iter()
@@ -407,41 +364,28 @@ impl CustomOperation for AffinityAdjacentVerbsOp {
             },
         )?))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // ── registry.governance-gaps ──────────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct AffinityGovernanceGapsOp;
+pub struct GovernanceGaps;
 
 #[async_trait]
-impl CustomOperation for AffinityGovernanceGapsOp {
-    fn domain(&self) -> &'static str {
-        "registry"
+impl SemOsVerbOp for GovernanceGaps {
+    fn fqn(&self) -> &str {
+        "registry.governance-gaps"
     }
-    fn verb(&self) -> &'static str {
-        "governance-gaps"
-    }
-    fn rationale(&self) -> &'static str {
-        "Identifies ungoverned tables, disconnected verbs, and attribute flow anomalies via the AffinityGraph"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let schema_filter = json_extract_string_opt(args, "schema-name");
         let gap_type = GapType::from_arg(json_extract_string_opt(args, "gap-type"))?;
 
-        let graph = load_affinity_graph_cached(pool).await?;
+        let graph = load_affinity_graph_cached(scope.pool()).await?;
 
-        // Pull the physical table list from information_schema for orphan-table detection.
         let known_tables: Vec<(String, String)> = match schema_filter.as_deref() {
             Some(schema) => {
                 sqlx::query_as(
@@ -450,7 +394,7 @@ impl CustomOperation for AffinityGovernanceGapsOp {
                      ORDER BY table_schema, table_name",
                 )
                 .bind(schema)
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
             }
             None => {
@@ -460,7 +404,7 @@ impl CustomOperation for AffinityGovernanceGapsOp {
                        AND table_schema NOT IN ('pg_catalog','information_schema','pg_toast') \
                      ORDER BY table_schema, table_name",
                 )
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
             }
         };
@@ -470,13 +414,15 @@ impl CustomOperation for AffinityGovernanceGapsOp {
             .collect();
 
         let result = GovernanceGapsResult {
-            orphan_tables: gap_includes(&gap_type, GapType::OrphanTables).then(|| {
-                graph
-                    .orphan_tables(&known_table_refs)
-                    .into_iter()
-                    .map(|t| t.key())
-                    .collect()
-            }).unwrap_or_default(),
+            orphan_tables: gap_includes(&gap_type, GapType::OrphanTables)
+                .then(|| {
+                    graph
+                        .orphan_tables(&known_table_refs)
+                        .into_iter()
+                        .map(|t| t.key())
+                        .collect()
+                })
+                .unwrap_or_default(),
             orphan_verbs: gap_includes(&gap_type, GapType::OrphanVerbs)
                 .then(|| graph.orphan_verbs())
                 .unwrap_or_default(),
@@ -490,40 +436,23 @@ impl CustomOperation for AffinityGovernanceGapsOp {
 
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-
-fn gap_includes(filter: &GapType, kind: GapType) -> bool {
-    matches!(filter, GapType::All) || *filter == kind
 }
 
 // ── registry.discover-dsl ─────────────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct AffinityDiscoverDslOp;
+pub struct DiscoverDsl;
 
 #[async_trait]
-impl CustomOperation for AffinityDiscoverDslOp {
-    fn domain(&self) -> &'static str {
-        "registry"
+impl SemOsVerbOp for DiscoverDsl {
+    fn fqn(&self) -> &str {
+        "registry.discover-dsl"
     }
-    fn verb(&self) -> &'static str {
-        "discover-dsl"
-    }
-    fn rationale(&self) -> &'static str {
-        "Utterance -> intent -> DSL chain synthesis via AffinityGraph with CCIR-aware filtering"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        // YAML contract names the arg `utterance`; legacy callers used `intent`.
         let utterance = json_extract_string(args, "utterance")
             .or_else(|_| json_extract_string(args, "intent"))?;
         let max_chain_length = json_extract_int_opt(args, "max-chain-length")
@@ -535,8 +464,8 @@ impl CustomOperation for AffinityDiscoverDslOp {
             .transpose()
             .map_err(|e| anyhow::anyhow!("invalid subject-id: {e}"))?;
 
-        let graph = load_affinity_graph_cached(pool).await?;
-        let verb_contracts = load_active_verb_contracts(pool).await?;
+        let graph = load_affinity_graph_cached(scope.pool()).await?;
+        let verb_contracts = load_active_verb_contracts(scope).await?;
 
         let (allowed_verbs, policy_check) = match subject_uuid {
             Some(subject_id) => resolve_ccir_scope(ctx, subject_id, &utterance).await,
@@ -554,14 +483,8 @@ impl CustomOperation for AffinityDiscoverDslOp {
         );
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Resolve the CCIR-allowed verb set for a subject, using the
-/// `SemOsContextResolver` trait. Returns `(allowed_verbs, policy_check_marker)`.
 async fn resolve_ccir_scope(
     ctx: &VerbExecutionContext,
     subject_id: Uuid,

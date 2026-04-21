@@ -29,6 +29,7 @@ use async_trait::async_trait;
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
+pub mod affinity;
 pub mod attribute;
 pub mod audit;
 pub mod changeset;
@@ -246,6 +247,14 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(semantic::MissingEntities));
     registry.register(Arc::new(semantic::NextActions));
     registry.register(Arc::new(semantic::PromptContext));
+
+    // Phase B slice #9: affinity navigation (registry.*-for-* verbs).
+    registry.register(Arc::new(affinity::VerbsForTable));
+    registry.register(Arc::new(affinity::VerbsForAttribute));
+    registry.register(Arc::new(affinity::DataForVerb));
+    registry.register(Arc::new(affinity::AdjacentVerbs));
+    registry.register(Arc::new(affinity::GovernanceGaps));
+    registry.register(Arc::new(affinity::DiscoverDsl));
 
     registry
 }
