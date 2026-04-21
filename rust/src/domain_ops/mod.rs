@@ -667,10 +667,12 @@ mod tests {
         assert!(registry.has("document", "upload"));
         assert!(registry.has("document", "waive-request"));
         // KYC case operations
-        assert!(registry.has("kyc-case", "create"));
-        assert!(registry.has("kyc-case", "close"));
-        assert!(registry.has("kyc-case", "summarize"));
-        assert!(registry.has("entity-workstream", "state"));
+        // Phase 5c-migrate Phase B slice #62: kyc_case_ops moved to
+        // `sem_os_postgres::ops::kyc_case::*`.
+        assert!(!registry.has("kyc-case", "create"));
+        assert!(!registry.has("kyc-case", "close"));
+        assert!(!registry.has("kyc-case", "summarize"));
+        assert!(!registry.has("entity-workstream", "state"));
         // UBO chain computation (Phase 2.3)
         // Phase 5c-migrate Phase B slice #48: ubo.compute-chains moved to
         // `sem_os_postgres::ops::ubo_compute::ComputeChains`.

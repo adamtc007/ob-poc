@@ -56,6 +56,7 @@ pub mod graph_validate;
 pub mod import_run;
 pub mod investor;
 pub mod investor_role;
+pub mod kyc_case;
 pub mod lifecycle;
 pub mod maintenance;
 pub mod manco;
@@ -633,6 +634,16 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #62: kyc-case.* + entity-workstream.state (5 plugin
+    // verbs — deal-aware create, FSM-gated update-status, close with
+    // KYC_GATE_COMPLETED deal event, summarize + workstream state views).
+    // sqlx::query! → runtime sqlx::query_as (offline-cache free).
+    registry.register(Arc::new(kyc_case::Create));
+    registry.register(Arc::new(kyc_case::UpdateStatus));
+    registry.register(Arc::new(kyc_case::Close));
+    registry.register(Arc::new(kyc_case::Summarize));
+    registry.register(Arc::new(kyc_case::WorkstreamState));
 
     // Phase B slice #61: document.* (9 plugin verbs — catalog/extract
     // + solicit + solicit-batch + upload-version + verify + reject +
