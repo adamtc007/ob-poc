@@ -179,6 +179,14 @@ pub mod sequencer;
 #[cfg(feature = "database")]
 pub mod sequencer_tx;
 
+// Phase 5b-deep — typed I/O + error contracts for the nine V&S stages.
+// Scaffold only: the types are defined here and unit-tested for
+// serde round-tripping; the actual extraction of `sequencer.rs`'s
+// tollgate handlers into per-stage typed functions lands one stage
+// at a time as `5b-deep-stage-N` slices. See `sequencer_stages.rs`
+// header for the rationale.
+pub mod sequencer_stages;
+
 // Phase 5e — outbox drainer. Polls `public.outbox` for post-commit
 // effects (maintenance subprocess spawn, narration synthesis, UI push,
 // constellation broadcast, external HTTP notify), claims rows with

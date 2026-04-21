@@ -775,13 +775,27 @@ impl ReplOrchestratorV2 {
 
         let trace_scaffold = self.persist_trace_scaffold(session, &input).await;
 
-        // Record user input as a message and trace entry.
+        // Stage 1 — utterance receipt (Phase 5b-deep typed contract).
+        // Computes the trace anchor / envelope-version / utterance hash
+        // through the §8.3 helper. The trace_scaffold above still owns
+        // the side-effecting trace-store write; this call gives the
+        // determinism harness a deterministic Stage 1 output to pin
+        // against fixtures and primes the typed extraction work that
+        // future `5b-deep-stage-N` slices will continue.
+        let stage_1_receipt = crate::sequencer_stages::UtteranceReceiptInput {
+            session_id,
+            input: input.clone(),
+        }
+        .run(chrono::Utc::now(), ob_poc_types::EnvelopeVersion::CURRENT);
+
+        // Record user input as a message and trace entry. The hash is
+        // computed once by Stage 1 and reused here.
         if let UserInputV2::Message { ref content } = input {
             session.push_message(MessageRole::User, content.clone());
-            let hash = {
-                use sha2::{Digest, Sha256};
-                format!("sha256:{:x}", Sha256::digest(content.as_bytes()))
-            };
+            let hash = stage_1_receipt
+                .utterance_hash
+                .clone()
+                .expect("Stage 1 produces a hash for Message inputs");
             session.append_trace(crate::repl::session_trace::TraceOp::Input {
                 utterance_hash: hash,
             });
