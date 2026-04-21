@@ -60,6 +60,7 @@ pub mod nav;
 pub mod observation;
 pub mod outreach;
 pub mod outreach_plan;
+pub mod ownership;
 pub mod pack_answer;
 pub mod partnership;
 pub mod pack_select;
@@ -626,6 +627,18 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #55: ownership.* (8 plugin verbs — snapshot derive/list,
+    // control positions, controller finder, reconciliation run/findings,
+    // gap analysis, recursive chain trace).
+    registry.register(Arc::new(ownership::Compute));
+    registry.register(Arc::new(ownership::SnapshotList));
+    registry.register(Arc::new(ownership::ListControlPositions));
+    registry.register(Arc::new(ownership::FindController));
+    registry.register(Arc::new(ownership::Reconcile));
+    registry.register(Arc::new(ownership::ReconcileFindings));
+    registry.register(Arc::new(ownership::AnalyzeGaps));
+    registry.register(Arc::new(ownership::TraceChain));
 
     // Phase B slice #54: graph.validate (1 plugin verb — cycle detection +
     // terminus integrity + per-target supply + source conflict +

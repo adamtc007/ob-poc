@@ -759,14 +759,16 @@ mod tests {
         assert!(registry.has("capital", "dilution.list"));
         assert!(registry.has("capital", "dilution.get-summary"));
         // Ownership operations
-        assert!(registry.has("ownership", "compute"));
-        assert!(registry.has("ownership", "snapshot.list"));
-        assert!(registry.has("ownership", "list-control-positions"));
-        assert!(registry.has("ownership", "find-controller"));
-        assert!(registry.has("ownership", "reconcile"));
-        assert!(registry.has("ownership", "reconcile.findings"));
-        assert!(registry.has("ownership", "analyze-gaps"));
-        assert!(registry.has("ownership", "trace-chain"));
+        // Phase 5c-migrate Phase B slice #55: ownership_ops moved to
+        // `sem_os_postgres::ops::ownership::*`.
+        assert!(!registry.has("ownership", "compute"));
+        assert!(!registry.has("ownership", "snapshot.list"));
+        assert!(!registry.has("ownership", "list-control-positions"));
+        assert!(!registry.has("ownership", "find-controller"));
+        assert!(!registry.has("ownership", "reconcile"));
+        assert!(!registry.has("ownership", "reconcile.findings"));
+        assert!(!registry.has("ownership", "analyze-gaps"));
+        assert!(!registry.has("ownership", "trace-chain"));
         // Phase 5c-migrate Phase B slice #17: board.analyze-control moved to
         // `sem_os_postgres::ops::board::AnalyzeControl`.
         assert!(!registry.has("board", "analyze-control"));

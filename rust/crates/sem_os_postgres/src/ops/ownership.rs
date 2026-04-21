@@ -1,135 +1,104 @@
-//! Ownership Computation & Reconciliation Operations
+//! Ownership computation + reconciliation (8 plugin verbs) —
+//! YAML-first re-implementation of `ownership.*` from
+//! `rust/config/verbs/ownership.yaml`.
 //!
-//! Plugin handlers for ownership snapshots, control positions, and reconciliation
-//! against external sources (BODS, GLEIF).
-//!
-//! ## Key Tables
-//! - "ob-poc".ownership_snapshots
-//! - "ob-poc".special_rights
-//! - "ob-poc".ownership_reconciliation_runs
-//! - "ob-poc".ownership_reconciliation_findings
-//!
-//! ## Key SQL Functions
-//! - "ob-poc".fn_holder_control_position()
-//! - "ob-poc".fn_derive_ownership_snapshots()
+//! Ops:
+//! - `ownership.compute` — invokes `fn_derive_ownership_snapshots`
+//! - `ownership.snapshot.list` — list snapshots with optional source /
+//!   min-pct filters
+//! - `ownership.list-control-positions` — dispatch
+//!   `fn_holder_control_position` with basis
+//! - `ownership.find-controller` — filter control-position rows to
+//!   entities with control / significant influence / board rights
+//! - `ownership.reconcile` — compare per-entity snapshots across two
+//!   derivation sources, persist a run + findings, return run_id
+//! - `ownership.reconcile.findings` — list findings for a run (severity +
+//!   resolution-status filters)
+//! - `ownership.analyze-gaps` — sum register-derived percentages, flag
+//!   gap from 100%
+//! - `ownership.trace-chain` — recursive CTE across
+//!   `entity_relationships` ownership edges, return top-5 paths
 
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use dsl_runtime_macros::register_custom_op;
-use serde_json::json;
+use serde_json::{json, Value};
+use sqlx::Row;
+use std::collections::HashMap;
 use uuid::Uuid;
 
-use sqlx::PgPool;
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_int_opt, json_extract_string_opt, json_extract_uuid,
+};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-use crate::domain_ops::helpers::{json_extract_int_opt, json_extract_string_opt, json_extract_uuid};
-use crate::custom_op::CustomOperation;
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use super::SemOsVerbOp;
 
-fn ownership_date_arg_json(args: &serde_json::Value, arg_name: &str) -> NaiveDate {
+fn ownership_date_arg(args: &Value, arg_name: &str) -> NaiveDate {
     json_extract_string_opt(args, arg_name)
         .as_deref()
         .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
         .unwrap_or_else(|| chrono::Utc::now().date_naive())
 }
 
-// ============================================================================
-// Ownership Computation
-// ============================================================================
-
-/// Derive ownership snapshots from register holdings
-#[register_custom_op]
-pub struct OwnershipComputeOp;
+pub struct Compute;
 
 #[async_trait]
-impl CustomOperation for OwnershipComputeOp {
-    fn domain(&self) -> &'static str {
-        "ownership"
+impl SemOsVerbOp for Compute {
+    fn fqn(&self) -> &str {
+        "ownership.compute"
     }
-
-    fn verb(&self) -> &'static str {
-        "compute"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Ownership computation aggregates holdings and calls SQL function for snapshot creation"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of = ownership_date_arg_json(args, "as-of");
+        let as_of = ownership_date_arg(args, "as-of");
         let count: i32 =
             sqlx::query_scalar(r#"SELECT "ob-poc".fn_derive_ownership_snapshots($1, $2)"#)
                 .bind(issuer_entity_id)
                 .bind(as_of)
-                .fetch_one(pool)
+                .fetch_one(scope.executor())
                 .await?;
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "issuer_entity_id": issuer_entity_id,
-                "as_of_date": as_of.to_string(),
-                "snapshots_created": count
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(json!({
+            "issuer_entity_id": issuer_entity_id,
+            "as_of_date": as_of.to_string(),
+            "snapshots_created": count
+        })))
     }
 }
 
-/// List ownership snapshots for an issuer
-#[register_custom_op]
-pub struct OwnershipSnapshotListOp;
+pub struct SnapshotList;
 
 #[async_trait]
-impl CustomOperation for OwnershipSnapshotListOp {
-    fn domain(&self) -> &'static str {
-        "ownership"
+impl SemOsVerbOp for SnapshotList {
+    fn fqn(&self) -> &str {
+        "ownership.snapshot.list"
     }
-
-    fn verb(&self) -> &'static str {
-        "snapshot.list"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Snapshot listing with filtering by source and minimum percentage"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of = ownership_date_arg_json(args, "as-of");
-        let derived_from =
-            json_extract_string_opt(args, "derived-from").unwrap_or_else(|| "ALL".to_string());
+        let as_of = ownership_date_arg(args, "as-of");
+        let derived_from = json_extract_string_opt(args, "derived-from")
+            .unwrap_or_else(|| "ALL".to_string());
         let min_pct: Option<rust_decimal::Decimal> =
             json_extract_string_opt(args, "min-pct").and_then(|s| s.parse().ok());
         let basis = json_extract_string_opt(args, "basis").unwrap_or_else(|| "VOTES".to_string());
-        let snapshots: Vec<(
-            Uuid,
-            Uuid,
-            Uuid,
-            Option<Uuid>,
-            NaiveDate,
-            String,
-            Option<rust_decimal::Decimal>,
-            Option<rust_decimal::Decimal>,
-            Option<rust_decimal::Decimal>,
-            Option<rust_decimal::Decimal>,
-            String,
-            bool,
-            bool,
-            String,
-        )> = if derived_from == "ALL" {
+
+        type Row14 = (
+            Uuid, Uuid, Uuid, Option<Uuid>, NaiveDate, String,
+            Option<rust_decimal::Decimal>, Option<rust_decimal::Decimal>,
+            Option<rust_decimal::Decimal>, Option<rust_decimal::Decimal>,
+            String, bool, bool, String,
+        );
+        let snapshots: Vec<Row14> = if derived_from == "ALL" {
             sqlx::query_as(
                 r#"
                 SELECT
@@ -143,13 +112,13 @@ impl CustomOperation for OwnershipSnapshotListOp {
                   AND os.superseded_at IS NULL
                   AND ($4::numeric IS NULL OR os.percentage >= $4)
                 ORDER BY os.percentage DESC NULLS LAST
-                "#
+                "#,
             )
             .bind(issuer_entity_id)
             .bind(as_of)
             .bind(&basis)
             .bind(min_pct)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?
         } else {
             sqlx::query_as(
@@ -166,90 +135,70 @@ impl CustomOperation for OwnershipSnapshotListOp {
                   AND os.superseded_at IS NULL
                   AND ($5::numeric IS NULL OR os.percentage >= $5)
                 ORDER BY os.percentage DESC NULLS LAST
-                "#
+                "#,
             )
             .bind(issuer_entity_id)
             .bind(as_of)
             .bind(&basis)
             .bind(&derived_from)
             .bind(min_pct)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?
         };
-        let snapshot_data: Vec<serde_json::Value> =
-            futures::future::try_join_all(snapshots.iter().map(|s| async {
-                let owner_name: Option<String> = sqlx::query_scalar(
-                    r#"SELECT name FROM "ob-poc".entities
-                       WHERE entity_id = $1
-                         AND deleted_at IS NULL"#,
-                )
-                .bind(s.2)
-                .fetch_optional(pool)
-                .await?;
-                Ok::<_, anyhow::Error>(json!({
-                    "snapshot_id": s.0,
-                    "owner_entity_id": s.2,
-                    "owner_name": owner_name,
-                    "share_class_id": s.3,
-                    "as_of_date": s.4.to_string(),
-                    "basis": s.5,
-                    "units": s.6.map(|d| d.to_string()),
-                    "percentage": s.7.map(|d| d.to_string()),
-                    "percentage_min": s.8.map(|d| d.to_string()),
-                    "percentage_max": s.9.map(|d| d.to_string()),
-                    "derived_from": s.10,
-                    "is_direct": s.11,
-                    "is_aggregated": s.12,
-                    "confidence": s.13
-                }))
-            }))
-            .await?;
-        Ok(VerbExecutionOutcome::RecordSet(
-            snapshot_data,
-        ))
-    }
 
-    fn is_migrated(&self) -> bool {
-        true
+        let mut out: Vec<Value> = Vec::with_capacity(snapshots.len());
+        for s in &snapshots {
+            let owner_name: Option<String> = sqlx::query_scalar(
+                r#"SELECT name FROM "ob-poc".entities
+                   WHERE entity_id = $1 AND deleted_at IS NULL"#,
+            )
+            .bind(s.2)
+            .fetch_optional(scope.executor())
+            .await?;
+            out.push(json!({
+                "snapshot_id": s.0,
+                "owner_entity_id": s.2,
+                "owner_name": owner_name,
+                "share_class_id": s.3,
+                "as_of_date": s.4.to_string(),
+                "basis": s.5,
+                "units": s.6.map(|d| d.to_string()),
+                "percentage": s.7.map(|d| d.to_string()),
+                "percentage_min": s.8.map(|d| d.to_string()),
+                "percentage_max": s.9.map(|d| d.to_string()),
+                "derived_from": s.10,
+                "is_direct": s.11,
+                "is_aggregated": s.12,
+                "confidence": s.13
+            }));
+        }
+        Ok(VerbExecutionOutcome::RecordSet(out))
     }
 }
 
-/// Get control positions for an issuer
-#[register_custom_op]
-pub struct OwnershipControlPositionsOp;
+pub struct ListControlPositions;
 
 #[async_trait]
-impl CustomOperation for OwnershipControlPositionsOp {
-    fn domain(&self) -> &'static str {
-        "ownership"
+impl SemOsVerbOp for ListControlPositions {
+    fn fqn(&self) -> &str {
+        "ownership.list-control-positions"
     }
-
-    fn verb(&self) -> &'static str {
-        "list-control-positions"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Control position computation uses SQL function with basis parameter"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of = ownership_date_arg_json(args, "as-of");
+        let as_of = ownership_date_arg(args, "as-of");
         let basis = json_extract_string_opt(args, "basis").unwrap_or_else(|| "VOTES".to_string());
-        use sqlx::Row;
-        let position_rows =
-            sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
-                .bind(issuer_entity_id)
-                .bind(as_of)
-                .bind(&basis)
-                .fetch_all(pool)
-                .await?;
-        let position_data: Vec<serde_json::Value> = position_rows
+        let rows = sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
+            .bind(issuer_entity_id)
+            .bind(as_of)
+            .bind(&basis)
+            .fetch_all(scope.executor())
+            .await?;
+        let data: Vec<Value> = rows
             .iter()
             .map(|row| {
                 json!({
@@ -273,50 +222,31 @@ impl CustomOperation for OwnershipControlPositionsOp {
                 })
             })
             .collect();
-        Ok(VerbExecutionOutcome::RecordSet(
-            position_data,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(data))
     }
 }
 
-/// Find who controls an issuer
-#[register_custom_op]
-pub struct OwnershipWhoControlsOp;
+pub struct FindController;
 
 #[async_trait]
-impl CustomOperation for OwnershipWhoControlsOp {
-    fn domain(&self) -> &'static str {
-        "ownership"
+impl SemOsVerbOp for FindController {
+    fn fqn(&self) -> &str {
+        "ownership.find-controller"
     }
-
-    fn verb(&self) -> &'static str {
-        "find-controller"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Who controls query filters to entities with control or board majority"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of = ownership_date_arg_json(args, "as-of");
-        use sqlx::Row;
-        let position_rows =
-            sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, 'VOTES')"#)
-                .bind(issuer_entity_id)
-                .bind(as_of)
-                .fetch_all(pool)
-                .await?;
-        let controllers: Vec<serde_json::Value> = position_rows
+        let as_of = ownership_date_arg(args, "as-of");
+        let rows = sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, 'VOTES')"#)
+            .bind(issuer_entity_id)
+            .bind(as_of)
+            .fetch_all(scope.executor())
+            .await?;
+        let controllers: Vec<Value> = rows
             .iter()
             .filter(|row| {
                 let has_control: bool = row.get("has_control");
@@ -352,55 +282,32 @@ impl CustomOperation for OwnershipWhoControlsOp {
                 })
             })
             .collect();
-        Ok(VerbExecutionOutcome::RecordSet(
-            controllers,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(controllers))
     }
 }
 
-// ============================================================================
-// Reconciliation
-// ============================================================================
-
-/// Compare ownership from different sources
-#[register_custom_op]
-pub struct OwnershipReconcileOp;
+pub struct Reconcile;
 
 #[async_trait]
-impl CustomOperation for OwnershipReconcileOp {
-    fn domain(&self) -> &'static str {
-        "ownership"
+impl SemOsVerbOp for Reconcile {
+    fn fqn(&self) -> &str {
+        "ownership.reconcile"
     }
-
-    fn verb(&self) -> &'static str {
-        "reconcile"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Reconciliation compares snapshots from two sources and creates findings"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of = ownership_date_arg_json(args, "as-of");
-        let source_a =
-            json_extract_string_opt(args, "source-a").unwrap_or_else(|| "REGISTER".to_string());
-        let source_b =
-            json_extract_string_opt(args, "source-b").unwrap_or_else(|| "BODS".to_string());
+        let as_of = ownership_date_arg(args, "as-of");
+        let source_a = json_extract_string_opt(args, "source-a").unwrap_or_else(|| "REGISTER".to_string());
+        let source_b = json_extract_string_opt(args, "source-b").unwrap_or_else(|| "BODS".to_string());
         let basis = json_extract_string_opt(args, "basis").unwrap_or_else(|| "VOTES".to_string());
         let tolerance_bps: i32 = json_extract_int_opt(args, "tolerance-bps")
             .map(|i| i as i32)
             .unwrap_or(100);
-        let mut tx = pool.begin().await?;
+
         let run_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".ownership_reconciliation_runs (
@@ -415,8 +322,9 @@ impl CustomOperation for OwnershipReconcileOp {
         .bind(&source_a)
         .bind(&source_b)
         .bind(tolerance_bps)
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
+
         let snapshots_a: Vec<(Uuid, rust_decimal::Decimal)> = sqlx::query_as(
             r#"
             SELECT owner_entity_id, COALESCE(percentage, 0)
@@ -432,8 +340,9 @@ impl CustomOperation for OwnershipReconcileOp {
         .bind(as_of)
         .bind(&source_a)
         .bind(&basis)
-        .fetch_all(&mut *tx)
+        .fetch_all(scope.executor())
         .await?;
+
         let snapshots_b: Vec<(Uuid, rust_decimal::Decimal)> = sqlx::query_as(
             r#"
             SELECT owner_entity_id, COALESCE(percentage, (COALESCE(percentage_min, 0) + COALESCE(percentage_max, 0)) / 2)
@@ -449,15 +358,16 @@ impl CustomOperation for OwnershipReconcileOp {
         .bind(as_of)
         .bind(&source_b)
         .bind(&basis)
-        .fetch_all(&mut *tx)
+        .fetch_all(scope.executor())
         .await?;
-        use std::collections::HashMap;
+
         let map_a: HashMap<Uuid, rust_decimal::Decimal> = snapshots_a.into_iter().collect();
         let map_b: HashMap<Uuid, rust_decimal::Decimal> = snapshots_b.into_iter().collect();
         let mut matched = 0;
         let mut mismatched = 0;
         let mut missing_in_a = 0;
         let mut missing_in_b = 0;
+
         for (entity_id, pct_a) in &map_a {
             if let Some(pct_b) = map_b.get(entity_id) {
                 let delta_bps = ((pct_a - pct_b).abs() * rust_decimal::Decimal::from(10000))
@@ -487,7 +397,7 @@ impl CustomOperation for OwnershipReconcileOp {
                 .bind(delta_bps)
                 .bind(finding_type)
                 .bind(severity)
-                .execute(&mut *tx)
+                .execute(scope.executor())
                 .await?;
             } else {
                 missing_in_b += 1;
@@ -501,7 +411,7 @@ impl CustomOperation for OwnershipReconcileOp {
                 .bind(run_id)
                 .bind(entity_id)
                 .bind(pct_a)
-                .execute(&mut *tx)
+                .execute(scope.executor())
                 .await?;
             }
         }
@@ -518,10 +428,11 @@ impl CustomOperation for OwnershipReconcileOp {
                 .bind(run_id)
                 .bind(entity_id)
                 .bind(pct_b)
-                .execute(&mut *tx)
+                .execute(scope.executor())
                 .await?;
             }
         }
+
         let total_entities = (map_a.len() + map_b.len()) as i32;
         sqlx::query(
             r#"
@@ -542,59 +453,38 @@ impl CustomOperation for OwnershipReconcileOp {
         .bind(mismatched)
         .bind(missing_in_a)
         .bind(missing_in_b)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
-        tx.commit().await?;
+
         ctx.bind("ownership_reconciliation_run", run_id);
         Ok(VerbExecutionOutcome::Uuid(run_id))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// List findings from a reconciliation run
-#[register_custom_op]
-pub struct OwnershipReconcileFindingsOp;
+pub struct ReconcileFindings;
 
 #[async_trait]
-impl CustomOperation for OwnershipReconcileFindingsOp {
-    fn domain(&self) -> &'static str {
-        "ownership"
+impl SemOsVerbOp for ReconcileFindings {
+    fn fqn(&self) -> &str {
+        "ownership.reconcile.findings"
     }
-
-    fn verb(&self) -> &'static str {
-        "reconcile.findings"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Findings listing with filtering by severity and resolution status"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let run_id = json_extract_uuid(args, ctx, "run-id")?;
-        let severity =
-            json_extract_string_opt(args, "severity").unwrap_or_else(|| "ALL".to_string());
+        let severity = json_extract_string_opt(args, "severity").unwrap_or_else(|| "ALL".to_string());
         let status = json_extract_string_opt(args, "status").unwrap_or_else(|| "OPEN".to_string());
-        let findings: Vec<(
-            Uuid,
-            Uuid,
-            Uuid,
-            Option<rust_decimal::Decimal>,
-            Option<rust_decimal::Decimal>,
-            Option<i32>,
-            String,
-            Option<String>,
-            String,
-            Option<String>,
-            Option<String>,
-        )> = if severity == "ALL" && status == "ALL" {
+
+        type Row11 = (
+            Uuid, Uuid, Uuid,
+            Option<rust_decimal::Decimal>, Option<rust_decimal::Decimal>,
+            Option<i32>, String, Option<String>, String,
+            Option<String>, Option<String>,
+        );
+        let findings: Vec<Row11> = if severity == "ALL" && status == "ALL" {
             sqlx::query_as(
                 r#"
                 SELECT f.finding_id, f.run_id, f.owner_entity_id,
@@ -607,7 +497,7 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
                 "#,
             )
             .bind(run_id)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?
         } else if severity == "ALL" {
             sqlx::query_as(
@@ -623,7 +513,7 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
             )
             .bind(run_id)
             .bind(&status)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?
         } else if status == "ALL" {
             sqlx::query_as(
@@ -639,7 +529,7 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
             )
             .bind(run_id)
             .bind(&severity)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?
         } else {
             sqlx::query_as(
@@ -656,75 +546,53 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
             .bind(run_id)
             .bind(&severity)
             .bind(&status)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?
         };
-        let finding_data: Vec<serde_json::Value> =
-            futures::future::try_join_all(findings.iter().map(|f| async {
-                let owner_name: Option<String> = sqlx::query_scalar(
-                    r#"SELECT name FROM "ob-poc".entities
-                       WHERE entity_id = $1
-                         AND deleted_at IS NULL"#,
-                )
-                .bind(f.2)
-                .fetch_optional(pool)
-                .await?;
-                Ok::<_, anyhow::Error>(json!({
-                    "finding_id": f.0,
-                    "run_id": f.1,
-                    "owner_entity_id": f.2,
-                    "owner_name": owner_name,
-                    "source_a_pct": f.3.map(|d| d.to_string()),
-                    "source_b_pct": f.4.map(|d| d.to_string()),
-                    "delta_bps": f.5,
-                    "finding_type": f.6,
-                    "severity": f.7,
-                    "resolution_status": f.8,
-                    "resolution_notes": f.9,
-                    "resolved_by": f.10
-                }))
-            }))
-            .await?;
-        Ok(VerbExecutionOutcome::RecordSet(
-            finding_data,
-        ))
-    }
 
-    fn is_migrated(&self) -> bool {
-        true
+        let mut out: Vec<Value> = Vec::with_capacity(findings.len());
+        for f in &findings {
+            let owner_name: Option<String> = sqlx::query_scalar(
+                r#"SELECT name FROM "ob-poc".entities
+                   WHERE entity_id = $1 AND deleted_at IS NULL"#,
+            )
+            .bind(f.2)
+            .fetch_optional(scope.executor())
+            .await?;
+            out.push(json!({
+                "finding_id": f.0,
+                "run_id": f.1,
+                "owner_entity_id": f.2,
+                "owner_name": owner_name,
+                "source_a_pct": f.3.map(|d| d.to_string()),
+                "source_b_pct": f.4.map(|d| d.to_string()),
+                "delta_bps": f.5,
+                "finding_type": f.6,
+                "severity": f.7,
+                "resolution_status": f.8,
+                "resolution_notes": f.9,
+                "resolved_by": f.10
+            }));
+        }
+        Ok(VerbExecutionOutcome::RecordSet(out))
     }
 }
 
-// ============================================================================
-// Ownership Analysis
-// ============================================================================
-
-/// Analyze ownership gaps for an issuer
-#[register_custom_op]
-pub struct OwnershipAnalyzeGapsOp;
+pub struct AnalyzeGaps;
 
 #[async_trait]
-impl CustomOperation for OwnershipAnalyzeGapsOp {
-    fn domain(&self) -> &'static str {
-        "ownership"
+impl SemOsVerbOp for AnalyzeGaps {
+    fn fqn(&self) -> &str {
+        "ownership.analyze-gaps"
     }
-
-    fn verb(&self) -> &'static str {
-        "analyze-gaps"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Gap analysis checks if ownership sums to 100% and identifies unallocated shares"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of = ownership_date_arg_json(args, "as-of");
+        let as_of = ownership_date_arg(args, "as-of");
         let total_pct: rust_decimal::Decimal = sqlx::query_scalar(
             r#"
             SELECT COALESCE(SUM(percentage), 0)
@@ -738,49 +606,32 @@ impl CustomOperation for OwnershipAnalyzeGapsOp {
         )
         .bind(issuer_entity_id)
         .bind(as_of)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
         let gap_pct = rust_decimal::Decimal::from(100) - total_pct;
         let is_reconciled = gap_pct.abs() < rust_decimal::Decimal::new(1, 2);
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "issuer_entity_id": issuer_entity_id,
-                "as_of_date": as_of.to_string(),
-                "total_ownership_pct": total_pct.to_string(),
-                "gap_pct": gap_pct.to_string(),
-                "is_reconciled": is_reconciled
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(json!({
+            "issuer_entity_id": issuer_entity_id,
+            "as_of_date": as_of.to_string(),
+            "total_ownership_pct": total_pct.to_string(),
+            "gap_pct": gap_pct.to_string(),
+            "is_reconciled": is_reconciled
+        })))
     }
 }
 
-/// Trace ownership chain from one entity to another
-#[register_custom_op]
-pub struct OwnershipTraceChainOp;
+pub struct TraceChain;
 
 #[async_trait]
-impl CustomOperation for OwnershipTraceChainOp {
-    fn domain(&self) -> &'static str {
-        "ownership"
+impl SemOsVerbOp for TraceChain {
+    fn fqn(&self) -> &str {
+        "ownership.trace-chain"
     }
-
-    fn verb(&self) -> &'static str {
-        "trace-chain"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Chain tracing uses recursive CTE to find paths and compute cumulative ownership"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let from_entity_id = json_extract_uuid(args, ctx, "from-entity-id")?;
         let to_entity_id = json_extract_uuid(args, ctx, "to-entity-id")?;
@@ -827,29 +678,22 @@ impl CustomOperation for OwnershipTraceChainOp {
         .bind(from_entity_id)
         .bind(to_entity_id)
         .bind(max_depth)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
         let path_exists = !paths.is_empty();
         let best_path = paths.first();
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "from_entity_id": from_entity_id,
-                "to_entity_id": to_entity_id,
-                "path_exists": path_exists,
-                "path": best_path.map(|(p, _, _)| p.clone()),
-                "cumulative_pct": best_path.map(|(_, pct, _)| pct.to_string()),
-                "depth": best_path.map(|(_, _, d)| d),
-                "all_paths": paths.iter().map(|(p, pct, d)| json!({
-                    "path": p,
-                    "cumulative_pct": pct.to_string(),
-                    "depth": d
-                })).collect::<Vec<_>>()
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(json!({
+            "from_entity_id": from_entity_id,
+            "to_entity_id": to_entity_id,
+            "path_exists": path_exists,
+            "path": best_path.map(|(p, _, _)| p.clone()),
+            "cumulative_pct": best_path.map(|(_, pct, _)| pct.to_string()),
+            "depth": best_path.map(|(_, _, d)| d),
+            "all_paths": paths.iter().map(|(p, pct, d)| json!({
+                "path": p,
+                "cumulative_pct": pct.to_string(),
+                "depth": d
+            })).collect::<Vec<_>>()
+        })))
     }
 }
-
