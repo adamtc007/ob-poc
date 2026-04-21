@@ -31,7 +31,7 @@ pub mod client_group_ops;
 // re-implementations; legacy file deleted.
 // Phase 5c-migrate Phase B slice #34: control_compute_ops → `sem_os_postgres::ops::control_compute`.
 // Phase 5c-migrate Phase B slice #33: control_ops → `sem_os_postgres::ops::control`.
-pub mod custody;
+// Phase 5c-migrate Phase B slice #50: custody → `sem_os_postgres::ops::custody`.
 pub mod deal_ops;
 pub mod dilution_ops;
 pub mod discovery_ops;

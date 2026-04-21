@@ -609,10 +609,12 @@ mod tests {
         assert!(!registry.has("service-resource", "validate-attrs"));
         // Delivery operations are now CRUD-based (delivery.yaml)
         // Custody operations
-        assert!(registry.has("subcustodian", "lookup"));
-        assert!(registry.has("cbu-custody", "lookup-ssi"));
-        assert!(registry.has("cbu-custody", "validate-booking-coverage"));
-        assert!(registry.has("cbu-custody", "derive-required-coverage"));
+        // Phase 5c-migrate Phase B slice #50: custody ops moved to
+        // `sem_os_postgres::ops::custody::*`.
+        assert!(!registry.has("subcustodian", "lookup"));
+        assert!(!registry.has("cbu-custody", "lookup-ssi"));
+        assert!(!registry.has("cbu-custody", "validate-booking-coverage"));
+        assert!(!registry.has("cbu-custody", "derive-required-coverage"));
         // CBU operations
         assert!(registry.has("cbu", "add-product"));
         assert!(registry.has("cbu", "inspect"));

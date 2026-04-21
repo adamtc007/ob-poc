@@ -40,6 +40,7 @@ pub mod constellation;
 pub mod control;
 pub mod control_compute;
 pub mod coverage_compute;
+pub mod custody;
 pub mod docs_bundle;
 pub mod economic_exposure;
 pub mod edge;
@@ -593,6 +594,14 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(ubo_graph::ConvergenceSupersede));
     registry.register(Arc::new(ubo_graph::TransferControl));
     registry.register(Arc::new(ubo_graph::WaiveVerification));
+
+    // Phase B slice #50: custody (5 plugin verbs across
+    // `subcustodian` + `cbu-custody` domains).
+    registry.register(Arc::new(custody::SubcustodianLookup));
+    registry.register(Arc::new(custody::LookupSsiForTrade));
+    registry.register(Arc::new(custody::ValidateBookingCoverage));
+    registry.register(Arc::new(custody::DeriveRequiredCoverage));
+    registry.register(Arc::new(custody::SetupSsi));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
