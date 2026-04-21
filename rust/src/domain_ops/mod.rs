@@ -768,11 +768,12 @@ mod tests {
         assert!(registry.has("partnership", "record-distribution"));
         assert!(registry.has("partnership", "reconcile"));
         assert!(registry.has("partnership", "analyze-control"));
-        // KYC Control Enhancement: Tollgate operations
-        assert!(registry.has("tollgate", "evaluate"));
-        assert!(registry.has("tollgate", "get-metrics"));
-        assert!(registry.has("tollgate", "override"));
-        assert!(registry.has("tollgate", "get-decision-readiness"));
+        // Phase 5c-migrate Phase B slice #38: tollgate ops moved to
+        // `sem_os_postgres::ops::tollgate::*`.
+        assert!(!registry.has("tollgate", "evaluate"));
+        assert!(!registry.has("tollgate", "get-metrics"));
+        assert!(!registry.has("tollgate", "override"));
+        assert!(!registry.has("tollgate", "get-decision-readiness"));
         // Phase 5c-migrate Phase B slice #35: coverage.compute moved to
         // `sem_os_postgres::ops::coverage_compute::Compute`.
         assert!(!registry.has("coverage", "compute"));

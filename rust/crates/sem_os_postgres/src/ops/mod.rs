@@ -73,6 +73,7 @@ pub mod state;
 pub mod stewardship_helper;
 pub mod team;
 pub mod temporal;
+pub mod tollgate;
 pub mod trading_matrix;
 pub mod ubo_registry;
 pub mod view;
@@ -482,6 +483,13 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(bods::FindByLei));
     registry.register(Arc::new(bods::ListOwnership));
     registry.register(Arc::new(bods::SyncFromGleif));
+
+    // Phase B slice #38: tollgate decision engine (4 plugin verbs —
+    // evaluate/get-metrics/override/get-decision-readiness).
+    registry.register(Arc::new(tollgate::Evaluate));
+    registry.register(Arc::new(tollgate::GetMetrics));
+    registry.register(Arc::new(tollgate::Override));
+    registry.register(Arc::new(tollgate::GetDecisionReadiness));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
