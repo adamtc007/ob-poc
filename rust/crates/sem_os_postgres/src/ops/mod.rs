@@ -42,6 +42,7 @@ pub mod pack_select;
 pub mod phrase;
 pub mod registry;
 pub mod registry_ops;
+pub mod semantic;
 pub mod service_pipeline;
 pub mod session;
 pub mod stewardship_helper;
@@ -237,6 +238,14 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(maintenance::DrainOutbox));
     registry.register(Arc::new(maintenance::ReindexEmbeddings));
     registry.register(Arc::new(maintenance::ValidateSchemaSync));
+
+    // Phase B slice #8: semantic domain (service-dispatch via SemanticStateService).
+    registry.register(Arc::new(semantic::GetState));
+    registry.register(Arc::new(semantic::ListStages));
+    registry.register(Arc::new(semantic::StagesForProduct));
+    registry.register(Arc::new(semantic::MissingEntities));
+    registry.register(Arc::new(semantic::NextActions));
+    registry.register(Arc::new(semantic::PromptContext));
 
     registry
 }
