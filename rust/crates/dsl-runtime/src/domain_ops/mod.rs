@@ -100,5 +100,5 @@ pub mod trust_ops;
 pub mod ubo_analysis;
 pub mod ubo_compute_ops;
 pub mod ubo_graph_ops;
-pub mod ubo_registry_ops;
+// Phase 5c-migrate Phase B slice #24: ubo_registry_ops → `sem_os_postgres::ops::ubo_registry`.
 pub mod verify_ops;

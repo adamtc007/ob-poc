@@ -61,6 +61,7 @@ pub mod session;
 pub mod state;
 pub mod stewardship_helper;
 pub mod team;
+pub mod ubo_registry;
 pub mod view;
 
 pub use registry::SemOsVerbOpRegistry;
@@ -348,6 +349,14 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(import_run::Begin));
     registry.register(Arc::new(import_run::Complete));
     registry.register(Arc::new(import_run::Supersede));
+
+    // Phase B slice #24: ubo.registry domain (5 plugin verbs — state
+    // machine lifecycle promote/advance/waive/reject/expire).
+    registry.register(Arc::new(ubo_registry::Promote));
+    registry.register(Arc::new(ubo_registry::Advance));
+    registry.register(Arc::new(ubo_registry::Waive));
+    registry.register(Arc::new(ubo_registry::Reject));
+    registry.register(Arc::new(ubo_registry::Expire));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
