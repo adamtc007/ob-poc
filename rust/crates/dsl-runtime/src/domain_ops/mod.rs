@@ -72,7 +72,7 @@ pub mod kyc_case_ops;
 // Phase 5c-migrate Phase B slice #27: resource_ops → `sem_os_postgres::ops::service_resource`.
 // Phase 5c-migrate Phase B slice #19: screening_ops → `sem_os_postgres::ops::screening`.
 // Phase 5c-migrate Phase B slice #12: research_normalize_ops → `sem_os_postgres::ops::research_normalize`.
-pub mod research_workflow_ops;
+// Phase 5c-migrate Phase B slice #58: research_workflow_ops → `sem_os_postgres::ops::research_workflow`.
 // Phase 5c-migrate Phase B slice #6: sem_os_audit_ops → `sem_os_postgres::ops::audit`.
 // Phase 5c-migrate Phase B slice #6: sem_os_changeset_ops → `sem_os_postgres::ops::changeset`.
 // Phase 5c-migrate Phase B slice #6: sem_os_focus_ops → `sem_os_postgres::ops::focus`.

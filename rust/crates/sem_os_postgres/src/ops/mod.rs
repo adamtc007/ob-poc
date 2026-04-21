@@ -74,6 +74,7 @@ pub mod regulatory;
 pub mod remediation;
 pub mod requirement;
 pub mod research_normalize;
+pub mod research_workflow;
 pub mod schema;
 pub mod screening;
 pub mod semantic;
@@ -629,6 +630,14 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #58: research.workflow.* (4 plugin verbs —
+    // confirm-decision, reject-decision, audit-trail (multi-table
+    // aggregate), supersession-trail (full supersession chain)).
+    registry.register(Arc::new(research_workflow::ConfirmDecision));
+    registry.register(Arc::new(research_workflow::RejectDecision));
+    registry.register(Arc::new(research_workflow::AuditTrail));
+    registry.register(Arc::new(research_workflow::SupersessionTrail));
 
     // Phase B slice #57: lifecycle.* (12 plugin verbs — 6 canonical
     // + 6 `service-resource.*-lifecycle` compat aliases). Shared
