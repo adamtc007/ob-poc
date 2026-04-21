@@ -88,7 +88,7 @@ pub mod sem_os_schema_ops;
 pub mod shared_atom_ops;
 pub mod skeleton_build_ops;
 pub mod state_ops;
-pub mod team_ops;
+// Phase 5c-migrate Phase B slice #10: team_ops → `sem_os_postgres::ops::team`.
 pub mod temporal_ops;
 pub mod tollgate_evaluate_ops;
 pub mod tollgate_ops;

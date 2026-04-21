@@ -47,6 +47,7 @@ pub mod semantic;
 pub mod service_pipeline;
 pub mod session;
 pub mod stewardship_helper;
+pub mod team;
 pub mod view;
 
 pub use registry::SemOsVerbOpRegistry;
@@ -255,6 +256,9 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(affinity::AdjacentVerbs));
     registry.register(Arc::new(affinity::GovernanceGaps));
     registry.register(Arc::new(affinity::DiscoverDsl));
+
+    // Phase B slice #10: team domain (direct-sqlx, multi-step txn).
+    registry.register(Arc::new(team::TransferMember));
 
     registry
 }

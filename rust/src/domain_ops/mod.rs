@@ -659,8 +659,10 @@ mod tests {
         assert!(registry.has("ubo", "convergence-supersede"));
         assert!(registry.has("ubo", "transfer-control"));
         assert!(registry.has("ubo", "waive-verification"));
-        // Team operations (only transfer-member is a plugin, rest are CRUD)
-        assert!(registry.has("team", "transfer-member"));
+        // Phase 5c-migrate Phase B slice #10: team.transfer-member migrated
+        // to `sem_os_postgres::ops::team::TransferMember`. Legacy registry
+        // no longer has it — covered via SemOS.
+        assert!(!registry.has("team", "transfer-member"));
         // Access Review operations (complex multi-step transactional operations)
         assert!(registry.has("access-review", "populate-campaign"));
         assert!(registry.has("access-review", "launch-campaign"));
