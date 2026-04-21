@@ -56,6 +56,7 @@ pub mod screening;
 pub mod semantic;
 pub mod service_pipeline;
 pub mod session;
+pub mod state;
 pub mod stewardship_helper;
 pub mod team;
 pub mod view;
@@ -315,6 +316,19 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(matrix_overlay::EffectiveMatrix));
     registry.register(Arc::new(matrix_overlay::UnifiedGaps));
     registry.register(Arc::new(matrix_overlay::CompareProducts));
+
+    // Phase B slice #21: state domain (8 plugin verbs — state
+    // reducer derive/diagnose/override lifecycle). Transitional
+    // `scope.pool()` pattern until state_reducer handlers take
+    // `&mut dyn TransactionScope`.
+    registry.register(Arc::new(state::Derive));
+    registry.register(Arc::new(state::Diagnose));
+    registry.register(Arc::new(state::DeriveAll));
+    registry.register(Arc::new(state::BlockedWhy));
+    registry.register(Arc::new(state::CheckConsistency));
+    registry.register(Arc::new(state::Override));
+    registry.register(Arc::new(state::RevokeOverride));
+    registry.register(Arc::new(state::ListOverrides));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
