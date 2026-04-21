@@ -621,10 +621,11 @@ mod tests {
         assert!(registry.has("cbu", "assign-service-provider"));
         assert!(registry.has("cbu", "assign-signatory"));
         assert!(registry.has("cbu", "validate-roles"));
-        // Trading Matrix operations
-        assert!(registry.has("investment-manager", "find-for-trade"));
-        assert!(registry.has("pricing-config", "find-for-instrument"));
-        assert!(registry.has("sla", "list-open-breaches"));
+        // Phase 5c-migrate Phase B slice #26: trading-matrix ops moved to
+        // `sem_os_postgres::ops::trading_matrix::*`.
+        assert!(!registry.has("investment-manager", "find-for-trade"));
+        assert!(!registry.has("pricing-config", "find-for-instrument"));
+        assert!(!registry.has("sla", "list-open-breaches"));
         // Lifecycle operations
         assert!(registry.has("lifecycle", "provision"));
         assert!(registry.has("lifecycle", "analyze-gaps"));

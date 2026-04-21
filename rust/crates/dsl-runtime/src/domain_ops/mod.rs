@@ -92,7 +92,7 @@ pub mod skeleton_build_ops;
 pub mod temporal_ops;
 pub mod tollgate_evaluate_ops;
 pub mod tollgate_ops;
-pub mod trading_matrix;
+// Phase 5c-migrate Phase B slice #26: trading_matrix → `sem_os_postgres::ops::trading_matrix`.
 pub mod trading_profile_ca_ops;
 pub mod trust_ops;
 // Phase 5c-migrate Phase B slice #5 (2026-04-21): view_ops relocated to

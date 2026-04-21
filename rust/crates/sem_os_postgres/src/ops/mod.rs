@@ -62,6 +62,7 @@ pub mod session;
 pub mod state;
 pub mod stewardship_helper;
 pub mod team;
+pub mod trading_matrix;
 pub mod ubo_registry;
 pub mod view;
 
@@ -367,6 +368,14 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(entity::ResolvePlaceholder));
     registry.register(Arc::new(entity::ListPlaceholders));
     registry.register(Arc::new(entity::PlaceholderSummary));
+
+    // Phase B slice #26: trading-matrix domain (3 plugin verbs —
+    // IM find-for-trade, pricing-config find-for-instrument, SLA
+    // list-open-breaches). NUMERIC cols cast to ::text to avoid
+    // `rust_decimal` dep.
+    registry.register(Arc::new(trading_matrix::FindImForTrade));
+    registry.register(Arc::new(trading_matrix::FindPricingForInstrument));
+    registry.register(Arc::new(trading_matrix::ListOpenSlaBreaches));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
