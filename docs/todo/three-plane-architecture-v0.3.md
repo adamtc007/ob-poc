@@ -651,6 +651,22 @@ Five deliverables, reviewed together:
 
 The heaviest phase structurally. The original v0.3 draft bundled everything under a single Phase 5; practical execution split it into six sub-phases (5a–5f) as each sub-phase has its own risk surface. Sub-phase decomposition is authoritative as of 2026-04-20; each sub-phase has its own gate.
 
+#### ⚠ DSL relocation methodology — YAML-first, NOT code lift-and-shift
+
+**This is a load-bearing rule for every R-sweep slice and any future DSL-related move (Phase 5a, 5c-migrate, 5f Pattern B remediation, Phase 6 CRUD dissolution).**
+
+When relocating a `domain_ops/<file>.rs` from ob-poc into `dsl-runtime`, the contract is the **YAML verb definition** in `config/verbs/<area>/<file>.yaml`, not the existing Rust source. The workflow is:
+
+1. Read the YAML for each verb's args / returns / behavior contract — this is what the relocated op must implement.
+2. Treat the existing Rust as **REFERENCE** for SQL queries and business invariants only — skip the legacy `execute(&VerbCall, ...)` path, helper indirection, conversion shims, cfg-gate sprawl, and any sub-ops that aren't declared in the YAML.
+3. Write fresh op code against the YAML contract using local dsl-runtime types from the start (`crate::execution::*`, `crate::custom_op::CustomOperation`, `sem_os_core::abac::ActorContext`, etc.).
+
+**Anti-pattern (do not do this):** the Python regex strip-script approach used in slices #19-#23 (`billing_ops`, `capital_ops`, `deal_ops`, `client_group_ops`, `discovery_ops`). Mechanical transliteration was fragile (brace counter breaks on JSON literals; import patterns vary per file; file-local helpers leak references) AND preserves accidental complexity from the ob-poc impl. Slice #24 (`affinity_ops`) produced a 565 LOC clean impl from a 1046 LOC legacy file by re-implementing fresh from the YAML — significantly shorter and clearer than transliteration would have produced. Slices #25-#30 confirmed the methodology across `sem_os_schema_ops`, `view_ops`, `session_ops`, `service_pipeline_ops`, `phrase_ops`, `attribute_ops`.
+
+**Sub-ops that aren't in YAML get folded.** When the YAML has one dispatcher verb (e.g. `add-component`) with a discriminator arg (`component-type`), the Rust file may have N sub-op structs registered separately. YAML-first says: drop the sub-op structs, fold their logic into private helper functions inside the single dispatcher impl. Slice #30 (`attribute_ops`) and the rejected slice #31 (`trading_profile`) both surfaced this pattern.
+
+**When the file IS the module surface, accept the ob-poc-adapter destination.** If every verb's implementation tangles deeply with `crate::module::*` types and helpers AND the existing code is already module-shaped (i.e. there's no plane-separation gain available without a 2000+ LOC delegation layer of ceremony), the matrix `ob-poc-adapter` tag is right and the file legitimately stays in ob-poc. Don't force a lift to satisfy a target count. Slice #31 (`trading_profile`) was investigated and rejected on this principle.
+
 #### Phase 5a — service traits (ServiceRegistry + trait injection)
 
 Define service-level traits in `dsl-runtime::service_traits` for ob-poc-retained capabilities. ob-poc wires concrete impls at startup via `ServiceRegistryBuilder`. Plugin ops that relocate to `dsl-runtime` consume services via `VerbExecutionContext::service::<dyn T>()`.
