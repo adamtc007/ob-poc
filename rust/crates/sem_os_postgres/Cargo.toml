@@ -31,5 +31,14 @@ sha2 = "0.10"
 # agent.activate-teaching shells out via tokio::process::Command.
 tokio = { version = "1", features = ["macros", "rt", "process"] }
 tracing = "0.1"
+# Phase 5c-migrate Phase B slice #69: dsl-core + entity-gateway + tonic
+# added for the `discovery.*` plugin ops. `dsl-core::config` loads verb
+# metadata for available-actions/verb-detail/valid-transitions/inspect-data.
+# `entity-gateway::proto` + `tonic` wire up the optional gRPC fuzzy-search
+# path in `search-entities` (falls back to direct SQL when the gateway is
+# unavailable).
+dsl-core = { path = "../dsl-core" }
+entity-gateway = { path = "../entity-gateway" }
+tonic = "0.12"
 
 [dev-dependencies]

@@ -49,6 +49,7 @@ pub mod coverage_compute;
 pub mod custody;
 pub mod deal;
 pub mod dilution;
+pub mod discovery;
 pub mod docs_bundle;
 pub mod document;
 pub mod economic_exposure;
@@ -640,6 +641,21 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #69: discovery.* (10 plugin verbs — read-only graph
+    // / entity / context / relationship exploration + verb metadata
+    // projection. Uses StewardshipDispatch service for verb-detail +
+    // search-data; gRPC EntityGateway (optional) for search-entities).
+    registry.register(Arc::new(discovery::SearchEntities));
+    registry.register(Arc::new(discovery::EntityContext));
+    registry.register(Arc::new(discovery::EntityRelationships));
+    registry.register(Arc::new(discovery::CascadeResearch));
+    registry.register(Arc::new(discovery::AvailableActions));
+    registry.register(Arc::new(discovery::VerbDetail));
+    registry.register(Arc::new(discovery::ValidTransitions));
+    registry.register(Arc::new(discovery::GraphWalk));
+    registry.register(Arc::new(discovery::InspectData));
+    registry.register(Arc::new(discovery::SearchData));
 
     // Phase B slice #68: deal.* (28 plugin verbs — full deal lifecycle:
     // create/search/update/status/cancel, participants, contracts,

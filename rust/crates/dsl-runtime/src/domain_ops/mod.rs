@@ -34,7 +34,7 @@ pub mod affinity_graph_cache;
 // Phase 5c-migrate Phase B slice #50: custody → `sem_os_postgres::ops::custody`.
 // Phase 5c-migrate Phase B slice #68: deal_ops → `sem_os_postgres::ops::deal`.
 // Phase 5c-migrate Phase B slice #59: dilution_ops → `sem_os_postgres::ops::dilution`.
-pub mod discovery_ops;
+// Phase 5c-migrate Phase B slice #69: discovery_ops → `sem_os_postgres::ops::discovery`.
 // Phase 5c-migrate Phase B slice #13: docs_bundle_ops → `sem_os_postgres::ops::docs_bundle`.
 // Phase 5c-migrate Phase B slice #61: document_ops → `sem_os_postgres::ops::document`.
 // Phase 5c-migrate Phase B slice #29: economic_exposure_ops → `sem_os_postgres::ops::economic_exposure`.

@@ -1,32 +1,64 @@
-//! Discovery domain CustomOps for the SemTaxonomy replacement path.
+//! Discovery domain plugin ops (10 verbs) — YAML-first re-implementation of
+//! `discovery.*` from `rust/config/verbs/discovery.yaml`.
 //!
-//! These verbs expose a read-only discovery surface over existing entity search,
-//! Sem OS registry/schema tooling, and lightweight operational context queries.
+//! These verbs expose a read-only discovery surface over entity search,
+//! SemOS registry/schema tooling, and lightweight operational context
+//! queries. Composition:
+//!
+//! - `search-entities` / `cascade-research` — EntityGateway gRPC fuzzy
+//!   search with SQL fallback.
+//! - `entity-context` / `entity-relationships` / `valid-transitions` /
+//!   `graph-walk` / `inspect-data` — operational state envelopes derived
+//!   from relational graphs + authored StateGraphs.
+//! - `available-actions` / `verb-detail` — verb YAML metadata
+//!   projections.
+//! - `search-data` — SemReg registry search routed through
+//!   [`StewardshipDispatch`].
+//!
+//! # Ops
+//!
+//! - `discovery.search-entities`
+//! - `discovery.entity-context`
+//! - `discovery.entity-relationships`
+//! - `discovery.cascade-research`
+//! - `discovery.available-actions`
+//! - `discovery.verb-detail`
+//! - `discovery.valid-transitions`
+//! - `discovery.graph-walk`
+//! - `discovery.inspect-data`
+//! - `discovery.search-data`
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_core::config::loader::ConfigLoader;
-use dsl_core::config::types::{ArgConfig, DomainConfig, VerbConfig, VerbMetadata};
-use dsl_runtime_macros::register_custom_op;
 use serde_json::{json, Value};
+use sqlx::{PgPool, Row};
 use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::entity_kind::matches as entity_kind_matches;
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
-use crate::stategraph::{load_state_graphs, validate_graphs, walk_graph};
-
-use {
-    entity_gateway::proto::ob::gateway::v1::{
-        entity_gateway_client::EntityGatewayClient, SearchMode, SearchRequest,
-    },
-    sqlx::{PgPool, Row},
-};
-
-use crate::document_requirements::{
+use dsl_core::config::loader::ConfigLoader;
+use dsl_core::config::types::{ArgConfig, DomainConfig, VerbConfig, VerbMetadata};
+use dsl_runtime::document_requirements::{
     GovernedDocumentRequirementsService, GovernedRequirementMatrix,
 };
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_list_opt,
+    json_extract_string_opt, json_extract_uuid,
+};
+use dsl_runtime::entity_kind::matches as entity_kind_matches;
+use dsl_runtime::service_traits::StewardshipDispatch;
+use dsl_runtime::stategraph::{load_state_graphs, validate_graphs, walk_graph};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+
+use entity_gateway::proto::ob::gateway::v1::{
+    entity_gateway_client::EntityGatewayClient, SearchMode, SearchRequest,
+};
+
+use super::SemOsVerbOp;
+
+// =============================================================================
+// Verb metadata helpers
+// =============================================================================
 
 fn normalize_entity_type(entity_type: &str) -> String {
     match entity_type.to_lowercase().as_str() {
@@ -192,7 +224,6 @@ fn evaluate_preconditions(config: &VerbConfig, entity_state: &Value) -> Vec<Stri
             "check_service_delivery_ready" => !signal_flag(entity_state, "has_active_onboarding"),
             "check_resources_provisioned" => !signal_flag(entity_state, "has_active_onboarding"),
             other => {
-                // Unknown checks remain advisory, not blocking, until wired.
                 tracing::debug!(precondition_check = %other, "valid-transitions skipping unknown precondition check");
                 true
             }
@@ -264,6 +295,10 @@ fn param_summary(arg: &ArgConfig) -> Value {
         "description": arg.description,
     })
 }
+
+// =============================================================================
+// Governed document signal summary
+// =============================================================================
 
 #[derive(Debug, Clone, Default)]
 struct GovernedDocumentSignalSummary {
@@ -362,6 +397,10 @@ async fn governed_document_signal_summary_for_entities(
         Ok(None)
     }
 }
+
+// =============================================================================
+// Entity search (gateway + DB fallback)
+// =============================================================================
 
 async fn search_entities_via_db(
     pool: &PgPool,
@@ -687,7 +726,8 @@ async fn search_entities_internal(
     entity_types: &[String],
     limit: i32,
 ) -> Result<Vec<Value>> {
-    let addr = std::env::var("ENTITY_GATEWAY_URL").unwrap_or_else(|_| "http://[::1]:50051".to_string());
+    let addr =
+        std::env::var("ENTITY_GATEWAY_URL").unwrap_or_else(|_| "http://[::1]:50051".to_string());
     let mut client = match EntityGatewayClient::connect(addr.clone()).await {
         Ok(client) => client,
         Err(_) => return search_entities_via_db(pool, query, entity_types, limit).await,
@@ -837,6 +877,10 @@ async fn load_entity_record(pool: &PgPool, entity_id: Uuid) -> Result<(String, S
         row.get::<String, _>("entity_type"),
     ))
 }
+
+// =============================================================================
+// Entity-context summary helpers
+// =============================================================================
 
 fn activity_record(
     domain: &str,
@@ -1922,7 +1966,11 @@ async fn build_entity_relationships_record(
         .map(|row| {
             let from_id: Uuid = row.get("from_entity_id");
             let to_id: Uuid = row.get("to_entity_id");
-            let direction = if from_id == entity_id { "outbound" } else { "inbound" };
+            let direction = if from_id == entity_id {
+                "outbound"
+            } else {
+                "inbound"
+            };
             let (target_id, target_name) = if from_id == entity_id {
                 (to_id, row.get::<String, _>("to_name"))
             } else {
@@ -1946,14 +1994,21 @@ async fn build_entity_relationships_record(
         })
         .collect();
 
+    let relationship_count = relationships.len();
+    let depth_hint = if relationship_count == 0 {
+        Value::Null
+    } else {
+        json!(1.min(max_depth))
+    };
+
     Ok(json!({
         "entity_id": entity_id,
         "entity_type": entity_type,
         "name": name,
         "relationships": relationships,
         "summary": {
-            "total_relationships": relationships.len(),
-            "ownership_chain_depth": if relationships.is_empty() { Value::Null } else { json!(1.min(max_depth)) },
+            "total_relationships": relationship_count,
+            "ownership_chain_depth": depth_hint,
             "ubo_count": Value::Null,
             "ubo_verified_count": Value::Null,
             "sub_fund_count": Value::Null,
@@ -1964,14 +2019,11 @@ async fn build_entity_relationships_record(
     }))
 }
 
-
 async fn sem_reg_tool_json(
-    _pool: &PgPool,
     ctx: &VerbExecutionContext,
     tool_name: &str,
     args: Value,
 ) -> Result<Value> {
-    use crate::service_traits::StewardshipDispatch;
     let dispatcher = ctx.service::<dyn StewardshipDispatch>()?;
     let outcome = dispatcher
         .dispatch(tool_name, &args, &ctx.principal)
@@ -1989,160 +2041,117 @@ async fn sem_reg_tool_json(
     }
 }
 
-#[register_custom_op]
-pub struct DiscoverySearchEntitiesOp;
+// =============================================================================
+// discovery.search-entities
+// =============================================================================
+
+pub struct SearchEntities;
 
 #[async_trait]
-impl CustomOperation for DiscoverySearchEntitiesOp {
-    fn domain(&self) -> &'static str {
-        "discovery"
+impl SemOsVerbOp for SearchEntities {
+    fn fqn(&self) -> &str {
+        "discovery.search-entities"
     }
 
-    fn verb(&self) -> &'static str {
-        "search-entities"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Wraps the existing EntityGateway-backed entity search surface with a stable discovery contract"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_bool_opt, json_extract_int_opt, json_extract_string,
-            json_extract_string_list_opt,
-        };
         let query = json_extract_string(args, "query")?;
         let entity_types = json_extract_string_list_opt(args, "entity-types").unwrap_or_default();
         let max_results = json_extract_int_opt(args, "max-results").unwrap_or(10) as i32;
         let include_inactive = json_extract_bool_opt(args, "include-inactive").unwrap_or(false);
-        let results = search_entities_internal(pool, &query, &entity_types, max_results).await?;
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "query": query, "entity_types": entity_types,
-                "include_inactive": include_inactive,
-                "total_matches": results.len(), "results": results,
-            }),
-        ))
+        let results =
+            search_entities_internal(scope.pool(), &query, &entity_types, max_results).await?;
+        Ok(VerbExecutionOutcome::Record(json!({
+            "query": query,
+            "entity_types": entity_types,
+            "include_inactive": include_inactive,
+            "total_matches": results.len(),
+            "results": results,
+        })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
 }
 
-#[register_custom_op]
-pub struct DiscoveryEntityContextOp;
+// =============================================================================
+// discovery.entity-context
+// =============================================================================
+
+pub struct EntityContext;
 
 #[async_trait]
-impl CustomOperation for DiscoveryEntityContextOp {
-    fn domain(&self) -> &'static str {
-        "discovery"
+impl SemOsVerbOp for EntityContext {
+    fn fqn(&self) -> &str {
+        "discovery.entity-context"
     }
 
-    fn verb(&self) -> &'static str {
-        "entity-context"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Builds an entity context envelope from operational entity state and relationship signals"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::{json_extract_bool_opt, json_extract_uuid};
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let include_completed = json_extract_bool_opt(args, "include-completed").unwrap_or(false);
-        Ok(VerbExecutionOutcome::Record(
-            build_entity_context_record(pool, entity_id, include_completed).await?,
-        ))
+        let record = build_entity_context_record(scope.pool(), entity_id, include_completed).await?;
+        Ok(VerbExecutionOutcome::Record(record))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
 }
 
-#[register_custom_op]
-pub struct DiscoveryEntityRelationshipsOp;
+// =============================================================================
+// discovery.entity-relationships
+// =============================================================================
+
+pub struct EntityRelationships;
 
 #[async_trait]
-impl CustomOperation for DiscoveryEntityRelationshipsOp {
-    fn domain(&self) -> &'static str {
-        "discovery"
+impl SemOsVerbOp for EntityRelationships {
+    fn fqn(&self) -> &str {
+        "discovery.entity-relationships"
     }
 
-    fn verb(&self) -> &'static str {
-        "entity-relationships"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Reads the normalized entity relationship graph and returns a stable relationship summary"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_int_opt, json_extract_string_list_opt, json_extract_uuid,
-        };
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let relationship_types =
             json_extract_string_list_opt(args, "relationship-types").unwrap_or_default();
         let max_depth = json_extract_int_opt(args, "max-depth").unwrap_or(2) as i32;
-        Ok(VerbExecutionOutcome::Record(
-            build_entity_relationships_record(pool, entity_id, &relationship_types, max_depth)
-                .await?,
-        ))
+        let record =
+            build_entity_relationships_record(scope.pool(), entity_id, &relationship_types, max_depth)
+                .await?;
+        Ok(VerbExecutionOutcome::Record(record))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
 }
 
-#[register_custom_op]
-pub struct DiscoveryCascadeResearchOp;
+// =============================================================================
+// discovery.cascade-research
+// =============================================================================
+
+pub struct CascadeResearch;
 
 #[async_trait]
-impl CustomOperation for DiscoveryCascadeResearchOp {
-    fn domain(&self) -> &'static str {
-        "discovery"
+impl SemOsVerbOp for CascadeResearch {
+    fn fqn(&self) -> &str {
+        "discovery.cascade-research"
     }
 
-    fn verb(&self) -> &'static str {
-        "cascade-research"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Composes entity search, entity context, and relationship discovery into one read-only research result"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::{json_extract_bool_opt, json_extract_int_opt, json_extract_string};
         let query = json_extract_string(args, "query")?;
         let top_n = json_extract_int_opt(args, "top-n").unwrap_or(3) as i32;
         let include_relationships =
             json_extract_bool_opt(args, "include-relationships").unwrap_or(true);
+        let pool = scope.pool();
         let results = search_entities_internal(pool, &query, &[], top_n).await?;
         let mut entities = Vec::new();
         for hit in results {
@@ -2162,6 +2171,10 @@ impl CustomOperation for DiscoveryCascadeResearchOp {
             } else {
                 None
             };
+            let signals = context
+                .as_ref()
+                .map(|c| c["signals"].clone())
+                .unwrap_or(Value::Null);
             entities.push(json!({
                 "entity_id": hit["entity_id"].clone(),
                 "entity_type": hit["entity_type"].clone(),
@@ -2177,47 +2190,40 @@ impl CustomOperation for DiscoveryCascadeResearchOp {
                 "has_active_workflow": hit["has_active_workflow"].clone(),
                 "context": context,
                 "relationships": relationships,
-                "signals": context.as_ref().map(|c| c["signals"].clone()).unwrap_or(Value::Null),
-                "likely_intents": [json!({"intent": "inspect-current-state", "confidence": "medium", "reason": "Discovery returned grounded entity context and available relationship state"})],
+                "signals": signals,
+                "likely_intents": [json!({
+                    "intent": "inspect-current-state",
+                    "confidence": "medium",
+                    "reason": "Discovery returned grounded entity context and available relationship state"
+                })],
             }));
         }
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "query": query, "total_entity_matches": entities.len(), "entities": entities,
-            }),
-        ))
+        Ok(VerbExecutionOutcome::Record(json!({
+            "query": query,
+            "total_entity_matches": entities.len(),
+            "entities": entities,
+        })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
 }
 
-#[register_custom_op]
-pub struct DiscoveryAvailableActionsOp;
+// =============================================================================
+// discovery.available-actions
+// =============================================================================
+
+pub struct AvailableActions;
 
 #[async_trait]
-impl CustomOperation for DiscoveryAvailableActionsOp {
-    fn domain(&self) -> &'static str {
-        "discovery"
+impl SemOsVerbOp for AvailableActions {
+    fn fqn(&self) -> &str {
+        "discovery.available-actions"
     }
 
-    fn verb(&self) -> &'static str {
-        "available-actions"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Builds a grouped action surface from verb YAML metadata for the target domain and entity type"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        _pool: &PgPool,
+        _scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_string_opt};
         let domain = json_extract_string(args, "domain")?;
         let entity_type = json_extract_string(args, "entity-type")?;
         let aspect = json_extract_string_opt(args, "aspect");
@@ -2249,61 +2255,54 @@ impl CustomOperation for DiscoveryAvailableActionsOp {
                 .unwrap_or_else(|| "general".to_string());
             groups.entry(group_key).or_default().push(json!({
                 "verb_id": format!("{}.{}", domain, verb_name),
-                "name": verb_name, "description": config.description,
+                "name": verb_name,
+                "description": config.description,
                 "polarity": verb_polarity,
                 "parameters": config.args.iter().map(param_summary).collect::<Vec<_>>(),
-                "preconditions": Value::Null, "governance_status": governance_status(config),
+                "preconditions": Value::Null,
+                "governance_status": governance_status(config),
             }));
         }
         let groups_json: Vec<Value> = groups
             .into_iter()
             .map(|(aspect_name, verbs)| json!({"aspect": aspect_name, "verbs": verbs}))
             .collect();
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "domain": domain, "entity_type": entity_type,
-                "total_verbs": groups_json.iter().map(|g| g["verbs"].as_array().map(|a| a.len()).unwrap_or(0)).sum::<usize>(),
-                "groups": groups_json,
-            }),
-        ))
+        let total_verbs: usize = groups_json
+            .iter()
+            .map(|g| g["verbs"].as_array().map(|a| a.len()).unwrap_or(0))
+            .sum();
+        Ok(VerbExecutionOutcome::Record(json!({
+            "domain": domain,
+            "entity_type": entity_type,
+            "total_verbs": total_verbs,
+            "groups": groups_json,
+        })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
 }
 
-#[register_custom_op]
-pub struct DiscoveryVerbDetailOp;
+// =============================================================================
+// discovery.verb-detail
+// =============================================================================
+
+pub struct VerbDetail;
 
 #[async_trait]
-impl CustomOperation for DiscoveryVerbDetailOp {
-    fn domain(&self) -> &'static str {
-        "discovery"
+impl SemOsVerbOp for VerbDetail {
+    fn fqn(&self) -> &str {
+        "discovery.verb-detail"
     }
 
-    fn verb(&self) -> &'static str {
-        "verb-detail"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Returns a normalized verb contract from YAML config and Sem OS governance detail"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        _scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_string;
         let verb_id = json_extract_string(args, "verb-id")?;
         let verbs = ConfigLoader::from_env().load_verbs()?;
         let (domain_name, config) = find_verb_config(&verbs, &verb_id)
             .ok_or_else(|| anyhow!("Unknown verb id: {}", verb_id))?;
         let sem_reg_surface = sem_reg_tool_json(
-            pool,
             ctx,
             "sem_reg_verb_surface",
             json!({
@@ -2313,71 +2312,56 @@ impl CustomOperation for DiscoveryVerbDetailOp {
         .await
         .unwrap_or(Value::Null);
 
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "verb_id": verb_id,
-                "domain": domain_name,
-                "name": verb_id.split('.').nth(1).unwrap_or(""),
-                "description": config.description,
-                "polarity": infer_polarity(config.metadata.as_ref()),
-                "subject_kinds": config.metadata.as_ref().map(|m| m.subject_kinds.clone()).unwrap_or_default(),
-                "phase_tags": config.metadata.as_ref().map(|m| m.phase_tags.clone()).unwrap_or_default(),
-                "parameters": config.args.iter().map(|arg| json!({
-                    "name": arg.name,
-                    "type": format!("{:?}", arg.arg_type).to_lowercase(),
-                    "required": arg.required,
-                    "default": arg.default,
-                    "description": arg.description,
-                    "validation": Value::Null,
-                })).collect::<Vec<_>>(),
-                "preconditions": sem_reg_surface.get("preconditions").cloned().unwrap_or(Value::Null),
-                "postconditions": Value::Null,
-                "governance": {
-                    "status": governance_status(config),
-                    "required_roles": [],
-                    "abac_policy": Value::Null,
-                    "sem_reg_surface": sem_reg_surface,
-                }
-            }),
-        ))
+        Ok(VerbExecutionOutcome::Record(json!({
+            "verb_id": verb_id,
+            "domain": domain_name,
+            "name": verb_id.split('.').nth(1).unwrap_or(""),
+            "description": config.description,
+            "polarity": infer_polarity(config.metadata.as_ref()),
+            "subject_kinds": config.metadata.as_ref().map(|m| m.subject_kinds.clone()).unwrap_or_default(),
+            "phase_tags": config.metadata.as_ref().map(|m| m.phase_tags.clone()).unwrap_or_default(),
+            "parameters": config.args.iter().map(|arg| json!({
+                "name": arg.name,
+                "type": format!("{:?}", arg.arg_type).to_lowercase(),
+                "required": arg.required,
+                "default": arg.default,
+                "description": arg.description,
+                "validation": Value::Null,
+            })).collect::<Vec<_>>(),
+            "preconditions": sem_reg_surface.get("preconditions").cloned().unwrap_or(Value::Null),
+            "postconditions": Value::Null,
+            "governance": {
+                "status": governance_status(config),
+                "required_roles": [],
+                "abac_policy": Value::Null,
+                "sem_reg_surface": sem_reg_surface,
+            }
+        })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
 }
 
-#[register_custom_op]
-pub struct DiscoveryValidTransitionsOp;
+// =============================================================================
+// discovery.valid-transitions
+// =============================================================================
+
+pub struct ValidTransitions;
 
 #[async_trait]
-impl CustomOperation for DiscoveryValidTransitionsOp {
-    fn domain(&self) -> &'static str {
-        "discovery"
+impl SemOsVerbOp for ValidTransitions {
+    fn fqn(&self) -> &str {
+        "discovery.valid-transitions"
     }
 
-    fn verb(&self) -> &'static str {
-        "valid-transitions"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Computes the currently valid and blocked transitions for a grounded entity using existing verb contracts, lifecycle metadata, and entity-context signals"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_bool_opt, json_extract_string_list_opt, json_extract_uuid,
-        };
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let include_blocked = json_extract_bool_opt(args, "include-blocked").unwrap_or(true);
         let lanes = json_extract_string_list_opt(args, "lanes").unwrap_or_default();
-        let context = build_entity_context_record(pool, entity_id, true).await?;
+        let context = build_entity_context_record(scope.pool(), entity_id, true).await?;
         let entity_type = context["entity_type"]
             .as_str()
             .unwrap_or("entity")
@@ -2403,7 +2387,8 @@ impl CustomOperation for DiscoveryValidTransitionsOp {
                 let verb_id = format!("{}.{}", domain_name, verb_name);
                 if unmet.is_empty() {
                     grouped_valid.entry(lane.clone()).or_default().push(json!({
-                        "verb_id": verb_id, "description": config.description,
+                        "verb_id": verb_id,
+                        "description": config.description,
                         "polarity": infer_polarity(config.metadata.as_ref()),
                         "invocation_phrases": config.invocation_phrases,
                         "enables": Value::Array(vec![]),
@@ -2413,19 +2398,42 @@ impl CustomOperation for DiscoveryValidTransitionsOp {
                     }));
                 } else if include_blocked {
                     blocked.push(json!({
-                        "verb_id": verb_id, "description": config.description,
+                        "verb_id": verb_id,
+                        "description": config.description,
                         "unmet_preconditions": unmet,
                         "unblocking_actions": derive_unblocking_actions(&evaluate_preconditions(config, &context)),
                     }));
                 }
             }
         }
-        let mut lanes_json = grouped_valid.into_iter().map(|(lane, mut valid)| {
-            valid.sort_by(|left, right| right["relevance"].as_f64().partial_cmp(&left["relevance"].as_f64()).unwrap_or(std::cmp::Ordering::Equal));
-            json!({"lane": lane.clone(), "current_phase": current_phase_for_lane(&context, &lane), "valid": valid})
-        }).collect::<Vec<_>>();
+        let mut lanes_json = grouped_valid
+            .into_iter()
+            .map(|(lane, mut valid)| {
+                valid.sort_by(|left, right| {
+                    right["relevance"]
+                        .as_f64()
+                        .partial_cmp(&left["relevance"].as_f64())
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                json!({
+                    "lane": lane.clone(),
+                    "current_phase": current_phase_for_lane(&context, &lane),
+                    "valid": valid,
+                })
+            })
+            .collect::<Vec<_>>();
         lanes_json.sort_by(|left, right| left["lane"].as_str().cmp(&right["lane"].as_str()));
         blocked.sort_by(|left, right| left["verb_id"].as_str().cmp(&right["verb_id"].as_str()));
+        let total_valid: usize = lanes_json
+            .iter()
+            .map(|lane| {
+                lane["valid"]
+                    .as_array()
+                    .map(|items| items.len())
+                    .unwrap_or(0)
+            })
+            .sum();
+        let total_blocked = blocked.len();
         let suggested_next = lanes_json
             .iter()
             .flat_map(|lane| lane["valid"].as_array().into_iter().flatten())
@@ -2437,52 +2445,42 @@ impl CustomOperation for DiscoveryValidTransitionsOp {
             })
             .and_then(|best| best["verb_id"].as_str().map(str::to_string));
 
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "entity_id": entity_id, "entity_type": entity_type, "entity_name": entity_name,
-                "lanes": lanes_json, "blocked": blocked,
-                "summary": {
-                    "total_valid": lanes_json.iter().map(|lane| lane["valid"].as_array().map(|items| items.len()).unwrap_or(0)).sum::<usize>(),
-                    "total_blocked": blocked.len(),
-                    "suggested_next": suggested_next,
-                }
-            }),
-        ))
+        Ok(VerbExecutionOutcome::Record(json!({
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "entity_name": entity_name,
+            "lanes": lanes_json,
+            "blocked": blocked,
+            "summary": {
+                "total_valid": total_valid,
+                "total_blocked": total_blocked,
+                "suggested_next": suggested_next,
+            }
+        })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
 }
 
-#[register_custom_op]
-pub struct DiscoveryGraphWalkOp;
+// =============================================================================
+// discovery.graph-walk
+// =============================================================================
+
+pub struct GraphWalk;
 
 #[async_trait]
-impl CustomOperation for DiscoveryGraphWalkOp {
-    fn domain(&self) -> &'static str {
-        "discovery"
+impl SemOsVerbOp for GraphWalk {
+    fn fqn(&self) -> &str {
+        "discovery.graph-walk"
     }
 
-    fn verb(&self) -> &'static str {
-        "graph-walk"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Walks applicable authored StateGraphs for a grounded entity and returns frontier and blocked actions"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::{json_extract_bool_opt, json_extract_uuid};
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let include_blocked = json_extract_bool_opt(args, "include-blocked").unwrap_or(true);
-        let context = build_entity_context_record(pool, entity_id, true).await?;
+        let context = build_entity_context_record(scope.pool(), entity_id, true).await?;
         let entity_type = context["entity_type"].as_str().unwrap_or("entity");
 
         let graphs = load_state_graphs()?;
@@ -2530,55 +2528,49 @@ impl CustomOperation for DiscoveryGraphWalkOp {
         }
         let valid_verbs = valid.into_values().collect::<Vec<_>>();
         let blocked_verbs = blocked_map.into_values().collect::<Vec<_>>();
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "entity_id": entity_id, "entity_type": entity_type,
-                "entity_name": context["name"].as_str().unwrap_or("unknown"),
-                "graph_ids": graph_ids,
-                "satisfied_nodes": satisfied_nodes.into_iter().collect::<Vec<_>>(),
-                "frontier_nodes": frontier_nodes.into_iter().collect::<Vec<_>>(),
-                "valid_verbs": valid_verbs, "blocked_verbs": blocked_verbs,
-                "gate_status": gate_status,
-                "summary": {"total_valid": valid_verbs.len(), "total_blocked": blocked_verbs.len()}
-            }),
-        ))
+        let valid_count = valid_verbs.len();
+        let blocked_count = blocked_verbs.len();
+        Ok(VerbExecutionOutcome::Record(json!({
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "entity_name": context["name"].as_str().unwrap_or("unknown"),
+            "graph_ids": graph_ids,
+            "satisfied_nodes": satisfied_nodes.into_iter().collect::<Vec<_>>(),
+            "frontier_nodes": frontier_nodes.into_iter().collect::<Vec<_>>(),
+            "valid_verbs": valid_verbs,
+            "blocked_verbs": blocked_verbs,
+            "gate_status": gate_status,
+            "summary": {
+                "total_valid": valid_count,
+                "total_blocked": blocked_count,
+            }
+        })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
 }
 
-#[register_custom_op]
-pub struct DiscoveryInspectDataOp;
+// =============================================================================
+// discovery.inspect-data
+// =============================================================================
+
+pub struct InspectData;
 
 #[async_trait]
-impl CustomOperation for DiscoveryInspectDataOp {
-    fn domain(&self) -> &'static str {
-        "discovery"
+impl SemOsVerbOp for InspectData {
+    fn fqn(&self) -> &str {
+        "discovery.inspect-data"
     }
 
-    fn verb(&self) -> &'static str {
-        "inspect-data"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Builds a scoped discovery snapshot by combining entity context and available actions"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string, json_extract_string_opt, json_extract_uuid};
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let domain = json_extract_string(args, "domain")?;
         let aspect = json_extract_string_opt(args, "aspect");
         let depth = json_extract_string_opt(args, "depth").unwrap_or_else(|| "summary".to_string());
-        let context = build_entity_context_record(pool, entity_id, false).await?;
+        let context = build_entity_context_record(scope.pool(), entity_id, false).await?;
         let entity_type = context["entity_type"]
             .as_str()
             .unwrap_or("entity")
@@ -2597,50 +2589,49 @@ impl CustomOperation for DiscoveryInspectDataOp {
             })
             .unwrap_or(0);
 
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "entity_id": entity_id, "entity_type": entity_type,
-                "domain": domain, "aspect": aspect,
-                "snapshot_at": chrono::Utc::now(),
-                "data": {"entity_context": context, "available_action_count": action_count, "depth": depth},
-                "summary": {"record_count": 1, "complete_count": if depth == "detail" { 1 } else { 0 },
-                    "incomplete_count": 0, "blocked_count": 0, "last_modified": Value::Null, "notable_gaps": []}
-            }),
-        ))
-    }
+        let complete_count = if depth == "detail" { 1 } else { 0 };
 
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(json!({
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "domain": domain,
+            "aspect": aspect,
+            "snapshot_at": chrono::Utc::now(),
+            "data": {
+                "entity_context": context,
+                "available_action_count": action_count,
+                "depth": depth,
+            },
+            "summary": {
+                "record_count": 1,
+                "complete_count": complete_count,
+                "incomplete_count": 0,
+                "blocked_count": 0,
+                "last_modified": Value::Null,
+                "notable_gaps": []
+            }
+        })))
     }
-
 }
 
-#[register_custom_op]
-pub struct DiscoverySearchDataOp;
+// =============================================================================
+// discovery.search-data
+// =============================================================================
+
+pub struct SearchData;
 
 #[async_trait]
-impl CustomOperation for DiscoverySearchDataOp {
-    fn domain(&self) -> &'static str {
-        "discovery"
+impl SemOsVerbOp for SearchData {
+    fn fqn(&self) -> &str {
+        "discovery.search-data"
     }
 
-    fn verb(&self) -> &'static str {
-        "search-data"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Wraps Sem OS search with entity/domain scope and a normalized data-search result envelope"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        _scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::{
-            json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
-        };
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let domain = json_extract_string(args, "domain")?;
         let query = json_extract_string(args, "query")?;
@@ -2648,7 +2639,6 @@ impl CustomOperation for DiscoverySearchDataOp {
         let max_results = json_extract_int_opt(args, "max-results").unwrap_or(20) as usize;
 
         let result = sem_reg_tool_json(
-            pool,
             ctx,
             "sem_reg_search",
             json!({
@@ -2686,88 +2676,13 @@ impl CustomOperation for DiscoverySearchDataOp {
             })
             .collect();
 
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "entity_id": entity_id,
-                "domain": domain,
-                "query": query,
-                "aspect": aspect,
-                "total_matches": filtered_results.len(),
-                "results": filtered_results,
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::CustomOperationRegistry;
-    use dsl_core::config::types::VerbStatus;
-
-    #[test]
-    fn discovery_domain_is_loaded_from_yaml() {
-        let verbs = ConfigLoader::from_env()
-            .load_verbs()
-            .expect("verbs config should load");
-        let domain = verbs
-            .domains
-            .get("discovery")
-            .expect("discovery domain should exist");
-        assert!(domain.verbs.contains_key("search-entities"));
-        assert!(domain.verbs.contains_key("available-actions"));
-        assert!(domain.verbs.contains_key("verb-detail"));
-        assert!(domain.verbs.contains_key("valid-transitions"));
-        assert!(domain.verbs.contains_key("graph-walk"));
-    }
-
-    #[test]
-    fn discovery_custom_ops_are_registered() {
-        let registry = CustomOperationRegistry::new();
-        assert!(registry.has("discovery", "search-entities"));
-        assert!(registry.has("discovery", "entity-context"));
-        assert!(registry.has("discovery", "entity-relationships"));
-        assert!(registry.has("discovery", "cascade-research"));
-        assert!(registry.has("discovery", "available-actions"));
-        assert!(registry.has("discovery", "verb-detail"));
-        assert!(registry.has("discovery", "valid-transitions"));
-        assert!(registry.has("discovery", "graph-walk"));
-        assert!(registry.has("discovery", "inspect-data"));
-        assert!(registry.has("discovery", "search-data"));
-    }
-
-    #[test]
-    fn matches_subject_kind_uses_canonical_entity_kind_aliases() {
-        let metadata = VerbMetadata {
-            tier: None,
-            source_of_truth: None,
-            scope: None,
-            writes_operational: false,
-            side_effects: None,
-            harm_class: None,
-            action_class: None,
-            noun: None,
-            internal: false,
-            tags: Vec::new(),
-            replaces: None,
-            status: VerbStatus::Active,
-            replaced_by: None,
-            since_version: None,
-            removal_version: None,
-            dangerous: false,
-            subject_kinds: vec!["client-group".to_string(), "kyc-case".to_string()],
-            phase_tags: Vec::new(),
-            requires_subject: true,
-            produces_focus: false,
-        };
-
-        assert!(matches_subject_kind(Some(&metadata), "client_group"));
-        assert!(matches_subject_kind(Some(&metadata), "kyc_case"));
-        assert!(!matches_subject_kind(Some(&metadata), "deal"));
+        Ok(VerbExecutionOutcome::Record(json!({
+            "entity_id": entity_id,
+            "domain": domain,
+            "query": query,
+            "aspect": aspect,
+            "total_matches": filtered_results.len(),
+            "results": filtered_results,
+        })))
     }
 }
