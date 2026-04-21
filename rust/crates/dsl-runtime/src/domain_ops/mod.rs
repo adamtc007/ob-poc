@@ -47,7 +47,9 @@ pub mod kyc_case_ops;
 pub mod lifecycle_ops;
 pub mod manco_ops;
 pub mod matrix_overlay_ops;
-pub mod navigation_ops;
+// Phase 5c-migrate Phase B slice #2 (2026-04-21): navigation_ops relocated
+// to `sem_os_postgres::ops::nav::*` as YAML-first re-implementations; legacy
+// file deleted.
 pub mod observation_ops;
 pub mod outreach_ops;
 pub mod outreach_plan_ops;
