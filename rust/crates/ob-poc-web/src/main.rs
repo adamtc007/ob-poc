@@ -690,6 +690,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "ServiceRegistry: registered dyn SessionService (session::UnifiedSession)"
         );
 
+        // dyn ServicePipelineService — used by relocated service_pipeline_ops
+        // for the 16 service intent → discovery → attribute → provisioning
+        // → readiness verbs. Bridge wraps `crate::service_resources::*`
+        // (engines, orchestrators, SRDEF registry loader) which stay in
+        // ob-poc. Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::ServicePipelineService>(Arc::new(
+            ob_poc::services::ObPocServicePipelineService::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn ServicePipelineService (service_resources::*)"
+        );
+
+        // dyn PhraseService — used by relocated phrase_ops for the 9
+        // governed-phrase-authoring verbs. Bridge wraps
+        // `crate::sem_reg::store::SnapshotStore` + types/ids and the
+        // embedding-similarity SQL on `verb_pattern_embeddings` /
+        // `phrase_bank` / `session_traces`. Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::PhraseService>(Arc::new(
+            ob_poc::services::ObPocPhraseService::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn PhraseService (sem_reg::* + phrase_bank embeddings)"
+        );
+
+        // dyn AttributeService — used by relocated attribute_ops for the
+        // 16 verbs across `attribute.*`, `document.*`, and `derivation.*`.
+        // Bridge wraps `crate::sem_reg::derivation_spec`, `SnapshotStore`,
+        // `crate::sem_reg::types::*`, and `attribute_identity_service`.
+        // Returns `AttributeDispatchOutcome { outcome, bindings }` so the
+        // wrapper can apply `@attribute` bindings via `ctx.bind` for the
+        // 3 `define*` verbs. Zero construction deps.
+        builder.register::<dyn dsl_runtime::service_traits::AttributeService>(Arc::new(
+            ob_poc::services::ObPocAttributeService::new(),
+        ));
+        tracing::info!(
+            "ServiceRegistry: registered dyn AttributeService (sem_reg::* + attribute_identity_service)"
+        );
+
         Arc::new(builder.build())
     };
 

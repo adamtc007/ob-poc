@@ -95,12 +95,42 @@ pub mod view_service_impl;
 // (the 10934 LOC multi-consumer session mega-module that stays in ob-poc).
 pub mod session_service_impl;
 
+// Phase 5a composite-blocker #28 — ob-poc-side impl of
+// `dsl_runtime::service_traits::ServicePipelineService`; multi-domain
+// single-method dispatch for the 16 verbs across the
+// intent → discovery → attribute → provisioning → readiness pipeline.
+// Bridges to `crate::service_resources::*` (engines, orchestrators,
+// SRDEF registry loader) which stay in ob-poc.
+pub mod service_pipeline_service_impl;
+
+// Phase 5a composite-blocker #29 — ob-poc-side impl of
+// `dsl_runtime::service_traits::PhraseService`; single-method dispatch
+// for the 9 governed-phrase-authoring verbs. Bridges to
+// `crate::sem_reg::store::SnapshotStore` + `crate::sem_reg::types::*`
+// + `crate::sem_reg::ids::object_id_for` and the embedding-similarity
+// SQL on `verb_pattern_embeddings` / `phrase_bank` / `session_traces`.
+pub mod phrase_service_impl;
+
+// Phase 5a composite-blocker #30 — ob-poc-side impl of
+// `dsl_runtime::service_traits::AttributeService`; multi-domain
+// single-method dispatch for the 16 verbs across `attribute.*`,
+// `document.*`, and `derivation.*`. Bridges to
+// `crate::sem_reg::derivation_spec`, `crate::sem_reg::store::SnapshotStore`,
+// `crate::sem_reg::types::*`, and `crate::services::attribute_identity_service`
+// (deferred from slice #8). Returns
+// `AttributeDispatchOutcome { outcome, bindings }` — the wrapper applies
+// `bindings` via `ctx.bind` for the 3 `define*` verbs that bind `@attribute`.
+pub mod attribute_service_impl;
+
 // Re-exports
 pub use attribute_identity_dispatch_impl::ObPocAttributeIdentityService;
 pub use constellation_runtime_impl::ObPocConstellationRuntime;
 pub use schema_introspection_impl::ObPocSchemaIntrospectionAccess;
 pub use sem_os_context_resolver_impl::ObPocSemOsContextResolver;
 pub use trading_profile_document_impl::ObPocTradingProfileDocument;
+pub use attribute_service_impl::ObPocAttributeService;
+pub use phrase_service_impl::ObPocPhraseService;
+pub use service_pipeline_service_impl::ObPocServicePipelineService;
 pub use session_service_impl::ObPocSessionService;
 pub use view_service_impl::ObPocViewService;
 pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};

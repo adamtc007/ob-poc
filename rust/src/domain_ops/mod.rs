@@ -35,7 +35,16 @@
 // affinity_graph_cache also relocated alongside (slice #24 step B).
 // Phase 5a — agent_ops relocated to `dsl-runtime::domain_ops::agent_ops`
 // consuming `dyn McpToolRegistry` via the ServiceRegistry.
-mod attribute_ops;
+// Phase 5a composite-blocker #30 — attribute_ops relocated to
+// `dsl-runtime::domain_ops::attribute_ops` via YAML-first re-implementation
+// (`config/verbs/attribute.yaml` + observation/derivation.yaml). 16 verbs
+// across `attribute.*`, `document.*`, and `derivation.*` dispatch through
+// the new `dyn AttributeService` trait (single-method bridge at
+// `crate::services::attribute_service_impl::ObPocAttributeService`) which
+// keeps `crate::sem_reg::*` and `crate::services::attribute_identity_service`
+// in ob-poc. The bridge returns `AttributeDispatchOutcome { outcome,
+// bindings }` so the wrapper can apply `@attribute` bindings from the
+// 3 `define*` verbs via `ctx.bind`.
 // Phase 5a composite-blocker #19 — billing_ops relocated to
 // `dsl-runtime::domain_ops::billing_ops`. Pure clean lift — matrix
 // tag "ob-poc-adapter destination" was wrong (same as slices #16-#18).
@@ -147,7 +156,16 @@ mod onboarding;
 // Phase 5c — outreach_ops relocated to `dsl-runtime::domain_ops::outreach_ops`
 // Phase 5e — ownership_ops relocated to `dsl-runtime::domain_ops::ownership_ops`
 // Phase 5e — partnership_ops relocated to `dsl-runtime::domain_ops::partnership_ops`
-mod phrase_ops;
+// Phase 5a composite-blocker #29 — phrase_ops relocated to
+// `dsl-runtime::domain_ops::phrase_ops` via YAML-first re-implementation
+// (`config/verbs/phrase.yaml`). 9 `phrase.*` verbs dispatch through the
+// new `dyn PhraseService` trait (single-method bridge at
+// `crate::services::phrase_service_impl::ObPocPhraseService`) which
+// keeps `crate::sem_reg::store::SnapshotStore` + `crate::sem_reg::types::*`
+// + `crate::sem_reg::ids::object_id_for` and the embedding-similarity
+// SQL on `verb_pattern_embeddings` / `phrase_bank` / `session_traces`
+// in ob-poc. The dispatch signature carries `&Principal` for snapshot
+// audit fields (mirroring `StewardshipDispatch::dispatch`).
 // Phase 5c — refdata_loader relocated to `dsl-runtime::domain_ops::refdata_loader`
 // Phase 5c — refdata_ops relocated to `dsl-runtime::domain_ops::refdata_ops`
 // Phase 5d — regulatory_ops relocated to `dsl-runtime::domain_ops::regulatory_ops`
@@ -210,7 +228,21 @@ pub(crate) mod sem_os_helpers;
 // direct sqlx + sem_os_core::diagram + relocated affinity_graph_cache.
 // Phase 5a — semantic_ops relocated to `dsl-runtime::domain_ops::semantic_ops`,
 // consuming `dyn SemanticStateService` via the ServiceRegistry.
-mod service_pipeline_ops;
+// Phase 5a composite-blocker #28 — service_pipeline_ops relocated to
+// `dsl-runtime::domain_ops::service_pipeline_ops` via YAML-first
+// re-implementation (`config/verbs/service.yaml`,
+// `service-pipeline.yaml`, `service-resource.yaml`,
+// `service-availability.yaml`). 16 verbs across 7 domains
+// (`service-intent.*`, `discovery.*`, `attributes.*`, `provisioning.*`,
+// `readiness.*`, `pipeline.full`, `service-resource.*`) dispatch
+// through the new `dyn ServicePipelineService` trait — one method
+// `dispatch_service_pipeline_verb(pool, domain, verb, args)` returning
+// `VerbExecutionOutcome` directly to preserve the four return-type
+// shapes (Uuid / Record / RecordSet / Affected) per YAML
+// `returns.type`. Bridge at
+// `crate::services::service_pipeline_service_impl::ObPocServicePipelineService`
+// keeps `crate::service_resources::*` (engines, orchestrators, SRDEF
+// registry loader) in ob-poc.
 // Phase 5a composite-blocker #27 — session_ops relocated to
 // `dsl-runtime::domain_ops::session_ops` via YAML-first re-implementation
 // against `config/verbs/session.yaml`. All 19 `session.*` verbs dispatch
@@ -326,12 +358,7 @@ pub use trading_profile::{
 // Phase 5e — ubo_analysis relocated. Types accessed via dsl_runtime::domain_ops::ubo_analysis.
 // Phase 5e — ubo_compute_ops relocated. Types accessed via dsl_runtime::domain_ops::ubo_compute_ops.
 
-// Domain-specific operation modules
-pub use attribute_ops::{
-    AttributeCheckCoverageOp, AttributeDefineGovernedOp, AttributeListByDocumentOp,
-    AttributeListSinksOp, AttributeListSourcesOp, AttributeTraceLineageOp,
-    DocumentCheckExtractionCoverageOp, DocumentListAttributesOp,
-};
+// Phase 5a composite-blocker #30 — attribute_ops re-exports removed; see relocation comment above.
 // Phase 5d — cbu_ops relocated. Types accessed via dsl_runtime::domain_ops::cbu_ops.
 // Phase 5d — cbu_role_ops relocated. Types accessed via dsl_runtime::domain_ops::cbu_role_ops.
 // Phase 4 Slice B Group 6 — document_ops relocated to `dsl-runtime::domain_ops::document_ops`.
@@ -375,12 +402,7 @@ pub use attribute_ops::{
 // import these types directly.
 // Phase 5e — trust_ops relocated. Types accessed via dsl_runtime::domain_ops::trust_ops.
 
-// Service pipeline operations (intent → discovery → provision → readiness)
-pub use service_pipeline_ops::{
-    AttributeGapsOp, AttributePopulateOp, AttributeRollupOp, AttributeSetOp, DiscoveryExplainOp,
-    DiscoveryRunOp, PipelineFullOp, ProvisioningRunOp, ProvisioningStatusOp, ReadinessComputeOp,
-    ReadinessExplainOp, ServiceIntentCreateOp, ServiceIntentListOp, ServiceIntentSupersedeOp,
-};
+// Phase 5a composite-blocker #28 — service_pipeline_ops re-exports removed; see relocation comment above.
 
 // GLEIF operations (LEI data enrichment)
 pub use gleif_ops::{
