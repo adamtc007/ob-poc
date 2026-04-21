@@ -755,11 +755,11 @@ Move `StateGateHash` re-computation inside the stage-8 transaction after acquiri
 
 #### Phase 5e — outbox wiring + drainer
 
-`OutboxDraft` values from verb outcomes land in `public.outbox` rows written inside the stage-8 transaction (migration 131 already drafted at Phase 0d). Drainer task consumes outbox rows post-commit and routes stage-9b effects (narration synthesis, UI push, broadcast).
+`OutboxDraft` values from verb outcomes land in `public.outbox` rows written inside the stage-8 transaction (migration `20260421_public_outbox.sql` per spec §10.4). Drainer task consumes outbox rows post-commit and routes stage-9b effects (narration synthesis, UI push, broadcast).
 
 **Gate:** drainer replay-safe test passes (kill mid-stream, restart, all effects delivered exactly-semantically-once via idempotency key); narration no longer fires inline in `process()`.
 
-**Status:** NOT STARTED. Scaffold migration + trait contracts exist in `ob-poc-types::OutboxDrainer`; drainer task absent.
+**Status:** **5e-foundation DONE.** Migration applied; `public.outbox` table live with the spec §10.4 schema (status CHECK + idempotency unique + pending/processing partial indices). Drainer task implemented at `ob-poc::outbox::OutboxDrainerImpl` with: pre-claim filter on registered consumer effect_kinds, `FOR UPDATE SKIP LOCKED` claim, stale-claim recycler, per-row attempt tracking, max-attempts auto-promote-to-terminal, panic-isolated consumer dispatch, graceful shutdown via `Notify`. First consumer `MaintenanceSpawnConsumer` closes the Phase 0g Pattern A loop (subprocess for `populate_embeddings` reindex). Wired into `ob-poc-web::main` startup. 3 integration tests green: claim→done, retry→max-attempts→terminal, no-consumer-skip. **5e-narration-cutover OPEN** — moving narration synthesis from inline `process()` to a `Narrate` outbox effect-kind requires touching the orchestrator and wiring a `NarrateConsumer` that pushes through the existing UI delivery channel; deferred as a separate slice.
 
 #### Phase 5f — Pattern B A1 remediation
 

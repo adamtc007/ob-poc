@@ -179,6 +179,16 @@ pub mod sequencer;
 #[cfg(feature = "database")]
 pub mod sequencer_tx;
 
+// Phase 5e — outbox drainer. Polls `public.outbox` for post-commit
+// effects (maintenance subprocess spawn, narration synthesis, UI push,
+// constellation broadcast, external HTTP notify), claims rows with
+// `FOR UPDATE SKIP LOCKED` semantics, dispatches to per-effect-kind
+// `AsyncOutboxConsumer` impls, and updates row status to done /
+// failed_retryable / failed_terminal. See `outbox/mod.rs` for the
+// full lifecycle model.
+#[cfg(feature = "database")]
+pub mod outbox;
+
 // BPMN-Lite integration - gRPC client, workflow dispatch, job worker, event bridge
 #[cfg(feature = "database")]
 pub mod bpmn_integration;

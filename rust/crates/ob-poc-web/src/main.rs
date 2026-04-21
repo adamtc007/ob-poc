@@ -732,6 +732,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // =========================================================================
+    // Phase 5e — Outbox drainer
+    // =========================================================================
+    // Polls `public.outbox` for post-commit effects (maintenance subprocess
+    // spawn, narration synthesis, UI push, constellation broadcast, external
+    // HTTP notify), claims rows with `FOR UPDATE SKIP LOCKED`, and dispatches
+    // to per-effect-kind consumers. Spawns as a background tokio task. The
+    // returned handle is dropped on process exit (the task ends with the
+    // process); explicit `shutdown().await` would join the task on a
+    // graceful-shutdown path if we ever add one.
+    let _outbox_drainer_handle = {
+        use ob_poc::outbox::{
+            MaintenanceSpawnConsumer, OutboxDrainerConfig, OutboxDrainerImpl,
+        };
+        let mut drainer = OutboxDrainerImpl::new(pool.clone(), OutboxDrainerConfig::default());
+        drainer.register(Arc::new(MaintenanceSpawnConsumer::new()))?;
+        tracing::info!("OutboxDrainer: spawning background task");
+        drainer.spawn()
+    };
+
+    // =========================================================================
     // BPMN-Lite Integration (before REPL V2 — determines executor)
     // =========================================================================
     type BpmnSetup = (

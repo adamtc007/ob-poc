@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict e96D5uu59DKh286NUawGa6gTxSvnINeqZXXBxd113CkcS8J4m98dOZjxxXKhxP1
+\restrict 8KBTl7629KRCIDVXyU208OlJQcAn4TbtSK07tSafkltTQFpN85AdfYdeCtGGwPk
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -7666,6 +7666,7 @@ CREATE TABLE "ob-poc".bpmn_pending_dispatches (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     last_attempted_at timestamp with time zone,
     dispatched_at timestamp with time zone,
+    session_stack jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT bpmn_pending_dispatches_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'dispatched'::text, 'failed_permanent'::text])))
 );
 
@@ -21051,6 +21052,28 @@ CREATE TABLE public._sqlx_migrations (
 
 
 --
+-- Name: outbox; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.outbox (
+    id uuid NOT NULL,
+    trace_id uuid NOT NULL,
+    envelope_version smallint NOT NULL,
+    effect_kind text NOT NULL,
+    payload jsonb NOT NULL,
+    idempotency_key text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    claimed_by text,
+    claimed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    processed_at timestamp with time zone,
+    last_error text,
+    CONSTRAINT outbox_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'done'::text, 'failed_retryable'::text, 'failed_terminal'::text])))
+);
+
+
+--
 -- Name: agent_plans; Type: TABLE; Schema: sem_reg; Owner: -
 --
 
@@ -26012,6 +26035,22 @@ ALTER TABLE ONLY "ob-poc".workspace_fact_refs
 
 ALTER TABLE ONLY public._sqlx_migrations
     ADD CONSTRAINT _sqlx_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: outbox outbox_idempotency_key_effect_kind_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox
+    ADD CONSTRAINT outbox_idempotency_key_effect_kind_key UNIQUE (idempotency_key, effect_kind);
+
+
+--
+-- Name: outbox outbox_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox
+    ADD CONSTRAINT outbox_pkey PRIMARY KEY (id);
 
 
 --
@@ -32112,6 +32151,20 @@ CREATE UNIQUE INDEX uq_entity_rel_natural_key_null_from ON "ob-poc".entity_relat
 
 
 --
+-- Name: outbox_pending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX outbox_pending_idx ON public.outbox USING btree (status, created_at) WHERE (status = ANY (ARRAY['pending'::text, 'failed_retryable'::text]));
+
+
+--
+-- Name: outbox_processing_claimed_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX outbox_processing_claimed_at_idx ON public.outbox USING btree (claimed_at) WHERE (status = 'processing'::text);
+
+
+--
 -- Name: idx_agent_plans_case_id; Type: INDEX; Schema: sem_reg; Owner: -
 --
 
@@ -37349,5 +37402,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict e96D5uu59DKh286NUawGa6gTxSvnINeqZXXBxd113CkcS8J4m98dOZjxxXKhxP1
+\unrestrict 8KBTl7629KRCIDVXyU208OlJQcAn4TbtSK07tSafkltTQFpN85AdfYdeCtGGwPk
 
