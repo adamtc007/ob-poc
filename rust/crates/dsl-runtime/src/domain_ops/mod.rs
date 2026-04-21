@@ -47,7 +47,7 @@ pub mod entity_query;
 // Phase 5c-migrate Phase B slice #46: investor_ops → `sem_os_postgres::ops::investor`.
 // Phase 5c-migrate Phase B slice #28: investor_role_ops → `sem_os_postgres::ops::investor_role`.
 pub mod kyc_case_ops;
-pub mod lifecycle_ops;
+// Phase 5c-migrate Phase B slice #57: lifecycle_ops → `sem_os_postgres::ops::lifecycle`.
 // Phase 5c-migrate Phase B slice #31: manco_ops → `sem_os_postgres::ops::manco`.
 // Phase 5c-migrate Phase B slice #20: matrix_overlay_ops → `sem_os_postgres::ops::matrix_overlay`.
 // Phase 5c-migrate Phase B slice #2 (2026-04-21): navigation_ops relocated

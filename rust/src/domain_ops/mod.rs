@@ -634,12 +634,14 @@ mod tests {
         assert!(!registry.has("pricing-config", "find-for-instrument"));
         assert!(!registry.has("sla", "list-open-breaches"));
         // Lifecycle operations
-        assert!(registry.has("lifecycle", "provision"));
-        assert!(registry.has("lifecycle", "analyze-gaps"));
-        assert!(registry.has("lifecycle", "check-readiness"));
-        assert!(registry.has("lifecycle", "discover"));
-        assert!(registry.has("lifecycle", "generate-plan"));
-        assert!(registry.has("lifecycle", "execute-plan"));
+        // Phase 5c-migrate Phase B slice #57: lifecycle_ops moved to
+        // `sem_os_postgres::ops::lifecycle::*` (+ 6 service-resource aliases).
+        assert!(!registry.has("lifecycle", "provision"));
+        assert!(!registry.has("lifecycle", "analyze-gaps"));
+        assert!(!registry.has("lifecycle", "check-readiness"));
+        assert!(!registry.has("lifecycle", "discover"));
+        assert!(!registry.has("lifecycle", "generate-plan"));
+        assert!(!registry.has("lifecycle", "execute-plan"));
         // Phase 5c-migrate Phase B slice #20: matrix-overlay ops moved to
         // `sem_os_postgres::ops::matrix_overlay::*`.
         assert!(!registry.has("matrix-overlay", "effective-matrix"));

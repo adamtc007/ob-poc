@@ -53,6 +53,7 @@ pub mod graph_validate;
 pub mod import_run;
 pub mod investor;
 pub mod investor_role;
+pub mod lifecycle;
 pub mod maintenance;
 pub mod manco;
 pub mod matrix_overlay;
@@ -628,6 +629,22 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #57: lifecycle.* (12 plugin verbs — 6 canonical
+    // + 6 `service-resource.*-lifecycle` compat aliases). Shared
+    // `do_*` helper functions keep the compat aliases single-line.
+    registry.register(Arc::new(lifecycle::Provision));
+    registry.register(Arc::new(lifecycle::AnalyzeGaps));
+    registry.register(Arc::new(lifecycle::CheckReadiness));
+    registry.register(Arc::new(lifecycle::Discover));
+    registry.register(Arc::new(lifecycle::GeneratePlan));
+    registry.register(Arc::new(lifecycle::ExecutePlan));
+    registry.register(Arc::new(lifecycle::ServiceProvisionLifecycle));
+    registry.register(Arc::new(lifecycle::ServiceAnalyzeLifecycleGaps));
+    registry.register(Arc::new(lifecycle::ServiceCheckLifecycleReadiness));
+    registry.register(Arc::new(lifecycle::ServiceDiscoverLifecycles));
+    registry.register(Arc::new(lifecycle::ServiceGenerateLifecyclePlan));
+    registry.register(Arc::new(lifecycle::ServiceExecuteLifecyclePlan));
 
     // Phase B slice #56: refdata loader (5 plugin verbs — bulk YAML→DB
     // for markets / instrument_classes / subcustodian_network /
