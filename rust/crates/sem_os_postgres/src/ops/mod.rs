@@ -66,6 +66,7 @@ pub mod partnership;
 pub mod pack_select;
 pub mod phrase;
 pub mod refdata;
+pub mod refdata_loader;
 pub mod registry;
 pub mod registry_ops;
 pub mod regulatory;
@@ -627,6 +628,15 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #56: refdata loader (5 plugin verbs — bulk YAML→DB
+    // for markets / instrument_classes / subcustodian_network /
+    // sla_templates + load-all orchestrator).
+    registry.register(Arc::new(refdata_loader::LoadMarkets));
+    registry.register(Arc::new(refdata_loader::LoadInstrumentClasses));
+    registry.register(Arc::new(refdata_loader::LoadSubcustodians));
+    registry.register(Arc::new(refdata_loader::LoadSlaTemplates));
+    registry.register(Arc::new(refdata_loader::LoadAll));
 
     // Phase B slice #55: ownership.* (8 plugin verbs — snapshot derive/list,
     // control positions, controller finder, reconciliation run/findings,

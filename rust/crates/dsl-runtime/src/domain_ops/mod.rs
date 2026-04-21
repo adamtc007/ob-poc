@@ -64,7 +64,7 @@ pub mod lifecycle_ops;
 // Phase 5c-migrate Phase B slice #4 (2026-04-21): phrase_ops relocated to
 // `sem_os_postgres::ops::phrase::*` as YAML-first re-implementations;
 // legacy file deleted.
-pub mod refdata_loader;
+// Phase 5c-migrate Phase B slice #56: refdata_loader → `sem_os_postgres::ops::refdata_loader`.
 // Phase 5c-migrate Phase B slice #45: refdata_ops → `sem_os_postgres::ops::refdata`.
 // Phase 5c-migrate Phase B slice #18: regulatory_ops → `sem_os_postgres::ops::regulatory`.
 // Phase 5c-migrate Phase B slice #14: remediation_ops → `sem_os_postgres::ops::remediation`.
