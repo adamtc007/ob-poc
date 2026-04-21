@@ -1,24 +1,69 @@
-//! Deal Record Operations
-//!
-//! Operations for deal lifecycle management, rate card negotiation, and onboarding handoff.
+//! Deal Record Operations (28 plugin verbs) — YAML-first re-implementation of
+//! `deal.*` from `rust/config/verbs/deal.yaml`.
 //!
 //! Deal Record is the commercial origination hub that links Sales through contracting,
 //! onboarding, servicing, and billing in a closed loop.
+//!
+//! # Ops
+//!
+//! CRUD:
+//! - `deal.create` — Create a new deal record (PROSPECT status)
+//! - `deal.search` — Full-text search by deal name or reference
+//! - `deal.update` — Update deal fields (name, owner, revenue, notes)
+//! - `deal.update-status` — State machine transition with KYC gating
+//! - `deal.cancel` — Cancel a deal (only from pre-active states)
+//!
+//! Participants:
+//! - `deal.add-participant` — Upsert participant with one-primary-per-deal enforcement
+//! - `deal.remove-participant` — Remove participant (optional role filter)
+//!
+//! Contracts:
+//! - `deal.add-contract` — Link contract (requires KYC clearance)
+//! - `deal.remove-contract` — Unlink contract (validates no dependent rate cards)
+//!
+//! Products:
+//! - `deal.add-product` — Add product to deal commercial scope
+//! - `deal.update-product-status` — Update product status with AGREED timestamp
+//! - `deal.remove-product` — Soft-delete (sets status REMOVED)
+//!
+//! Rate Cards:
+//! - `deal.create-rate-card` — Create DRAFT rate card for product
+//! - `deal.add-rate-card-line` — Add fee line (DRAFT/PROPOSED only)
+//! - `deal.update-rate-card-line` — Modify line values (non-AGREED only)
+//! - `deal.remove-rate-card-line` — Delete line (validates no billing deps)
+//! - `deal.propose-rate-card` — Transition to PROPOSED (requires lines)
+//! - `deal.counter-rate-card` — Clone with COUNTER_OFFERED, mark original SUPERSEDED
+//! - `deal.agree-rate-card` — Transition to AGREED (from PROPOSED/COUNTER_OFFERED)
+//!
+//! SLA & Documents:
+//! - `deal.add-sla` — Create SLA record with optional contract/product/service
+//! - `deal.add-document` — Link document to deal
+//! - `deal.update-document-status` — Update document status
+//!
+//! UBO & Onboarding:
+//! - `deal.add-ubo-assessment` — Link entity UBO assessment
+//! - `deal.update-ubo-assessment` — Update assessment status / risk rating
+//! - `deal.request-onboarding` — Create single onboarding request (validates prereqs)
+//! - `deal.request-onboarding-batch` — Batch insert onboarding requests
+//! - `deal.update-onboarding-status` — Update request; auto-transition deal to ACTIVE when all complete
+//!
+//! Summary:
+//! - `deal.read-summary` — Composite summary with counts
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use uuid::Uuid;
 
-use sqlx::PgPool;
-
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::{
+use dsl_runtime::domain_ops::helpers::{
     json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+
+use super::SemOsVerbOp;
 
 // =============================================================================
 // Result Types
@@ -71,8 +116,11 @@ fn is_valid_deal_status_transition(from: &str, to: &str) -> bool {
     )
 }
 
-async fn deal_has_group_approved_kyc_clearance(pool: &PgPool, deal_id: Uuid) -> Result<bool> {
-    let has_approved_case = sqlx::query_scalar(
+async fn deal_has_group_approved_kyc_clearance(
+    scope: &mut dyn TransactionScope,
+    deal_id: Uuid,
+) -> Result<bool> {
+    let has_approved_case: bool = sqlx::query_scalar(
         r#"
         SELECT EXISTS(
             SELECT 1
@@ -85,14 +133,18 @@ async fn deal_has_group_approved_kyc_clearance(pool: &PgPool, deal_id: Uuid) -> 
         "#,
     )
     .bind(deal_id)
-    .fetch_one(pool)
+    .fetch_one(scope.executor())
     .await?;
 
     Ok(has_approved_case)
 }
 
-async fn deal_controls_cbu(pool: &PgPool, deal_id: Uuid, cbu_id: Uuid) -> Result<bool> {
-    let is_controlled = sqlx::query_scalar(
+async fn deal_controls_cbu(
+    scope: &mut dyn TransactionScope,
+    deal_id: Uuid,
+    cbu_id: Uuid,
+) -> Result<bool> {
+    let is_controlled: bool = sqlx::query_scalar(
         r#"
         SELECT EXISTS(
             SELECT 1
@@ -107,48 +159,41 @@ async fn deal_controls_cbu(pool: &PgPool, deal_id: Uuid, cbu_id: Uuid) -> Result
     )
     .bind(deal_id)
     .bind(cbu_id)
-    .fetch_one(pool)
+    .fetch_one(scope.executor())
     .await?;
 
     Ok(is_controlled)
 }
 
 // =============================================================================
-// Deal CRUD Operations
+// deal.create
 // =============================================================================
 
-/// Create a new deal record
-#[register_custom_op]
-pub struct DealCreateOp;
+/// Create a new deal record.
+pub struct Create;
 
 #[async_trait]
-impl CustomOperation for DealCreateOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "create"
-    }
-    fn rationale(&self) -> &'static str {
-        "Creates deal and records initial event in deal_events audit trail"
+impl SemOsVerbOp for Create {
+    fn fqn(&self) -> &str {
+        "deal.create"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_name = json_extract_string(args, "deal-name")?;
         let primary_client_group_id = json_extract_uuid(args, ctx, "primary-client-group-id")?;
         let deal_reference = json_extract_string_opt(args, "deal-reference");
         let sales_owner = json_extract_string_opt(args, "sales-owner");
         let sales_team = json_extract_string_opt(args, "sales-team");
-        let estimated_revenue: Option<f64> = args.get("estimated-revenue").and_then(|v| v.as_f64());
+        let estimated_revenue: Option<f64> =
+            args.get("estimated-revenue").and_then(|v| v.as_f64());
         let currency_code = json_extract_string_opt(args, "currency-code").unwrap_or("USD".into());
         let notes = json_extract_string_opt(args, "notes");
 
-        // Insert deal
         let deal_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".deals (
@@ -167,10 +212,9 @@ impl CustomOperation for DealCreateOp {
         .bind(estimated_revenue)
         .bind(&currency_code)
         .bind(&notes)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, new_value, actor)
@@ -179,43 +223,31 @@ impl CustomOperation for DealCreateOp {
         )
         .bind(deal_id)
         .bind(&sales_owner)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        let _result = DealCreateResult {
-            deal_id,
-            deal_name,
-            deal_status: "PROSPECT".to_string(),
-        };
         Ok(VerbExecutionOutcome::Uuid(deal_id))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
-/// Search deals by name or reference
-#[register_custom_op]
-pub struct DealSearchOp;
+// =============================================================================
+// deal.search
+// =============================================================================
+
+/// Search deals by name or reference.
+pub struct Search;
 
 #[async_trait]
-impl CustomOperation for DealSearchOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "search"
-    }
-    fn rationale(&self) -> &'static str {
-        "Full-text search across deal name and reference"
+impl SemOsVerbOp for Search {
+    fn fqn(&self) -> &str {
+        "deal.search"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let query = json_extract_string(args, "query")?;
         let pattern = format!("%{}%", query);
@@ -230,10 +262,10 @@ impl CustomOperation for DealSearchOp {
             "#,
         )
         .bind(&pattern)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
-        let results: Vec<serde_json::Value> = rows
+        let results: Vec<Value> = rows
             .into_iter()
             .map(|(deal_id, deal_name, deal_ref, status, owner)| {
                 serde_json::json!({
@@ -246,42 +278,34 @@ impl CustomOperation for DealSearchOp {
             })
             .collect();
 
-        Ok(VerbExecutionOutcome::RecordSet(
-            results,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
-/// Update deal record fields
-#[register_custom_op]
-pub struct DealUpdateOp;
+// =============================================================================
+// deal.update
+// =============================================================================
+
+/// Update deal record fields.
+pub struct Update;
 
 #[async_trait]
-impl CustomOperation for DealUpdateOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "update"
-    }
-    fn rationale(&self) -> &'static str {
-        "Updates deal fields and records change event"
+impl SemOsVerbOp for Update {
+    fn fqn(&self) -> &str {
+        "deal.update"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let deal_name = json_extract_string_opt(args, "deal-name");
         let sales_owner = json_extract_string_opt(args, "sales-owner");
-        let estimated_revenue: Option<f64> = args.get("estimated-revenue").and_then(|v| v.as_f64());
+        let estimated_revenue: Option<f64> =
+            args.get("estimated-revenue").and_then(|v| v.as_f64());
         let notes = json_extract_string_opt(args, "notes");
 
         let result = sqlx::query(
@@ -301,52 +325,41 @@ impl CustomOperation for DealUpdateOp {
         .bind(&sales_owner)
         .bind(estimated_revenue)
         .bind(&notes)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
-/// Transition deal status with lifecycle validation
-#[register_custom_op]
-pub struct DealUpdateStatusOp;
+// =============================================================================
+// deal.update-status
+// =============================================================================
+
+/// Transition deal status with lifecycle validation.
+pub struct UpdateStatus;
 
 #[async_trait]
-impl CustomOperation for DealUpdateStatusOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "update-status"
-    }
-    fn rationale(&self) -> &'static str {
-        "State machine validation for deal status transitions"
+impl SemOsVerbOp for UpdateStatus {
+    fn fqn(&self) -> &str {
+        "deal.update-status"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let new_status = json_extract_string(args, "new-status")?;
 
-        // Get current status
         let current_status: String =
             sqlx::query_scalar(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
                 .bind(deal_id)
-                .fetch_one(pool)
+                .fetch_one(scope.executor())
                 .await?;
 
-        // Validate transition
         if !is_valid_deal_status_transition(&current_status, &new_status) {
             return Err(anyhow!(
                 "Invalid status transition from {} to {}",
@@ -356,14 +369,13 @@ impl CustomOperation for DealUpdateStatusOp {
         }
 
         if new_status == "CONTRACTED"
-            && !deal_has_group_approved_kyc_clearance(pool, deal_id).await?
+            && !deal_has_group_approved_kyc_clearance(scope, deal_id).await?
         {
             return Err(anyhow!(
                 "Deal cannot move to CONTRACTED until the primary client group has APPROVED KYC clearance"
             ));
         }
 
-        // Determine which timestamp to set
         let timestamp_column = match new_status.as_str() {
             "QUALIFYING" => Some("qualified_at"),
             "CONTRACTED" => Some("contracted_at"),
@@ -372,7 +384,6 @@ impl CustomOperation for DealUpdateStatusOp {
             _ => None,
         };
 
-        // Update status
         if let Some(col) = timestamp_column {
             let query = format!(
                 r#"UPDATE "ob-poc".deals SET deal_status = $2, {} = NOW(), updated_at = NOW() WHERE deal_id = $1"#,
@@ -381,7 +392,7 @@ impl CustomOperation for DealUpdateStatusOp {
             sqlx::query(&query)
                 .bind(deal_id)
                 .bind(&new_status)
-                .execute(pool)
+                .execute(scope.executor())
                 .await?;
         } else {
             sqlx::query(
@@ -389,11 +400,10 @@ impl CustomOperation for DealUpdateStatusOp {
             )
             .bind(deal_id)
             .bind(&new_status)
-            .execute(pool)
+            .execute(scope.executor())
             .await?;
         }
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, old_value, new_value)
@@ -403,7 +413,7 @@ impl CustomOperation for DealUpdateStatusOp {
         .bind(deal_id)
         .bind(&current_status)
         .bind(&new_status)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         let result = DealStatusUpdateResult {
@@ -411,49 +421,38 @@ impl CustomOperation for DealUpdateStatusOp {
             old_status: current_status,
             new_status,
         };
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
-/// Cancel a deal
-#[register_custom_op]
-pub struct DealCancelOp;
+// =============================================================================
+// deal.cancel
+// =============================================================================
+
+/// Cancel a deal.
+pub struct Cancel;
 
 #[async_trait]
-impl CustomOperation for DealCancelOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "cancel"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates deal can be cancelled and records cancellation event"
+impl SemOsVerbOp for Cancel {
+    fn fqn(&self) -> &str {
+        "deal.cancel"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let reason = json_extract_string(args, "reason")?;
 
-        // Get current status
         let current_status: String =
             sqlx::query_scalar(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
                 .bind(deal_id)
-                .fetch_one(pool)
+                .fetch_one(scope.executor())
                 .await?;
 
-        // Cannot cancel if already ACTIVE, WINDING_DOWN, or OFFBOARDED
         if matches!(
             current_status.as_str(),
             "ACTIVE" | "WINDING_DOWN" | "OFFBOARDED" | "CANCELLED"
@@ -461,7 +460,6 @@ impl CustomOperation for DealCancelOp {
             return Err(anyhow!("Cannot cancel deal in status {}", current_status));
         }
 
-        // Update to cancelled
         sqlx::query(
             r#"
             UPDATE "ob-poc".deals
@@ -470,10 +468,9 @@ impl CustomOperation for DealCancelOp {
             "#,
         )
         .bind(deal_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, old_value, new_value, description)
@@ -483,42 +480,31 @@ impl CustomOperation for DealCancelOp {
         .bind(deal_id)
         .bind(&current_status)
         .bind(&reason)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
-// Participant Operations
+// deal.add-participant
 // =============================================================================
 
-/// Add a participant to a deal
-#[register_custom_op]
-pub struct DealAddParticipantOp;
+/// Add a participant to a deal.
+pub struct AddParticipant;
 
 #[async_trait]
-impl CustomOperation for DealAddParticipantOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "add-participant"
-    }
-    fn rationale(&self) -> &'static str {
-        "Handles upsert logic and enforces one-primary-per-deal constraint"
+impl SemOsVerbOp for AddParticipant {
+    fn fqn(&self) -> &str {
+        "deal.add-participant"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -527,7 +513,6 @@ impl CustomOperation for DealAddParticipantOp {
         let lei = json_extract_string_opt(args, "lei");
         let is_primary = json_extract_bool_opt(args, "is-primary").unwrap_or(false);
 
-        // Insert participant (upsert on unique constraint)
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_participants (deal_id, entity_id, participant_role, lei, is_primary)
@@ -541,10 +526,9 @@ impl CustomOperation for DealAddParticipantOp {
         .bind(&participant_role)
         .bind(&lei)
         .bind(is_primary)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
@@ -554,38 +538,31 @@ impl CustomOperation for DealAddParticipantOp {
         .bind(deal_id)
         .bind(entity_id)
         .bind(&participant_role)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Remove a participant from a deal
-#[register_custom_op]
-pub struct DealRemoveParticipantOp;
+// =============================================================================
+// deal.remove-participant
+// =============================================================================
+
+/// Remove a participant from a deal.
+pub struct RemoveParticipant;
 
 #[async_trait]
-impl CustomOperation for DealRemoveParticipantOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "remove-participant"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates no orphaned contracts before removal"
+impl SemOsVerbOp for RemoveParticipant {
+    fn fqn(&self) -> &str {
+        "deal.remove-participant"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -598,7 +575,7 @@ impl CustomOperation for DealRemoveParticipantOp {
             .bind(deal_id)
             .bind(entity_id)
             .bind(role)
-            .execute(pool)
+            .execute(scope.executor())
             .await?
         } else {
             sqlx::query(
@@ -606,45 +583,32 @@ impl CustomOperation for DealRemoveParticipantOp {
             )
             .bind(deal_id)
             .bind(entity_id)
-            .execute(pool)
+            .execute(scope.executor())
             .await?
         };
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
 // =============================================================================
-// Contract Operations
+// deal.add-contract
 // =============================================================================
 
-/// Add a contract to a deal
-#[register_custom_op]
-pub struct DealAddContractOp;
+/// Add a contract to a deal.
+pub struct AddContract;
 
 #[async_trait]
-impl CustomOperation for DealAddContractOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "add-contract"
-    }
-    fn rationale(&self) -> &'static str {
-        "Links contract to deal and records CONTRACT_ADDED event"
+impl SemOsVerbOp for AddContract {
+    fn fqn(&self) -> &str {
+        "deal.add-contract"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
@@ -656,7 +620,7 @@ impl CustomOperation for DealAddContractOp {
             .map(|i| i as i32)
             .unwrap_or(1);
 
-        if !deal_has_group_approved_kyc_clearance(pool, deal_id).await? {
+        if !deal_has_group_approved_kyc_clearance(scope, deal_id).await? {
             return Err(anyhow!(
                 "Cannot link contract to deal until the primary client group has APPROVED KYC clearance"
             ));
@@ -672,10 +636,9 @@ impl CustomOperation for DealAddContractOp {
         .bind(contract_id)
         .bind(&contract_role)
         .bind(sequence_order)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
@@ -685,49 +648,41 @@ impl CustomOperation for DealAddContractOp {
         .bind(deal_id)
         .bind(contract_id)
         .bind(&contract_role)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Remove a contract from a deal
-#[register_custom_op]
-pub struct DealRemoveContractOp;
+// =============================================================================
+// deal.remove-contract
+// =============================================================================
+
+/// Remove a contract from a deal.
+pub struct RemoveContract;
 
 #[async_trait]
-impl CustomOperation for DealRemoveContractOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "remove-contract"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates no rate cards or billing profiles reference this contract"
+impl SemOsVerbOp for RemoveContract {
+    fn fqn(&self) -> &str {
+        "deal.remove-contract"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
 
-        // Check for dependent rate cards
         let count: i64 = sqlx::query_scalar(
             r#"SELECT COUNT(*) FROM "ob-poc".deal_rate_cards WHERE deal_id = $1 AND contract_id = $2"#,
         )
         .bind(deal_id)
         .bind(contract_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if count > 0 {
@@ -742,44 +697,31 @@ impl CustomOperation for DealRemoveContractOp {
         )
         .bind(deal_id)
         .bind(contract_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
 // =============================================================================
-// Deal Product Operations
+// deal.add-product
 // =============================================================================
 
-/// Add a product to the deal's commercial scope
-#[register_custom_op]
-pub struct DealAddProductOp;
+/// Add a product to the deal's commercial scope.
+pub struct AddProduct;
 
 #[async_trait]
-impl CustomOperation for DealAddProductOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "add-product"
-    }
-    fn rationale(&self) -> &'static str {
-        "Adds product to deal scope and records PRODUCT_ADDED event"
+impl SemOsVerbOp for AddProduct {
+    fn fqn(&self) -> &str {
+        "deal.add-product"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let product_id = json_extract_uuid(args, ctx, "product-id")?;
@@ -811,10 +753,9 @@ impl CustomOperation for DealAddProductOp {
         .bind(indicative_revenue)
         .bind(&currency_code)
         .bind(&notes)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
@@ -824,46 +765,36 @@ impl CustomOperation for DealAddProductOp {
         .bind(deal_id)
         .bind(product_id)
         .bind(&product_status)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Uuid(
-            deal_product_id.0,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(deal_product_id.0))
     }
 }
 
-/// Update the status of a product in the deal scope
-#[register_custom_op]
-pub struct DealUpdateProductStatusOp;
+// =============================================================================
+// deal.update-product-status
+// =============================================================================
+
+/// Update the status of a product in the deal scope.
+pub struct UpdateProductStatus;
 
 #[async_trait]
-impl CustomOperation for DealUpdateProductStatusOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "update-product-status"
-    }
-    fn rationale(&self) -> &'static str {
-        "Updates product status with event recording"
+impl SemOsVerbOp for UpdateProductStatus {
+    fn fqn(&self) -> &str {
+        "deal.update-product-status"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let product_id = json_extract_uuid(args, ctx, "product-id")?;
         let product_status = json_extract_string(args, "product-status")?;
 
-        // Update with AGREED timestamp if status is AGREED
         let result = if product_status == "AGREED" {
             sqlx::query(
                 r#"
@@ -875,7 +806,7 @@ impl CustomOperation for DealUpdateProductStatusOp {
             .bind(deal_id)
             .bind(product_id)
             .bind(&product_status)
-            .execute(pool)
+            .execute(scope.executor())
             .await?
         } else {
             sqlx::query(
@@ -888,11 +819,10 @@ impl CustomOperation for DealUpdateProductStatusOp {
             .bind(deal_id)
             .bind(product_id)
             .bind(&product_status)
-            .execute(pool)
+            .execute(scope.executor())
             .await?
         };
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
@@ -902,40 +832,31 @@ impl CustomOperation for DealUpdateProductStatusOp {
         .bind(deal_id)
         .bind(product_id)
         .bind(&product_status)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
-/// Remove a product from the deal scope (sets status to REMOVED)
-#[register_custom_op]
-pub struct DealRemoveProductOp;
+// =============================================================================
+// deal.remove-product
+// =============================================================================
+
+/// Remove a product from the deal scope (soft-delete via status=REMOVED).
+pub struct RemoveProduct;
 
 #[async_trait]
-impl CustomOperation for DealRemoveProductOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "remove-product"
-    }
-    fn rationale(&self) -> &'static str {
-        "Soft-deletes product from deal by setting status to REMOVED"
+impl SemOsVerbOp for RemoveProduct {
+    fn fqn(&self) -> &str {
+        "deal.remove-product"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let product_id = json_extract_uuid(args, ctx, "product-id")?;
@@ -949,10 +870,9 @@ impl CustomOperation for DealRemoveProductOp {
         )
         .bind(deal_id)
         .bind(product_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
@@ -961,44 +881,31 @@ impl CustomOperation for DealRemoveProductOp {
         )
         .bind(deal_id)
         .bind(product_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
 // =============================================================================
-// Rate Card Operations
+// deal.create-rate-card
 // =============================================================================
 
-/// Create a negotiated rate card for a product within a deal
-#[register_custom_op]
-pub struct DealCreateRateCardOp;
+/// Create a negotiated rate card for a product within a deal.
+pub struct CreateRateCard;
 
 #[async_trait]
-impl CustomOperation for DealCreateRateCardOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "create-rate-card"
-    }
-    fn rationale(&self) -> &'static str {
-        "Creates rate card in DRAFT status and validates contract is linked to deal"
+impl SemOsVerbOp for CreateRateCard {
+    fn fqn(&self) -> &str {
+        "deal.create-rate-card"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
@@ -1007,13 +914,12 @@ impl CustomOperation for DealCreateRateCardOp {
         let effective_from = json_extract_string(args, "effective-from")?;
         let effective_to = json_extract_string_opt(args, "effective-to");
 
-        // Validate contract is linked to deal
         let exists: bool = sqlx::query_scalar(
             r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".deal_contracts WHERE deal_id = $1 AND contract_id = $2)"#,
         )
         .bind(deal_id)
         .bind(contract_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if !exists {
@@ -1033,10 +939,9 @@ impl CustomOperation for DealCreateRateCardOp {
         .bind(&rate_card_name)
         .bind(&effective_from)
         .bind(&effective_to)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, new_value)
@@ -1045,40 +950,31 @@ impl CustomOperation for DealCreateRateCardOp {
         )
         .bind(deal_id)
         .bind(rate_card_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Uuid(
-            rate_card_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(rate_card_id))
     }
 }
 
-/// Add a fee line to a rate card
-#[register_custom_op]
-pub struct DealAddRateCardLineOp;
+// =============================================================================
+// deal.add-rate-card-line
+// =============================================================================
+
+/// Add a fee line to a rate card.
+pub struct AddRateCardLine;
 
 #[async_trait]
-impl CustomOperation for DealAddRateCardLineOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "add-rate-card-line"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates rate card is negotiable and relies on DB CHECK constraints for pricing model"
+impl SemOsVerbOp for AddRateCardLine {
+    fn fqn(&self) -> &str {
+        "deal.add-rate-card-line"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let rate_card_id = json_extract_uuid(args, ctx, "rate-card-id")?;
         let fee_type = json_extract_string(args, "fee-type")?;
@@ -1090,16 +986,15 @@ impl CustomOperation for DealAddRateCardLineOp {
         let maximum_fee: Option<f64> = args.get("maximum-fee").and_then(|v| v.as_f64());
         let currency_code =
             json_extract_string_opt(args, "currency-code").unwrap_or_else(|| "USD".to_string());
-        let tier_brackets = args.get("tier-brackets").and_then(|v| Some(v.clone()));
+        let tier_brackets = args.get("tier-brackets").cloned();
         let fee_basis = json_extract_string_opt(args, "fee-basis");
         let description = json_extract_string_opt(args, "description");
 
-        // Validate rate card is in DRAFT or PROPOSED status
         let status: String = sqlx::query_scalar(
             r#"SELECT status FROM "ob-poc".deal_rate_cards WHERE rate_card_id = $1"#,
         )
         .bind(rate_card_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if !matches!(status.as_str(), "DRAFT" | "PROPOSED") {
@@ -1128,46 +1023,38 @@ impl CustomOperation for DealAddRateCardLineOp {
         .bind(&tier_brackets)
         .bind(&fee_basis)
         .bind(&description)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Uuid(line_id))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Modify an existing rate card line
-#[register_custom_op]
-pub struct DealUpdateRateCardLineOp;
+// =============================================================================
+// deal.update-rate-card-line
+// =============================================================================
+
+/// Modify an existing rate card line.
+pub struct UpdateRateCardLine;
 
 #[async_trait]
-impl CustomOperation for DealUpdateRateCardLineOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "update-rate-card-line"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates parent rate card is still negotiable"
+impl SemOsVerbOp for UpdateRateCardLine {
+    fn fqn(&self) -> &str {
+        "deal.update-rate-card-line"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let line_id = json_extract_uuid(args, ctx, "line-id")?;
         let rate_value: Option<f64> = args.get("rate-value").and_then(|v| v.as_f64());
         let minimum_fee: Option<f64> = args.get("minimum-fee").and_then(|v| v.as_f64());
         let maximum_fee: Option<f64> = args.get("maximum-fee").and_then(|v| v.as_f64());
-        let tier_brackets = args.get("tier-brackets").and_then(|v| Some(v.clone()));
+        let tier_brackets = args.get("tier-brackets").cloned();
 
-        // Validate rate card is not AGREED
         let status: String = sqlx::query_scalar(
             r#"
             SELECT rc.status
@@ -1177,7 +1064,7 @@ impl CustomOperation for DealUpdateRateCardLineOp {
             "#,
         )
         .bind(line_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if status == "AGREED" {
@@ -1200,49 +1087,39 @@ impl CustomOperation for DealUpdateRateCardLineOp {
         .bind(minimum_fee)
         .bind(maximum_fee)
         .bind(&tier_brackets)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
-/// Remove a fee line from a rate card
-#[register_custom_op]
-pub struct DealRemoveRateCardLineOp;
+// =============================================================================
+// deal.remove-rate-card-line
+// =============================================================================
+
+/// Remove a fee line from a rate card.
+pub struct RemoveRateCardLine;
 
 #[async_trait]
-impl CustomOperation for DealRemoveRateCardLineOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "remove-rate-card-line"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates no billing targets reference this line"
+impl SemOsVerbOp for RemoveRateCardLine {
+    fn fqn(&self) -> &str {
+        "deal.remove-rate-card-line"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let line_id = json_extract_uuid(args, ctx, "line-id")?;
 
-        // Check for dependent billing targets
         let count: i64 = sqlx::query_scalar(
             r#"SELECT COUNT(*) FROM "ob-poc".fee_billing_account_targets WHERE rate_card_line_id = $1"#,
         )
         .bind(line_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if count > 0 {
@@ -1254,64 +1131,52 @@ impl CustomOperation for DealRemoveRateCardLineOp {
 
         let result = sqlx::query(r#"DELETE FROM "ob-poc".deal_rate_card_lines WHERE line_id = $1"#)
             .bind(line_id)
-            .execute(pool)
+            .execute(scope.executor())
             .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
-/// Propose rate card for client review
-#[register_custom_op]
-pub struct DealProposeRateCardOp;
+// =============================================================================
+// deal.propose-rate-card
+// =============================================================================
+
+/// Propose rate card for client review.
+pub struct ProposeRateCard;
 
 #[async_trait]
-impl CustomOperation for DealProposeRateCardOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "propose-rate-card"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates at least one line exists and transitions to PROPOSED"
+impl SemOsVerbOp for ProposeRateCard {
+    fn fqn(&self) -> &str {
+        "deal.propose-rate-card"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let rate_card_id = json_extract_uuid(args, ctx, "rate-card-id")?;
 
-        // Validate at least one line exists
         let count: i64 = sqlx::query_scalar(
             r#"SELECT COUNT(*) FROM "ob-poc".deal_rate_card_lines WHERE rate_card_id = $1"#,
         )
         .bind(rate_card_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if count == 0 {
             return Err(anyhow!("Cannot propose empty rate card"));
         }
 
-        // Get deal_id for event recording
         let deal_id: Uuid = sqlx::query_scalar(
             r#"SELECT deal_id FROM "ob-poc".deal_rate_cards WHERE rate_card_id = $1"#,
         )
         .bind(rate_card_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Update status
         sqlx::query(
             r#"
             UPDATE "ob-poc".deal_rate_cards
@@ -1320,10 +1185,9 @@ impl CustomOperation for DealProposeRateCardOp {
             "#,
         )
         .bind(rate_card_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, new_value)
@@ -1332,44 +1196,34 @@ impl CustomOperation for DealProposeRateCardOp {
         )
         .bind(deal_id)
         .bind(rate_card_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Client counter-offer - creates new version via clone
-#[register_custom_op]
-pub struct DealCounterRateCardOp;
+// =============================================================================
+// deal.counter-rate-card
+// =============================================================================
+
+/// Client counter-offer — clones rate card with COUNTER_OFFERED status.
+pub struct CounterRateCard;
 
 #[async_trait]
-impl CustomOperation for DealCounterRateCardOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "counter-rate-card"
-    }
-    fn rationale(&self) -> &'static str {
-        "Clones rate card with COUNTER_OFFERED status and applies counter values"
+impl SemOsVerbOp for CounterRateCard {
+    fn fqn(&self) -> &str {
+        "deal.counter-rate-card"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let rate_card_id = json_extract_uuid(args, ctx, "rate-card-id")?;
-        // counter-lines would be JSON array of {line_id, proposed_rate, proposed_minimum, proposed_maximum}
-        // For simplicity, we create a clone and let caller update lines separately
 
-        // Get original rate card details
         let row: (Uuid, Uuid, Uuid, Option<String>, String, Option<String>, i32) = sqlx::query_as(
             r#"
             SELECT deal_id, contract_id, product_id, rate_card_name, effective_from::text, effective_to::text, negotiation_round
@@ -1377,12 +1231,11 @@ impl CustomOperation for DealCounterRateCardOp {
             "#,
         )
         .bind(rate_card_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         let (deal_id, contract_id, product_id, name, eff_from, eff_to, round) = row;
 
-        // Create new rate card with COUNTER_OFFERED status
         let new_rate_card_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".deal_rate_cards (deal_id, contract_id, product_id, rate_card_name, effective_from, effective_to, status, negotiation_round)
@@ -1397,10 +1250,9 @@ impl CustomOperation for DealCounterRateCardOp {
         .bind(&eff_from)
         .bind(&eff_to)
         .bind(round + 1)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Copy lines from original
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_rate_card_lines (rate_card_id, fee_type, fee_subtype, pricing_model, rate_value, minimum_fee, maximum_fee, currency_code, tier_brackets, fee_basis, description, sequence_order)
@@ -1410,19 +1262,17 @@ impl CustomOperation for DealCounterRateCardOp {
         )
         .bind(rate_card_id)
         .bind(new_rate_card_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        // Mark original as superseded
         sqlx::query(
             r#"UPDATE "ob-poc".deal_rate_cards SET status = 'SUPERSEDED', superseded_by = $2, updated_at = NOW() WHERE rate_card_id = $1"#,
         )
         .bind(rate_card_id)
         .bind(new_rate_card_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, old_value, new_value, description)
@@ -1433,49 +1283,39 @@ impl CustomOperation for DealCounterRateCardOp {
         .bind(new_rate_card_id)
         .bind(rate_card_id.to_string())
         .bind(new_rate_card_id.to_string())
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Uuid(
-            new_rate_card_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(new_rate_card_id))
     }
 }
 
-/// Finalise rate card - both parties agree
-#[register_custom_op]
-pub struct DealAgreeRateCardOp;
+// =============================================================================
+// deal.agree-rate-card
+// =============================================================================
+
+/// Finalise rate card — both parties agree.
+pub struct AgreeRateCard;
 
 #[async_trait]
-impl CustomOperation for DealAgreeRateCardOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "agree-rate-card"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates rate card is PROPOSED or COUNTER_OFFERED and transitions to AGREED"
+impl SemOsVerbOp for AgreeRateCard {
+    fn fqn(&self) -> &str {
+        "deal.agree-rate-card"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let rate_card_id = json_extract_uuid(args, ctx, "rate-card-id")?;
 
-        // Validate status
         let row: (String, Uuid) = sqlx::query_as(
             r#"SELECT status, deal_id FROM "ob-poc".deal_rate_cards WHERE rate_card_id = $1"#,
         )
         .bind(rate_card_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         let (status, deal_id) = row;
@@ -1484,15 +1324,13 @@ impl CustomOperation for DealAgreeRateCardOp {
             return Err(anyhow!("Cannot agree rate card in status {}", status));
         }
 
-        // Update status
         sqlx::query(
             r#"UPDATE "ob-poc".deal_rate_cards SET status = 'AGREED', updated_at = NOW() WHERE rate_card_id = $1"#,
         )
         .bind(rate_card_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, old_value, new_value)
@@ -1502,42 +1340,31 @@ impl CustomOperation for DealAgreeRateCardOp {
         .bind(deal_id)
         .bind(rate_card_id)
         .bind(&status)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
-// SLA Operations
+// deal.add-sla
 // =============================================================================
 
-/// Add an SLA to a deal
-#[register_custom_op]
-pub struct DealAddSlaOp;
+/// Add an SLA to a deal.
+pub struct AddSla;
 
 #[async_trait]
-impl CustomOperation for DealAddSlaOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "add-sla"
-    }
-    fn rationale(&self) -> &'static str {
-        "Creates SLA record with optional contract/product/service linkage"
+impl SemOsVerbOp for AddSla {
+    fn fqn(&self) -> &str {
+        "deal.add-sla"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid_opt(args, ctx, "contract-id");
@@ -1575,10 +1402,9 @@ impl CustomOperation for DealAddSlaOp {
         .bind(&penalty_type)
         .bind(penalty_value)
         .bind(&effective_from)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
@@ -1588,42 +1414,31 @@ impl CustomOperation for DealAddSlaOp {
         .bind(deal_id)
         .bind(sla_id)
         .bind(&sla_name)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Uuid(sla_id))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
-// Document Operations
+// deal.add-document
 // =============================================================================
 
-/// Add a document to a deal
-#[register_custom_op]
-pub struct DealAddDocumentOp;
+/// Add a document to a deal.
+pub struct AddDocument;
 
 #[async_trait]
-impl CustomOperation for DealAddDocumentOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "add-document"
-    }
-    fn rationale(&self) -> &'static str {
-        "Links document to deal with type and status tracking"
+impl SemOsVerbOp for AddDocument {
+    fn fqn(&self) -> &str {
+        "deal.add-document"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
@@ -1642,38 +1457,31 @@ impl CustomOperation for DealAddDocumentOp {
         .bind(document_id)
         .bind(&document_type)
         .bind(&document_status)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Update document status
-#[register_custom_op]
-pub struct DealUpdateDocumentStatusOp;
+// =============================================================================
+// deal.update-document-status
+// =============================================================================
+
+/// Update document status.
+pub struct UpdateDocumentStatus;
 
 #[async_trait]
-impl CustomOperation for DealUpdateDocumentStatusOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "update-document-status"
-    }
-    fn rationale(&self) -> &'static str {
-        "Updates document status and records event"
+impl SemOsVerbOp for UpdateDocumentStatus {
+    fn fqn(&self) -> &str {
+        "deal.update-document-status"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
@@ -1685,44 +1493,31 @@ impl CustomOperation for DealUpdateDocumentStatusOp {
         .bind(deal_id)
         .bind(document_id)
         .bind(&document_status)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
 // =============================================================================
-// UBO Assessment Operations
+// deal.add-ubo-assessment
 // =============================================================================
 
-/// Add UBO assessment to deal
-#[register_custom_op]
-pub struct DealAddUboAssessmentOp;
+/// Add UBO assessment to deal.
+pub struct AddUboAssessment;
 
 #[async_trait]
-impl CustomOperation for DealAddUboAssessmentOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "add-ubo-assessment"
-    }
-    fn rationale(&self) -> &'static str {
-        "Links entity UBO assessment to deal with optional KYC case"
+impl SemOsVerbOp for AddUboAssessment {
+    fn fqn(&self) -> &str {
+        "deal.add-ubo-assessment"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
@@ -1738,40 +1533,31 @@ impl CustomOperation for DealAddUboAssessmentOp {
         .bind(deal_id)
         .bind(entity_id)
         .bind(kyc_case_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Uuid(
-            assessment_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(assessment_id))
     }
 }
 
-/// Update UBO assessment status
-#[register_custom_op]
-pub struct DealUpdateUboAssessmentOp;
+// =============================================================================
+// deal.update-ubo-assessment
+// =============================================================================
+
+/// Update UBO assessment status.
+pub struct UpdateUboAssessment;
 
 #[async_trait]
-impl CustomOperation for DealUpdateUboAssessmentOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "update-ubo-assessment"
-    }
-    fn rationale(&self) -> &'static str {
-        "Updates assessment status and risk rating with PROHIBITED check"
+impl SemOsVerbOp for UpdateUboAssessment {
+    fn fqn(&self) -> &str {
+        "deal.update-ubo-assessment"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let assessment_id = json_extract_uuid(args, ctx, "assessment-id")?;
         let assessment_status = json_extract_string_opt(args, "assessment-status");
@@ -1791,44 +1577,31 @@ impl CustomOperation for DealUpdateUboAssessmentOp {
         .bind(assessment_id)
         .bind(&assessment_status)
         .bind(&risk_rating)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
 // =============================================================================
-// Onboarding Handoff Operations
+// deal.request-onboarding
 // =============================================================================
 
-/// Create onboarding request
-#[register_custom_op]
-pub struct DealRequestOnboardingOp;
+/// Create onboarding request.
+pub struct RequestOnboarding;
 
 #[async_trait]
-impl CustomOperation for DealRequestOnboardingOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "request-onboarding"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates deal status, contract linkage, and CBU ownership before creating request"
+impl SemOsVerbOp for RequestOnboarding {
+    fn fqn(&self) -> &str {
+        "deal.request-onboarding"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
@@ -1839,11 +1612,10 @@ impl CustomOperation for DealRequestOnboardingOp {
         let requested_by = json_extract_string_opt(args, "requested-by");
         let notes = json_extract_string_opt(args, "notes");
 
-        // Validate deal status
         let deal_status: String =
             sqlx::query_scalar(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
                 .bind(deal_id)
-                .fetch_one(pool)
+                .fetch_one(scope.executor())
                 .await?;
 
         if !matches!(deal_status.as_str(), "CONTRACTED" | "ONBOARDING") {
@@ -1852,32 +1624,30 @@ impl CustomOperation for DealRequestOnboardingOp {
             ));
         }
 
-        // Validate contract is linked
         let contract_linked: bool = sqlx::query_scalar(
             r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".deal_contracts WHERE deal_id = $1 AND contract_id = $2)"#,
         )
         .bind(deal_id)
         .bind(contract_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if !contract_linked {
             return Err(anyhow!("Contract is not linked to this deal"));
         }
 
-        if !deal_has_group_approved_kyc_clearance(pool, deal_id).await? {
+        if !deal_has_group_approved_kyc_clearance(scope, deal_id).await? {
             return Err(anyhow!(
                 "Deal onboarding requires APPROVED KYC clearance for the primary client group"
             ));
         }
 
-        if !deal_controls_cbu(pool, deal_id, cbu_id).await? {
+        if !deal_controls_cbu(scope, deal_id, cbu_id).await? {
             return Err(anyhow!(
                 "CBU must already be linked to the deal's primary client group before onboarding can be requested"
             ));
         }
 
-        // Create request
         let request_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".deal_onboarding_requests (
@@ -1896,18 +1666,16 @@ impl CustomOperation for DealRequestOnboardingOp {
         .bind(&target_live_date)
         .bind(&requested_by)
         .bind(&notes)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Transition deal to ONBOARDING if currently CONTRACTED
         if deal_status == "CONTRACTED" {
             sqlx::query(r#"UPDATE "ob-poc".deals SET deal_status = 'ONBOARDING', updated_at = NOW() WHERE deal_id = $1"#)
                 .bind(deal_id)
-                .execute(pool)
+                .execute(scope.executor())
                 .await?;
         }
 
-        // Record event
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description, actor)
@@ -1918,40 +1686,31 @@ impl CustomOperation for DealRequestOnboardingOp {
         .bind(request_id)
         .bind(format!("CBU {} for product", cbu_id))
         .bind(&requested_by)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Uuid(
-            request_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(request_id))
     }
 }
 
-/// Batch onboarding request
-#[register_custom_op]
-pub struct DealRequestOnboardingBatchOp;
+// =============================================================================
+// deal.request-onboarding-batch
+// =============================================================================
+
+/// Batch onboarding request.
+pub struct RequestOnboardingBatch;
 
 #[async_trait]
-impl CustomOperation for DealRequestOnboardingBatchOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "request-onboarding-batch"
-    }
-    fn rationale(&self) -> &'static str {
-        "Transactional batch insert of multiple onboarding requests"
+impl SemOsVerbOp for RequestOnboardingBatch {
+    fn fqn(&self) -> &str {
+        "deal.request-onboarding-batch"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
@@ -1961,7 +1720,7 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
         let deal_status: String =
             sqlx::query_scalar(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
                 .bind(deal_id)
-                .fetch_one(pool)
+                .fetch_one(scope.executor())
                 .await?;
 
         if !matches!(deal_status.as_str(), "CONTRACTED" | "ONBOARDING") {
@@ -1975,25 +1734,24 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
         )
         .bind(deal_id)
         .bind(contract_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if !contract_linked {
             return Err(anyhow!("Contract is not linked to this deal"));
         }
 
-        if !deal_has_group_approved_kyc_clearance(pool, deal_id).await? {
+        if !deal_has_group_approved_kyc_clearance(scope, deal_id).await? {
             return Err(anyhow!(
                 "Deal onboarding requires APPROVED KYC clearance for the primary client group"
             ));
         }
 
-        // Get requests array from arg
         let requests_arg = args
             .get("requests")
             .ok_or_else(|| anyhow!("requests argument is required"))?;
 
-        let requests: Vec<serde_json::Value> =
+        let requests: Vec<Value> =
             serde_json::from_value(requests_arg.clone()).unwrap_or_default();
 
         let mut request_ids = Vec::new();
@@ -2013,7 +1771,7 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
                 .and_then(|s| Uuid::parse_str(s).ok())
                 .ok_or_else(|| anyhow!("product-id required in each request"))?;
 
-            if !deal_controls_cbu(pool, deal_id, cbu_id).await? {
+            if !deal_controls_cbu(scope, deal_id, cbu_id).await? {
                 return Err(anyhow!(
                     "CBU {} is not linked to the deal's primary client group",
                     cbu_id
@@ -2042,7 +1800,7 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
             .bind(requires_kyc)
             .bind(&target_live_date)
             .bind(&requested_by)
-            .fetch_one(pool)
+            .fetch_one(scope.executor())
             .await?;
 
             request_ids.push(request_id);
@@ -2053,7 +1811,7 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
                 r#"UPDATE "ob-poc".deals SET deal_status = 'ONBOARDING', updated_at = NOW() WHERE deal_id = $1"#,
             )
             .bind(deal_id)
-            .execute(pool)
+            .execute(scope.executor())
             .await?;
         }
 
@@ -2062,51 +1820,40 @@ impl CustomOperation for DealRequestOnboardingBatchOp {
             count: request_ids.len() as i32,
         };
 
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
-/// Update onboarding request status
-#[register_custom_op]
-pub struct DealUpdateOnboardingStatusOp;
+// =============================================================================
+// deal.update-onboarding-status
+// =============================================================================
+
+/// Update onboarding request status.
+pub struct UpdateOnboardingStatus;
 
 #[async_trait]
-impl CustomOperation for DealUpdateOnboardingStatusOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "update-onboarding-status"
-    }
-    fn rationale(&self) -> &'static str {
-        "Updates request status and checks if all requests complete to transition deal to ACTIVE"
+impl SemOsVerbOp for UpdateOnboardingStatus {
+    fn fqn(&self) -> &str {
+        "deal.update-onboarding-status"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let request_id = json_extract_uuid(args, ctx, "request-id")?;
         let request_status = json_extract_string(args, "request-status")?;
         let kyc_case_id = json_extract_uuid_opt(args, ctx, "kyc-case-id");
 
-        // Get deal_id
         let deal_id: Uuid = sqlx::query_scalar(
             r#"SELECT deal_id FROM "ob-poc".deal_onboarding_requests WHERE request_id = $1"#,
         )
         .bind(request_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Update request
         sqlx::query(
             r#"
             UPDATE "ob-poc".deal_onboarding_requests
@@ -2122,10 +1869,9 @@ impl CustomOperation for DealUpdateOnboardingStatusOp {
         .bind(request_id)
         .bind(&request_status)
         .bind(kyc_case_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        // If COMPLETED, check if all requests are completed
         if request_status == "COMPLETED" {
             let pending_count: i64 = sqlx::query_scalar(
                 r#"
@@ -2134,16 +1880,15 @@ impl CustomOperation for DealUpdateOnboardingStatusOp {
                 "#,
             )
             .bind(deal_id)
-            .fetch_one(pool)
+            .fetch_one(scope.executor())
             .await?;
 
             if pending_count == 0 {
-                // All requests completed - transition deal to ACTIVE
                 sqlx::query(
                     r#"UPDATE "ob-poc".deals SET deal_status = 'ACTIVE', active_at = NOW(), updated_at = NOW() WHERE deal_id = $1 AND deal_status = 'ONBOARDING'"#,
                 )
                 .bind(deal_id)
-                .execute(pool)
+                .execute(scope.executor())
                 .await?;
 
                 sqlx::query(
@@ -2153,48 +1898,36 @@ impl CustomOperation for DealUpdateOnboardingStatusOp {
                     "#,
                 )
                 .bind(deal_id)
-                .execute(pool)
+                .execute(scope.executor())
                 .await?;
             }
         }
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
 // =============================================================================
-// Summary Operations
+// deal.read-summary
 // =============================================================================
 
-/// Full deal summary
-#[register_custom_op]
-pub struct DealSummaryOp;
+/// Full deal summary with counts.
+pub struct ReadSummary;
 
 #[async_trait]
-impl CustomOperation for DealSummaryOp {
-    fn domain(&self) -> &'static str {
-        "deal"
-    }
-    fn verb(&self) -> &'static str {
-        "read-summary"
-    }
-    fn rationale(&self) -> &'static str {
-        "Composite query returning deal with all nested data"
+impl SemOsVerbOp for ReadSummary {
+    fn fqn(&self) -> &str {
+        "deal.read-summary"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
 
-        // Get deal
         let deal: Option<(
             Uuid,
             String,
@@ -2209,7 +1942,7 @@ impl CustomOperation for DealSummaryOp {
             "#,
         )
         .bind(deal_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
 
         let deal_info = match deal {
@@ -2224,31 +1957,27 @@ impl CustomOperation for DealSummaryOp {
             None => return Err(anyhow!("Deal not found")),
         };
 
-        // Get participants count
         let participant_count: i64 = sqlx::query_scalar(
             r#"SELECT COUNT(*) FROM "ob-poc".deal_participants WHERE deal_id = $1"#,
         )
         .bind(deal_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Get contracts count
         let contract_count: i64 = sqlx::query_scalar(
             r#"SELECT COUNT(*) FROM "ob-poc".deal_contracts WHERE deal_id = $1"#,
         )
         .bind(deal_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Get rate cards count
         let rate_card_count: i64 = sqlx::query_scalar(
             r#"SELECT COUNT(*) FROM "ob-poc".deal_rate_cards WHERE deal_id = $1"#,
         )
         .bind(deal_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        // Get onboarding progress
         let onboarding_stats: (i64, i64) = sqlx::query_as(
             r#"
             SELECT
@@ -2258,7 +1987,7 @@ impl CustomOperation for DealSummaryOp {
             "#,
         )
         .bind(deal_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         let result = serde_json::json!({
@@ -2271,9 +2000,5 @@ impl CustomOperation for DealSummaryOp {
         });
 
         Ok(VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

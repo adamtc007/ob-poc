@@ -47,6 +47,7 @@ pub mod control;
 pub mod control_compute;
 pub mod coverage_compute;
 pub mod custody;
+pub mod deal;
 pub mod dilution;
 pub mod docs_bundle;
 pub mod document;
@@ -639,6 +640,40 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #68: deal.* (28 plugin verbs — full deal lifecycle:
+    // create/search/update/status/cancel, participants, contracts,
+    // products, rate cards (create + CRUD + propose/counter/agree),
+    // SLAs, documents, UBO assessments, onboarding requests, summary).
+    // All inner transactions collapsed into the ambient Sequencer txn.
+    registry.register(Arc::new(deal::Create));
+    registry.register(Arc::new(deal::Search));
+    registry.register(Arc::new(deal::Update));
+    registry.register(Arc::new(deal::UpdateStatus));
+    registry.register(Arc::new(deal::Cancel));
+    registry.register(Arc::new(deal::AddParticipant));
+    registry.register(Arc::new(deal::RemoveParticipant));
+    registry.register(Arc::new(deal::AddContract));
+    registry.register(Arc::new(deal::RemoveContract));
+    registry.register(Arc::new(deal::AddProduct));
+    registry.register(Arc::new(deal::UpdateProductStatus));
+    registry.register(Arc::new(deal::RemoveProduct));
+    registry.register(Arc::new(deal::CreateRateCard));
+    registry.register(Arc::new(deal::AddRateCardLine));
+    registry.register(Arc::new(deal::UpdateRateCardLine));
+    registry.register(Arc::new(deal::RemoveRateCardLine));
+    registry.register(Arc::new(deal::ProposeRateCard));
+    registry.register(Arc::new(deal::CounterRateCard));
+    registry.register(Arc::new(deal::AgreeRateCard));
+    registry.register(Arc::new(deal::AddSla));
+    registry.register(Arc::new(deal::AddDocument));
+    registry.register(Arc::new(deal::UpdateDocumentStatus));
+    registry.register(Arc::new(deal::AddUboAssessment));
+    registry.register(Arc::new(deal::UpdateUboAssessment));
+    registry.register(Arc::new(deal::RequestOnboarding));
+    registry.register(Arc::new(deal::RequestOnboardingBatch));
+    registry.register(Arc::new(deal::UpdateOnboardingStatus));
+    registry.register(Arc::new(deal::ReadSummary));
 
     // Phase B slice #67: cbu.* (9 plugin verbs — create, link-structure,
     // list-structure-links, unlink-structure, add-product, inspect,
