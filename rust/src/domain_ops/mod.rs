@@ -768,10 +768,12 @@ mod tests {
         assert!(!registry.has("trust", "identify-ubos"));
         assert!(!registry.has("trust", "classify"));
         // KYC Control Enhancement: Partnership operations
-        assert!(registry.has("partnership", "record-contribution"));
-        assert!(registry.has("partnership", "record-distribution"));
-        assert!(registry.has("partnership", "reconcile"));
-        assert!(registry.has("partnership", "analyze-control"));
+        // Phase 5c-migrate Phase B slice #43: partnership ops moved to
+        // `sem_os_postgres::ops::partnership::*`.
+        assert!(!registry.has("partnership", "record-contribution"));
+        assert!(!registry.has("partnership", "record-distribution"));
+        assert!(!registry.has("partnership", "reconcile"));
+        assert!(!registry.has("partnership", "analyze-control"));
         // Phase 5c-migrate Phase B slice #38: tollgate ops moved to
         // `sem_os_postgres::ops::tollgate::*`.
         assert!(!registry.has("tollgate", "evaluate"));

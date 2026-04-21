@@ -56,6 +56,7 @@ pub mod observation;
 pub mod outreach;
 pub mod outreach_plan;
 pub mod pack_answer;
+pub mod partnership;
 pub mod pack_select;
 pub mod phrase;
 pub mod registry;
@@ -522,6 +523,12 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(trust::AnalyzeControl));
     registry.register(Arc::new(trust::IdentifyUbos));
     registry.register(Arc::new(trust::Classify));
+
+    // Phase B slice #43: partnership capital + control analysis.
+    registry.register(Arc::new(partnership::RecordContribution));
+    registry.register(Arc::new(partnership::RecordDistribution));
+    registry.register(Arc::new(partnership::Reconcile));
+    registry.register(Arc::new(partnership::AnalyzeControl));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

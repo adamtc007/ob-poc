@@ -60,7 +60,7 @@ pub mod ownership_ops;
 // Phase 5c-migrate Phase B slice #1 (2026-04-21): pack_ops relocated to
 // `sem_os_postgres::ops::{pack_select,pack_answer}` as YAML-first
 // re-implementations; legacy file deleted.
-pub mod partnership_ops;
+// Phase 5c-migrate Phase B slice #43: partnership_ops → `sem_os_postgres::ops::partnership`.
 // Phase 5c-migrate Phase B slice #4 (2026-04-21): phrase_ops relocated to
 // `sem_os_postgres::ops::phrase::*` as YAML-first re-implementations;
 // legacy file deleted.
