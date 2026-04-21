@@ -33,6 +33,7 @@ pub mod access_review;
 pub mod affinity;
 pub mod attribute;
 pub mod audit;
+pub mod billing;
 pub mod board;
 pub mod bods;
 pub mod cbu_role;
@@ -631,6 +632,23 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #60: billing.* (14 plugin verbs — profile + account
+    // target + period lifecycle + invoice + dispute + summary/revenue).
+    registry.register(Arc::new(billing::CreateProfile));
+    registry.register(Arc::new(billing::ActivateProfile));
+    registry.register(Arc::new(billing::SuspendProfile));
+    registry.register(Arc::new(billing::CloseProfile));
+    registry.register(Arc::new(billing::AddAccountTarget));
+    registry.register(Arc::new(billing::RemoveAccountTarget));
+    registry.register(Arc::new(billing::CreatePeriod));
+    registry.register(Arc::new(billing::CalculatePeriod));
+    registry.register(Arc::new(billing::ReviewPeriod));
+    registry.register(Arc::new(billing::ApprovePeriod));
+    registry.register(Arc::new(billing::GenerateInvoice));
+    registry.register(Arc::new(billing::DisputePeriod));
+    registry.register(Arc::new(billing::PeriodSummary));
+    registry.register(Arc::new(billing::RevenueSummary));
 
     // Phase B slice #59: capital.dilution.* (8 plugin verbs —
     // option grants, warrants, SAFEs, convertible notes, exercise with

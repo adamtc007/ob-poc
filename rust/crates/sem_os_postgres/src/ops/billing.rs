@@ -1,27 +1,27 @@
-//! Fee Billing Operations
+//! Fee billing verbs (14 plugin verbs) — YAML-first
+//! re-implementation of `billing.*` from
+//! `rust/config/verbs/billing.yaml`.
 //!
-//! Operations for billing profile lifecycle, account targeting, and fee calculation.
-//!
-//! The fee billing system bridges commercial deals to operational billing cycles,
-//! implementing a closed loop from rate cards through to invoicing.
+//! Profile lifecycle: create-profile → activate-profile →
+//! suspend/close-profile. Account targets: add/remove-account-target.
+//! Period lifecycle: create-period → calculate-period → review-period
+//! → approve-period → generate-invoice (or dispute-period). Reads:
+//! period-summary + revenue-summary.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use uuid::Uuid;
 
-use sqlx::PgPool;
-
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::{
-    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_bool_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
+    json_extract_uuid_opt,
 };
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-// =============================================================================
-// Result Types
-// =============================================================================
+use super::SemOsVerbOp;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BillingCalculationResult {
@@ -31,31 +31,22 @@ pub struct BillingCalculationResult {
     pub status: String,
 }
 
-// =============================================================================
-// Billing Profile Operations
-// =============================================================================
+// ---------------------------------------------------------------------------
+// Profile lifecycle
+// ---------------------------------------------------------------------------
 
-/// Create a fee billing profile
-#[register_custom_op]
-pub struct BillingCreateProfileOp;
+pub struct CreateProfile;
 
 #[async_trait]
-impl CustomOperation for BillingCreateProfileOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for CreateProfile {
+    fn fqn(&self) -> &str {
+        "billing.create-profile"
     }
-    fn verb(&self) -> &'static str {
-        "create-profile"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates rate card is AGREED and creates billing profile in PENDING status"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let contract_id = json_extract_uuid(args, ctx, "contract-id")?;
@@ -64,8 +55,8 @@ impl CustomOperation for BillingCreateProfileOp {
         let product_id = json_extract_uuid(args, ctx, "product-id")?;
         let invoice_entity_id = json_extract_uuid(args, ctx, "invoice-entity-id")?;
         let profile_name = json_extract_string_opt(args, "profile-name");
-        let billing_frequency = json_extract_string_opt(args, "billing-frequency")
-            .unwrap_or_else(|| "MONTHLY".to_string());
+        let billing_frequency =
+            json_extract_string_opt(args, "billing-frequency").unwrap_or_else(|| "MONTHLY".to_string());
         let invoice_currency =
             json_extract_string_opt(args, "invoice-currency").unwrap_or_else(|| "USD".to_string());
         let payment_method = json_extract_string_opt(args, "payment-method");
@@ -76,13 +67,10 @@ impl CustomOperation for BillingCreateProfileOp {
             r#"SELECT status FROM "ob-poc".deal_rate_cards WHERE rate_card_id = $1"#,
         )
         .bind(rate_card_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
-
         if rate_card_status != "AGREED" {
-            return Err(anyhow!(
-                "Rate card must be in AGREED status to create billing profile"
-            ));
+            return Err(anyhow!("Rate card must be in AGREED status to create billing profile"));
         }
 
         let profile_id: Uuid = sqlx::query_scalar(
@@ -108,7 +96,7 @@ impl CustomOperation for BillingCreateProfileOp {
         .bind(&payment_method)
         .bind(&payment_account_ref)
         .bind(&effective_from)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
@@ -119,40 +107,25 @@ impl CustomOperation for BillingCreateProfileOp {
         )
         .bind(deal_id)
         .bind(profile_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Uuid(
-            profile_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(profile_id))
     }
 }
 
-/// Activate a billing profile
-#[register_custom_op]
-pub struct BillingActivateProfileOp;
+pub struct ActivateProfile;
 
 #[async_trait]
-impl CustomOperation for BillingActivateProfileOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for ActivateProfile {
+    fn fqn(&self) -> &str {
+        "billing.activate-profile"
     }
-    fn verb(&self) -> &'static str {
-        "activate-profile"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates at least one account target exists before activating"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
 
@@ -160,27 +133,24 @@ impl CustomOperation for BillingActivateProfileOp {
             r#"SELECT COUNT(*) FROM "ob-poc".fee_billing_account_targets WHERE profile_id = $1 AND is_active = true"#,
         )
         .bind(profile_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
-
         if target_count == 0 {
-            return Err(anyhow!(
-                "Cannot activate billing profile without account targets"
-            ));
+            return Err(anyhow!("Cannot activate billing profile without account targets"));
         }
 
         let deal_id: Uuid = sqlx::query_scalar(
             r#"SELECT deal_id FROM "ob-poc".fee_billing_profiles WHERE profile_id = $1"#,
         )
         .bind(profile_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
             r#"UPDATE "ob-poc".fee_billing_profiles SET status = 'ACTIVE', updated_at = NOW() WHERE profile_id = $1"#,
         )
         .bind(profile_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         sqlx::query(
@@ -191,38 +161,25 @@ impl CustomOperation for BillingActivateProfileOp {
         )
         .bind(deal_id)
         .bind(profile_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Suspend a billing profile
-#[register_custom_op]
-pub struct BillingSuspendProfileOp;
+pub struct SuspendProfile;
 
 #[async_trait]
-impl CustomOperation for BillingSuspendProfileOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for SuspendProfile {
+    fn fqn(&self) -> &str {
+        "billing.suspend-profile"
     }
-    fn verb(&self) -> &'static str {
-        "suspend-profile"
-    }
-    fn rationale(&self) -> &'static str {
-        "Suspends billing and records reason"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
         let reason = json_extract_string(args, "reason")?;
@@ -231,14 +188,14 @@ impl CustomOperation for BillingSuspendProfileOp {
             r#"SELECT deal_id FROM "ob-poc".fee_billing_profiles WHERE profile_id = $1"#,
         )
         .bind(profile_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
             r#"UPDATE "ob-poc".fee_billing_profiles SET status = 'SUSPENDED', updated_at = NOW() WHERE profile_id = $1"#,
         )
         .bind(profile_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         sqlx::query(
@@ -250,38 +207,25 @@ impl CustomOperation for BillingSuspendProfileOp {
         .bind(deal_id)
         .bind(profile_id)
         .bind(&reason)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Close a billing profile
-#[register_custom_op]
-pub struct BillingCloseProfileOp;
+pub struct CloseProfile;
 
 #[async_trait]
-impl CustomOperation for BillingCloseProfileOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for CloseProfile {
+    fn fqn(&self) -> &str {
+        "billing.close-profile"
     }
-    fn verb(&self) -> &'static str {
-        "close-profile"
-    }
-    fn rationale(&self) -> &'static str {
-        "Sets effective_to date and closes profile"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
         let effective_to = json_extract_string(args, "effective-to")?;
@@ -295,47 +239,30 @@ impl CustomOperation for BillingCloseProfileOp {
         )
         .bind(profile_id)
         .bind(&effective_to)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
-// =============================================================================
-// Account Target Operations
-// =============================================================================
+// ---------------------------------------------------------------------------
+// Account targets
+// ---------------------------------------------------------------------------
 
-/// Add an account target to a billing profile
-#[register_custom_op]
-pub struct BillingAddAccountTargetOp;
+pub struct AddAccountTarget;
 
 #[async_trait]
-impl CustomOperation for BillingAddAccountTargetOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for AddAccountTarget {
+    fn fqn(&self) -> &str {
+        "billing.add-account-target"
     }
-    fn verb(&self) -> &'static str {
-        "add-account-target"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates resource instance belongs to profile's CBU before adding target"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::json_extract_bool_opt;
-
         let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
         let cbu_resource_instance_id = json_extract_uuid(args, ctx, "cbu-resource-instance-id")?;
         let rate_card_line_id = json_extract_uuid_opt(args, ctx, "rate-card-line-id");
@@ -351,20 +278,16 @@ impl CustomOperation for BillingAddAccountTargetOp {
             r#"SELECT cbu_id FROM "ob-poc".fee_billing_profiles WHERE profile_id = $1"#,
         )
         .bind(profile_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
-
         let instance_cbu_id: Uuid = sqlx::query_scalar(
             r#"SELECT cbu_id FROM "ob-poc".cbu_resource_instances WHERE instance_id = $1"#,
         )
         .bind(cbu_resource_instance_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
-
         if profile_cbu_id != instance_cbu_id {
-            return Err(anyhow!(
-                "Resource instance does not belong to the profile's CBU"
-            ));
+            return Err(anyhow!("Resource instance does not belong to the profile's CBU"));
         }
 
         let target_id: Uuid = sqlx::query_scalar(
@@ -387,85 +310,53 @@ impl CustomOperation for BillingAddAccountTargetOp {
         .bind(has_override)
         .bind(override_rate)
         .bind(&override_model)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Uuid(
-            target_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(target_id))
     }
 }
 
-/// Remove an account target (soft delete)
-#[register_custom_op]
-pub struct BillingRemoveAccountTargetOp;
+pub struct RemoveAccountTarget;
 
 #[async_trait]
-impl CustomOperation for BillingRemoveAccountTargetOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for RemoveAccountTarget {
+    fn fqn(&self) -> &str {
+        "billing.remove-account-target"
     }
-    fn verb(&self) -> &'static str {
-        "remove-account-target"
-    }
-    fn rationale(&self) -> &'static str {
-        "Soft-removes account target by setting is_active = false"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let target_id = json_extract_uuid(args, ctx, "target-id")?;
-
         let result = sqlx::query(
             r#"UPDATE "ob-poc".fee_billing_account_targets SET is_active = false, updated_at = NOW() WHERE target_id = $1"#,
         )
         .bind(target_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
-
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
-// =============================================================================
-// Billing Period Operations
-// =============================================================================
+// ---------------------------------------------------------------------------
+// Period lifecycle
+// ---------------------------------------------------------------------------
 
-/// Create a billing period
-#[register_custom_op]
-pub struct BillingCreatePeriodOp;
+pub struct CreatePeriod;
 
 #[async_trait]
-impl CustomOperation for BillingCreatePeriodOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for CreatePeriod {
+    fn fqn(&self) -> &str {
+        "billing.create-period"
     }
-    fn verb(&self) -> &'static str {
-        "create-period"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates no overlapping period and profile is ACTIVE"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let profile_id = json_extract_uuid(args, ctx, "profile-id")?;
         let period_start = json_extract_string(args, "period-start")?;
@@ -475,9 +366,8 @@ impl CustomOperation for BillingCreatePeriodOp {
             r#"SELECT status FROM "ob-poc".fee_billing_profiles WHERE profile_id = $1"#,
         )
         .bind(profile_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
-
         if profile_status != "ACTIVE" {
             return Err(anyhow!("Billing profile must be ACTIVE to create periods"));
         }
@@ -492,9 +382,8 @@ impl CustomOperation for BillingCreatePeriodOp {
         .bind(profile_id)
         .bind(&period_start)
         .bind(&period_end)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
-
         if overlap_count > 0 {
             return Err(anyhow!("Billing period overlaps with existing period"));
         }
@@ -503,7 +392,7 @@ impl CustomOperation for BillingCreatePeriodOp {
             r#"SELECT invoice_currency FROM "ob-poc".fee_billing_profiles WHERE profile_id = $1"#,
         )
         .bind(profile_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         let period_id: Uuid = sqlx::query_scalar(
@@ -517,40 +406,25 @@ impl CustomOperation for BillingCreatePeriodOp {
         .bind(&period_start)
         .bind(&period_end)
         .bind(&currency_code)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Uuid(
-            period_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(period_id))
     }
 }
 
-/// Calculate fees for a billing period
-#[register_custom_op]
-pub struct BillingCalculatePeriodOp;
+pub struct CalculatePeriod;
 
 #[async_trait]
-impl CustomOperation for BillingCalculatePeriodOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for CalculatePeriod {
+    fn fqn(&self) -> &str {
+        "billing.calculate-period"
     }
-    fn verb(&self) -> &'static str {
-        "calculate-period"
-    }
-    fn rationale(&self) -> &'static str {
-        "Iterates account targets, applies pricing models, and generates period lines"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
 
@@ -558,25 +432,20 @@ impl CustomOperation for BillingCalculatePeriodOp {
             r#"UPDATE "ob-poc".fee_billing_periods SET calc_status = 'CALCULATING' WHERE period_id = $1"#,
         )
         .bind(period_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        let period_row: (Uuid, String, String) = sqlx::query_as(
+        let (profile_id, _period_start, _period_end): (Uuid, String, String) = sqlx::query_as(
             r#"SELECT profile_id, period_start::text, period_end::text FROM "ob-poc".fee_billing_periods WHERE period_id = $1"#,
         )
         .bind(period_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
-        let (profile_id, _period_start, _period_end) = period_row;
-
-        let targets: Vec<(
-            Uuid,
-            Option<Uuid>,
-            Option<String>,
-            Option<f64>,
-            Option<String>,
-        )> = sqlx::query_as(
+        type TargetRow = (
+            Uuid, Option<Uuid>, Option<String>, Option<f64>, Option<String>,
+        );
+        let targets: Vec<TargetRow> = sqlx::query_as(
             r#"
             SELECT t.target_id, t.rate_card_line_id,
                    COALESCE(t.activity_type, l.fee_basis) as activity_type,
@@ -588,19 +457,19 @@ impl CustomOperation for BillingCalculatePeriodOp {
             "#,
         )
         .bind(profile_id)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
         let mut line_count = 0;
         let mut gross_amount = 0.0f64;
 
         for (target_id, rate_card_line_id, _activity_type, rate, pricing_model) in targets {
-            let activity_volume = 1000000.0f64;
+            let activity_volume = 1_000_000.0f64;
             let activity_unit = "USD_AUM".to_string();
 
             let calculated_fee = match pricing_model.as_deref() {
                 Some("BPS") => {
-                    let rate_decimal = rate.unwrap_or(0.0) / 10000.0;
+                    let rate_decimal = rate.unwrap_or(0.0) / 10_000.0;
                     activity_volume * rate_decimal
                 }
                 Some("FLAT") => rate.unwrap_or(0.0),
@@ -625,7 +494,7 @@ impl CustomOperation for BillingCalculatePeriodOp {
             .bind(&activity_unit)
             .bind(rate)
             .bind(calculated_fee)
-            .execute(pool)
+            .execute(scope.executor())
             .await?;
 
             line_count += 1;
@@ -635,13 +504,14 @@ impl CustomOperation for BillingCalculatePeriodOp {
         sqlx::query(
             r#"
             UPDATE "ob-poc".fee_billing_periods
-            SET gross_amount = $2, net_amount = $2, calc_status = 'CALCULATED', calculated_at = NOW(), updated_at = NOW()
+            SET gross_amount = $2, net_amount = $2, calc_status = 'CALCULATED',
+                calculated_at = NOW(), updated_at = NOW()
             WHERE period_id = $1
             "#,
         )
         .bind(period_id)
         .bind(gross_amount)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         let result = BillingCalculationResult {
@@ -650,38 +520,22 @@ impl CustomOperation for BillingCalculatePeriodOp {
             gross_amount,
             status: "CALCULATED".to_string(),
         };
-
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
-/// Review a billing period
-#[register_custom_op]
-pub struct BillingReviewPeriodOp;
+pub struct ReviewPeriod;
 
 #[async_trait]
-impl CustomOperation for BillingReviewPeriodOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for ReviewPeriod {
+    fn fqn(&self) -> &str {
+        "billing.review-period"
     }
-    fn verb(&self) -> &'static str {
-        "review-period"
-    }
-    fn rationale(&self) -> &'static str {
-        "Applies adjustments and marks period as REVIEWED"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
         let reviewed_by = json_extract_string(args, "reviewed-by")?;
@@ -695,38 +549,25 @@ impl CustomOperation for BillingReviewPeriodOp {
         )
         .bind(period_id)
         .bind(&reviewed_by)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Approve a billing period
-#[register_custom_op]
-pub struct BillingApprovePeriodOp;
+pub struct ApprovePeriod;
 
 #[async_trait]
-impl CustomOperation for BillingApprovePeriodOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for ApprovePeriod {
+    fn fqn(&self) -> &str {
+        "billing.approve-period"
     }
-    fn verb(&self) -> &'static str {
-        "approve-period"
-    }
-    fn rationale(&self) -> &'static str {
-        "Marks period as APPROVED for invoicing"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
         let approved_by = json_extract_string(args, "approved-by")?;
@@ -740,38 +581,25 @@ impl CustomOperation for BillingApprovePeriodOp {
         )
         .bind(period_id)
         .bind(&approved_by)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Generate invoice from approved period
-#[register_custom_op]
-pub struct BillingGenerateInvoiceOp;
+pub struct GenerateInvoice;
 
 #[async_trait]
-impl CustomOperation for BillingGenerateInvoiceOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for GenerateInvoice {
+    fn fqn(&self) -> &str {
+        "billing.generate-invoice"
     }
-    fn verb(&self) -> &'static str {
-        "generate-invoice"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates period is APPROVED and generates invoice record"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
 
@@ -779,15 +607,13 @@ impl CustomOperation for BillingGenerateInvoiceOp {
             r#"SELECT calc_status FROM "ob-poc".fee_billing_periods WHERE period_id = $1"#,
         )
         .bind(period_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
-
         if status != "APPROVED" {
             return Err(anyhow!("Period must be APPROVED to generate invoice"));
         }
 
         let invoice_id = Uuid::new_v4();
-
         sqlx::query(
             r#"
             UPDATE "ob-poc".fee_billing_periods
@@ -797,7 +623,7 @@ impl CustomOperation for BillingGenerateInvoiceOp {
         )
         .bind(period_id)
         .bind(invoice_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         let deal_id: Uuid = sqlx::query_scalar(
@@ -809,7 +635,7 @@ impl CustomOperation for BillingGenerateInvoiceOp {
             "#,
         )
         .bind(period_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
@@ -821,40 +647,25 @@ impl CustomOperation for BillingGenerateInvoiceOp {
         .bind(deal_id)
         .bind(period_id)
         .bind(invoice_id.to_string())
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Uuid(
-            invoice_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(invoice_id))
     }
 }
 
-/// Dispute a billing period
-#[register_custom_op]
-pub struct BillingDisputePeriodOp;
+pub struct DisputePeriod;
 
 #[async_trait]
-impl CustomOperation for BillingDisputePeriodOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for DisputePeriod {
+    fn fqn(&self) -> &str {
+        "billing.dispute-period"
     }
-    fn verb(&self) -> &'static str {
-        "dispute-period"
-    }
-    fn rationale(&self) -> &'static str {
-        "Marks period as DISPUTED and records dispute details"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
         let dispute_reason = json_extract_string(args, "dispute-reason")?;
@@ -863,7 +674,7 @@ impl CustomOperation for BillingDisputePeriodOp {
             r#"UPDATE "ob-poc".fee_billing_periods SET calc_status = 'DISPUTED', updated_at = NOW() WHERE period_id = $1"#,
         )
         .bind(period_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         let deal_id: Uuid = sqlx::query_scalar(
@@ -875,7 +686,7 @@ impl CustomOperation for BillingDisputePeriodOp {
             "#,
         )
         .bind(period_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
@@ -887,38 +698,25 @@ impl CustomOperation for BillingDisputePeriodOp {
         .bind(deal_id)
         .bind(period_id)
         .bind(&dispute_reason)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-/// Get billing period summary
-#[register_custom_op]
-pub struct BillingPeriodSummaryOp;
+pub struct PeriodSummary;
 
 #[async_trait]
-impl CustomOperation for BillingPeriodSummaryOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for PeriodSummary {
+    fn fqn(&self) -> &str {
+        "billing.period-summary"
     }
-    fn verb(&self) -> &'static str {
-        "period-summary"
-    }
-    fn rationale(&self) -> &'static str {
-        "Returns period with line-level detail"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let period_id = json_extract_uuid(args, ctx, "period-id")?;
 
@@ -929,7 +727,7 @@ impl CustomOperation for BillingPeriodSummaryOp {
             "#,
         )
         .bind(period_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         let lines: Vec<(Uuid, Option<f64>, Option<f64>, Option<f64>)> = sqlx::query_as(
@@ -939,22 +737,20 @@ impl CustomOperation for BillingPeriodSummaryOp {
             "#,
         )
         .bind(period_id)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
-        let line_values: Vec<serde_json::Value> = lines
+        let line_values: Vec<Value> = lines
             .into_iter()
-            .map(|(line_id, volume, calc_fee, net_fee)| {
-                serde_json::json!({
-                    "period_line_id": line_id,
-                    "activity_volume": volume,
-                    "calculated_fee": calc_fee,
-                    "net_fee": net_fee
-                })
-            })
+            .map(|(line_id, volume, calc_fee, net_fee)| json!({
+                "period_line_id": line_id,
+                "activity_volume": volume,
+                "calculated_fee": calc_fee,
+                "net_fee": net_fee
+            }))
             .collect();
 
-        let result = serde_json::json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "period_id": period.0,
             "period_start": period.1,
             "period_end": period.2,
@@ -962,37 +758,22 @@ impl CustomOperation for BillingPeriodSummaryOp {
             "gross_amount": period.4,
             "net_amount": period.5,
             "lines": line_values
-        });
-
-        Ok(VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        })))
     }
 }
 
-/// Revenue summary across deals/periods
-#[register_custom_op]
-pub struct BillingRevenueSummaryOp;
+pub struct RevenueSummary;
 
 #[async_trait]
-impl CustomOperation for BillingRevenueSummaryOp {
-    fn domain(&self) -> &'static str {
-        "billing"
+impl SemOsVerbOp for RevenueSummary {
+    fn fqn(&self) -> &str {
+        "billing.revenue-summary"
     }
-    fn verb(&self) -> &'static str {
-        "revenue-summary"
-    }
-    fn rationale(&self) -> &'static str {
-        "Aggregates revenue across deals, periods, and products"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let deal_id = json_extract_uuid_opt(args, ctx, "deal-id");
         let cbu_id = json_extract_uuid_opt(args, ctx, "cbu-id");
@@ -1001,7 +782,6 @@ impl CustomOperation for BillingRevenueSummaryOp {
 
         let mut conditions = Vec::new();
         let mut bind_idx = 1;
-
         if deal_id.is_some() {
             conditions.push(format!("p.deal_id = ${}", bind_idx));
             bind_idx += 1;
@@ -1041,35 +821,28 @@ impl CustomOperation for BillingRevenueSummaryOp {
             where_clause
         );
 
-        let mut query_builder = sqlx::query_as::<_, (i64, f64, i64, i64)>(&query);
-
+        let mut q = sqlx::query_as::<_, (i64, f64, i64, i64)>(&query);
         if let Some(d) = deal_id {
-            query_builder = query_builder.bind(d);
+            q = q.bind(d);
         }
         if let Some(c) = cbu_id {
-            query_builder = query_builder.bind(c);
+            q = q.bind(c);
         }
         if let Some(ref f) = from_date {
-            query_builder = query_builder.bind(f);
+            q = q.bind(f);
         }
         if let Some(ref t) = to_date {
-            query_builder = query_builder.bind(t);
+            q = q.bind(t);
         }
 
         let (period_count, total_revenue, deal_count, cbu_count) =
-            query_builder.fetch_one(pool).await?;
+            q.fetch_one(scope.executor()).await?;
 
-        let result = serde_json::json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "period_count": period_count,
             "total_revenue": total_revenue,
             "deal_count": deal_count,
             "cbu_count": cbu_count
-        });
-
-        Ok(VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        })))
     }
 }
