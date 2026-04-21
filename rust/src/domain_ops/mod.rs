@@ -839,18 +839,19 @@ mod tests {
         assert!(!registry.has("investor", "suspend"));
         assert!(!registry.has("investor", "reinstate"));
         assert!(!registry.has("investor", "count-by-state"));
-        // Agent control operations (agent mode lifecycle, checkpoints)
-        assert!(registry.has("agent", "start"));
-        assert!(registry.has("agent", "pause"));
-        assert!(registry.has("agent", "resume"));
-        assert!(registry.has("agent", "stop"));
-        assert!(registry.has("agent", "confirm-decision"));
-        assert!(registry.has("agent", "reject-decision"));
-        assert!(registry.has("agent", "select-decision-option"));
-        assert!(registry.has("agent", "read-status"));
-        assert!(registry.has("agent", "read-history"));
-        assert!(registry.has("agent", "set-selection-threshold"));
-        assert!(registry.has("agent", "set-execution-mode"));
+        // Phase 5c-migrate Phase B slice #64: agent_ops moved to
+        // `sem_os_postgres::ops::agent::*`.
+        assert!(!registry.has("agent", "start"));
+        assert!(!registry.has("agent", "pause"));
+        assert!(!registry.has("agent", "resume"));
+        assert!(!registry.has("agent", "stop"));
+        assert!(!registry.has("agent", "confirm-decision"));
+        assert!(!registry.has("agent", "reject-decision"));
+        assert!(!registry.has("agent", "select-decision-option"));
+        assert!(!registry.has("agent", "read-status"));
+        assert!(!registry.has("agent", "read-history"));
+        assert!(!registry.has("agent", "set-selection-threshold"));
+        assert!(!registry.has("agent", "set-execution-mode"));
         // Research source loader operations
         assert!(registry.has("research.sources", "list"));
         assert!(registry.has("research.sources", "info"));

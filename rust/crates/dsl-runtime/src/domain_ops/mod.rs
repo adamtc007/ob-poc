@@ -12,7 +12,7 @@
 pub mod helpers;
 
 // Phase 5c-migrate Phase B slice #44: access_review_ops → `sem_os_postgres::ops::access_review`.
-pub mod agent_ops;
+// Phase 5c-migrate Phase B slice #64: agent_ops → `sem_os_postgres::ops::agent`.
 // Phase 5c-migrate Phase B slice #5 (2026-04-21): attribute_ops relocated
 // to `sem_os_postgres::ops::attribute::*`.
 pub mod batch_control_ops;

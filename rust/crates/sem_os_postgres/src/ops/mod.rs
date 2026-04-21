@@ -31,6 +31,7 @@ use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 pub mod access_review;
 pub mod affinity;
+pub mod agent;
 pub mod attribute;
 pub mod audit;
 pub mod billing;
@@ -635,6 +636,35 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #64: agent.* (20 plugin verbs — lifecycle
+    // (start/pause/resume/stop), checkpoints (confirm/reject/select),
+    // status (read-status/read-history), config (set-selection-threshold/
+    // set-execution-mode/set-authoring-mode), teaching (teach/unteach/
+    // read-teaching-status/activate-teaching), introspection
+    // (read-mode/read-policy/list-tools/read-telemetry-summary)).
+    // Most ops set `pending_agent_control` on ctx.extensions; DB-touching
+    // ones ride the ambient scope. `sqlx::query!` → runtime queries.
+    registry.register(Arc::new(agent::Start));
+    registry.register(Arc::new(agent::Pause));
+    registry.register(Arc::new(agent::Resume));
+    registry.register(Arc::new(agent::Stop));
+    registry.register(Arc::new(agent::ConfirmDecision));
+    registry.register(Arc::new(agent::RejectDecision));
+    registry.register(Arc::new(agent::SelectDecisionOption));
+    registry.register(Arc::new(agent::ReadStatus));
+    registry.register(Arc::new(agent::ReadHistory));
+    registry.register(Arc::new(agent::SetSelectionThreshold));
+    registry.register(Arc::new(agent::SetExecutionMode));
+    registry.register(Arc::new(agent::SetAuthoringMode));
+    registry.register(Arc::new(agent::Teach));
+    registry.register(Arc::new(agent::Unteach));
+    registry.register(Arc::new(agent::ReadTeachingStatus));
+    registry.register(Arc::new(agent::ActivateTeaching));
+    registry.register(Arc::new(agent::ReadMode));
+    registry.register(Arc::new(agent::ReadPolicy));
+    registry.register(Arc::new(agent::ListTools));
+    registry.register(Arc::new(agent::ReadTelemetrySummary));
 
     // Phase B slice #63: skeleton.build (1 plugin verb — 7-step KYC
     // pipeline: import-run.begin → graph.validate → ubo.compute-chains

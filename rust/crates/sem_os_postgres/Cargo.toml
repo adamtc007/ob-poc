@@ -27,7 +27,9 @@ serde_json = "1.0"
 # bulk-load verbs that deserialize YAML reference files.
 serde_yaml = "0.9"
 sha2 = "0.10"
+# Phase 5c-migrate Phase B slice #64: tokio promoted from dev-deps —
+# agent.activate-teaching shells out via tokio::process::Command.
+tokio = { version = "1", features = ["macros", "rt", "process"] }
 tracing = "0.1"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt"] }
