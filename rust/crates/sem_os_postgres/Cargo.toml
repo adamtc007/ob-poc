@@ -15,6 +15,9 @@ anyhow = "1.0"
 rust_decimal = { version = "1", features = ["serde-with-str"] }
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros", "rust_decimal", "bigdecimal"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
+# Phase 5c-migrate Phase B slice #31: ob-poc-types promoted from dev-deps —
+# the manco ops need `manco_group::*` DTOs in production code.
+ob-poc-types = { path = "../ob-poc-types" }
 uuid = { version = "1", features = ["v4", "v5", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 hex = "0.4"
@@ -24,7 +27,4 @@ sha2 = "0.10"
 tracing = "0.1"
 
 [dev-dependencies]
-# Needed only by `ops::*` unit tests that stub `TransactionScope` for ops
-# with no DB effects; production code stays clear of this crate.
-ob-poc-types = { path = "../ob-poc-types" }
 tokio = { version = "1", features = ["macros", "rt"] }

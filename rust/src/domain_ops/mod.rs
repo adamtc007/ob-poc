@@ -835,18 +835,18 @@ mod tests {
         assert!(registry.has("research.sec-edgar", "fetch-beneficial-owners"));
         assert!(registry.has("research.sec-edgar", "fetch-filings"));
         assert!(registry.has("research.sec-edgar", "import-company"));
-        // ManCo / Governance Controller operations
-        assert!(registry.has("manco", "group.derive"));
-        assert!(registry.has("manco", "group.cbus"));
-        assert!(registry.has("manco", "group.for-cbu"));
-        assert!(registry.has("manco", "primary-controller"));
-        assert!(registry.has("manco", "control-chain"));
-        // Ownership domain operations (bridges + control links + refresh)
-        assert!(registry.has("ownership", "bridge.manco-roles"));
-        assert!(registry.has("ownership", "bridge.gleif-fund-managers"));
-        assert!(registry.has("ownership", "bridge.bods-ownership"));
-        assert!(registry.has("ownership", "control-links.compute"));
-        assert!(registry.has("ownership", "refresh"));
+        // Phase 5c-migrate Phase B slice #31: manco + ownership governance
+        // controller ops moved to `sem_os_postgres::ops::manco::*`.
+        assert!(!registry.has("manco", "group.derive"));
+        assert!(!registry.has("manco", "group.cbus"));
+        assert!(!registry.has("manco", "group.for-cbu"));
+        assert!(!registry.has("manco", "primary-controller"));
+        assert!(!registry.has("manco", "control-chain"));
+        assert!(!registry.has("ownership", "bridge.manco-roles"));
+        assert!(!registry.has("ownership", "bridge.gleif-fund-managers"));
+        assert!(!registry.has("ownership", "bridge.bods-ownership"));
+        assert!(!registry.has("ownership", "control-links.compute"));
+        assert!(!registry.has("ownership", "refresh"));
     }
 
     #[test]
@@ -939,7 +939,8 @@ mod tests {
         assert!(!registry.has("investor-role", "mark-as-end-investor"));
 
         // Manco ops
-        assert!(registry.has("manco", "book.summary"));
+        // Phase 5c-migrate Phase B slice #31: manco.book.summary moved.
+        assert!(!registry.has("manco", "book.summary"));
 
         // Pack operations migrated to `sem_os_postgres::ops::{pack_select,
         // pack_answer}` (Phase 5c-migrate Phase B slice #1, 2026-04-21).

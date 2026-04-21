@@ -48,7 +48,7 @@ pub mod investor_ops;
 // Phase 5c-migrate Phase B slice #28: investor_role_ops → `sem_os_postgres::ops::investor_role`.
 pub mod kyc_case_ops;
 pub mod lifecycle_ops;
-pub mod manco_ops;
+// Phase 5c-migrate Phase B slice #31: manco_ops → `sem_os_postgres::ops::manco`.
 // Phase 5c-migrate Phase B slice #20: matrix_overlay_ops → `sem_os_postgres::ops::matrix_overlay`.
 // Phase 5c-migrate Phase B slice #2 (2026-04-21): navigation_ops relocated
 // to `sem_os_postgres::ops::nav::*` as YAML-first re-implementations; legacy

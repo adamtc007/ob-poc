@@ -44,6 +44,7 @@ pub mod governance;
 pub mod import_run;
 pub mod investor_role;
 pub mod maintenance;
+pub mod manco;
 pub mod matrix_overlay;
 pub mod nav;
 pub mod outreach;
@@ -409,6 +410,21 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #30: edge domain (1 plugin verb — `upsert` with
     // end-and-insert semantics on entity_relationships).
     registry.register(Arc::new(edge::Upsert));
+
+    // Phase B slice #31: manco + ownership governance controller
+    // (9 plugin verbs — 3 bridges, 4 group queries, control-links
+    // compute, pipeline refresh).
+    registry.register(Arc::new(manco::BridgeMancoRoles));
+    registry.register(Arc::new(manco::BridgeGleifFundManagers));
+    registry.register(Arc::new(manco::BridgeBodsOwnership));
+    registry.register(Arc::new(manco::GroupDerive));
+    registry.register(Arc::new(manco::GroupCbus));
+    registry.register(Arc::new(manco::GroupForCbu));
+    registry.register(Arc::new(manco::PrimaryController));
+    registry.register(Arc::new(manco::ControlChain));
+    registry.register(Arc::new(manco::BookSummary));
+    registry.register(Arc::new(manco::ComputeControlLinks));
+    registry.register(Arc::new(manco::Refresh));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
