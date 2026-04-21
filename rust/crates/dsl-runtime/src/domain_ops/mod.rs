@@ -89,7 +89,7 @@ pub mod research_workflow_ops;
 pub mod skeleton_build_ops;
 // Phase 5c-migrate Phase B slice #21: state_ops → `sem_os_postgres::ops::state`.
 // Phase 5c-migrate Phase B slice #10: team_ops → `sem_os_postgres::ops::team`.
-pub mod temporal_ops;
+// Phase 5c-migrate Phase B slice #32: temporal_ops → `sem_os_postgres::ops::temporal`.
 pub mod tollgate_evaluate_ops;
 pub mod tollgate_ops;
 // Phase 5c-migrate Phase B slice #26: trading_matrix → `sem_os_postgres::ops::trading_matrix`.

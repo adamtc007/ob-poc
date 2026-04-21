@@ -1,35 +1,34 @@
-//! Temporal Query Operations
+//! Temporal-query verbs (8 plugin verbs) — SemOS-side YAML-first
+//! re-implementation of the plugin subset of
+//! `rust/config/verbs/temporal.yaml`.
 //!
-//! Point-in-time queries for regulatory lookback.
-//! Answers: "What did the structure look like on date X?"
-//!
-//! Uses SQL functions from migrations/005_temporal_query_layer.sql
+//! Point-in-time queries for regulatory lookback ("what did the
+//! structure look like on date X?"). Wraps the SQL functions
+//! defined in `migrations/005_temporal_query_layer.sql`.
+
+use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use dsl_runtime_macros::register_custom_op;
 use serde_json::{json, Value};
-use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-// ============================================================================
-// Helper: Parse date from args or default to today
-// ============================================================================
+use super::SemOsVerbOp;
 
-fn get_date_arg_json(args: &serde_json::Value, arg_name: &str) -> Result<NaiveDate> {
-    if let Some(val) = json_extract_string_opt(args, arg_name) {
+fn get_date_arg(args: &Value, name: &str) -> Result<NaiveDate> {
+    if let Some(val) = json_extract_string_opt(args, name) {
         if val == "today" {
             return Ok(chrono::Utc::now().date_naive());
         }
         return NaiveDate::parse_from_str(&val, "%Y-%m-%d").map_err(|e| {
             anyhow!(
                 "Invalid date format for {}: {} (expected YYYY-MM-DD)",
-                arg_name,
+                name,
                 e
             )
         });
@@ -37,60 +36,46 @@ fn get_date_arg_json(args: &serde_json::Value, arg_name: &str) -> Result<NaiveDa
     Ok(chrono::Utc::now().date_naive())
 }
 
-fn get_optional_date_arg_json(
-    args: &serde_json::Value,
-    arg_name: &str,
-) -> Result<Option<NaiveDate>> {
-    if let Some(val) = json_extract_string_opt(args, arg_name) {
-        let date = NaiveDate::parse_from_str(&val, "%Y-%m-%d")
-            .map_err(|e| anyhow!("Invalid date format for {}: {}", arg_name, e))?;
-        return Ok(Some(date));
-    }
-    Ok(None)
+fn get_optional_date_arg(args: &Value, name: &str) -> Result<Option<NaiveDate>> {
+    json_extract_string_opt(args, name)
+        .map(|s| {
+            NaiveDate::parse_from_str(&s, "%Y-%m-%d")
+                .map_err(|e| anyhow!("Invalid date format for {}: {}", name, e))
+        })
+        .transpose()
 }
 
-fn get_decimal_arg_json(args: &serde_json::Value, arg_name: &str, default: f64) -> f64 {
-    json_extract_string_opt(args, arg_name)
+fn get_decimal_arg(args: &Value, name: &str, default: f64) -> f64 {
+    json_extract_string_opt(args, name)
         .and_then(|v| v.parse().ok())
         .unwrap_or(default)
 }
 
-fn get_int_arg_json(args: &serde_json::Value, arg_name: &str, default: i32) -> i32 {
-    json_extract_string_opt(args, arg_name)
+fn get_int_arg(args: &Value, name: &str, default: i32) -> i32 {
+    json_extract_string_opt(args, name)
         .and_then(|v| v.parse().ok())
         .unwrap_or(default)
 }
 
-// ============================================================================
-// temporal.ownership-as-of
-// ============================================================================
+// ── temporal.ownership-as-of ──────────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct TemporalOwnershipAsOfOp;
+pub struct OwnershipAsOf;
 
 #[async_trait]
-impl CustomOperation for TemporalOwnershipAsOfOp {
-    fn domain(&self) -> &'static str {
-        "temporal"
+impl SemOsVerbOp for OwnershipAsOf {
+    fn fqn(&self) -> &str {
+        "temporal.ownership-as-of"
     }
-
-    fn verb(&self) -> &'static str {
-        "ownership-as-of"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Point-in-time ownership query using SQL function with temporal filtering"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let as_of_date = get_date_arg_json(args, "as-of-date")?;
-        let rows: Vec<(
+        let as_of_date = get_date_arg(args, "as-of-date")?;
+
+        type Row = (
             Uuid,
             Uuid,
             String,
@@ -100,11 +85,14 @@ impl CustomOperation for TemporalOwnershipAsOfOp {
             Option<String>,
             Option<NaiveDate>,
             Option<NaiveDate>,
-        )> = sqlx::query_as(r#"SELECT * FROM "ob-poc".ownership_as_of($1, $2)"#)
+        );
+
+        let rows: Vec<Row> = sqlx::query_as(r#"SELECT * FROM "ob-poc".ownership_as_of($1, $2)"#)
             .bind(entity_id)
             .bind(as_of_date)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?;
+
         let results: Vec<Value> = rows
             .iter()
             .map(|row| {
@@ -121,6 +109,7 @@ impl CustomOperation for TemporalOwnershipAsOfOp {
                 })
             })
             .collect();
+
         Ok(VerbExecutionOutcome::Record(json!({
             "entity_id": entity_id.to_string(),
             "as_of_date": as_of_date.to_string(),
@@ -128,43 +117,28 @@ impl CustomOperation for TemporalOwnershipAsOfOp {
             "relationships": results,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-// ============================================================================
-// temporal.ubo-chain-as-of
-// ============================================================================
+// ── temporal.ubo-chain-as-of ──────────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct TemporalUboChainAsOfOp;
+pub struct UboChainAsOf;
 
 #[async_trait]
-impl CustomOperation for TemporalUboChainAsOfOp {
-    fn domain(&self) -> &'static str {
-        "temporal"
+impl SemOsVerbOp for UboChainAsOf {
+    fn fqn(&self) -> &str {
+        "temporal.ubo-chain-as-of"
     }
-
-    fn verb(&self) -> &'static str {
-        "ubo-chain-as-of"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Point-in-time UBO chain tracing with recursive CTE and temporal filtering"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let as_of_date = get_date_arg_json(args, "as-of-date")?;
-        let threshold = get_decimal_arg_json(args, "threshold", 25.0);
-        let rows: Vec<(
+        let as_of_date = get_date_arg(args, "as-of-date")?;
+        let threshold = get_decimal_arg(args, "threshold", 25.0);
+
+        type Row = (
             Vec<Uuid>,
             Vec<String>,
             Uuid,
@@ -172,12 +146,15 @@ impl CustomOperation for TemporalUboChainAsOfOp {
             String,
             sqlx::types::BigDecimal,
             i32,
-        )> = sqlx::query_as(r#"SELECT * FROM "ob-poc".ubo_chain_as_of($1, $2, $3)"#)
+        );
+
+        let rows: Vec<Row> = sqlx::query_as(r#"SELECT * FROM "ob-poc".ubo_chain_as_of($1, $2, $3)"#)
             .bind(entity_id)
             .bind(as_of_date)
             .bind(sqlx::types::BigDecimal::try_from(threshold).unwrap_or_default())
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?;
+
         let chains: Vec<Value> = rows
             .iter()
             .map(|row| {
@@ -192,6 +169,7 @@ impl CustomOperation for TemporalUboChainAsOfOp {
                 })
             })
             .collect();
+
         Ok(VerbExecutionOutcome::Record(json!({
             "entity_id": entity_id.to_string(),
             "as_of_date": as_of_date.to_string(),
@@ -200,42 +178,27 @@ impl CustomOperation for TemporalUboChainAsOfOp {
             "ubo_chains": chains,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-// ============================================================================
-// temporal.cbu-relationships-as-of
-// ============================================================================
+// ── temporal.cbu-relationships-as-of ──────────────────────────────────────────
 
-#[register_custom_op]
-pub struct TemporalCbuRelationshipsAsOfOp;
+pub struct CbuRelationshipsAsOf;
 
 #[async_trait]
-impl CustomOperation for TemporalCbuRelationshipsAsOfOp {
-    fn domain(&self) -> &'static str {
-        "temporal"
+impl SemOsVerbOp for CbuRelationshipsAsOf {
+    fn fqn(&self) -> &str {
+        "temporal.cbu-relationships-as-of"
     }
-
-    fn verb(&self) -> &'static str {
-        "cbu-relationships-as-of"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Point-in-time query of all CBU relationships for regulatory lookback"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let as_of_date = get_date_arg_json(args, "as-of-date")?;
-        let rows: Vec<(
+        let as_of_date = get_date_arg(args, "as-of-date")?;
+
+        type Row = (
             Uuid,
             Uuid,
             String,
@@ -248,11 +211,15 @@ impl CustomOperation for TemporalCbuRelationshipsAsOfOp {
             Option<String>,
             Option<NaiveDate>,
             Option<NaiveDate>,
-        )> = sqlx::query_as(r#"SELECT * FROM "ob-poc".cbu_relationships_as_of($1, $2)"#)
-            .bind(cbu_id)
-            .bind(as_of_date)
-            .fetch_all(pool)
-            .await?;
+        );
+
+        let rows: Vec<Row> =
+            sqlx::query_as(r#"SELECT * FROM "ob-poc".cbu_relationships_as_of($1, $2)"#)
+                .bind(cbu_id)
+                .bind(as_of_date)
+                .fetch_all(scope.executor())
+                .await?;
+
         let results: Vec<Value> = rows
             .iter()
             .map(|row| {
@@ -272,6 +239,7 @@ impl CustomOperation for TemporalCbuRelationshipsAsOfOp {
                 })
             })
             .collect();
+
         Ok(VerbExecutionOutcome::Record(json!({
             "cbu_id": cbu_id.to_string(),
             "as_of_date": as_of_date.to_string(),
@@ -279,53 +247,41 @@ impl CustomOperation for TemporalCbuRelationshipsAsOfOp {
             "relationships": results,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-// ============================================================================
-// temporal.cbu-roles-as-of
-// ============================================================================
+// ── temporal.cbu-roles-as-of ──────────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct TemporalCbuRolesAsOfOp;
+pub struct CbuRolesAsOf;
 
 #[async_trait]
-impl CustomOperation for TemporalCbuRolesAsOfOp {
-    fn domain(&self) -> &'static str {
-        "temporal"
+impl SemOsVerbOp for CbuRolesAsOf {
+    fn fqn(&self) -> &str {
+        "temporal.cbu-roles-as-of"
     }
-
-    fn verb(&self) -> &'static str {
-        "cbu-roles-as-of"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Point-in-time query of CBU entity roles"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let as_of_date = get_date_arg_json(args, "as-of-date")?;
-        let rows: Vec<(
+        let as_of_date = get_date_arg(args, "as-of-date")?;
+
+        type Row = (
             Uuid,
             String,
             String,
             String,
             Option<NaiveDate>,
             Option<NaiveDate>,
-        )> = sqlx::query_as(r#"SELECT * FROM "ob-poc".cbu_roles_as_of($1, $2)"#)
+        );
+
+        let rows: Vec<Row> = sqlx::query_as(r#"SELECT * FROM "ob-poc".cbu_roles_as_of($1, $2)"#)
             .bind(cbu_id)
             .bind(as_of_date)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?;
+
         let results: Vec<Value> = rows
             .iter()
             .map(|row| {
@@ -339,6 +295,7 @@ impl CustomOperation for TemporalCbuRolesAsOfOp {
                 })
             })
             .collect();
+
         Ok(VerbExecutionOutcome::Record(json!({
             "cbu_id": cbu_id.to_string(),
             "as_of_date": as_of_date.to_string(),
@@ -346,41 +303,26 @@ impl CustomOperation for TemporalCbuRolesAsOfOp {
             "roles": results,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-// ============================================================================
-// temporal.cbu-state-at-approval
-// ============================================================================
+// ── temporal.cbu-state-at-approval ────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct TemporalCbuStateAtApprovalOp;
+pub struct CbuStateAtApproval;
 
 #[async_trait]
-impl CustomOperation for TemporalCbuStateAtApprovalOp {
-    fn domain(&self) -> &'static str {
-        "temporal"
+impl SemOsVerbOp for CbuStateAtApproval {
+    fn fqn(&self) -> &str {
+        "temporal.cbu-state-at-approval"
     }
-
-    fn verb(&self) -> &'static str {
-        "cbu-state-at-approval"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Get CBU state at KYC case approval - answers 'what did we know when we approved?'"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let rows: Vec<(
+
+        type Row = (
             Uuid,
             chrono::DateTime<chrono::Utc>,
             Uuid,
@@ -388,16 +330,20 @@ impl CustomOperation for TemporalCbuStateAtApprovalOp {
             String,
             Option<Uuid>,
             Option<sqlx::types::BigDecimal>,
-        )> = sqlx::query_as(r#"SELECT * FROM "ob-poc".cbu_state_at_approval($1)"#)
+        );
+
+        let rows: Vec<Row> = sqlx::query_as(r#"SELECT * FROM "ob-poc".cbu_state_at_approval($1)"#)
             .bind(cbu_id)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?;
+
         if rows.is_empty() {
             return Ok(VerbExecutionOutcome::Record(json!({
                 "cbu_id": cbu_id.to_string(),
                 "error": "No approved KYC case found for this CBU",
             })));
         }
+
         let case_id = rows[0].0;
         let approved_at = rows[0].1;
         let entities: Vec<Value> = rows
@@ -412,6 +358,7 @@ impl CustomOperation for TemporalCbuStateAtApprovalOp {
                 })
             })
             .collect();
+
         Ok(VerbExecutionOutcome::Record(json!({
             "cbu_id": cbu_id.to_string(),
             "case_id": case_id.to_string(),
@@ -420,42 +367,27 @@ impl CustomOperation for TemporalCbuStateAtApprovalOp {
             "state_at_approval": entities,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-// ============================================================================
-// temporal.relationship-history
-// ============================================================================
+// ── temporal.relationship-history ─────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct TemporalRelationshipHistoryOp;
+pub struct RelationshipHistory;
 
 #[async_trait]
-impl CustomOperation for TemporalRelationshipHistoryOp {
-    fn domain(&self) -> &'static str {
-        "temporal"
+impl SemOsVerbOp for RelationshipHistory {
+    fn fqn(&self) -> &str {
+        "temporal.relationship-history"
     }
-
-    fn verb(&self) -> &'static str {
-        "relationship-history"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Query audit trail of changes to a specific relationship"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let relationship_id = json_extract_uuid(args, ctx, "relationship-id")?;
-        let limit = get_int_arg_json(args, "limit", 50);
-        let rows: Vec<(
+        let limit = get_int_arg(args, "limit", 50);
+
+        type Row = (
             Uuid,
             String,
             chrono::DateTime<chrono::Utc>,
@@ -463,7 +395,9 @@ impl CustomOperation for TemporalRelationshipHistoryOp {
             Option<String>,
             Option<NaiveDate>,
             Option<NaiveDate>,
-        )> = sqlx::query_as(
+        );
+
+        let rows: Vec<Row> = sqlx::query_as(
             r#"
             SELECT
                 history_id,
@@ -481,8 +415,9 @@ impl CustomOperation for TemporalRelationshipHistoryOp {
         )
         .bind(relationship_id)
         .bind(limit)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
+
         let history: Vec<Value> = rows
             .iter()
             .map(|row| {
@@ -497,50 +432,36 @@ impl CustomOperation for TemporalRelationshipHistoryOp {
                 })
             })
             .collect();
+
         Ok(VerbExecutionOutcome::Record(json!({
             "relationship_id": relationship_id.to_string(),
             "count": history.len(),
             "history": history,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-// ============================================================================
-// temporal.entity-history
-// ============================================================================
+// ── temporal.entity-history ───────────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct TemporalEntityHistoryOp;
+pub struct EntityHistory;
 
 #[async_trait]
-impl CustomOperation for TemporalEntityHistoryOp {
-    fn domain(&self) -> &'static str {
-        "temporal"
+impl SemOsVerbOp for EntityHistory {
+    fn fqn(&self) -> &str {
+        "temporal.entity-history"
     }
-
-    fn verb(&self) -> &'static str {
-        "entity-history"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Query all relationship changes involving an entity"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let from_date = get_optional_date_arg_json(args, "from-date")?;
-        let to_date = get_optional_date_arg_json(args, "to-date")?;
-        let limit = get_int_arg_json(args, "limit", 100);
-        let rows: Vec<(
+        let from_date = get_optional_date_arg(args, "from-date")?;
+        let to_date = get_optional_date_arg(args, "to-date")?;
+        let limit = get_int_arg(args, "limit", 100);
+
+        type Row = (
             Uuid,
             Uuid,
             String,
@@ -549,7 +470,9 @@ impl CustomOperation for TemporalEntityHistoryOp {
             String,
             chrono::DateTime<chrono::Utc>,
             Option<sqlx::types::BigDecimal>,
-        )> = sqlx::query_as(
+        );
+
+        let rows: Vec<Row> = sqlx::query_as(
             r#"
             SELECT
                 h.history_id,
@@ -572,8 +495,9 @@ impl CustomOperation for TemporalEntityHistoryOp {
         .bind(from_date)
         .bind(to_date)
         .bind(limit)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
+
         let history: Vec<Value> = rows
             .iter()
             .map(|row| {
@@ -589,6 +513,7 @@ impl CustomOperation for TemporalEntityHistoryOp {
                 })
             })
             .collect();
+
         Ok(VerbExecutionOutcome::Record(json!({
             "entity_id": entity_id.to_string(),
             "from_date": from_date.map(|d| d.to_string()),
@@ -597,72 +522,60 @@ impl CustomOperation for TemporalEntityHistoryOp {
             "history": history,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-// ============================================================================
-// temporal.compare-ownership
-// ============================================================================
+// ── temporal.compare-ownership ────────────────────────────────────────────────
 
-#[register_custom_op]
-pub struct TemporalCompareOwnershipOp;
+pub struct CompareOwnership;
 
 #[async_trait]
-impl CustomOperation for TemporalCompareOwnershipOp {
-    fn domain(&self) -> &'static str {
-        "temporal"
+impl SemOsVerbOp for CompareOwnership {
+    fn fqn(&self) -> &str {
+        "temporal.compare-ownership"
     }
-
-    fn verb(&self) -> &'static str {
-        "compare-ownership"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Compare ownership structure between two dates to identify changes"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let date_a = get_optional_date_arg_json(args, "date-a")?
+        let date_a = get_optional_date_arg(args, "date-a")?
             .ok_or_else(|| anyhow!("date-a is required"))?;
-        let date_b = get_optional_date_arg_json(args, "date-b")?
+        let date_b = get_optional_date_arg(args, "date-b")?
             .ok_or_else(|| anyhow!("date-b is required"))?;
-        use std::collections::HashMap;
-        let rows_a: Vec<(Uuid, Uuid, Option<sqlx::types::BigDecimal>, Option<String>)> =
-            sqlx::query_as(
-                r#"
+
+        type OwnershipRow = (Uuid, Uuid, Option<sqlx::types::BigDecimal>, Option<String>);
+
+        let rows_a: Vec<OwnershipRow> = sqlx::query_as(
+            r#"
             SELECT relationship_id, from_entity_id, percentage, ownership_type
             FROM "ob-poc".ownership_as_of($1, $2)
             "#,
-            )
-            .bind(entity_id)
-            .bind(date_a)
-            .fetch_all(pool)
-            .await?;
-        let rows_b: Vec<(Uuid, Uuid, Option<sqlx::types::BigDecimal>, Option<String>)> =
-            sqlx::query_as(
-                r#"
+        )
+        .bind(entity_id)
+        .bind(date_a)
+        .fetch_all(scope.executor())
+        .await?;
+
+        let rows_b: Vec<OwnershipRow> = sqlx::query_as(
+            r#"
             SELECT relationship_id, from_entity_id, percentage, ownership_type
             FROM "ob-poc".ownership_as_of($1, $2)
             "#,
-            )
-            .bind(entity_id)
-            .bind(date_b)
-            .fetch_all(pool)
-            .await?;
-        let set_a: HashMap<Uuid, _> = rows_a.iter().map(|r| (r.0, r)).collect();
-        let set_b: HashMap<Uuid, _> = rows_b.iter().map(|r| (r.0, r)).collect();
+        )
+        .bind(entity_id)
+        .bind(date_b)
+        .fetch_all(scope.executor())
+        .await?;
+
+        let set_a: HashMap<Uuid, &OwnershipRow> = rows_a.iter().map(|r| (r.0, r)).collect();
+        let set_b: HashMap<Uuid, &OwnershipRow> = rows_b.iter().map(|r| (r.0, r)).collect();
+
         let mut added = Vec::new();
         let mut removed = Vec::new();
         let mut changed = Vec::new();
+
         for (id, row) in &set_b {
             if !set_a.contains_key(id) {
                 added.push(json!({
@@ -699,6 +612,7 @@ impl CustomOperation for TemporalCompareOwnershipOp {
                 }
             }
         }
+
         Ok(VerbExecutionOutcome::Record(json!({
             "entity_id": entity_id.to_string(),
             "date_a": date_a.to_string(),
@@ -712,9 +626,5 @@ impl CustomOperation for TemporalCompareOwnershipOp {
             "removed": removed,
             "changed": changed,
         })))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

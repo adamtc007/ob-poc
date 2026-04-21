@@ -683,14 +683,16 @@ mod tests {
         assert!(registry.has("access-review", "process-deadline"));
         assert!(registry.has("access-review", "send-reminders"));
         // Temporal operations (point-in-time queries)
-        assert!(registry.has("temporal", "ownership-as-of"));
-        assert!(registry.has("temporal", "ubo-chain-as-of"));
-        assert!(registry.has("temporal", "cbu-relationships-as-of"));
-        assert!(registry.has("temporal", "cbu-roles-as-of"));
-        assert!(registry.has("temporal", "cbu-state-at-approval"));
-        assert!(registry.has("temporal", "relationship-history"));
-        assert!(registry.has("temporal", "entity-history"));
-        assert!(registry.has("temporal", "compare-ownership"));
+        // Phase 5c-migrate Phase B slice #32: temporal ops moved to
+        // `sem_os_postgres::ops::temporal::*`.
+        assert!(!registry.has("temporal", "ownership-as-of"));
+        assert!(!registry.has("temporal", "ubo-chain-as-of"));
+        assert!(!registry.has("temporal", "cbu-relationships-as-of"));
+        assert!(!registry.has("temporal", "cbu-roles-as-of"));
+        assert!(!registry.has("temporal", "cbu-state-at-approval"));
+        assert!(!registry.has("temporal", "relationship-history"));
+        assert!(!registry.has("temporal", "entity-history"));
+        assert!(!registry.has("temporal", "compare-ownership"));
         // GLEIF operations (LEI data enrichment)
         assert!(registry.has("gleif", "enrich"));
         assert!(registry.has("gleif", "search"));

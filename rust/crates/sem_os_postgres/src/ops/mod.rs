@@ -67,6 +67,7 @@ pub mod session;
 pub mod state;
 pub mod stewardship_helper;
 pub mod team;
+pub mod temporal;
 pub mod trading_matrix;
 pub mod ubo_registry;
 pub mod view;
@@ -425,6 +426,17 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(manco::BookSummary));
     registry.register(Arc::new(manco::ComputeControlLinks));
     registry.register(Arc::new(manco::Refresh));
+
+    // Phase B slice #32: temporal queries (8 plugin verbs — regulatory
+    // lookback "what did X look like on date Y?").
+    registry.register(Arc::new(temporal::OwnershipAsOf));
+    registry.register(Arc::new(temporal::UboChainAsOf));
+    registry.register(Arc::new(temporal::CbuRelationshipsAsOf));
+    registry.register(Arc::new(temporal::CbuRolesAsOf));
+    registry.register(Arc::new(temporal::CbuStateAtApproval));
+    registry.register(Arc::new(temporal::RelationshipHistory));
+    registry.register(Arc::new(temporal::EntityHistory));
+    registry.register(Arc::new(temporal::CompareOwnership));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
