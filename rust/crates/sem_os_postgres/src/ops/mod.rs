@@ -38,6 +38,7 @@ pub mod billing;
 pub mod board;
 pub mod capital;
 pub mod bods;
+pub mod cbu;
 pub mod cbu_role;
 pub mod changeset;
 pub mod client_group;
@@ -638,6 +639,20 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #67: cbu.* (9 plugin verbs — create, link-structure,
+    // list-structure-links, unlink-structure, add-product, inspect,
+    // decide, delete-cascade, create-from-client-group). Inner txns
+    // collapsed — ambient Sequencer owns the outer transaction.
+    registry.register(Arc::new(cbu::Create));
+    registry.register(Arc::new(cbu::LinkStructure));
+    registry.register(Arc::new(cbu::ListStructureLinks));
+    registry.register(Arc::new(cbu::UnlinkStructure));
+    registry.register(Arc::new(cbu::AddProduct));
+    registry.register(Arc::new(cbu::Inspect));
+    registry.register(Arc::new(cbu::Decide));
+    registry.register(Arc::new(cbu::DeleteCascade));
+    registry.register(Arc::new(cbu::CreateFromClientGroup));
 
     // Phase B slice #66: client-group.* (24 plugin verbs — entity/tag
     // management, roles, parties, relationships, ownership sources,

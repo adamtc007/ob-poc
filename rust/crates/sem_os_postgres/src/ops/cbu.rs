@@ -1,24 +1,44 @@
-//! CBU custom operations
+//! CBU custom operations (9 plugin verbs) — YAML-first re-implementation of
+//! `cbu.*` from `rust/config/verbs/cbu.yaml`.
 //!
 //! Operations for CBU (Client Business Unit) management including
-//! product assignment, show, decide, and cascade delete.
+//! creation, structure links, product assignment, inspect, decide,
+//! cascade delete, and bulk creation from client groups.
+//!
+//! # Ops
+//!
+//! - `cbu.create` — Create CBU with optional entity linking (ASSET_OWNER, MANAGEMENT_COMPANY)
+//! - `cbu.link-structure` — Persist parent-child structure link between two CBUs
+//! - `cbu.list-structure-links` — List persisted structure links
+//! - `cbu.unlink-structure` — Terminate an active structure link
+//! - `cbu.add-product` — Link CBU to product and create service delivery entries
+//! - `cbu.inspect` — Show full CBU structure with entities, roles, documents, screenings
+//! - `cbu.decide` — Record KYC/AML decision for CBU collective state
+//! - `cbu.delete-cascade` — Delete CBU and related data with cascade
+//! - `cbu.create-from-client-group` — Bulk CBU creation from client group entities
 
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use dsl_runtime_macros::register_custom_op;
-use sqlx::PgPool;
+use serde_json::Value;
+use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::{
+use dsl_runtime::domain_ops::helpers::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
     json_extract_uuid, json_extract_uuid_opt,
 };
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+
+use super::SemOsVerbOp;
+
+// =============================================================================
+// Local helpers
+// =============================================================================
 
 fn json_extract_uuid_alias(
-    args: &serde_json::Value,
+    args: &Value,
     ctx: &mut VerbExecutionContext,
     keys: &[&str],
 ) -> Result<Option<Uuid>> {
@@ -30,7 +50,7 @@ fn json_extract_uuid_alias(
     Ok(None)
 }
 
-fn json_extract_string_alias(args: &serde_json::Value, keys: &[&str]) -> Option<String> {
+fn json_extract_string_alias(args: &Value, keys: &[&str]) -> Option<String> {
     keys.iter().find_map(|key| {
         args.get(*key)
             .and_then(|value| value.as_str().map(ToOwned::to_owned))
@@ -54,40 +74,29 @@ fn normalize_capital_flow(raw: &str) -> String {
     raw.replace('-', "_").to_ascii_uppercase()
 }
 
-// ============================================================================
-// CBU Create (with entity-based idempotency)
-// ============================================================================
+// =============================================================================
+// cbu.create
+// =============================================================================
 
-/// Create a new CBU with optional fund entity linking
+/// Create a new CBU with optional fund entity linking.
 ///
 /// Idempotency:
 /// - If :fund-entity-id is provided, checks if that entity is already linked to ANY CBU
 ///   as ASSET_OWNER. If so, returns the existing CBU (skipped).
 /// - If no :fund-entity-id, uses name+jurisdiction as fallback idempotency key.
-///
-/// Entity Linking:
-/// - If :fund-entity-id provided, links entity to CBU with ASSET_OWNER role
-/// - If :manco-entity-id provided, links entity with MANAGEMENT_COMPANY role
-#[register_custom_op]
-pub struct CbuCreateOp;
+pub struct Create;
 
 #[async_trait]
-impl CustomOperation for CbuCreateOp {
-    fn domain(&self) -> &'static str {
-        "cbu"
-    }
-    fn verb(&self) -> &'static str {
-        "create"
-    }
-    fn rationale(&self) -> &'static str {
-        "Entity-based idempotency: skips if fund entity already on a CBU"
+impl SemOsVerbOp for Create {
+    fn fqn(&self) -> &str {
+        "cbu.create"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let name = json_extract_string(args, "name")?;
         let jurisdiction = json_extract_string_opt(args, "jurisdiction");
@@ -115,18 +124,16 @@ impl CustomOperation for CbuCreateOp {
                 "#,
             )
             .bind(fund_id)
-            .fetch_optional(pool)
+            .fetch_optional(scope.executor())
             .await?;
 
             if let Some((existing_cbu_id, existing_cbu_name)) = existing {
-                return Ok(VerbExecutionOutcome::Record(
-                    serde_json::json!({
-                        "cbu_id": existing_cbu_id,
-                        "name": existing_cbu_name,
-                        "created": false,
-                        "skipped_reason": format!("Entity {} already linked to CBU '{}'", fund_id, existing_cbu_name)
-                    }),
-                ));
+                return Ok(VerbExecutionOutcome::Record(serde_json::json!({
+                    "cbu_id": existing_cbu_id,
+                    "name": existing_cbu_name,
+                    "created": false,
+                    "skipped_reason": format!("Entity {} already linked to CBU '{}'", fund_id, existing_cbu_name)
+                })));
             }
         }
 
@@ -145,14 +152,14 @@ impl CustomOperation for CbuCreateOp {
         .bind(&nature_purpose)
         .bind(&description)
         .bind(commercial_client_entity_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if let Some(fund_id) = fund_entity_id {
             let asset_owner_role_id: Option<Uuid> = sqlx::query_scalar(
                 r#"SELECT role_id FROM "ob-poc".roles WHERE name = 'ASSET_OWNER'"#,
             )
-            .fetch_optional(pool)
+            .fetch_optional(scope.executor())
             .await?;
 
             if let Some(role_id) = asset_owner_role_id {
@@ -166,7 +173,7 @@ impl CustomOperation for CbuCreateOp {
                 .bind(cbu_id)
                 .bind(fund_id)
                 .bind(role_id)
-                .execute(pool)
+                .execute(scope.executor())
                 .await?;
             }
 
@@ -181,7 +188,7 @@ impl CustomOperation for CbuCreateOp {
             )
             .bind(cbu_id)
             .bind(fund_id)
-            .execute(pool)
+            .execute(scope.executor())
             .await?;
         }
 
@@ -189,7 +196,7 @@ impl CustomOperation for CbuCreateOp {
             let manco_role_id: Option<Uuid> = sqlx::query_scalar(
                 r#"SELECT role_id FROM "ob-poc".roles WHERE name = 'MANAGEMENT_COMPANY'"#,
             )
-            .fetch_optional(pool)
+            .fetch_optional(scope.executor())
             .await?;
 
             if let Some(role_id) = manco_role_id {
@@ -203,7 +210,7 @@ impl CustomOperation for CbuCreateOp {
                 .bind(cbu_id)
                 .bind(manco_id)
                 .bind(role_id)
-                .execute(pool)
+                .execute(scope.executor())
                 .await?;
             }
         }
@@ -214,49 +221,34 @@ impl CustomOperation for CbuCreateOp {
             Some("CBU with same name+jurisdiction already exists")
         };
 
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({
-                "cbu_id": cbu_id,
-                "name": name,
-                "jurisdiction": jurisdiction,
-                "created": is_new,
-                "skipped_reason": skipped_reason
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
+            "cbu_id": cbu_id,
+            "name": name,
+            "jurisdiction": jurisdiction,
+            "created": is_new,
+            "skipped_reason": skipped_reason
+        })))
     }
 }
 
-// ============================================================================
-// CBU Structure Links
-// ============================================================================
+// =============================================================================
+// cbu.link-structure
+// =============================================================================
 
 /// Persist a parent-child structure link between two CBUs.
-#[register_custom_op]
-pub struct CbuLinkStructureOp;
+pub struct LinkStructure;
 
 #[async_trait]
-impl CustomOperation for CbuLinkStructureOp {
-    fn domain(&self) -> &'static str {
-        "cbu"
+impl SemOsVerbOp for LinkStructure {
+    fn fqn(&self) -> &str {
+        "cbu.link-structure"
     }
 
-    fn verb(&self) -> &'static str {
-        "link-structure"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Persists cross-border and parallel-fund structure relationships between CBUs"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let parent_cbu_id =
             json_extract_uuid_alias(args, ctx, &["parent-cbu-id", "parent_cbu_id"])?.ok_or_else(
@@ -264,8 +256,8 @@ impl CustomOperation for CbuLinkStructureOp {
             )?;
         let child_cbu_id = json_extract_uuid_alias(args, ctx, &["child-cbu-id", "child_cbu_id"])?
             .ok_or_else(|| {
-            anyhow::anyhow!("cbu.link-structure: missing required argument :child-cbu-id")
-        })?;
+                anyhow::anyhow!("cbu.link-structure: missing required argument :child-cbu-id")
+            })?;
         let relationship_type_raw =
             json_extract_string_alias(args, &["relationship-type", "relationship_type"])
                 .ok_or_else(|| {
@@ -325,7 +317,7 @@ impl CustomOperation for CbuLinkStructureOp {
             r#"SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
         )
         .bind(parent_cbu_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
         if parent_exists.is_none() {
             return Err(anyhow::anyhow!(
@@ -338,7 +330,7 @@ impl CustomOperation for CbuLinkStructureOp {
             r#"SELECT cbu_id FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
         )
         .bind(child_cbu_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
         if child_exists.is_none() {
             return Err(anyhow::anyhow!(
@@ -346,8 +338,6 @@ impl CustomOperation for CbuLinkStructureOp {
                 child_cbu_id
             ));
         }
-
-        let mut tx = pool.begin().await?;
 
         let existing_link_id: Option<Uuid> = sqlx::query_scalar(
             r#"
@@ -363,7 +353,7 @@ impl CustomOperation for CbuLinkStructureOp {
         .bind(parent_cbu_id)
         .bind(child_cbu_id)
         .bind(&relationship_type)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(scope.executor())
         .await?;
 
         if let Some(link_id) = existing_link_id {
@@ -384,7 +374,7 @@ impl CustomOperation for CbuLinkStructureOp {
             .bind(&capital_flow)
             .bind(effective_from)
             .bind(effective_to)
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await?;
         } else {
             sqlx::query(
@@ -409,45 +399,32 @@ impl CustomOperation for CbuLinkStructureOp {
             .bind(&capital_flow)
             .bind(effective_from)
             .bind(effective_to)
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await?;
         }
 
-        tx.commit().await?;
-
-        Ok(VerbExecutionOutcome::Uuid(
-            child_cbu_id,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(child_cbu_id))
     }
 }
 
+// =============================================================================
+// cbu.list-structure-links
+// =============================================================================
+
 /// List persisted structure links for a parent or child CBU.
-#[register_custom_op]
-pub struct CbuListStructureLinksOp;
+pub struct ListStructureLinks;
 
 #[async_trait]
-impl CustomOperation for CbuListStructureLinksOp {
-    fn domain(&self) -> &'static str {
-        "cbu"
+impl SemOsVerbOp for ListStructureLinks {
+    fn fqn(&self) -> &str {
+        "cbu.list-structure-links"
     }
 
-    fn verb(&self) -> &'static str {
-        "list-structure-links"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Reads persisted cross-border structure relationships for diagnostics and macros"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let parent_cbu_id =
             json_extract_uuid_alias(args, ctx, &["parent-cbu-id", "parent_cbu_id"])?;
@@ -478,24 +455,23 @@ impl CustomOperation for CbuListStructureLinksOp {
             ));
         }
 
-        let rows = match (parent_cbu_id, child_cbu_id, status) {
+        type LinkRow = (
+            Uuid,
+            Uuid,
+            String,
+            Uuid,
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<NaiveDate>,
+            Option<NaiveDate>,
+        );
+
+        let rows: Vec<LinkRow> = match (parent_cbu_id, child_cbu_id, status) {
             (Some(parent), Some(child), Some(status)) => {
-                sqlx::query_as::<
-                    _,
-                    (
-                        Uuid,
-                        Uuid,
-                        String,
-                        Uuid,
-                        String,
-                        String,
-                        String,
-                        String,
-                        Option<String>,
-                        Option<NaiveDate>,
-                        Option<NaiveDate>,
-                    ),
-                >(
+                sqlx::query_as::<_, LinkRow>(
                     r#"
                     SELECT
                         l.link_id,
@@ -521,26 +497,11 @@ impl CustomOperation for CbuListStructureLinksOp {
                 .bind(parent)
                 .bind(child)
                 .bind(status.to_ascii_uppercase())
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
             }
             (Some(parent), Some(child), None) => {
-                sqlx::query_as::<
-                    _,
-                    (
-                        Uuid,
-                        Uuid,
-                        String,
-                        Uuid,
-                        String,
-                        String,
-                        String,
-                        String,
-                        Option<String>,
-                        Option<NaiveDate>,
-                        Option<NaiveDate>,
-                    ),
-                >(
+                sqlx::query_as::<_, LinkRow>(
                     r#"
                     SELECT
                         l.link_id,
@@ -564,26 +525,11 @@ impl CustomOperation for CbuListStructureLinksOp {
                 )
                 .bind(parent)
                 .bind(child)
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
             }
             (Some(parent), None, Some(status)) => {
-                sqlx::query_as::<
-                    _,
-                    (
-                        Uuid,
-                        Uuid,
-                        String,
-                        Uuid,
-                        String,
-                        String,
-                        String,
-                        String,
-                        Option<String>,
-                        Option<NaiveDate>,
-                        Option<NaiveDate>,
-                    ),
-                >(
+                sqlx::query_as::<_, LinkRow>(
                     r#"
                     SELECT
                         l.link_id,
@@ -607,26 +553,11 @@ impl CustomOperation for CbuListStructureLinksOp {
                 )
                 .bind(parent)
                 .bind(status.to_ascii_uppercase())
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
             }
             (Some(parent), None, None) => {
-                sqlx::query_as::<
-                    _,
-                    (
-                        Uuid,
-                        Uuid,
-                        String,
-                        Uuid,
-                        String,
-                        String,
-                        String,
-                        String,
-                        Option<String>,
-                        Option<NaiveDate>,
-                        Option<NaiveDate>,
-                    ),
-                >(
+                sqlx::query_as::<_, LinkRow>(
                     r#"
                     SELECT
                         l.link_id,
@@ -648,26 +579,11 @@ impl CustomOperation for CbuListStructureLinksOp {
                     "#,
                 )
                 .bind(parent)
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
             }
             (None, Some(child), Some(status)) => {
-                sqlx::query_as::<
-                    _,
-                    (
-                        Uuid,
-                        Uuid,
-                        String,
-                        Uuid,
-                        String,
-                        String,
-                        String,
-                        String,
-                        Option<String>,
-                        Option<NaiveDate>,
-                        Option<NaiveDate>,
-                    ),
-                >(
+                sqlx::query_as::<_, LinkRow>(
                     r#"
                     SELECT
                         l.link_id,
@@ -691,26 +607,11 @@ impl CustomOperation for CbuListStructureLinksOp {
                 )
                 .bind(child)
                 .bind(status.to_ascii_uppercase())
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
             }
             (None, Some(child), None) => {
-                sqlx::query_as::<
-                    _,
-                    (
-                        Uuid,
-                        Uuid,
-                        String,
-                        Uuid,
-                        String,
-                        String,
-                        String,
-                        String,
-                        Option<String>,
-                        Option<NaiveDate>,
-                        Option<NaiveDate>,
-                    ),
-                >(
+                sqlx::query_as::<_, LinkRow>(
                     r#"
                     SELECT
                         l.link_id,
@@ -732,7 +633,7 @@ impl CustomOperation for CbuListStructureLinksOp {
                     "#,
                 )
                 .bind(child)
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
             }
             (None, None, _) => unreachable!(),
@@ -772,35 +673,26 @@ impl CustomOperation for CbuListStructureLinksOp {
                 .collect(),
         ))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
+// =============================================================================
+// cbu.unlink-structure
+// =============================================================================
+
 /// Terminate an active persisted structure link between CBUs.
-#[register_custom_op]
-pub struct CbuUnlinkStructureOp;
+pub struct UnlinkStructure;
 
 #[async_trait]
-impl CustomOperation for CbuUnlinkStructureOp {
-    fn domain(&self) -> &'static str {
-        "cbu"
+impl SemOsVerbOp for UnlinkStructure {
+    fn fqn(&self) -> &str {
+        "cbu.unlink-structure"
     }
 
-    fn verb(&self) -> &'static str {
-        "unlink-structure"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Terminates an active cross-border structure relationship without deleting history"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let link_id = json_extract_uuid(args, ctx, "link-id")?;
         let reason = json_extract_string(args, "reason")?;
@@ -818,137 +710,103 @@ impl CustomOperation for CbuUnlinkStructureOp {
         )
         .bind(link_id)
         .bind(reason)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        Ok(VerbExecutionOutcome::Affected(
-            result.rows_affected(),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
 
-// ============================================================================
-// CBU Product Assignment
-// ============================================================================
+// =============================================================================
+// cbu.add-product
+// =============================================================================
 
-/// Add a product to a CBU by creating service_delivery_map and cbu_resource_instances entries
-///
-/// This is a CRITICAL onboarding operation that:
-/// 1. Validates CBU exists
-/// 2. Looks up product by name and validates it exists
-/// 3. Validates product has services defined
-/// 4. Creates service_delivery_map entries for ALL services under that product
-/// 5. Creates cbu_resource_instances for ALL resource types under each service
-///    (via service_resource_capabilities join) - one per (CBU, resource_type)
-///
-/// NOTE: A CBU can have MULTIPLE products. This verb adds one product at a time.
-/// The service_delivery_map is the source of truth for CBU->Product relationships.
-/// cbus.product_id is NOT used (legacy field).
-///
-/// Idempotency: Safe to re-run - uses ON CONFLICT DO NOTHING for all entries
-/// Transaction: All operations wrapped in a transaction for atomicity
-#[register_custom_op]
-pub struct CbuAddProductOp;
+/// Add a product to a CBU by creating service_delivery_map and cbu_resource_instances entries.
+pub struct AddProduct;
 
 #[async_trait]
-impl CustomOperation for CbuAddProductOp {
-    fn domain(&self) -> &'static str {
-        "cbu"
-    }
-    fn verb(&self) -> &'static str {
-        "add-product"
-    }
-    fn rationale(&self) -> &'static str {
-        "Critical onboarding op: links CBU to product and creates service delivery entries"
+impl SemOsVerbOp for AddProduct {
+    fn fqn(&self) -> &str {
+        "cbu.add-product"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use uuid::Uuid;
-
         let product_name = json_extract_string(args, "product")?;
-        let cbu_id_arg = args
-            .get("cbu-id")
-            .ok_or_else(|| anyhow::anyhow!("cbu.add-product: Missing required argument :cbu-id"))?;
+        let cbu_id_arg = args.get("cbu-id").ok_or_else(|| {
+            anyhow::anyhow!("cbu.add-product: Missing required argument :cbu-id")
+        })?;
 
         let (cbu_id, cbu_name): (Uuid, String) = if let Some(str_val) = cbu_id_arg.as_str() {
             if str_val.starts_with('@') {
                 let resolved_id = json_extract_uuid(args, ctx, "cbu-id")?;
-                let row: (Uuid, String) = sqlx::query_as(
+                sqlx::query_as(
                     r#"SELECT cbu_id, name
                        FROM "ob-poc".cbus
                        WHERE cbu_id = $1
                          AND deleted_at IS NULL"#,
                 )
                 .bind(resolved_id)
-                .fetch_optional(pool)
+                .fetch_optional(scope.executor())
                 .await?
                 .ok_or_else(|| {
                     anyhow::anyhow!("cbu.add-product: CBU not found with id {}", resolved_id)
-                })?;
-                row
+                })?
             } else if let Ok(uuid_val) = Uuid::parse_str(str_val) {
-                let row: (Uuid, String) = sqlx::query_as(
+                sqlx::query_as(
                     r#"SELECT cbu_id, name
                        FROM "ob-poc".cbus
                        WHERE cbu_id = $1
                          AND deleted_at IS NULL"#,
                 )
                 .bind(uuid_val)
-                .fetch_optional(pool)
+                .fetch_optional(scope.executor())
                 .await?
                 .ok_or_else(|| {
                     anyhow::anyhow!("cbu.add-product: CBU not found with id {}", uuid_val)
-                })?;
-                row
+                })?
             } else {
-                let row: (Uuid, String) = sqlx::query_as(
+                sqlx::query_as(
                     r#"SELECT cbu_id, name
                        FROM "ob-poc".cbus
                        WHERE LOWER(name) = LOWER($1)
                          AND deleted_at IS NULL"#,
                 )
                 .bind(str_val)
-                .fetch_optional(pool)
+                .fetch_optional(scope.executor())
                 .await?
                 .ok_or_else(|| {
                     anyhow::anyhow!(
                         "cbu.add-product: CBU '{}' not found. Use cbu.list to see available CBUs.",
                         str_val
                     )
-                })?;
-                row
+                })?
             }
         } else {
             let resolved_id = json_extract_uuid(args, ctx, "cbu-id")?;
-            let row: (Uuid, String) = sqlx::query_as(
+            sqlx::query_as(
                 r#"SELECT cbu_id, name
                    FROM "ob-poc".cbus
                    WHERE cbu_id = $1
                      AND deleted_at IS NULL"#,
             )
             .bind(resolved_id)
-            .fetch_optional(pool)
+            .fetch_optional(scope.executor())
             .await?
             .ok_or_else(|| {
                 anyhow::anyhow!("cbu.add-product: CBU not found with id {}", resolved_id)
-            })?;
-            row
+            })?
         };
 
         let product_row: Option<(Uuid, String, String)> = sqlx::query_as(
             r#"SELECT product_id, name, product_code FROM "ob-poc".products WHERE product_code = $1"#,
         )
         .bind(&product_name)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
 
         let product = product_row.ok_or_else(|| {
@@ -968,7 +826,7 @@ impl CustomOperation for CbuAddProductOp {
                ORDER BY s.name"#,
         )
         .bind(product_id)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
         if services.is_empty() {
@@ -979,7 +837,6 @@ impl CustomOperation for CbuAddProductOp {
             ));
         }
 
-        let mut tx = pool.begin().await?;
         let mut delivery_created: i64 = 0;
         let mut delivery_skipped: i64 = 0;
 
@@ -995,7 +852,7 @@ impl CustomOperation for CbuAddProductOp {
             .bind(cbu_id)
             .bind(product_id)
             .bind(svc.0)
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await?;
 
             if result.rows_affected() > 0 {
@@ -1018,7 +875,7 @@ impl CustomOperation for CbuAddProductOp {
                ORDER BY src.service_id, srt.name"#,
         )
         .bind(product_id)
-        .fetch_all(&mut *tx)
+        .fetch_all(scope.executor())
         .await?;
 
         for sr in &service_resources {
@@ -1044,7 +901,7 @@ impl CustomOperation for CbuAddProductOp {
             .bind(sr.1)
             .bind(&instance_url)
             .bind(&sr.3)
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await?;
 
             if result.rows_affected() > 0 {
@@ -1053,8 +910,6 @@ impl CustomOperation for CbuAddProductOp {
                 resource_skipped += 1;
             }
         }
-
-        tx.commit().await?;
 
         tracing::info!(
             cbu_id = %cbu_id,
@@ -1072,249 +927,264 @@ impl CustomOperation for CbuAddProductOp {
             (delivery_created + resource_created) as u64,
         ))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-// ============================================================================
-// CBU Show Operation
-// ============================================================================
+// =============================================================================
+// cbu.inspect
+// =============================================================================
 
-/// Show full CBU structure including entities, roles, documents, screenings
-///
-/// Rationale: Requires multiple joins across CBU, entities, roles, documents,
-/// screenings, and service deliveries to build a complete picture.
-#[register_custom_op]
-pub struct CbuInspectOp;
+/// Show full CBU structure including entities, roles, documents, screenings.
+pub struct Inspect;
 
 #[async_trait]
-impl CustomOperation for CbuInspectOp {
-    fn domain(&self) -> &'static str {
-        "cbu"
-    }
-    fn verb(&self) -> &'static str {
-        "inspect"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires aggregating data from multiple tables into a structured view"
+impl SemOsVerbOp for Inspect {
+    fn fqn(&self) -> &str {
+        "cbu.inspect"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use super::helpers::{json_extract_string_opt, json_extract_uuid};
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let as_of_date = json_extract_string_opt(args, "as-of-date")
-            .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
+            .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
-        let result = cbu_inspect_impl(cbu_id, as_of_date, pool).await?;
-        Ok(VerbExecutionOutcome::Record(result))
-    }
 
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
+        let cbu: (
+            Uuid,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<chrono::DateTime<chrono::Utc>>,
+            Option<chrono::DateTime<chrono::Utc>>,
+        ) = sqlx::query_as(
+            r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category,
+                      nature_purpose, description, created_at, updated_at
+               FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(scope.executor())
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
 
-/// Shared implementation for cbu.inspect — called by execute_json().
-async fn cbu_inspect_impl(
-    cbu_id: Uuid,
-    as_of_date: NaiveDate,
-    pool: &PgPool,
-) -> Result<serde_json::Value> {
-    let cbu = sqlx::query!(
-        r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category,
-                  nature_purpose, description, created_at, updated_at
-           FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
-        cbu_id
-    )
-    .fetch_optional(pool)
-    .await?
-    .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
+        let entities: Vec<(Uuid, String, String, Option<String>)> = sqlx::query_as(
+            r#"SELECT DISTINCT e.entity_id, e.name, et.type_code as entity_type,
+                      COALESCE(lc.jurisdiction, pp.nationality, p.jurisdiction, t.jurisdiction) as jurisdiction
+               FROM "ob-poc".cbu_entity_roles cer
+               JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
+               JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
+               LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
+               LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
+               LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
+               LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
+               WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL
+                 AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
+                 AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
+               ORDER BY e.name"#,
+        )
+        .bind(cbu_id)
+        .bind(as_of_date)
+        .fetch_all(scope.executor())
+        .await?;
 
-    let entities = sqlx::query!(
-        r#"SELECT DISTINCT e.entity_id, e.name, et.type_code as entity_type,
-                  COALESCE(lc.jurisdiction, pp.nationality, p.jurisdiction, t.jurisdiction) as jurisdiction
-           FROM "ob-poc".cbu_entity_roles cer
-           JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
-           JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-           LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
-           LEFT JOIN "ob-poc".entity_proper_persons pp ON e.entity_id = pp.entity_id
-           LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
-           LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
-           WHERE cer.cbu_id = $1 AND e.deleted_at IS NULL
-             AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
-             AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
-           ORDER BY e.name"#,
-        cbu_id, as_of_date
-    )
-    .fetch_all(pool)
-    .await?;
+        let roles: Vec<(Uuid, String)> = sqlx::query_as(
+            r#"SELECT cer.entity_id, r.name as role_name
+               FROM "ob-poc".cbu_entity_roles cer
+               JOIN "ob-poc".roles r ON cer.role_id = r.role_id
+               WHERE cer.cbu_id = $1
+               AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
+               AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
+               ORDER BY cer.entity_id, r.name"#,
+        )
+        .bind(cbu_id)
+        .bind(as_of_date)
+        .fetch_all(scope.executor())
+        .await?;
 
-    let roles = sqlx::query!(
-        r#"SELECT cer.entity_id, r.name as role_name
-           FROM "ob-poc".cbu_entity_roles cer
-           JOIN "ob-poc".roles r ON cer.role_id = r.role_id
-           WHERE cer.cbu_id = $1
-           AND (cer.effective_from IS NULL OR cer.effective_from <= $2)
-           AND (cer.effective_to IS NULL OR cer.effective_to >= $2)
-           ORDER BY cer.entity_id, r.name"#,
-        cbu_id,
-        as_of_date
-    )
-    .fetch_all(pool)
-    .await?;
-
-    let entity_list: Vec<serde_json::Value> = entities
-        .iter()
-        .map(|e| {
-            let entity_roles: Vec<String> = roles
-                .iter()
-                .filter(|r| r.entity_id == e.entity_id)
-                .map(|r| r.role_name.clone())
-                .collect();
-            serde_json::json!({
-                "entity_id": e.entity_id, "name": e.name,
-                "entity_type": e.entity_type, "jurisdiction": e.jurisdiction,
-                "roles": entity_roles
+        let entity_list: Vec<Value> = entities
+            .iter()
+            .map(|(eid, name, etype, juris)| {
+                let entity_roles: Vec<String> = roles
+                    .iter()
+                    .filter(|(rid, _)| rid == eid)
+                    .map(|(_, rn)| rn.clone())
+                    .collect();
+                serde_json::json!({
+                    "entity_id": eid, "name": name,
+                    "entity_type": etype, "jurisdiction": juris,
+                    "roles": entity_roles
+                })
             })
-        })
-        .collect();
+            .collect();
 
-    let documents = sqlx::query!(
-        r#"SELECT dc.doc_id, dc.document_name, dt.type_code, dt.display_name, dc.status
-           FROM "ob-poc".document_catalog dc
-           LEFT JOIN "ob-poc".document_types dt ON dc.document_type_id = dt.type_id
-           WHERE dc.cbu_id = $1 ORDER BY dt.type_code"#,
-        cbu_id
-    )
-    .fetch_all(pool)
-    .await?;
+        let documents: Vec<(Uuid, Option<String>, Option<String>, Option<String>, Option<String>)> =
+            sqlx::query_as(
+                r#"SELECT dc.doc_id, dc.document_name, dt.type_code, dt.display_name, dc.status
+                   FROM "ob-poc".document_catalog dc
+                   LEFT JOIN "ob-poc".document_types dt ON dc.document_type_id = dt.type_id
+                   WHERE dc.cbu_id = $1 ORDER BY dt.type_code"#,
+            )
+            .bind(cbu_id)
+            .fetch_all(scope.executor())
+            .await?;
 
-    let doc_list: Vec<serde_json::Value> = documents
-        .iter()
-        .map(|d| {
-            serde_json::json!({"doc_id": d.doc_id, "name": d.document_name,
-            "type_code": d.type_code, "type_name": d.display_name, "status": d.status})
-        })
-        .collect();
+        let doc_list: Vec<Value> = documents
+            .iter()
+            .map(|(doc_id, document_name, type_code, display_name, status)| {
+                serde_json::json!({
+                    "doc_id": doc_id,
+                    "name": document_name,
+                    "type_code": type_code,
+                    "type_name": display_name,
+                    "status": status
+                })
+            })
+            .collect();
 
-    let screenings = sqlx::query!(
-        r#"SELECT s.screening_id, w.entity_id, e.name as entity_name,
-                  s.screening_type, s.status, s.result_summary
-           FROM "ob-poc".screenings s
-           JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
-           JOIN "ob-poc".cases c ON c.case_id = w.case_id
-           JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
-           WHERE c.cbu_id = $1 AND e.deleted_at IS NULL
-           ORDER BY s.screening_type, e.name"#,
-        cbu_id
-    )
-    .fetch_all(pool)
-    .await?;
+        let screenings: Vec<(Uuid, Uuid, String, String, String, Option<String>)> = sqlx::query_as(
+            r#"SELECT s.screening_id, w.entity_id, e.name as entity_name,
+                      s.screening_type, s.status, s.result_summary
+               FROM "ob-poc".screenings s
+               JOIN "ob-poc".entity_workstreams w ON w.workstream_id = s.workstream_id
+               JOIN "ob-poc".cases c ON c.case_id = w.case_id
+               JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
+               WHERE c.cbu_id = $1 AND e.deleted_at IS NULL
+               ORDER BY s.screening_type, e.name"#,
+        )
+        .bind(cbu_id)
+        .fetch_all(scope.executor())
+        .await?;
 
-    let screening_list: Vec<serde_json::Value> = screenings
-        .iter()
-        .map(|s| {
-            serde_json::json!({"screening_id": s.screening_id, "entity_id": s.entity_id,
-            "entity_name": s.entity_name, "screening_type": s.screening_type,
-            "status": s.status, "result": s.result_summary})
-        })
-        .collect();
+        let screening_list: Vec<Value> = screenings
+            .iter()
+            .map(|(sid, eid, ename, stype, status, result)| {
+                serde_json::json!({
+                    "screening_id": sid,
+                    "entity_id": eid,
+                    "entity_name": ename,
+                    "screening_type": stype,
+                    "status": status,
+                    "result": result
+                })
+            })
+            .collect();
 
-    let services = sqlx::query!(
-        r#"SELECT sdm.delivery_id, p.name as product_name, p.product_code,
-                  s.name as service_name, sdm.delivery_status
-           FROM "ob-poc".service_delivery_map sdm
-           JOIN "ob-poc".products p ON p.product_id = sdm.product_id
-           JOIN "ob-poc".services s ON s.service_id = sdm.service_id
-           WHERE sdm.cbu_id = $1 ORDER BY p.name, s.name"#,
-        cbu_id
-    )
-    .fetch_all(pool)
-    .await?;
+        let services: Vec<(Uuid, String, String, String, String)> = sqlx::query_as(
+            r#"SELECT sdm.delivery_id, p.name as product_name, p.product_code,
+                      s.name as service_name, sdm.delivery_status
+               FROM "ob-poc".service_delivery_map sdm
+               JOIN "ob-poc".products p ON p.product_id = sdm.product_id
+               JOIN "ob-poc".services s ON s.service_id = sdm.service_id
+               WHERE sdm.cbu_id = $1 ORDER BY p.name, s.name"#,
+        )
+        .bind(cbu_id)
+        .fetch_all(scope.executor())
+        .await?;
 
-    let service_list: Vec<serde_json::Value> = services
-        .iter()
-        .map(|s| {
-            serde_json::json!({"delivery_id": s.delivery_id, "product": s.product_name,
-            "product_code": s.product_code, "service": s.service_name, "status": s.delivery_status})
-        })
-        .collect();
+        let service_list: Vec<Value> = services
+            .iter()
+            .map(|(did, pname, pcode, sname, dstatus)| {
+                serde_json::json!({
+                    "delivery_id": did,
+                    "product": pname,
+                    "product_code": pcode,
+                    "service": sname,
+                    "status": dstatus
+                })
+            })
+            .collect();
 
-    let cases = sqlx::query!(
-        r#"SELECT case_id, status, case_type, risk_rating, escalation_level,
-                  opened_at, closed_at
-           FROM "ob-poc".cases WHERE cbu_id = $1 ORDER BY opened_at DESC"#,
-        cbu_id
-    )
-    .fetch_all(pool)
-    .await?;
+        let cases: Vec<(
+            Uuid,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            chrono::DateTime<chrono::Utc>,
+            Option<chrono::DateTime<chrono::Utc>>,
+        )> = sqlx::query_as(
+            r#"SELECT case_id, status, case_type, risk_rating, escalation_level,
+                      opened_at, closed_at
+               FROM "ob-poc".cases WHERE cbu_id = $1 ORDER BY opened_at DESC"#,
+        )
+        .bind(cbu_id)
+        .fetch_all(scope.executor())
+        .await?;
 
-    let case_list: Vec<serde_json::Value> = cases
-        .iter()
-        .map(|c| {
-            serde_json::json!({"case_id": c.case_id, "status": c.status,
-            "case_type": c.case_type, "risk_rating": c.risk_rating,
-            "escalation_level": c.escalation_level,
-            "opened_at": c.opened_at.to_rfc3339(),
-            "closed_at": c.closed_at.map(|t| t.to_rfc3339())})
-        })
-        .collect();
+        let case_list: Vec<Value> = cases
+            .iter()
+            .map(
+                |(cid, status, ctype, risk_rating, escalation_level, opened_at, closed_at)| {
+                    serde_json::json!({
+                        "case_id": cid,
+                        "status": status,
+                        "case_type": ctype,
+                        "risk_rating": risk_rating,
+                        "escalation_level": escalation_level,
+                        "opened_at": opened_at.to_rfc3339(),
+                        "closed_at": closed_at.map(|t| t.to_rfc3339())
+                    })
+                },
+            )
+            .collect();
 
-    Ok(serde_json::json!({
-        "cbu_id": cbu.cbu_id, "name": cbu.name,
-        "jurisdiction": cbu.jurisdiction, "client_type": cbu.client_type,
-        "category": cbu.cbu_category, "nature_purpose": cbu.nature_purpose,
-        "description": cbu.description,
-        "created_at": cbu.created_at.map(|t| t.to_rfc3339()),
-        "updated_at": cbu.updated_at.map(|t| t.to_rfc3339()),
-        "as_of_date": as_of_date.to_string(),
-        "entities": entity_list, "documents": doc_list,
-        "screenings": screening_list, "services": service_list,
-        "kyc_cases": case_list,
-        "summary": {
-            "entity_count": entity_list.len(), "document_count": doc_list.len(),
-            "screening_count": screening_list.len(), "service_count": service_list.len(),
-            "case_count": case_list.len()
-        }
-    }))
+        let entity_count = entity_list.len();
+        let document_count = doc_list.len();
+        let screening_count = screening_list.len();
+        let service_count = service_list.len();
+        let case_count = case_list.len();
+
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
+            "cbu_id": cbu.0,
+            "name": cbu.1,
+            "jurisdiction": cbu.2,
+            "client_type": cbu.3,
+            "category": cbu.4,
+            "nature_purpose": cbu.5,
+            "description": cbu.6,
+            "created_at": cbu.7.map(|t| t.to_rfc3339()),
+            "updated_at": cbu.8.map(|t| t.to_rfc3339()),
+            "as_of_date": as_of_date.to_string(),
+            "entities": entity_list,
+            "documents": doc_list,
+            "screenings": screening_list,
+            "services": service_list,
+            "kyc_cases": case_list,
+            "summary": {
+                "entity_count": entity_count,
+                "document_count": document_count,
+                "screening_count": screening_count,
+                "service_count": service_count,
+                "case_count": case_count
+            }
+        })))
+    }
 }
 
-// ============================================================================
-// CBU Decision Operation
-// ============================================================================
+// =============================================================================
+// cbu.decide
+// =============================================================================
 
-/// Record KYC/AML decision for CBU collective state
-///
-/// Rationale: This is the decision point verb. Its execution in DSL history
-/// IS the searchable snapshot boundary. Updates CBU status, case status,
-/// and creates evaluation snapshot.
-#[register_custom_op]
-pub struct CbuDecideOp;
+/// Record KYC/AML decision for CBU collective state.
+pub struct Decide;
 
 #[async_trait]
-impl CustomOperation for CbuDecideOp {
-    fn domain(&self) -> &'static str {
-        "cbu"
-    }
-    fn verb(&self) -> &'static str {
-        "decide"
-    }
-    fn rationale(&self) -> &'static str {
-        "Decision point for CBU collective state - searchable in DSL history"
+impl SemOsVerbOp for Decide {
+    fn fqn(&self) -> &str {
+        "cbu.decide"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let decision = json_extract_string(args, "decision")?;
@@ -1334,14 +1204,14 @@ impl CustomOperation for CbuDecideOp {
             ));
         }
 
-        let cbu = sqlx::query!(
+        let cbu: (String, Option<String>) = sqlx::query_as(
             r#"SELECT name, status
                FROM "ob-poc".cbus
                WHERE cbu_id = $1
                  AND deleted_at IS NULL"#,
-            cbu_id
         )
-        .fetch_optional(pool)
+        .bind(cbu_id)
+        .fetch_optional(scope.executor())
         .await?
         .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
 
@@ -1362,136 +1232,111 @@ impl CustomOperation for CbuDecideOp {
         let case_id = match case_id {
             Some(id) => id,
             None => {
-                let row = sqlx::query!(
+                let row: Option<(Uuid,)> = sqlx::query_as(
                     r#"SELECT case_id FROM "ob-poc".cases
                        WHERE cbu_id = $1 AND status NOT IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'EXPIRED')
                        ORDER BY opened_at DESC LIMIT 1"#,
-                    cbu_id
                 )
-                .fetch_optional(pool)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("No active KYC case found for CBU"))?;
-                row.case_id
+                .bind(cbu_id)
+                .fetch_optional(scope.executor())
+                .await?;
+                row.ok_or_else(|| anyhow::anyhow!("No active KYC case found for CBU"))?
+                    .0
             }
         };
 
-        let mut tx = pool.begin().await?;
-
-        sqlx::query!(
+        sqlx::query(
             r#"UPDATE "ob-poc".cbus
                SET status = $1, updated_at = now()
                WHERE cbu_id = $2
                  AND deleted_at IS NULL"#,
-            new_cbu_status,
-            cbu_id
         )
-        .execute(&mut *tx)
+        .bind(new_cbu_status)
+        .bind(cbu_id)
+        .execute(scope.executor())
         .await?;
 
         let should_close = matches!(decision.as_str(), "APPROVED" | "REJECTED");
         if should_close {
-            sqlx::query!(
+            sqlx::query(
                 r#"UPDATE "ob-poc".cases SET status = $1, closed_at = now(), last_activity_at = now() WHERE case_id = $2"#,
-                new_case_status,
-                case_id
             )
-            .execute(&mut *tx)
+            .bind(new_case_status)
+            .bind(case_id)
+            .execute(scope.executor())
             .await?;
         } else {
-            sqlx::query!(
+            sqlx::query(
                 r#"UPDATE "ob-poc".cases SET escalation_level = 'SENIOR_COMPLIANCE', last_activity_at = now() WHERE case_id = $1"#,
-                case_id
             )
-            .execute(&mut *tx)
+            .bind(case_id)
+            .execute(scope.executor())
             .await?;
         }
 
         let snapshot_id = Uuid::new_v4();
-        sqlx::query!(
+        sqlx::query(
             r#"INSERT INTO "ob-poc".case_evaluation_snapshots
                (snapshot_id, case_id, soft_count, escalate_count, hard_stop_count, total_score,
                 recommended_action, evaluated_by, decision_made, decision_made_at, decision_made_by, decision_notes)
                VALUES ($1, $2, 0, 0, 0, 0, $3, $4, $3, now(), $4, $5)"#,
-            snapshot_id,
-            case_id,
-            decision,
-            decided_by,
-            rationale
         )
-        .execute(&mut *tx)
+        .bind(snapshot_id)
+        .bind(case_id)
+        .bind(&decision)
+        .bind(&decided_by)
+        .bind(&rationale)
+        .execute(scope.executor())
         .await?;
 
-        tx.commit().await?;
-
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({
-                "cbu_id": cbu_id,
-                "cbu_name": cbu.name,
-                "case_id": case_id,
-                "snapshot_id": snapshot_id,
-                "decision": decision,
-                "previous_status": cbu.status,
-                "new_status": new_cbu_status,
-                "decided_by": decided_by,
-                "rationale": rationale,
-                "conditions": conditions,
-                "escalation_reason": escalation_reason
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
+            "cbu_id": cbu_id,
+            "cbu_name": cbu.0,
+            "case_id": case_id,
+            "snapshot_id": snapshot_id,
+            "decision": decision,
+            "previous_status": cbu.1,
+            "new_status": new_cbu_status,
+            "decided_by": decided_by,
+            "rationale": rationale,
+            "conditions": conditions,
+            "escalation_reason": escalation_reason
+        })))
     }
 }
 
-// ============================================================================
-// CBU Delete Cascade Operation
-// ============================================================================
+// =============================================================================
+// cbu.delete-cascade
+// =============================================================================
 
-/// Delete a CBU and all related data with cascade
-///
-/// Rationale: Requires ordered deletion across 25+ dependent tables in multiple
-/// schemas (ob-poc, kyc, custody). Also handles entity deletion with shared-entity
-/// check - entities linked to multiple CBUs are preserved.
-///
-/// WARNING: This is a destructive operation. Use with caution.
-#[register_custom_op]
-pub struct CbuDeleteCascadeOp;
+/// Delete a CBU and all related data with cascade.
+pub struct DeleteCascade;
 
 #[async_trait]
-impl CustomOperation for CbuDeleteCascadeOp {
-    fn domain(&self) -> &'static str {
-        "cbu"
-    }
-    fn verb(&self) -> &'static str {
-        "delete-cascade"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires ordered deletion across 25+ tables with FK dependencies and shared-entity check"
+impl SemOsVerbOp for DeleteCascade {
+    fn fqn(&self) -> &str {
+        "cbu.delete-cascade"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let delete_entities = json_extract_bool_opt(args, "delete-entities").unwrap_or(true);
 
-        let cbu = sqlx::query!(
+        let cbu: (String,) = sqlx::query_as(
             r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
-            cbu_id
         )
-        .fetch_optional(pool)
+        .bind(cbu_id)
+        .fetch_optional(scope.executor())
         .await?
         .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
 
-        let cbu_name = cbu.name;
-        let mut deleted_counts: std::collections::HashMap<String, i64> =
-            std::collections::HashMap::new();
-        let mut tx = pool.begin().await?;
+        let cbu_name = cbu.0;
+        let mut deleted_counts: HashMap<String, i64> = HashMap::new();
 
         let result = sqlx::query(
             r#"UPDATE "ob-poc".client_group_entity
@@ -1499,7 +1344,7 @@ impl CustomOperation for CbuDeleteCascadeOp {
                WHERE cbu_id = $1"#,
         )
         .bind(cbu_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
         deleted_counts.insert(
             "client_group_entity_unlinked".to_string(),
@@ -1511,7 +1356,7 @@ impl CustomOperation for CbuDeleteCascadeOp {
                WHERE cbu_id = $1"#,
         )
         .bind(cbu_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
         deleted_counts.insert(
             "cbu_group_members".to_string(),
@@ -1523,7 +1368,7 @@ impl CustomOperation for CbuDeleteCascadeOp {
                WHERE parent_cbu_id = $1 OR child_cbu_id = $1"#,
         )
         .bind(cbu_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
         deleted_counts.insert(
             "cbu_structure_links".to_string(),
@@ -1548,7 +1393,7 @@ impl CustomOperation for CbuDeleteCascadeOp {
                      )"#,
             )
             .bind(cbu_id)
-            .fetch_all(&mut *tx)
+            .fetch_all(scope.executor())
             .await?;
 
             let shared_count: Option<i64> = sqlx::query_scalar(
@@ -1565,7 +1410,7 @@ impl CustomOperation for CbuDeleteCascadeOp {
                      )"#,
             )
             .bind(cbu_id)
-            .fetch_one(&mut *tx)
+            .fetch_one(scope.executor())
             .await?;
             entities_preserved = shared_count.unwrap_or(0);
 
@@ -1577,7 +1422,7 @@ impl CustomOperation for CbuDeleteCascadeOp {
                          AND deleted_at IS NULL"#,
                 )
                 .bind(entity_id)
-                .execute(&mut *tx)
+                .execute(scope.executor())
                 .await;
             }
 
@@ -1586,7 +1431,7 @@ impl CustomOperation for CbuDeleteCascadeOp {
 
         let result = sqlx::query(r#"DELETE FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#)
             .bind(cbu_id)
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await?;
         deleted_counts.insert(
             "cbu_entity_roles".to_string(),
@@ -1600,11 +1445,9 @@ impl CustomOperation for CbuDeleteCascadeOp {
                  AND deleted_at IS NULL"#,
         )
         .bind(cbu_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
         deleted_counts.insert("cbus".to_string(), result.rows_affected() as i64);
-
-        tx.commit().await?;
 
         let total_deleted: i64 = deleted_counts.values().sum();
 
@@ -1617,29 +1460,23 @@ impl CustomOperation for CbuDeleteCascadeOp {
             "cbu.delete-cascade completed"
         );
 
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({
-                "cbu_id": cbu_id,
-                "cbu_name": cbu_name,
-                "deleted": true,
-                "total_records_deleted": total_deleted,
-                "entities_deleted": entities_deleted,
-                "entities_preserved_shared": entities_preserved,
-                "by_table": deleted_counts
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
+            "cbu_id": cbu_id,
+            "cbu_name": cbu_name,
+            "deleted": true,
+            "total_records_deleted": total_deleted,
+            "entities_deleted": entities_deleted,
+            "entities_preserved_shared": entities_preserved,
+            "by_table": deleted_counts
+        })))
     }
 }
 
-// ============================================================================
-// CBU Create from Client Group
-// ============================================================================
+// =============================================================================
+// cbu.create-from-client-group
+// =============================================================================
 
-/// Entity info from client group query - includes GLEIF category and group role for mapping
+/// Entity info from client group query - includes GLEIF category and group role for mapping.
 #[derive(Debug)]
 struct ClientGroupEntity {
     entity_id: Uuid,
@@ -1649,38 +1486,20 @@ struct ClientGroupEntity {
     group_role: Option<String>,
 }
 
-/// Create CBUs from entities in a client group with GLEIF category and role filters
-///
-/// Rationale: Bulk CBU creation from research results. Queries client_group_entity
-/// with optional filters:
-/// - `gleif-category`: Filter by GLEIF category (FUND, GENERAL) - recommended for fund onboarding
-/// - `role-filter`: Filter by client group role (SUBSIDIARY, ULTIMATE_PARENT)
-/// - `jurisdiction-filter`: Filter by entity jurisdiction
-///
-/// Maps GLEIF roles to CBU entity roles:
-/// - FUND entities get ASSET_OWNER role (the fund owns its trading unit)
-/// - ULTIMATE_PARENT entities get HOLDING_COMPANY role if added to CBU
-/// - Optionally assigns MANAGEMENT_COMPANY and INVESTMENT_MANAGER from provided entity IDs
-#[register_custom_op]
-pub struct CbuCreateFromClientGroupOp;
+/// Create CBUs from entities in a client group with GLEIF category and role filters.
+pub struct CreateFromClientGroup;
 
 #[async_trait]
-impl CustomOperation for CbuCreateFromClientGroupOp {
-    fn domain(&self) -> &'static str {
-        "cbu"
-    }
-    fn verb(&self) -> &'static str {
-        "create-from-client-group"
-    }
-    fn rationale(&self) -> &'static str {
-        "Bulk CBU creation from client group entities - bridges research to onboarding with GLEIF role mapping"
+impl SemOsVerbOp for CreateFromClientGroup {
+    fn fqn(&self) -> &str {
+        "cbu.create-from-client-group"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let group_id = json_extract_uuid(args, ctx, "group-id")?;
         let gleif_category = json_extract_string_opt(args, "gleif-category");
@@ -1731,7 +1550,7 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
             .bind(&role_filter)
             .bind(&jurisdiction_filter)
             .bind(limit)
-            .fetch_all(pool)
+            .fetch_all(scope.executor())
             .await?
             .into_iter()
             .map(
@@ -1746,7 +1565,7 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
             .collect();
 
         let mut dsl_statements: Vec<String> = Vec::new();
-        let mut entity_info: Vec<serde_json::Value> = Vec::new();
+        let mut entity_info: Vec<Value> = Vec::new();
 
         for ent in &entities {
             let jurisdiction = ent.jurisdiction.as_deref().unwrap_or(&default_jurisdiction);
@@ -1775,40 +1594,29 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
         }
 
         if dry_run {
-            return Ok(VerbExecutionOutcome::Record(
-                serde_json::json!({
-                    "dry_run": true,
-                    "group_id": group_id,
-                    "gleif_category": gleif_category,
-                    "role_filter": role_filter,
-                    "jurisdiction_filter": jurisdiction_filter,
-                    "entities_found": entities.len(),
-                    "entities": entity_info,
-                    "dsl_batch": dsl_statements,
-                }),
-            ));
-        }
-
-        let combined_dsl = dsl_statements.join("\n");
-
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({
+            return Ok(VerbExecutionOutcome::Record(serde_json::json!({
+                "dry_run": true,
                 "group_id": group_id,
                 "gleif_category": gleif_category,
                 "role_filter": role_filter,
                 "jurisdiction_filter": jurisdiction_filter,
                 "entities_found": entities.len(),
+                "entities": entity_info,
                 "dsl_batch": dsl_statements,
-                "combined_dsl": combined_dsl,
-                "message": format!("Generated {} cbu.create statements. Stage in runbook and say 'run' to execute.", entities.len())
-            }),
-        ))
-    }
+            })));
+        }
 
-    fn is_migrated(&self) -> bool {
-        true
+        let combined_dsl = dsl_statements.join("\n");
+
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
+            "group_id": group_id,
+            "gleif_category": gleif_category,
+            "role_filter": role_filter,
+            "jurisdiction_filter": jurisdiction_filter,
+            "entities_found": entities.len(),
+            "dsl_batch": dsl_statements,
+            "combined_dsl": combined_dsl,
+            "message": format!("Generated {} cbu.create statements. Stage in runbook and say 'run' to execute.", entities.len())
+        })))
     }
 }
-
-// Note: legacy role-mapping helpers were removed.
-// Role assignment is now handled by cbu.create plugin via :fund-entity-id arg

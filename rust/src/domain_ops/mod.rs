@@ -618,9 +618,11 @@ mod tests {
         assert!(!registry.has("cbu-custody", "validate-booking-coverage"));
         assert!(!registry.has("cbu-custody", "derive-required-coverage"));
         // CBU operations
-        assert!(registry.has("cbu", "add-product"));
-        assert!(registry.has("cbu", "inspect"));
-        assert!(registry.has("cbu", "delete-cascade"));
+        // Phase 5c-migrate Phase B slice #67: cbu_ops moved to
+        // `sem_os_postgres::ops::cbu::*`.
+        assert!(!registry.has("cbu", "add-product"));
+        assert!(!registry.has("cbu", "inspect"));
+        assert!(!registry.has("cbu", "delete-cascade"));
         // Phase 5c-migrate Phase B slice #53: cbu_role_ops moved to
         // `sem_os_postgres::ops::cbu_role::*`.
         assert!(!registry.has("cbu", "assign-ownership"));
