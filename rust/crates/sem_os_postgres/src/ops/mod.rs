@@ -36,6 +36,7 @@ pub mod board;
 pub mod changeset;
 pub mod constellation;
 pub mod docs_bundle;
+pub mod economic_exposure;
 pub mod entity;
 pub mod focus;
 pub mod governance;
@@ -397,6 +398,12 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(investor_role::MarkAsFof));
     registry.register(Arc::new(investor_role::MarkAsMasterPool));
     registry.register(Arc::new(investor_role::MarkAsEndInvestor));
+
+    // Phase B slice #29: economic-exposure domain (2 plugin verbs —
+    // compute look-through + summary). Unblocked by rust_decimal dep
+    // addition to sem_os_postgres.
+    registry.register(Arc::new(economic_exposure::Compute));
+    registry.register(Arc::new(economic_exposure::Summary));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

@@ -9,9 +9,12 @@ sem_os_core = { path = "../sem_os_core" }
 dsl-runtime = { path = "../dsl-runtime" }
 async-trait = "0.1"
 anyhow = "1.0"
-# Phase 3: dropped sqlx `rust_decimal` feature and `rust_decimal` crate —
-# only `crud_executor.rs` used them, and it moved to `dsl-runtime`.
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
+# Phase 5c-migrate Phase B slice #29: rust_decimal re-added to unblock
+# the NUMERIC-binding plugin ops migrated from `dsl-runtime::domain_ops`
+# (economic_exposure, edge, observation, ownership, capital, etc.).
+rust_decimal = { version = "1", features = ["serde-with-str"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros", "rust_decimal", "bigdecimal"] }
+bigdecimal = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "v5", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 hex = "0.4"
