@@ -704,13 +704,14 @@ mod tests {
         assert!(registry.has("gleif", "trace-ownership"));
         assert!(registry.has("gleif", "get-managed-funds"));
         assert!(registry.has("gleif", "resolve-successor"));
-        // BODS operations (UBO discovery)
-        assert!(registry.has("bods", "discover-ubos"));
-        assert!(registry.has("bods", "import"));
-        assert!(registry.has("bods", "get-statement"));
-        assert!(registry.has("bods", "find-by-lei"));
-        assert!(registry.has("bods", "list-ownership"));
-        assert!(registry.has("bods", "sync-from-gleif"));
+        // Phase 5c-migrate Phase B slice #37: BODS ops moved to
+        // `sem_os_postgres::ops::bods::*`.
+        assert!(!registry.has("bods", "discover-ubos"));
+        assert!(!registry.has("bods", "import"));
+        assert!(!registry.has("bods", "get-statement"));
+        assert!(!registry.has("bods", "find-by-lei"));
+        assert!(!registry.has("bods", "list-ownership"));
+        assert!(!registry.has("bods", "sync-from-gleif"));
         // View / session / service-pipeline operations moved to
         // `sem_os_postgres::ops::{view,session,service_pipeline}::*` in
         // Phase 5c-migrate Phase B slice #5. Legacy registry no longer has

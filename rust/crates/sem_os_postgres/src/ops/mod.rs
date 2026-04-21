@@ -33,6 +33,7 @@ pub mod affinity;
 pub mod attribute;
 pub mod audit;
 pub mod board;
+pub mod bods;
 pub mod changeset;
 pub mod constellation;
 pub mod control;
@@ -472,6 +473,15 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(observation::Reconcile));
     registry.register(Arc::new(observation::VerifyAllegations));
     registry.register(Arc::new(observation::ExtractToObservations));
+
+    // Phase B slice #37: bods (6 plugin verbs — BODS statement
+    // queries + UBO discovery service).
+    registry.register(Arc::new(bods::DiscoverUbos));
+    registry.register(Arc::new(bods::Import));
+    registry.register(Arc::new(bods::GetStatement));
+    registry.register(Arc::new(bods::FindByLei));
+    registry.register(Arc::new(bods::ListOwnership));
+    registry.register(Arc::new(bods::SyncFromGleif));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
