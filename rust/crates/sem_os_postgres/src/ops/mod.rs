@@ -39,6 +39,7 @@ pub mod docs_bundle;
 pub mod focus;
 pub mod governance;
 pub mod maintenance;
+pub mod matrix_overlay;
 pub mod nav;
 pub mod outreach;
 pub mod pack_answer;
@@ -308,6 +309,12 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(screening::Sanctions));
     registry.register(Arc::new(screening::AdverseMedia));
     registry.register(Arc::new(screening::BulkRefresh));
+
+    // Phase B slice #20: matrix-overlay domain (3 plugin verbs —
+    // effective-matrix, unified-gaps, compare-products).
+    registry.register(Arc::new(matrix_overlay::EffectiveMatrix));
+    registry.register(Arc::new(matrix_overlay::UnifiedGaps));
+    registry.register(Arc::new(matrix_overlay::CompareProducts));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

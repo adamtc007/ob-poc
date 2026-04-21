@@ -630,10 +630,11 @@ mod tests {
         assert!(registry.has("lifecycle", "discover"));
         assert!(registry.has("lifecycle", "generate-plan"));
         assert!(registry.has("lifecycle", "execute-plan"));
-        // Matrix-Overlay operations
-        assert!(registry.has("matrix-overlay", "effective-matrix"));
-        assert!(registry.has("matrix-overlay", "unified-gaps"));
-        assert!(registry.has("matrix-overlay", "compare-products"));
+        // Phase 5c-migrate Phase B slice #20: matrix-overlay ops moved to
+        // `sem_os_postgres::ops::matrix_overlay::*`.
+        assert!(!registry.has("matrix-overlay", "effective-matrix"));
+        assert!(!registry.has("matrix-overlay", "unified-gaps"));
+        assert!(!registry.has("matrix-overlay", "compare-products"));
         // Phase 5c-migrate Phase B slice #18: regulatory ops moved to
         // `sem_os_postgres::ops::regulatory::*`.
         assert!(!registry.has("regulatory.registration", "verify"));
