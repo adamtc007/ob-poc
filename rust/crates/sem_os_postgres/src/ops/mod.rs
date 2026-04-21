@@ -29,12 +29,16 @@ use async_trait::async_trait;
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
+pub mod attribute;
 pub mod constellation;
 pub mod nav;
 pub mod pack_answer;
 pub mod pack_select;
 pub mod phrase;
 pub mod registry;
+pub mod service_pipeline;
+pub mod session;
+pub mod view;
 
 pub use registry::SemOsVerbOpRegistry;
 
@@ -75,6 +79,78 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(phrase::Approve));
     registry.register(Arc::new(phrase::Reject));
     registry.register(Arc::new(phrase::Defer));
+
+    // Phase B slice #5: view/session/attribute/service_pipeline
+    // (service-dispatch batch).
+    registry.register(Arc::new(view::Universe));
+    registry.register(Arc::new(view::Book));
+    registry.register(Arc::new(view::Cbu));
+    registry.register(Arc::new(view::EntityForest));
+    registry.register(Arc::new(view::Refine));
+    registry.register(Arc::new(view::ClearRefinements));
+    registry.register(Arc::new(view::Clear));
+    registry.register(Arc::new(view::SetSelection));
+    registry.register(Arc::new(view::SetLayout));
+    registry.register(Arc::new(view::ReadStatus));
+    registry.register(Arc::new(view::ReadSelectionInfo));
+    registry.register(Arc::new(view::ZoomIn));
+    registry.register(Arc::new(view::ZoomOut));
+    registry.register(Arc::new(view::NavigateBackTo));
+    registry.register(Arc::new(view::ReadBreadcrumbs));
+
+    registry.register(Arc::new(session::Start));
+    registry.register(Arc::new(session::LoadUniverse));
+    registry.register(Arc::new(session::LoadGalaxy));
+    registry.register(Arc::new(session::LoadCluster));
+    registry.register(Arc::new(session::LoadSystem));
+    registry.register(Arc::new(session::UnloadSystem));
+    registry.register(Arc::new(session::FilterJurisdiction));
+    registry.register(Arc::new(session::Clear));
+    registry.register(Arc::new(session::Undo));
+    registry.register(Arc::new(session::Redo));
+    registry.register(Arc::new(session::Info));
+    registry.register(Arc::new(session::List));
+    registry.register(Arc::new(session::SetClient));
+    registry.register(Arc::new(session::SetPersona));
+    registry.register(Arc::new(session::SetStructure));
+    registry.register(Arc::new(session::SetCase));
+    registry.register(Arc::new(session::SetMandate));
+    registry.register(Arc::new(session::LoadDeal));
+    registry.register(Arc::new(session::UnloadDeal));
+
+    registry.register(Arc::new(attribute::AttributeListSources));
+    registry.register(Arc::new(attribute::AttributeListSinks));
+    registry.register(Arc::new(attribute::AttributeTraceLineage));
+    registry.register(Arc::new(attribute::AttributeListByDocument));
+    registry.register(Arc::new(attribute::AttributeCheckCoverage));
+    registry.register(Arc::new(attribute::DocumentListAttributes));
+    registry.register(Arc::new(attribute::DocumentCheckExtractionCoverage));
+    registry.register(Arc::new(attribute::AttributeDefineGoverned));
+    registry.register(Arc::new(attribute::AttributeDefineInternal));
+    registry.register(Arc::new(attribute::AttributeUpdateInternal));
+    registry.register(Arc::new(attribute::AttributeDefineDerived));
+    registry.register(Arc::new(attribute::AttributeSetEvidenceGrade));
+    registry.register(Arc::new(attribute::AttributeDeprecate));
+    registry.register(Arc::new(attribute::AttributeInspect));
+    registry.register(Arc::new(attribute::DerivationRecomputeStale));
+    registry.register(Arc::new(attribute::AttributeBridgeToSemos));
+
+    registry.register(Arc::new(service_pipeline::ServiceIntentCreate));
+    registry.register(Arc::new(service_pipeline::ServiceIntentList));
+    registry.register(Arc::new(service_pipeline::ServiceIntentSupersede));
+    registry.register(Arc::new(service_pipeline::DiscoveryRun));
+    registry.register(Arc::new(service_pipeline::DiscoveryExplain));
+    registry.register(Arc::new(service_pipeline::AttributeRollup));
+    registry.register(Arc::new(service_pipeline::AttributePopulate));
+    registry.register(Arc::new(service_pipeline::AttributeGaps));
+    registry.register(Arc::new(service_pipeline::AttributeSet));
+    registry.register(Arc::new(service_pipeline::ProvisioningRun));
+    registry.register(Arc::new(service_pipeline::ProvisioningStatus));
+    registry.register(Arc::new(service_pipeline::ReadinessCompute));
+    registry.register(Arc::new(service_pipeline::ReadinessExplain));
+    registry.register(Arc::new(service_pipeline::PipelineFull));
+    registry.register(Arc::new(service_pipeline::ServiceResourceCheckAttributeGaps));
+    registry.register(Arc::new(service_pipeline::ServiceResourceSyncDefinitions));
 
     registry
 }

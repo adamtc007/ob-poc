@@ -577,14 +577,17 @@ mod tests {
         assert!(registry.has("entity", "identify"));
         assert!(registry.has("document", "catalog"));
         assert!(registry.has("document", "extract"));
-        // Attribute operations (document-attribute catalogue)
-        assert!(registry.has("attribute", "list-sources"));
-        assert!(registry.has("attribute", "list-sinks"));
-        assert!(registry.has("attribute", "trace-lineage"));
-        assert!(registry.has("attribute", "list-by-document"));
-        assert!(registry.has("attribute", "check-coverage"));
-        assert!(registry.has("document", "list-attributes"));
-        assert!(registry.has("document", "check-extraction-coverage"));
+        // Phase 5c-migrate Phase B slice #5: attribute + document.list-attributes +
+        // document.check-extraction-coverage moved to `sem_os_postgres::ops::
+        // attribute::*`. The legacy registry no longer has them — covered via
+        // `sem_os_postgres::ops::build_registry()` instead.
+        assert!(!registry.has("attribute", "list-sources"));
+        assert!(!registry.has("attribute", "list-sinks"));
+        assert!(!registry.has("attribute", "trace-lineage"));
+        assert!(!registry.has("attribute", "list-by-document"));
+        assert!(!registry.has("attribute", "check-coverage"));
+        assert!(!registry.has("document", "list-attributes"));
+        assert!(!registry.has("document", "check-extraction-coverage"));
         assert!(registry.has("ubo", "calculate"));
         assert!(registry.has("screening", "pep"));
         assert!(registry.has("screening", "sanctions"));
@@ -694,22 +697,15 @@ mod tests {
         assert!(registry.has("bods", "find-by-lei"));
         assert!(registry.has("bods", "list-ownership"));
         assert!(registry.has("bods", "sync-from-gleif"));
-        // View operations (session scope and selection management)
-        assert!(registry.has("view", "universe"));
-        assert!(registry.has("view", "book"));
-        assert!(registry.has("view", "cbu"));
-        assert!(registry.has("view", "entity-forest"));
-        assert!(registry.has("view", "refine"));
-        assert!(registry.has("view", "clear"));
-        assert!(registry.has("view", "set-selection"));
-        assert!(registry.has("view", "set-layout"));
-        assert!(registry.has("view", "read-status"));
-        assert!(registry.has("view", "read-selection-info"));
-        // Zoom navigation (fractal taxonomy navigation)
-        assert!(registry.has("view", "zoom-in"));
-        assert!(registry.has("view", "zoom-out"));
-        assert!(registry.has("view", "navigate-back-to"));
-        assert!(registry.has("view", "read-breadcrumbs"));
+        // View / session / service-pipeline operations moved to
+        // `sem_os_postgres::ops::{view,session,service_pipeline}::*` in
+        // Phase 5c-migrate Phase B slice #5. Legacy registry no longer has
+        // them — covered via `sem_os_postgres::ops::build_registry()`.
+        assert!(!registry.has("view", "universe"));
+        assert!(!registry.has("view", "cbu"));
+        assert!(!registry.has("view", "refine"));
+        assert!(!registry.has("session", "start"));
+        assert!(!registry.has("session", "load-universe"));
 
         // KYC Control Enhancement: Capital operations
         assert!(registry.has("capital", "transfer"));

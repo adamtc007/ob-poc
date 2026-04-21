@@ -13,7 +13,8 @@ pub mod helpers;
 
 pub mod access_review_ops;
 pub mod agent_ops;
-pub mod attribute_ops;
+// Phase 5c-migrate Phase B slice #5 (2026-04-21): attribute_ops relocated
+// to `sem_os_postgres::ops::attribute::*`.
 pub mod batch_control_ops;
 pub mod affinity_graph_cache;
 pub mod affinity_ops;
@@ -80,8 +81,10 @@ pub mod sem_os_maintenance_ops;
 pub mod sem_os_registry_ops;
 pub mod sem_os_schema_ops;
 pub mod semantic_ops;
-pub mod service_pipeline_ops;
-pub mod session_ops;
+// Phase 5c-migrate Phase B slice #5 (2026-04-21): service_pipeline_ops
+// relocated to `sem_os_postgres::ops::service_pipeline::*`.
+// Phase 5c-migrate Phase B slice #5 (2026-04-21): session_ops relocated to
+// `sem_os_postgres::ops::session::*`.
 pub mod shared_atom_ops;
 pub mod skeleton_build_ops;
 pub mod state_ops;
@@ -92,7 +95,8 @@ pub mod tollgate_ops;
 pub mod trading_matrix;
 pub mod trading_profile_ca_ops;
 pub mod trust_ops;
-pub mod view_ops;
+// Phase 5c-migrate Phase B slice #5 (2026-04-21): view_ops relocated to
+// `sem_os_postgres::ops::view::*`.
 pub mod ubo_analysis;
 pub mod ubo_compute_ops;
 pub mod ubo_graph_ops;
