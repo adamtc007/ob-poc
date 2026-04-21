@@ -676,14 +676,16 @@ mod tests {
         // no longer has it — covered via SemOS.
         assert!(!registry.has("team", "transfer-member"));
         // Access Review operations (complex multi-step transactional operations)
-        assert!(registry.has("access-review", "populate-campaign"));
-        assert!(registry.has("access-review", "launch-campaign"));
-        assert!(registry.has("access-review", "revoke-access"));
-        assert!(registry.has("access-review", "bulk-confirm"));
-        assert!(registry.has("access-review", "confirm-all-clean"));
-        assert!(registry.has("access-review", "attest"));
-        assert!(registry.has("access-review", "process-deadline"));
-        assert!(registry.has("access-review", "send-reminders"));
+        // Phase 5c-migrate Phase B slice #44: access-review ops moved to
+        // `sem_os_postgres::ops::access_review::*`.
+        assert!(!registry.has("access-review", "populate-campaign"));
+        assert!(!registry.has("access-review", "launch-campaign"));
+        assert!(!registry.has("access-review", "revoke-access"));
+        assert!(!registry.has("access-review", "bulk-confirm"));
+        assert!(!registry.has("access-review", "confirm-all-clean"));
+        assert!(!registry.has("access-review", "attest"));
+        assert!(!registry.has("access-review", "process-deadline"));
+        assert!(!registry.has("access-review", "send-reminders"));
         // Temporal operations (point-in-time queries)
         // Phase 5c-migrate Phase B slice #32: temporal ops moved to
         // `sem_os_postgres::ops::temporal::*`.

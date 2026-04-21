@@ -29,6 +29,7 @@ use async_trait::async_trait;
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
+pub mod access_review;
 pub mod affinity;
 pub mod attribute;
 pub mod audit;
@@ -529,6 +530,16 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(partnership::RecordDistribution));
     registry.register(Arc::new(partnership::Reconcile));
     registry.register(Arc::new(partnership::AnalyzeControl));
+
+    // Phase B slice #44: access-review automation (8 plugin verbs).
+    registry.register(Arc::new(access_review::PopulateCampaign));
+    registry.register(Arc::new(access_review::LaunchCampaign));
+    registry.register(Arc::new(access_review::RevokeAccess));
+    registry.register(Arc::new(access_review::BulkConfirm));
+    registry.register(Arc::new(access_review::ConfirmAllClean));
+    registry.register(Arc::new(access_review::Attest));
+    registry.register(Arc::new(access_review::ProcessDeadline));
+    registry.register(Arc::new(access_review::SendReminders));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
