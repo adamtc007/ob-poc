@@ -25,7 +25,7 @@ pub mod affinity_graph_cache;
 // Phase 5c-migrate Phase B slice #65: capital_ops → `sem_os_postgres::ops::capital`.
 pub mod cbu_ops;
 // Phase 5c-migrate Phase B slice #53: cbu_role_ops → `sem_os_postgres::ops::cbu_role`.
-pub mod client_group_ops;
+// Phase 5c-migrate Phase B slice #66: client_group_ops → `sem_os_postgres::ops::client_group`.
 // Phase 5c-migrate Phase B slice #3 (2026-04-21): constellation_ops
 // relocated to `sem_os_postgres::ops::constellation::*` as YAML-first
 // re-implementations; legacy file deleted.

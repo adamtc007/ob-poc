@@ -40,6 +40,7 @@ pub mod capital;
 pub mod bods;
 pub mod cbu_role;
 pub mod changeset;
+pub mod client_group;
 pub mod constellation;
 pub mod control;
 pub mod control_compute;
@@ -637,6 +638,35 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #66: client-group.* (24 plugin verbs — entity/tag
+    // management, roles, parties, relationships, ownership sources,
+    // discovery lifecycle). EntityManage dispatches to other ops via
+    // SemOsVerbOp::execute, keeping the multi-action API intact.
+    registry.register(Arc::new(client_group::EntityManage));
+    registry.register(Arc::new(client_group::EntityAdd));
+    registry.register(Arc::new(client_group::EntityRemove));
+    registry.register(Arc::new(client_group::ListEntities));
+    registry.register(Arc::new(client_group::TagAdd));
+    registry.register(Arc::new(client_group::TagRemove));
+    registry.register(Arc::new(client_group::ListTags));
+    registry.register(Arc::new(client_group::SearchEntities));
+    registry.register(Arc::new(client_group::DiscoverEntities));
+    registry.register(Arc::new(client_group::ConfirmEntity));
+    registry.register(Arc::new(client_group::RejectEntity));
+    registry.register(Arc::new(client_group::AssignRole));
+    registry.register(Arc::new(client_group::RemoveRole));
+    registry.register(Arc::new(client_group::ListRoles));
+    registry.register(Arc::new(client_group::ListParties));
+    registry.register(Arc::new(client_group::AddRelationship));
+    registry.register(Arc::new(client_group::ListRelationships));
+    registry.register(Arc::new(client_group::AddOwnershipSource));
+    registry.register(Arc::new(client_group::VerifyOwnership));
+    registry.register(Arc::new(client_group::SetCanonical));
+    registry.register(Arc::new(client_group::ListUnverified));
+    registry.register(Arc::new(client_group::ListDiscrepancies));
+    registry.register(Arc::new(client_group::StartDiscovery));
+    registry.register(Arc::new(client_group::CompleteDiscovery));
 
     // Phase B slice #65: capital.* (14 plugin verbs — share-class
     // lifecycle, transfer, reconcile, ownership chain, issue/cancel,
