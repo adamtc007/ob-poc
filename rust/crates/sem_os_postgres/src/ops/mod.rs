@@ -84,6 +84,7 @@ pub mod trading_matrix;
 pub mod trust;
 pub mod ubo_analysis;
 pub mod ubo_registry;
+pub mod verify;
 pub mod view;
 
 pub use registry::SemOsVerbOpRegistry;
@@ -566,6 +567,16 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(investor::Suspend));
     registry.register(Arc::new(investor::Reinstate));
     registry.register(Arc::new(investor::CountByState));
+
+    // Phase B slice #47: verify.* adversarial-agent (6 plugin verbs —
+    // pattern/evasion detection, confidence, registry verification,
+    // gate assertion).
+    registry.register(Arc::new(verify::DetectPatterns));
+    registry.register(Arc::new(verify::DetectEvasion));
+    registry.register(Arc::new(verify::CalculateConfidence));
+    registry.register(Arc::new(verify::GetStatus));
+    registry.register(Arc::new(verify::VerifyAgainstRegistry));
+    registry.register(Arc::new(verify::Assert));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
