@@ -54,7 +54,7 @@ pub mod matrix_overlay_ops;
 // to `sem_os_postgres::ops::nav::*` as YAML-first re-implementations; legacy
 // file deleted.
 pub mod observation_ops;
-pub mod outreach_ops;
+// Phase 5c-migrate Phase B slice #16: outreach_ops → `sem_os_postgres::ops::outreach`.
 pub mod outreach_plan_ops;
 pub mod ownership_ops;
 // Phase 5c-migrate Phase B slice #1 (2026-04-21): pack_ops relocated to

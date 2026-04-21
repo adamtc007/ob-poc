@@ -39,6 +39,7 @@ pub mod focus;
 pub mod governance;
 pub mod maintenance;
 pub mod nav;
+pub mod outreach;
 pub mod pack_answer;
 pub mod pack_select;
 pub mod phrase;
@@ -282,6 +283,11 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(remediation::Defer));
     registry.register(Arc::new(remediation::RevokeDeferral));
     registry.register(Arc::new(remediation::ConfirmExternalCorrection));
+
+    // Phase B slice #16: research.outreach domain (direct-sqlx,
+    // 2 plugin verbs — record-response + list-overdue).
+    registry.register(Arc::new(outreach::RecordResponse));
+    registry.register(Arc::new(outreach::ListOverdue));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
