@@ -75,6 +75,7 @@ pub mod team;
 pub mod temporal;
 pub mod tollgate;
 pub mod trading_matrix;
+pub mod ubo_analysis;
 pub mod ubo_registry;
 pub mod view;
 
@@ -490,6 +491,12 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(tollgate::GetMetrics));
     registry.register(Arc::new(tollgate::Override));
     registry.register(Arc::new(tollgate::GetDecisionReadiness));
+
+    // Phase B slice #39: ubo.calculate / trace-chains / list-owners
+    // (3 plugin verbs — recursive ownership chain + temporal owners).
+    registry.register(Arc::new(ubo_analysis::Calculate));
+    registry.register(Arc::new(ubo_analysis::TraceChains));
+    registry.register(Arc::new(ubo_analysis::ListOwners));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

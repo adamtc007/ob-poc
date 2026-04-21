@@ -590,7 +590,9 @@ mod tests {
         assert!(!registry.has("attribute", "check-coverage"));
         assert!(!registry.has("document", "list-attributes"));
         assert!(!registry.has("document", "check-extraction-coverage"));
-        assert!(registry.has("ubo", "calculate"));
+        // Phase 5c-migrate Phase B slice #39: ubo analysis ops moved to
+        // `sem_os_postgres::ops::ubo_analysis::*`.
+        assert!(!registry.has("ubo", "calculate"));
         // Phase 5c-migrate Phase B slice #19: screening ops moved to
         // `sem_os_postgres::ops::screening::*`; legacy registry no longer
         // has them — covered via `sem_os_postgres::ops::build_registry()`.
