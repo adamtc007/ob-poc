@@ -1,47 +1,50 @@
-//! Document Bundle custom operations
+//! Document bundle verbs — SemOS-side YAML-first re-implementation.
 //!
-//! Operations for applying versioned document bundles to CBUs.
-//! Bundles define sets of required documents for fund structures.
+//! Three `docs-bundle.*` verbs apply versioned document bundles to CBUs:
+//! - `apply` — resolves a bundle registry from disk, creates applied
+//!   bundle + document requirements via `DocsBundleService`.
+//! - `list-applied` — reads `applied_bundles` for a CBU.
+//! - `list-available` — loads the on-disk registry and lists
+//!   currently-effective bundles with document counts.
+//!
+//! `DocsBundleService::new(pool, registry)` takes an owned pool, so
+//! we pass `scope.pool().clone()` (cheap Arc-internal clone). Queries
+//! the service issues run on fresh connections, separate from the
+//! Sequencer txn — acceptable until the service migrates to
+//! scope-aware signatures.
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
-use sqlx::PgPool;
+use std::path::Path;
 
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::{json_extract_bool_opt, json_extract_string_opt, json_extract_uuid};
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::document_bundles::{BundleContext, DocsBundleRegistry, DocsBundleService};
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_bool_opt, json_extract_string_opt, json_extract_uuid,
+};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-#[register_custom_op]
-pub struct DocsBundleApplyOp;
+use super::SemOsVerbOp;
+
+pub struct Apply;
 
 #[async_trait]
-impl CustomOperation for DocsBundleApplyOp {
-    fn domain(&self) -> &'static str {
-        "docs-bundle"
-    }
-    fn verb(&self) -> &'static str {
-        "apply"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires bundle registry lookup, inheritance resolution, and conditional document creation"
+impl SemOsVerbOp for Apply {
+    fn fqn(&self) -> &str {
+        "docs-bundle.apply"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use crate::document_bundles::{BundleContext, DocsBundleRegistry, DocsBundleService};
-        use std::path::Path;
-
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let bundle_id = json_extract_string_opt(args, "bundle")
             .ok_or_else(|| anyhow::anyhow!("Missing bundle argument"))?;
 
         let mut bundle_context = BundleContext::new();
-
         if let Some(has_pb) = json_extract_bool_opt(args, "has-prime-broker") {
             bundle_context = bundle_context.with_flag("has-prime-broker", has_pb);
         }
@@ -58,7 +61,7 @@ impl CustomOperation for DocsBundleApplyOp {
         let registry = DocsBundleRegistry::load_from_dir(&bundles_dir)
             .map_err(|e| anyhow::anyhow!("Failed to load bundle registry: {}", e))?;
 
-        let service = DocsBundleService::new(pool.clone(), registry);
+        let service = DocsBundleService::new(scope.pool().clone(), registry);
 
         let macro_id = json_extract_string_opt(args, "macro-id");
 
@@ -87,32 +90,21 @@ impl CustomOperation for DocsBundleApplyOp {
             "requirement_ids": requirement_ids,
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-#[register_custom_op]
-pub struct DocsBundleListAppliedOp;
+pub struct ListApplied;
 
 #[async_trait]
-impl CustomOperation for DocsBundleListAppliedOp {
-    fn domain(&self) -> &'static str {
-        "docs-bundle"
-    }
-    fn verb(&self) -> &'static str {
-        "list-applied"
-    }
-    fn rationale(&self) -> &'static str {
-        "Queries applied_bundles table for CBU"
+impl SemOsVerbOp for ListApplied {
+    fn fqn(&self) -> &str {
+        "docs-bundle.list-applied"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
 
@@ -123,18 +115,18 @@ impl CustomOperation for DocsBundleListAppliedOp {
             Option<String>,
         )> = sqlx::query_as(
             r#"
-                SELECT
-                    bundle_id,
-                    bundle_version,
-                    applied_at,
-                    macro_id
-                FROM "ob-poc".applied_bundles
-                WHERE cbu_id = $1
-                ORDER BY applied_at DESC
-                "#,
+            SELECT
+                bundle_id,
+                bundle_version,
+                applied_at,
+                macro_id
+            FROM "ob-poc".applied_bundles
+            WHERE cbu_id = $1
+            ORDER BY applied_at DESC
+            "#,
         )
         .bind(cbu_id)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
         let records: Vec<serde_json::Value> = bundles
@@ -151,36 +143,22 @@ impl CustomOperation for DocsBundleListAppliedOp {
 
         Ok(VerbExecutionOutcome::RecordSet(records))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-#[register_custom_op]
-pub struct DocsBundleListAvailableOp;
+pub struct ListAvailable;
 
 #[async_trait]
-impl CustomOperation for DocsBundleListAvailableOp {
-    fn domain(&self) -> &'static str {
-        "docs-bundle"
-    }
-    fn verb(&self) -> &'static str {
-        "list-available"
-    }
-    fn rationale(&self) -> &'static str {
-        "Loads bundle registry from YAML and returns metadata"
+impl SemOsVerbOp for ListAvailable {
+    fn fqn(&self) -> &str {
+        "docs-bundle.list-available"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
         _args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _pool: &PgPool,
+        _scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use crate::document_bundles::DocsBundleRegistry;
-        use std::path::Path;
-
         let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
         let bundles_dir = Path::new(&config_dir).join("document_bundles");
 
@@ -207,21 +185,5 @@ impl CustomOperation for DocsBundleListAvailableOp {
             .collect();
 
         Ok(VerbExecutionOutcome::RecordSet(records))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_op_metadata() {
-        let op = DocsBundleApplyOp;
-        assert_eq!(op.domain(), "docs-bundle");
-        assert_eq!(op.verb(), "apply");
     }
 }

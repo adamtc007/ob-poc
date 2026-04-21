@@ -35,7 +35,7 @@ pub mod custody;
 pub mod deal_ops;
 pub mod dilution_ops;
 pub mod discovery_ops;
-pub mod docs_bundle_ops;
+// Phase 5c-migrate Phase B slice #13: docs_bundle_ops → `sem_os_postgres::ops::docs_bundle`.
 pub mod document_ops;
 pub mod economic_exposure_ops;
 pub mod edge_ops;

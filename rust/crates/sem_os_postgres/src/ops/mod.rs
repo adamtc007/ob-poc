@@ -34,6 +34,7 @@ pub mod attribute;
 pub mod audit;
 pub mod changeset;
 pub mod constellation;
+pub mod docs_bundle;
 pub mod focus;
 pub mod governance;
 pub mod maintenance;
@@ -268,6 +269,11 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
 
     // Phase B slice #12: research-generic normalize (direct-sqlx + sha2/hex).
     registry.register(Arc::new(research_normalize::Normalize));
+
+    // Phase B slice #13: docs-bundle domain.
+    registry.register(Arc::new(docs_bundle::Apply));
+    registry.register(Arc::new(docs_bundle::ListApplied));
+    registry.register(Arc::new(docs_bundle::ListAvailable));
 
     registry
 }
