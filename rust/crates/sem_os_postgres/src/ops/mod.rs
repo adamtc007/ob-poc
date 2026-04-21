@@ -50,6 +50,7 @@ pub mod maintenance;
 pub mod manco;
 pub mod matrix_overlay;
 pub mod nav;
+pub mod observation;
 pub mod outreach;
 pub mod pack_answer;
 pub mod pack_select;
@@ -462,6 +463,15 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #35: coverage.compute (per-prong UBO evidence
     // coverage + gap ID generation + tollgate-blocking annotation).
     registry.register(Arc::new(coverage_compute::Compute));
+
+    // Phase B slice #36: observation + document.extract-to-observations
+    // (5 plugin verbs — attribute observations / reconciliation /
+    // allegation verification / document extraction).
+    registry.register(Arc::new(observation::RecordFromDocument));
+    registry.register(Arc::new(observation::GetCurrent));
+    registry.register(Arc::new(observation::Reconcile));
+    registry.register(Arc::new(observation::VerifyAllegations));
+    registry.register(Arc::new(observation::ExtractToObservations));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
