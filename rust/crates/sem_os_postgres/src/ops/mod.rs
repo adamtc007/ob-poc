@@ -43,6 +43,7 @@ pub mod docs_bundle;
 pub mod economic_exposure;
 pub mod edge;
 pub mod entity;
+pub mod evidence;
 pub mod focus;
 pub mod governance;
 pub mod import_run;
@@ -497,6 +498,19 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(ubo_analysis::Calculate));
     registry.register(Arc::new(ubo_analysis::TraceChains));
     registry.register(Arc::new(ubo_analysis::ListOwners));
+
+    // Phase B slice #40: evidence state machine (5 canonical verbs +
+    // 5 compatibility aliases).
+    registry.register(Arc::new(evidence::Require));
+    registry.register(Arc::new(evidence::Link));
+    registry.register(Arc::new(evidence::Verify));
+    registry.register(Arc::new(evidence::Reject));
+    registry.register(Arc::new(evidence::Waive));
+    registry.register(Arc::new(evidence::CreateRequirement));
+    registry.register(Arc::new(evidence::AttachDocument));
+    registry.register(Arc::new(evidence::MarkVerified));
+    registry.register(Arc::new(evidence::MarkRejected));
+    registry.register(Arc::new(evidence::MarkWaived));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
