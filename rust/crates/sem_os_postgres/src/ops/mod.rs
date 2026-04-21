@@ -48,6 +48,7 @@ pub mod evidence;
 pub mod focus;
 pub mod governance;
 pub mod import_run;
+pub mod investor;
 pub mod investor_role;
 pub mod maintenance;
 pub mod manco;
@@ -548,6 +549,23 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(refdata::Read));
     registry.register(Arc::new(refdata::List));
     registry.register(Arc::new(refdata::Deactivate));
+
+    // Phase B slice #46: investor lifecycle (13 plugin verbs — full
+    // ENQUIRY→OFFBOARDED state machine + suspend/reinstate +
+    // count-by-state).
+    registry.register(Arc::new(investor::RequestDocuments));
+    registry.register(Arc::new(investor::StartKyc));
+    registry.register(Arc::new(investor::ApproveKyc));
+    registry.register(Arc::new(investor::RejectKyc));
+    registry.register(Arc::new(investor::MarkEligible));
+    registry.register(Arc::new(investor::RecordSubscription));
+    registry.register(Arc::new(investor::Activate));
+    registry.register(Arc::new(investor::StartRedemption));
+    registry.register(Arc::new(investor::CompleteRedemption));
+    registry.register(Arc::new(investor::Offboard));
+    registry.register(Arc::new(investor::Suspend));
+    registry.register(Arc::new(investor::Reinstate));
+    registry.register(Arc::new(investor::CountByState));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

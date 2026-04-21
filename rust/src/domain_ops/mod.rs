@@ -807,19 +807,21 @@ mod tests {
         // Versioned document lifecycle operations (Phase 7)
         assert!(registry.has("trading-profile", "create-new-version"));
         // Investor lifecycle operations (TA KYC-as-a-Service)
-        assert!(registry.has("investor", "request-documents"));
-        assert!(registry.has("investor", "start-kyc"));
-        assert!(registry.has("investor", "approve-kyc"));
-        assert!(registry.has("investor", "reject-kyc"));
-        assert!(registry.has("investor", "mark-eligible"));
-        assert!(registry.has("investor", "record-subscription"));
-        assert!(registry.has("investor", "activate"));
-        assert!(registry.has("investor", "start-redemption"));
-        assert!(registry.has("investor", "complete-redemption"));
-        assert!(registry.has("investor", "offboard"));
-        assert!(registry.has("investor", "suspend"));
-        assert!(registry.has("investor", "reinstate"));
-        assert!(registry.has("investor", "count-by-state"));
+        // Phase 5c-migrate Phase B slice #46: investor lifecycle ops moved to
+        // `sem_os_postgres::ops::investor::*`.
+        assert!(!registry.has("investor", "request-documents"));
+        assert!(!registry.has("investor", "start-kyc"));
+        assert!(!registry.has("investor", "approve-kyc"));
+        assert!(!registry.has("investor", "reject-kyc"));
+        assert!(!registry.has("investor", "mark-eligible"));
+        assert!(!registry.has("investor", "record-subscription"));
+        assert!(!registry.has("investor", "activate"));
+        assert!(!registry.has("investor", "start-redemption"));
+        assert!(!registry.has("investor", "complete-redemption"));
+        assert!(!registry.has("investor", "offboard"));
+        assert!(!registry.has("investor", "suspend"));
+        assert!(!registry.has("investor", "reinstate"));
+        assert!(!registry.has("investor", "count-by-state"));
         // Agent control operations (agent mode lifecycle, checkpoints)
         assert!(registry.has("agent", "start"));
         assert!(registry.has("agent", "pause"));
