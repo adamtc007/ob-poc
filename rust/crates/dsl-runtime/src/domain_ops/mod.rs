@@ -93,7 +93,7 @@ pub mod skeleton_build_ops;
 // Phase 5c-migrate Phase B slice #51: tollgate_evaluate_ops → `sem_os_postgres::ops::tollgate_evaluate`.
 // Phase 5c-migrate Phase B slice #38: tollgate_ops → `sem_os_postgres::ops::tollgate`.
 // Phase 5c-migrate Phase B slice #26: trading_matrix → `sem_os_postgres::ops::trading_matrix`.
-pub mod trading_profile_ca_ops;
+// Phase 5c-migrate Phase B slice #52: trading_profile_ca_ops → `sem_os_postgres::ops::trading_profile_ca`.
 // Phase 5c-migrate Phase B slice #42: trust_ops → `sem_os_postgres::ops::trust`.
 // Phase 5c-migrate Phase B slice #5 (2026-04-21): view_ops relocated to
 // `sem_os_postgres::ops::view::*`.

@@ -83,6 +83,7 @@ pub mod temporal;
 pub mod tollgate;
 pub mod tollgate_evaluate;
 pub mod trading_matrix;
+pub mod trading_profile_ca;
 pub mod trust;
 pub mod ubo_analysis;
 pub mod ubo_compute;
@@ -623,6 +624,20 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #52: trading-profile.ca.* (11 plugin verbs — matrix
+    // JSONB mutations via TradingProfileDocument service trait).
+    registry.register(Arc::new(trading_profile_ca::EnableEventTypes));
+    registry.register(Arc::new(trading_profile_ca::DisableEventTypes));
+    registry.register(Arc::new(trading_profile_ca::SetNotificationPolicy));
+    registry.register(Arc::new(trading_profile_ca::SetElectionPolicy));
+    registry.register(Arc::new(trading_profile_ca::SetDefaultOption));
+    registry.register(Arc::new(trading_profile_ca::RemoveDefaultOption));
+    registry.register(Arc::new(trading_profile_ca::AddCutoffRule));
+    registry.register(Arc::new(trading_profile_ca::RemoveCutoffRule));
+    registry.register(Arc::new(trading_profile_ca::LinkProceedsSsi));
+    registry.register(Arc::new(trading_profile_ca::RemoveProceedsSsi));
+    registry.register(Arc::new(trading_profile_ca::GetPolicy));
 
     registry
 }
