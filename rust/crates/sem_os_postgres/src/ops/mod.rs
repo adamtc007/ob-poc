@@ -60,6 +60,7 @@ pub mod pack_answer;
 pub mod partnership;
 pub mod pack_select;
 pub mod phrase;
+pub mod refdata;
 pub mod registry;
 pub mod registry_ops;
 pub mod regulatory;
@@ -540,6 +541,13 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(access_review::Attest));
     registry.register(Arc::new(access_review::ProcessDeadline));
     registry.register(Arc::new(access_review::SendReminders));
+
+    // Phase B slice #45: refdata ensure/read/list/deactivate — unified
+    // access across 9 reference-data tables via compile-time dispatch.
+    registry.register(Arc::new(refdata::Ensure));
+    registry.register(Arc::new(refdata::Read));
+    registry.register(Arc::new(refdata::List));
+    registry.register(Arc::new(refdata::Deactivate));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
