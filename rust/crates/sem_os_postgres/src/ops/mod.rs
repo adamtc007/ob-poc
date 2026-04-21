@@ -45,6 +45,7 @@ pub mod coverage_compute;
 pub mod custody;
 pub mod dilution;
 pub mod docs_bundle;
+pub mod document;
 pub mod economic_exposure;
 pub mod edge;
 pub mod entity;
@@ -632,6 +633,21 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #61: document.* (9 plugin verbs — catalog/extract
+    // + solicit + solicit-batch + upload-version + verify + reject +
+    // missing-for-entity + compute-requirements; GovernedDocumentRequirementsService
+    // still takes PgPool — transitional scope.pool().clone() on the
+    // 3 governed ops).
+    registry.register(Arc::new(document::Catalog));
+    registry.register(Arc::new(document::Extract));
+    registry.register(Arc::new(document::Solicit));
+    registry.register(Arc::new(document::SolicitBatch));
+    registry.register(Arc::new(document::UploadVersion));
+    registry.register(Arc::new(document::Verify));
+    registry.register(Arc::new(document::Reject));
+    registry.register(Arc::new(document::MissingForEntity));
+    registry.register(Arc::new(document::ComputeRequirements));
 
     // Phase B slice #60: billing.* (14 plugin verbs — profile + account
     // target + period lifecycle + invoice + dispute + summary/revenue).

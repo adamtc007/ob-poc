@@ -577,8 +577,10 @@ mod tests {
         // `sem_os_postgres::ops::entity::*`.
         assert!(!registry.has("entity", "ghost"));
         assert!(!registry.has("entity", "identify"));
-        assert!(registry.has("document", "catalog"));
-        assert!(registry.has("document", "extract"));
+        // Phase 5c-migrate Phase B slice #61: document_ops moved to
+        // `sem_os_postgres::ops::document::*`.
+        assert!(!registry.has("document", "catalog"));
+        assert!(!registry.has("document", "extract"));
         // Phase 5c-migrate Phase B slice #5: attribute + document.list-attributes +
         // document.check-extraction-coverage moved to `sem_os_postgres::ops::
         // attribute::*`. The legacy registry no longer has them — covered via
@@ -956,10 +958,11 @@ mod tests {
         // Verify ops registered via #[register_custom_op] macro are present
         let registry = CustomOperationRegistry::new();
 
-        // Document ops (use macro)
-        assert!(registry.has("document", "solicit"));
-        assert!(registry.has("document", "verify"));
-        assert!(registry.has("document", "reject"));
+        // Phase 5c-migrate Phase B slice #61: document_ops moved to
+        // `sem_os_postgres::ops::document::*`.
+        assert!(!registry.has("document", "solicit"));
+        assert!(!registry.has("document", "verify"));
+        assert!(!registry.has("document", "reject"));
 
         // Phase 5c-migrate Phase B slice #28: investor-role ops moved to
         // `sem_os_postgres::ops::investor_role::*`.
