@@ -1,20 +1,21 @@
-//! Research Generic Normalize Operations.
+//! `research.generic.normalize` — SemOS-side YAML-first re-implementation.
 //!
-//! Canonicalises raw research payloads (sorted keys, trimmed strings) and
-//! produces a SHA-256 content hash for deduplication, optionally persisting
-//! to the `research_normalized_payloads` table.
+//! Canonicalises a raw research payload (recursive key sort + string
+//! trim) and produces a SHA-256 content hash. Upserts into
+//! `"ob-poc".research_normalized_payloads` on the hash for dedup.
+//! Write runs in the Sequencer-owned scope.
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::{json_extract_string, json_extract_string_opt};
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::domain_ops::helpers::{json_extract_string, json_extract_string_opt};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+
+use super::SemOsVerbOp;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizeResult {
@@ -44,9 +45,6 @@ fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-#[register_custom_op]
-pub struct ResearchGenericNormalizeOp;
-
 fn normalize_payload_impl(source_name: String, payload_raw: &str) -> Result<NormalizeResult> {
     let parsed: serde_json::Value = serde_json::from_str(payload_raw)
         .map_err(|e| anyhow::anyhow!("Invalid JSON payload: {}", e))?;
@@ -71,25 +69,19 @@ fn normalize_payload_impl(source_name: String, payload_raw: &str) -> Result<Norm
     })
 }
 
+pub struct Normalize;
+
 #[async_trait]
-impl CustomOperation for ResearchGenericNormalizeOp {
-    fn domain(&self) -> &'static str {
-        "research.generic"
+impl SemOsVerbOp for Normalize {
+    fn fqn(&self) -> &str {
+        "research.generic.normalize"
     }
 
-    fn verb(&self) -> &'static str {
-        "normalize"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Requires custom canonicalization logic (recursive key sorting, string trimming) and SHA-256 content hashing for deduplication"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let source_name = json_extract_string(args, "source-name")?;
         let payload_raw = json_extract_string(args, "payload")?;
@@ -107,14 +99,10 @@ impl CustomOperation for ResearchGenericNormalizeOp {
         .bind(&result.source_name)
         .bind(&result.content_hash)
         .bind(&result.canonical_json)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
@@ -123,22 +111,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_handler_metadata() {
-        let op = ResearchGenericNormalizeOp;
-        assert_eq!(op.domain(), "research.generic");
-        assert_eq!(op.verb(), "normalize");
-        assert!(!op.rationale().is_empty());
-    }
-
-    #[test]
-    fn test_canonicalize_sorts_keys() {
-        let input: serde_json::Value = serde_json::from_str(r#"{"b": 1, "a": 2, "c": 3}"#).unwrap();
+    fn canonicalize_sorts_keys() {
+        let input: serde_json::Value =
+            serde_json::from_str(r#"{"b": 1, "a": 2, "c": 3}"#).unwrap();
         let canonical = canonicalize_json(&input);
-        assert_eq!(serde_json::to_string(&canonical).unwrap(), r#"{"a":2,"b":1,"c":3}"#);
+        assert_eq!(
+            serde_json::to_string(&canonical).unwrap(),
+            r#"{"a":2,"b":1,"c":3}"#
+        );
     }
 
     #[test]
-    fn test_canonicalize_trims_strings() {
+    fn canonicalize_trims_strings() {
         let input: serde_json::Value =
             serde_json::from_str(r#"{"name": "  hello  ", "city": " London "}"#).unwrap();
         let canonical = canonicalize_json(&input);
@@ -147,51 +131,46 @@ mod tests {
     }
 
     #[test]
-    fn test_same_payload_same_hash() {
+    fn same_payload_same_hash() {
         let json_a = r#"{"name": "Allianz", "country": "DE", "lei": "ABC123"}"#;
         let json_b = r#"{"lei": "ABC123", "name": "Allianz", "country": "DE"}"#;
 
-        let canonical_a = canonicalize_json(&serde_json::from_str::<serde_json::Value>(json_a).unwrap());
-        let canonical_b = canonicalize_json(&serde_json::from_str::<serde_json::Value>(json_b).unwrap());
+        let ca = canonicalize_json(&serde_json::from_str::<serde_json::Value>(json_a).unwrap());
+        let cb = canonicalize_json(&serde_json::from_str::<serde_json::Value>(json_b).unwrap());
 
-        let str_a = serde_json::to_string(&canonical_a).unwrap();
-        let str_b = serde_json::to_string(&canonical_b).unwrap();
+        let sa = serde_json::to_string(&ca).unwrap();
+        let sb = serde_json::to_string(&cb).unwrap();
+        assert_eq!(sa, sb);
 
-        assert_eq!(str_a, str_b);
-
-        let hash_a = {
+        let ha = {
             let mut h = Sha256::new();
-            h.update(str_a.as_bytes());
+            h.update(sa.as_bytes());
             hex::encode(h.finalize())
         };
-        let hash_b = {
+        let hb = {
             let mut h = Sha256::new();
-            h.update(str_b.as_bytes());
+            h.update(sb.as_bytes());
             hex::encode(h.finalize())
         };
-
-        assert_eq!(hash_a, hash_b);
+        assert_eq!(ha, hb);
     }
 
     #[test]
-    fn test_different_payload_different_hash() {
+    fn different_payload_different_hash() {
         let json_a = r#"{"name": "Allianz"}"#;
         let json_b = r#"{"name": "BlackRock"}"#;
-
-        let canonical_a = canonicalize_json(&serde_json::from_str::<serde_json::Value>(json_a).unwrap());
-        let canonical_b = canonicalize_json(&serde_json::from_str::<serde_json::Value>(json_b).unwrap());
-
-        let hash_a = {
+        let ca = canonicalize_json(&serde_json::from_str::<serde_json::Value>(json_a).unwrap());
+        let cb = canonicalize_json(&serde_json::from_str::<serde_json::Value>(json_b).unwrap());
+        let ha = {
             let mut h = Sha256::new();
-            h.update(serde_json::to_string(&canonical_a).unwrap().as_bytes());
+            h.update(serde_json::to_string(&ca).unwrap().as_bytes());
             hex::encode(h.finalize())
         };
-        let hash_b = {
+        let hb = {
             let mut h = Sha256::new();
-            h.update(serde_json::to_string(&canonical_b).unwrap().as_bytes());
+            h.update(serde_json::to_string(&cb).unwrap().as_bytes());
             hex::encode(h.finalize())
         };
-
-        assert_ne!(hash_a, hash_b);
+        assert_ne!(ha, hb);
     }
 }

@@ -44,6 +44,7 @@ pub mod phrase;
 pub mod registry;
 pub mod registry_ops;
 pub mod requirement;
+pub mod research_normalize;
 pub mod semantic;
 pub mod service_pipeline;
 pub mod session;
@@ -264,6 +265,9 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #11: requirement domain (direct-sqlx batch).
     registry.register(Arc::new(requirement::CreateSet));
     registry.register(Arc::new(requirement::ListOutstanding));
+
+    // Phase B slice #12: research-generic normalize (direct-sqlx + sha2/hex).
+    registry.register(Arc::new(research_normalize::Normalize));
 
     registry
 }
