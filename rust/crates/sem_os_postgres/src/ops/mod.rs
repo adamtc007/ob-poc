@@ -40,6 +40,7 @@ pub mod entity;
 pub mod focus;
 pub mod governance;
 pub mod import_run;
+pub mod investor_role;
 pub mod maintenance;
 pub mod matrix_overlay;
 pub mod nav;
@@ -386,6 +387,16 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(service_resource::Suspend));
     registry.register(Arc::new(service_resource::Decommission));
     registry.register(Arc::new(service_resource::ValidateAttrs));
+
+    // Phase B slice #28: investor-role domain (6 plugin verbs — set,
+    // read-as-of, 4 convenience mark-as-* variants that all delegate
+    // to the `upsert_role_profile` stored proc).
+    registry.register(Arc::new(investor_role::Set));
+    registry.register(Arc::new(investor_role::ReadAsOf));
+    registry.register(Arc::new(investor_role::MarkAsNominee));
+    registry.register(Arc::new(investor_role::MarkAsFof));
+    registry.register(Arc::new(investor_role::MarkAsMasterPool));
+    registry.register(Arc::new(investor_role::MarkAsEndInvestor));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

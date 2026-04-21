@@ -931,11 +931,12 @@ mod tests {
         assert!(registry.has("document", "verify"));
         assert!(registry.has("document", "reject"));
 
-        // Investor role ops (convenience verbs added in PR1)
-        assert!(registry.has("investor-role", "mark-as-nominee"));
-        assert!(registry.has("investor-role", "mark-as-fof"));
-        assert!(registry.has("investor-role", "mark-as-master-pool"));
-        assert!(registry.has("investor-role", "mark-as-end-investor"));
+        // Phase 5c-migrate Phase B slice #28: investor-role ops moved to
+        // `sem_os_postgres::ops::investor_role::*`.
+        assert!(!registry.has("investor-role", "mark-as-nominee"));
+        assert!(!registry.has("investor-role", "mark-as-fof"));
+        assert!(!registry.has("investor-role", "mark-as-master-pool"));
+        assert!(!registry.has("investor-role", "mark-as-end-investor"));
 
         // Manco ops
         assert!(registry.has("manco", "book.summary"));

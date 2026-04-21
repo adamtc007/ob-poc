@@ -45,7 +45,7 @@ pub mod evidence_ops;
 pub mod graph_validate_ops;
 // Phase 5c-migrate Phase B slice #23: import_run_ops → `sem_os_postgres::ops::import_run`.
 pub mod investor_ops;
-pub mod investor_role_ops;
+// Phase 5c-migrate Phase B slice #28: investor_role_ops → `sem_os_postgres::ops::investor_role`.
 pub mod kyc_case_ops;
 pub mod lifecycle_ops;
 pub mod manco_ops;
