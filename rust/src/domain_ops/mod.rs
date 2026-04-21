@@ -589,8 +589,11 @@ mod tests {
         assert!(!registry.has("document", "list-attributes"));
         assert!(!registry.has("document", "check-extraction-coverage"));
         assert!(registry.has("ubo", "calculate"));
-        assert!(registry.has("screening", "pep"));
-        assert!(registry.has("screening", "sanctions"));
+        // Phase 5c-migrate Phase B slice #19: screening ops moved to
+        // `sem_os_postgres::ops::screening::*`; legacy registry no longer
+        // has them — covered via `sem_os_postgres::ops::build_registry()`.
+        assert!(!registry.has("screening", "pep"));
+        assert!(!registry.has("screening", "sanctions"));
         // Service resource instance operations
         assert!(registry.has("service-resource", "provision"));
         assert!(registry.has("service-resource", "set-attr"));
@@ -631,9 +634,10 @@ mod tests {
         assert!(registry.has("matrix-overlay", "effective-matrix"));
         assert!(registry.has("matrix-overlay", "unified-gaps"));
         assert!(registry.has("matrix-overlay", "compare-products"));
-        // Regulatory operations
-        assert!(registry.has("regulatory.registration", "verify"));
-        assert!(registry.has("regulatory.status", "check"));
+        // Phase 5c-migrate Phase B slice #18: regulatory ops moved to
+        // `sem_os_postgres::ops::regulatory::*`.
+        assert!(!registry.has("regulatory.registration", "verify"));
+        assert!(!registry.has("regulatory.status", "check"));
         // Outstanding Request operations
         assert!(registry.has("request", "create"));
         assert!(registry.has("request", "overdue"));
@@ -743,8 +747,9 @@ mod tests {
         assert!(registry.has("ownership", "reconcile.findings"));
         assert!(registry.has("ownership", "analyze-gaps"));
         assert!(registry.has("ownership", "trace-chain"));
-        // KYC Control Enhancement: Board operations
-        assert!(registry.has("board", "analyze-control"));
+        // Phase 5c-migrate Phase B slice #17: board.analyze-control moved to
+        // `sem_os_postgres::ops::board::AnalyzeControl`.
+        assert!(!registry.has("board", "analyze-control"));
         // KYC Control Enhancement: Trust operations
         assert!(registry.has("trust", "analyze-control"));
         assert!(registry.has("trust", "identify-ubos"));

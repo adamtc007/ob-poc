@@ -51,6 +51,7 @@ pub mod remediation;
 pub mod requirement;
 pub mod research_normalize;
 pub mod schema;
+pub mod screening;
 pub mod semantic;
 pub mod service_pipeline;
 pub mod session;
@@ -299,6 +300,14 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // rewritten as runtime `sqlx::query_as` — 2 plugin verbs).
     registry.register(Arc::new(regulatory::RegistrationVerify));
     registry.register(Arc::new(regulatory::StatusCheck));
+
+    // Phase B slice #19: screening domain (4 plugin verbs — PEP,
+    // sanctions, adverse-media stub, bulk-refresh). Shared
+    // enqueue_workstream_screening helper.
+    registry.register(Arc::new(screening::Pep));
+    registry.register(Arc::new(screening::Sanctions));
+    registry.register(Arc::new(screening::AdverseMedia));
+    registry.register(Arc::new(screening::BulkRefresh));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
