@@ -47,6 +47,7 @@ pub mod registry_ops;
 pub mod remediation;
 pub mod requirement;
 pub mod research_normalize;
+pub mod schema;
 pub mod semantic;
 pub mod service_pipeline;
 pub mod session;
@@ -281,6 +282,22 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(remediation::Defer));
     registry.register(Arc::new(remediation::RevokeDeferral));
     registry.register(Arc::new(remediation::ConfirmExternalCorrection));
+
+    // Phase B slice #15: schema domain (structure semantics + stewardship
+    // dispatch + AffinityGraph-backed diagram generation).
+    registry.register(Arc::new(schema::SchemaDomainDescribe));
+    registry.register(Arc::new(schema::SchemaEntityDescribe));
+    registry.register(Arc::new(schema::SchemaEntityListFields));
+    registry.register(Arc::new(schema::SchemaEntityListRelationships));
+    registry.register(Arc::new(schema::SchemaEntityListVerbs));
+    registry.register(Arc::new(schema::SchemaIntrospect));
+    registry.register(Arc::new(schema::SchemaExtractAttributes));
+    registry.register(Arc::new(schema::SchemaExtractVerbs));
+    registry.register(Arc::new(schema::SchemaExtractEntities));
+    registry.register(Arc::new(schema::SchemaCrossReference));
+    registry.register(Arc::new(schema::SchemaGenerateErd));
+    registry.register(Arc::new(schema::SchemaGenerateVerbFlow));
+    registry.register(Arc::new(schema::SchemaGenerateDiscoveryMap));
 
     registry
 }

@@ -79,7 +79,7 @@ pub mod research_workflow_ops;
 // Phase 5c-migrate Phase B slice #6: sem_os_governance_ops → `sem_os_postgres::ops::governance`.
 // Phase 5c-migrate Phase B slice #7: sem_os_maintenance_ops → `sem_os_postgres::ops::maintenance`.
 // Phase 5c-migrate Phase B slice #6: sem_os_registry_ops → `sem_os_postgres::ops::registry_ops`.
-pub mod sem_os_schema_ops;
+// Phase 5c-migrate Phase B slice #15: sem_os_schema_ops → `sem_os_postgres::ops::schema`.
 // Phase 5c-migrate Phase B slice #8: semantic_ops → `sem_os_postgres::ops::semantic`.
 // Phase 5c-migrate Phase B slice #5 (2026-04-21): service_pipeline_ops
 // relocated to `sem_os_postgres::ops::service_pipeline::*`.
