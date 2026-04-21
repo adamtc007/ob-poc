@@ -1,66 +1,37 @@
-//! UBO Graph Operations for Convergence Model
-//!
-//! These operations implement the observation-based KYC convergence model where:
-//! 1. Client allegations build an ownership graph (ubo.allege)
-//! 2. Proofs are linked to specific edges (ubo.link-proof)
-//! 3. Observations extracted from proofs are compared to allegations (ubo.verify)
-//! 4. Graph converges when all edges are proven (ubo.status)
-//! 5. Assertions gate progression to evaluation and decision (ubo.assert)
-//!
-//! See: docs/KYC-UBO-SOLUTION-OVERVIEW.md
+//! UBO-graph lifecycle verbs (4 plugin verbs) — YAML-first
+//! re-implementation of the lifecycle subset of
+//! `rust/config/verbs/ubo.yaml`: mark-deceased, convergence-supersede,
+//! transfer-control, waive-verification. All per-op `pool.begin()`
+//! transactions replaced by the Sequencer-owned scope.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
-
-use crate::domain_ops::helpers::{json_extract_cbu_id, json_extract_string, json_extract_string_opt, json_extract_uuid};
-use crate::custom_op::CustomOperation;
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
-
-use sqlx::PgPool;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
-// ═══════════════════════════════════════════════════════════════════════════
-// UBO LIFECYCLE OPERATIONS
-// ═══════════════════════════════════════════════════════════════════════════
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_cbu_id, json_extract_string, json_extract_string_opt, json_extract_uuid,
+};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PHASE 7: UBO REMOVAL OPERATIONS
-// Handles scenarios: deceased, superseded ownership, control transfer, waiver
-// ═══════════════════════════════════════════════════════════════════════════
+use super::SemOsVerbOp;
 
-/// Mark a UBO as deceased and cascade effects
-///
-/// When a natural person who is a UBO dies:
-/// 1. Mark the person entity as deceased
-/// 2. End all ownership relationships effective as of death date
-/// 3. Update verification status to require re-verification
-/// 4. Flag affected CBUs for UBO redetermination
-///
-/// DSL: (ubo.mark-deceased :entity-id @person :date-of-death "2024-12-01" :reason "Death certificate received")
-#[register_custom_op]
-pub struct UboMarkDeceasedOp;
+// ── ubo.mark-deceased ─────────────────────────────────────────────────────────
+
+pub struct MarkDeceased;
 
 #[async_trait]
-impl CustomOperation for UboMarkDeceasedOp {
-    fn domain(&self) -> &'static str {
-        "ubo"
+impl SemOsVerbOp for MarkDeceased {
+    fn fqn(&self) -> &str {
+        "ubo.mark-deceased"
     }
-    fn verb(&self) -> &'static str {
-        "mark-deceased"
-    }
-    fn rationale(&self) -> &'static str {
-        "Marks person as deceased and cascades effects to ownership relationships and UBO status"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use serde_json::json;
-
         let entity_id = if args.get("entity-id").is_some() {
             json_extract_uuid(args, ctx, "entity-id")?
         } else {
@@ -69,13 +40,9 @@ impl CustomOperation for UboMarkDeceasedOp {
 
         let date_of_death_str = json_extract_string_opt(args, "date-of-death")
             .or_else(|| json_extract_string_opt(args, "death-date"))
-            .ok_or_else(|| {
-                anyhow::anyhow!("Missing or invalid date-of-death argument (format: YYYY-MM-DD)")
-            })?;
+            .ok_or_else(|| anyhow!("Missing or invalid date-of-death argument (format: YYYY-MM-DD)"))?;
         let date_of_death = chrono::NaiveDate::parse_from_str(&date_of_death_str, "%Y-%m-%d")
-            .map_err(|_| {
-                anyhow::anyhow!("Missing or invalid date-of-death argument (format: YYYY-MM-DD)")
-            })?;
+            .map_err(|_| anyhow!("Missing or invalid date-of-death argument (format: YYYY-MM-DD)"))?;
         let reason = json_extract_string_opt(args, "reason")
             .or_else(|| json_extract_string_opt(args, "notes"))
             .unwrap_or_else(|| "Deceased - death certificate received".to_string());
@@ -84,32 +51,25 @@ impl CustomOperation for UboMarkDeceasedOp {
             r#"SELECT EXISTS (
                 SELECT 1 FROM "ob-poc".entities e
                 JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-                WHERE e.entity_id = $1
-                  AND e.deleted_at IS NULL
-                  AND et.entity_category = 'PERSON'
+                WHERE e.entity_id = $1 AND e.deleted_at IS NULL AND et.entity_category = 'PERSON'
             )"#,
         )
         .bind(entity_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
-
         if !is_natural_person {
-            return Err(anyhow::anyhow!(
+            return Err(anyhow!(
                 "Entity {} is not a natural person. mark-deceased only applies to PERSON entities.",
                 entity_id
             ));
         }
 
         let person_name: Option<String> = sqlx::query_scalar(
-            r#"SELECT name FROM "ob-poc".entities
-                   WHERE entity_id = $1
-                     AND deleted_at IS NULL"#,
+            r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL"#,
         )
         .bind(entity_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
-
-        let mut tx = pool.begin().await?;
 
         sqlx::query(
             r#"UPDATE "ob-poc".entity_proper_persons
@@ -118,7 +78,7 @@ impl CustomOperation for UboMarkDeceasedOp {
         )
         .bind(date_of_death)
         .bind(entity_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         let ownership_ended = sqlx::query(
@@ -133,7 +93,7 @@ impl CustomOperation for UboMarkDeceasedOp {
         .bind(date_of_death)
         .bind(&reason)
         .bind(entity_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         let control_ended = sqlx::query(
@@ -148,7 +108,7 @@ impl CustomOperation for UboMarkDeceasedOp {
         .bind(date_of_death)
         .bind(&reason)
         .bind(entity_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         let affected_cbus: Vec<Uuid> = sqlx::query_scalar(
@@ -158,7 +118,7 @@ impl CustomOperation for UboMarkDeceasedOp {
                WHERE r.from_entity_id = $1"#,
         )
         .bind(entity_id)
-        .fetch_all(&mut *tx)
+        .fetch_all(scope.executor())
         .await?;
 
         let verifications_updated = sqlx::query(
@@ -174,18 +134,16 @@ impl CustomOperation for UboMarkDeceasedOp {
         )
         .bind(date_of_death.to_string())
         .bind(entity_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         sqlx::query(
             r#"UPDATE "ob-poc".entity_workstreams
-               SET is_ubo = false,
-                   status = 'COMPLETE',
-                   completed_at = NOW()
+               SET is_ubo = false, status = 'COMPLETE', completed_at = NOW()
                WHERE entity_id = $1 AND is_ubo = true"#,
         )
         .bind(entity_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         for cbu_id in &affected_cbus {
@@ -199,64 +157,41 @@ impl CustomOperation for UboMarkDeceasedOp {
                 "entity_id": entity_id,
                 "person_name": person_name,
                 "date_of_death": date_of_death,
-                "reason": reason
+                "reason": reason,
             }))
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await;
         }
 
-        tx.commit().await?;
-
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "entity_id": entity_id,
-                "person_name": person_name,
-                "date_of_death": date_of_death,
-                "reason": reason,
-                "ownership_relationships_ended": ownership_ended.rows_affected(),
-                "control_relationships_ended": control_ended.rows_affected(),
-                "verifications_flagged": verifications_updated.rows_affected(),
-                "affected_cbus": affected_cbus,
-                "message": "UBO marked deceased. All affected CBUs require UBO redetermination."
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(json!({
+            "entity_id": entity_id,
+            "person_name": person_name,
+            "date_of_death": date_of_death,
+            "reason": reason,
+            "ownership_relationships_ended": ownership_ended.rows_affected(),
+            "control_relationships_ended": control_ended.rows_affected(),
+            "verifications_flagged": verifications_updated.rows_affected(),
+            "affected_cbus": affected_cbus,
+            "message": "UBO marked deceased. All affected CBUs require UBO redetermination.",
+        })))
     }
 }
 
-/// Supersede an ownership relationship with reason and audit trail (convergence model)
-///
-/// Used when ownership changes hands (sale, transfer, restructure).
-/// Creates new relationship and ends old one in a single transaction.
-/// Note: Named convergence-supersede to distinguish from deprecated ubo.supersede-ubo verb.
-///
-/// DSL: (ubo.convergence-supersede :cbu @cbu :old-relationship @old :new-owner @new-person :percentage 100 :reason "Share transfer")
-#[register_custom_op]
-pub struct UboConvergenceSupersedeOp;
+// ── ubo.convergence-supersede ─────────────────────────────────────────────────
+
+pub struct ConvergenceSupersede;
 
 #[async_trait]
-impl CustomOperation for UboConvergenceSupersedeOp {
-    fn domain(&self) -> &'static str {
-        "ubo"
+impl SemOsVerbOp for ConvergenceSupersede {
+    fn fqn(&self) -> &str {
+        "ubo.convergence-supersede"
     }
-    fn verb(&self) -> &'static str {
-        "convergence-supersede"
-    }
-    fn rationale(&self) -> &'static str {
-        "Atomically ends old ownership and creates new one with full audit trail"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use serde_json::json;
-
         let cbu_id = json_extract_cbu_id(args, ctx)?;
         let old_relationship_id = if args.get("old-relationship").is_some() {
             json_extract_uuid(args, ctx, "old-relationship")?
@@ -272,28 +207,27 @@ impl CustomOperation for UboConvergenceSupersedeOp {
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
         let reason = json_extract_string(args, "reason")?;
 
-        let old_rel: (
+        type OldRel = (
             Uuid,
             Uuid,
             Option<rust_decimal::Decimal>,
             String,
             Option<String>,
             String,
-        ) = sqlx::query_as(
+        );
+        let old_rel: OldRel = sqlx::query_as(
             r#"SELECT r.from_entity_id, r.to_entity_id, r.percentage, r.relationship_type,
-                          r.ownership_type, e.name as from_name
-                   FROM "ob-poc".entity_relationships r
-                   JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
-                   WHERE r.relationship_id = $1
-                     AND e.deleted_at IS NULL"#,
+                      r.ownership_type, e.name as from_name
+               FROM "ob-poc".entity_relationships r
+               JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
+               WHERE r.relationship_id = $1 AND e.deleted_at IS NULL"#,
         )
         .bind(old_relationship_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?
-        .ok_or_else(|| anyhow::anyhow!("Old relationship not found: {}", old_relationship_id))?;
+        .ok_or_else(|| anyhow!("Old relationship not found: {}", old_relationship_id))?;
 
         let new_percentage = percentage.or(old_rel.2);
-        let mut tx = pool.begin().await?;
 
         sqlx::query(
             r#"UPDATE "ob-poc".entity_relationships
@@ -305,7 +239,7 @@ impl CustomOperation for UboConvergenceSupersedeOp {
         .bind(effective_date)
         .bind(&reason)
         .bind(old_relationship_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         sqlx::query(
@@ -321,7 +255,7 @@ impl CustomOperation for UboConvergenceSupersedeOp {
         .bind(&reason)
         .bind(old_relationship_id)
         .bind(cbu_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         let new_relationship_id: Uuid = sqlx::query_scalar(
@@ -338,7 +272,7 @@ impl CustomOperation for UboConvergenceSupersedeOp {
         .bind(&old_rel.4)
         .bind(effective_date)
         .bind(format!("Superseded from {} - {}", &old_rel.5, reason))
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
@@ -349,7 +283,7 @@ impl CustomOperation for UboConvergenceSupersedeOp {
         .bind(cbu_id)
         .bind(new_relationship_id)
         .bind(new_percentage)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         let _ = sqlx::query(
@@ -365,64 +299,42 @@ impl CustomOperation for UboConvergenceSupersedeOp {
             "new_owner_id": new_owner_id,
             "percentage": new_percentage,
             "effective_date": effective_date,
-            "reason": reason
+            "reason": reason,
         }))
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await;
 
-        tx.commit().await?;
         ctx.bind("relationship", new_relationship_id);
-
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "old_relationship_id": old_relationship_id,
-                "new_relationship_id": new_relationship_id,
-                "old_owner_id": old_rel.0,
-                "old_owner_name": old_rel.5,
-                "new_owner_id": new_owner_id,
-                "to_entity_id": old_rel.1,
-                "percentage": new_percentage,
-                "effective_date": effective_date,
-                "reason": reason,
-                "message": "Ownership superseded. New relationship requires verification."
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(json!({
+            "old_relationship_id": old_relationship_id,
+            "new_relationship_id": new_relationship_id,
+            "old_owner_id": old_rel.0,
+            "old_owner_name": old_rel.5,
+            "new_owner_id": new_owner_id,
+            "to_entity_id": old_rel.1,
+            "percentage": new_percentage,
+            "effective_date": effective_date,
+            "reason": reason,
+            "message": "Ownership superseded. New relationship requires verification.",
+        })))
     }
 }
 
-/// Transfer control from one entity to another
-///
-/// Used when control changes hands (board resignation, new executive, voting transfer).
-/// Ends old control relationship and creates new one.
-///
-/// DSL: (ubo.transfer-control :cbu @cbu :from @old-controller :to @new-controller :controlled-entity @entity :control-type "board_member" :reason "Board resignation")
-#[register_custom_op]
-pub struct UboTransferControlOp;
+// ── ubo.transfer-control ──────────────────────────────────────────────────────
+
+pub struct TransferControl;
 
 #[async_trait]
-impl CustomOperation for UboTransferControlOp {
-    fn domain(&self) -> &'static str {
-        "ubo"
+impl SemOsVerbOp for TransferControl {
+    fn fqn(&self) -> &str {
+        "ubo.transfer-control"
     }
-    fn verb(&self) -> &'static str {
-        "transfer-control"
-    }
-    fn rationale(&self) -> &'static str {
-        "Transfers control relationship from one entity to another with audit trail"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use serde_json::json;
-
         let cbu_id = json_extract_cbu_id(args, ctx)?;
         let from_controller_id = json_extract_uuid(args, ctx, "from")?;
         let to_controller_id = json_extract_uuid(args, ctx, "to")?;
@@ -436,7 +348,7 @@ impl CustomOperation for UboTransferControlOp {
             "board_appointment",
         ];
         if !valid_control_types.contains(&control_type.as_str()) {
-            return Err(anyhow::anyhow!(
+            return Err(anyhow!(
                 "Invalid control-type: {}. Valid values: {:?}",
                 control_type,
                 valid_control_types
@@ -447,7 +359,6 @@ impl CustomOperation for UboTransferControlOp {
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
         let reason = json_extract_string(args, "reason")?;
 
-        let mut tx = pool.begin().await?;
         let old_rel: Option<(Uuid,)> = sqlx::query_as(
             r#"SELECT relationship_id FROM "ob-poc".entity_relationships
                WHERE from_entity_id = $1
@@ -459,7 +370,7 @@ impl CustomOperation for UboTransferControlOp {
         .bind(from_controller_id)
         .bind(controlled_entity_id)
         .bind(&control_type)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(scope.executor())
         .await?;
         let old_relationship_id = old_rel.map(|r| r.0);
 
@@ -474,7 +385,7 @@ impl CustomOperation for UboTransferControlOp {
             .bind(effective_date)
             .bind(&reason)
             .bind(old_id)
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await?;
 
             sqlx::query(
@@ -489,7 +400,7 @@ impl CustomOperation for UboTransferControlOp {
             .bind(effective_date.to_string())
             .bind(old_id)
             .bind(cbu_id)
-            .execute(&mut *tx)
+            .execute(scope.executor())
             .await?;
         }
 
@@ -505,7 +416,7 @@ impl CustomOperation for UboTransferControlOp {
         .bind(&control_type)
         .bind(effective_date)
         .bind(&reason)
-        .fetch_one(&mut *tx)
+        .fetch_one(scope.executor())
         .await?;
 
         sqlx::query(
@@ -515,7 +426,7 @@ impl CustomOperation for UboTransferControlOp {
         )
         .bind(cbu_id)
         .bind(new_relationship_id)
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await?;
 
         let _ = sqlx::query(
@@ -532,65 +443,41 @@ impl CustomOperation for UboTransferControlOp {
             "controlled_entity_id": controlled_entity_id,
             "control_type": control_type,
             "effective_date": effective_date,
-            "reason": reason
+            "reason": reason,
         }))
-        .execute(&mut *tx)
+        .execute(scope.executor())
         .await;
 
-        tx.commit().await?;
         ctx.bind("relationship", new_relationship_id);
-
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "old_relationship_id": old_relationship_id,
-                "new_relationship_id": new_relationship_id,
-                "from_controller_id": from_controller_id,
-                "to_controller_id": to_controller_id,
-                "controlled_entity_id": controlled_entity_id,
-                "control_type": control_type,
-                "effective_date": effective_date,
-                "reason": reason,
-                "message": "Control transferred. New relationship requires verification."
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(json!({
+            "old_relationship_id": old_relationship_id,
+            "new_relationship_id": new_relationship_id,
+            "from_controller_id": from_controller_id,
+            "to_controller_id": to_controller_id,
+            "controlled_entity_id": controlled_entity_id,
+            "control_type": control_type,
+            "effective_date": effective_date,
+            "reason": reason,
+            "message": "Control transferred. New relationship requires verification.",
+        })))
     }
 }
 
-/// Waive verification for a relationship with justification
-///
-/// Used when normal verification is not possible or not required:
-/// - Regulatory exemption
-/// - Low-risk threshold
-/// - Alternative verification method
-///
-/// DSL: (ubo.waive-verification :cbu @cbu :relationship @rel :reason "Regulatory exemption for listed company" :approved-by "senior.analyst@example.com")
-#[register_custom_op]
-pub struct UboWaiveVerificationOp;
+// ── ubo.waive-verification ────────────────────────────────────────────────────
+
+pub struct WaiveVerification;
 
 #[async_trait]
-impl CustomOperation for UboWaiveVerificationOp {
-    fn domain(&self) -> &'static str {
-        "ubo"
+impl SemOsVerbOp for WaiveVerification {
+    fn fqn(&self) -> &str {
+        "ubo.waive-verification"
     }
-    fn verb(&self) -> &'static str {
-        "waive-verification"
-    }
-    fn rationale(&self) -> &'static str {
-        "Waives verification requirement with documented justification and approval"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use serde_json::json;
-
         let cbu_id = json_extract_cbu_id(args, ctx)?;
         let relationship_id = if args.get("relationship").is_some() {
             json_extract_uuid(args, ctx, "relationship")?
@@ -613,7 +500,7 @@ impl CustomOperation for UboWaiveVerificationOp {
             "other",
         ];
         if !valid_waiver_types.contains(&waiver_type.as_str()) {
-            return Err(anyhow::anyhow!(
+            return Err(anyhow!(
                 "Invalid waiver-type: {}. Valid values: {:?}",
                 waiver_type,
                 valid_waiver_types
@@ -622,7 +509,7 @@ impl CustomOperation for UboWaiveVerificationOp {
         let reason = json_extract_string(args, "reason")?;
         let approved_by = json_extract_string_opt(args, "approved-by")
             .or_else(|| json_extract_string_opt(args, "approver"))
-            .ok_or_else(|| anyhow::anyhow!("Missing approved-by argument"))?;
+            .ok_or_else(|| anyhow!("Missing approved-by argument"))?;
         let expiry_date: Option<chrono::NaiveDate> = json_extract_string_opt(args, "expires")
             .or_else(|| json_extract_string_opt(args, "expiry-date"))
             .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
@@ -635,11 +522,11 @@ impl CustomOperation for UboWaiveVerificationOp {
         )
         .bind(cbu_id)
         .bind(relationship_id)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         if !exists {
-            return Err(anyhow::anyhow!(
+            return Err(anyhow!(
                 "Relationship verification not found for CBU. relationship_id={}, cbu_id={}",
                 relationship_id,
                 cbu_id
@@ -669,7 +556,7 @@ impl CustomOperation for UboWaiveVerificationOp {
         .bind(&waiver_notes)
         .bind(relationship_id)
         .bind(cbu_id)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         let _ = sqlx::query(
@@ -683,27 +570,20 @@ impl CustomOperation for UboWaiveVerificationOp {
             "waiver_type": waiver_type,
             "reason": reason,
             "approved_by": approved_by,
-            "expiry_date": expiry_date
+            "expiry_date": expiry_date,
         }))
-        .execute(pool)
+        .execute(scope.executor())
         .await;
 
-        Ok(VerbExecutionOutcome::Record(
-            json!({
-                "relationship_id": relationship_id,
-                "cbu_id": cbu_id,
-                "status": "waived",
-                "waiver_type": waiver_type,
-                "reason": reason,
-                "approved_by": approved_by,
-                "expiry_date": expiry_date,
-                "message": "Verification requirement waived. Relationship counts as proven for convergence."
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(json!({
+            "relationship_id": relationship_id,
+            "cbu_id": cbu_id,
+            "status": "waived",
+            "waiver_type": waiver_type,
+            "reason": reason,
+            "approved_by": approved_by,
+            "expiry_date": expiry_date,
+            "message": "Verification requirement waived. Relationship counts as proven for convergence.",
+        })))
     }
 }
-

@@ -669,10 +669,12 @@ mod tests {
         // `sem_os_postgres::ops::ubo_compute::ComputeChains`.
         assert!(!registry.has("ubo", "compute-chains"));
         // UBO removal operations (Phase 7)
-        assert!(registry.has("ubo", "mark-deceased"));
-        assert!(registry.has("ubo", "convergence-supersede"));
-        assert!(registry.has("ubo", "transfer-control"));
-        assert!(registry.has("ubo", "waive-verification"));
+        // Phase 5c-migrate Phase B slice #49: ubo graph-lifecycle ops moved
+        // to `sem_os_postgres::ops::ubo_graph::*`.
+        assert!(!registry.has("ubo", "mark-deceased"));
+        assert!(!registry.has("ubo", "convergence-supersede"));
+        assert!(!registry.has("ubo", "transfer-control"));
+        assert!(!registry.has("ubo", "waive-verification"));
         // Phase 5c-migrate Phase B slice #10: team.transfer-member migrated
         // to `sem_os_postgres::ops::team::TransferMember`. Legacy registry
         // no longer has it — covered via SemOS.

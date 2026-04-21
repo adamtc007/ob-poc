@@ -84,6 +84,7 @@ pub mod trading_matrix;
 pub mod trust;
 pub mod ubo_analysis;
 pub mod ubo_compute;
+pub mod ubo_graph;
 pub mod ubo_registry;
 pub mod verify;
 pub mod view;
@@ -585,6 +586,13 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(ubo_compute::ComputeChains));
     registry.register(Arc::new(ubo_compute::SnapshotCapture));
     registry.register(Arc::new(ubo_compute::SnapshotDiff));
+
+    // Phase B slice #49: ubo graph-lifecycle (mark-deceased,
+    // convergence-supersede, transfer-control, waive-verification).
+    registry.register(Arc::new(ubo_graph::MarkDeceased));
+    registry.register(Arc::new(ubo_graph::ConvergenceSupersede));
+    registry.register(Arc::new(ubo_graph::TransferControl));
+    registry.register(Arc::new(ubo_graph::WaiveVerification));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
