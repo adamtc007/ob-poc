@@ -46,6 +46,7 @@ pub mod pack_select;
 pub mod phrase;
 pub mod registry;
 pub mod registry_ops;
+pub mod regulatory;
 pub mod remediation;
 pub mod requirement;
 pub mod research_normalize;
@@ -293,6 +294,11 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #17: board domain (direct-sqlx, 1 plugin verb —
     // analyze-control).
     registry.register(Arc::new(board::AnalyzeControl));
+
+    // Phase B slice #18: regulatory domain (ex-`sqlx::query!` macro,
+    // rewritten as runtime `sqlx::query_as` — 2 plugin verbs).
+    registry.register(Arc::new(regulatory::RegistrationVerify));
+    registry.register(Arc::new(regulatory::StatusCheck));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

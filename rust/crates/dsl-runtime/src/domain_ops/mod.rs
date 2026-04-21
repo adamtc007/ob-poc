@@ -66,7 +66,7 @@ pub mod partnership_ops;
 // legacy file deleted.
 pub mod refdata_loader;
 pub mod refdata_ops;
-pub mod regulatory_ops;
+// Phase 5c-migrate Phase B slice #18: regulatory_ops → `sem_os_postgres::ops::regulatory`.
 // Phase 5c-migrate Phase B slice #14: remediation_ops → `sem_os_postgres::ops::remediation`.
 // Phase 5c-migrate Phase B slice #11: requirement_ops → `sem_os_postgres::ops::requirement`.
 pub mod resource_ops;
