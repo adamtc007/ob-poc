@@ -67,7 +67,7 @@ pub mod partnership_ops;
 pub mod refdata_loader;
 pub mod refdata_ops;
 pub mod regulatory_ops;
-pub mod remediation_ops;
+// Phase 5c-migrate Phase B slice #14: remediation_ops → `sem_os_postgres::ops::remediation`.
 // Phase 5c-migrate Phase B slice #11: requirement_ops → `sem_os_postgres::ops::requirement`.
 pub mod resource_ops;
 pub mod screening_ops;

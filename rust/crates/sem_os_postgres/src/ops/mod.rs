@@ -44,6 +44,7 @@ pub mod pack_select;
 pub mod phrase;
 pub mod registry;
 pub mod registry_ops;
+pub mod remediation;
 pub mod requirement;
 pub mod research_normalize;
 pub mod semantic;
@@ -274,6 +275,12 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(docs_bundle::Apply));
     registry.register(Arc::new(docs_bundle::ListApplied));
     registry.register(Arc::new(docs_bundle::ListAvailable));
+
+    // Phase B slice #14: remediation domain (cross-workspace helpers).
+    registry.register(Arc::new(remediation::ListOpen));
+    registry.register(Arc::new(remediation::Defer));
+    registry.register(Arc::new(remediation::RevokeDeferral));
+    registry.register(Arc::new(remediation::ConfirmExternalCorrection));
 
     registry
 }
