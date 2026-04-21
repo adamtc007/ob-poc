@@ -33,6 +33,7 @@ pub mod constellation;
 pub mod nav;
 pub mod pack_answer;
 pub mod pack_select;
+pub mod phrase;
 pub mod registry;
 
 pub use registry::SemOsVerbOpRegistry;
@@ -63,6 +64,17 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #3: constellation domain (service-dispatch Category D).
     registry.register(Arc::new(constellation::Hydrate));
     registry.register(Arc::new(constellation::Summary));
+
+    // Phase B slice #4: phrase domain (service-dispatch via PhraseService).
+    registry.register(Arc::new(phrase::ObserveMisses));
+    registry.register(Arc::new(phrase::CoverageReport));
+    registry.register(Arc::new(phrase::CheckCollisions));
+    registry.register(Arc::new(phrase::Propose));
+    registry.register(Arc::new(phrase::BatchPropose));
+    registry.register(Arc::new(phrase::ReviewProposals));
+    registry.register(Arc::new(phrase::Approve));
+    registry.register(Arc::new(phrase::Reject));
+    registry.register(Arc::new(phrase::Defer));
 
     registry
 }

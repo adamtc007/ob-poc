@@ -96,6 +96,9 @@ mod tests {
         fn transaction(&mut self) -> &mut sqlx::Transaction<'static, sqlx::Postgres> {
             unreachable!("pack.answer should not touch the database")
         }
+        fn pool(&self) -> &sqlx::PgPool {
+            unreachable!("pack.answer does not need the pool")
+        }
     }
 
     #[tokio::test]

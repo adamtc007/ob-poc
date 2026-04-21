@@ -90,9 +90,8 @@ mod tests {
     use super::*;
     use sem_os_core::principal::Principal;
 
-    /// A minimal [`TransactionScope`] stub that panics if anyone actually
-    /// asks for the underlying `sqlx::Transaction` — `pack.select` has
-    /// no DB effects so a live pool isn't needed.
+    /// A minimal [`TransactionScope`] stub — `pack.select` has no DB
+    /// effects so the transaction / pool methods are `unreachable!`.
     struct NullScope;
 
     impl TransactionScope for NullScope {
@@ -101,6 +100,9 @@ mod tests {
         }
         fn transaction(&mut self) -> &mut sqlx::Transaction<'static, sqlx::Postgres> {
             unreachable!("pack.select should not touch the database")
+        }
+        fn pool(&self) -> &sqlx::PgPool {
+            unreachable!("pack.select does not need the pool")
         }
     }
 

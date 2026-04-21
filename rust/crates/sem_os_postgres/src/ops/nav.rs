@@ -237,6 +237,9 @@ mod tests {
         fn transaction(&mut self) -> &mut sqlx::Transaction<'static, sqlx::Postgres> {
             unreachable!("nav verbs should not touch the database")
         }
+        fn pool(&self) -> &sqlx::PgPool {
+            unreachable!("nav verbs do not need the pool")
+        }
     }
 
     fn rec(outcome: VerbExecutionOutcome) -> serde_json::Value {

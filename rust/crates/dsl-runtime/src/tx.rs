@@ -18,45 +18,25 @@
 //! `ob-poc-types` with only the data-shaped [`TransactionScopeId`]
 //! newtype.
 //!
-//! # Phase 5c-prep (2026-04-20)
+//! # Phase 5c-migrate (2026-04-21)
 //!
-//! Phase 5c is split into two sub-slices (see v0.3 §13):
+//! The trait now carries four methods:
+//! - [`TransactionScope::scope_id`] — correlation id (logs / traces / replay).
+//! - [`TransactionScope::transaction`] — the underlying `sqlx::Transaction`.
+//! - [`TransactionScope::executor`] — convenience deref to
+//!   `&mut sqlx::PgConnection`; migrated plugin ops call
+//!   `sqlx::query("…").execute(scope.executor())` directly.
+//! - [`TransactionScope::pool`] — transitional accessor for services
+//!   whose Phase 5a-era bridge methods still take `&PgPool` directly
+//!   (`PhraseService`, `AttributeService`, `ViewService`, etc.).
+//!   Removed once those services adopt scope-aware signatures.
 //!
-//! - **5c-prep (this commit):** extend the trait with
-//!   [`TransactionScope::transaction`], add the concrete
-//!   [`crate::tx::PgTransactionScope`]-shaped impl in ob-poc (see
-//!   `ob_poc::sequencer_tx`), document the new method on the trait.
-//!   Plugin op signatures are unchanged; the new method exists so the
-//!   Sequencer can begin/commit a txn and pass a trait-object scope
-//!   through dispatch, ready for 5c-migrate.
-//! - **5c-migrate (future):** mass-rewrite `CustomOperation::execute_json`
-//!   signatures from `pool: &PgPool` to `scope: &mut dyn TransactionScope`,
-//!   adopt the trait method inside every plugin op body. Staged per-op
-//!   or per-domain, not big-bang.
-//!
-//! Phase 0b rationale for trait object safety is preserved: the trait is
-//! dyn-compatible today and stays that way post-extension. The
-//! `transaction` method returns a concrete
-//! `&mut sqlx::Transaction<'static, Postgres>` — every production
-//! transaction in ob-poc begins via `pool.begin()` which yields a
-//! `'static` lifetime (connection owned by the pool).
+//! Dyn-compatibility is preserved — every method is object-safe.
 
 use ob_poc_types::TransactionScopeId;
 
 /// A transaction-scope handle supplied by the Sequencer to the runtime at
 /// dispatch time.
-///
-/// # Post-5c-prep surface
-///
-/// - [`Self::scope_id`] — correlation id for logs / traces / replay.
-///   Stable across a scope's lifetime.
-/// - [`Self::transaction`] — the underlying `sqlx::Transaction`. Plugin
-///   ops after 5c-migrate take `scope: &mut dyn TransactionScope` and
-///   call `scope.transaction()` wherever they previously took
-///   `pool: &PgPool` and used it directly.
-///
-/// The trait stays dyn-compatible after the extension — both methods are
-/// object-safe.
 pub trait TransactionScope: Send + Sync {
     /// Scope id, for logs and traces. Available regardless of storage
     /// backend. Stable across a scope's lifetime.
@@ -64,40 +44,47 @@ pub trait TransactionScope: Send + Sync {
 
     /// The underlying Postgres transaction handle the scope owns.
     ///
-    /// Phase 5c-migrate adopts this signature: plugin ops replace their
-    /// `pool: &PgPool` binding with `scope.transaction()` where needed
-    /// for statement execution. Until then this method exists on the
-    /// trait surface but no plugin op consumes it — the Sequencer's
-    /// begin/commit path can already thread a scope through dispatch.
-    ///
     /// `'static` lifetime: all production transactions begin via
     /// `PgPool::begin()` which yields `Transaction<'static, Postgres>`
     /// (the pool owns the connection). Tests may supply a different
     /// lifetime via a custom impl; the concrete `PgTransactionScope`
     /// in ob-poc standardises on `'static`.
     fn transaction(&mut self) -> &mut sqlx::Transaction<'static, sqlx::Postgres>;
+
+    /// Convenience: the underlying `&mut PgConnection` that sqlx
+    /// statement executors consume.
+    ///
+    /// Migrated plugin ops write `sqlx::query("…").execute(scope.executor())`
+    /// and `.fetch_optional(scope.executor())` etc. Each call re-borrows,
+    /// so sequential statements against the same scope compose without
+    /// fighting the borrow checker.
+    fn executor(&mut self) -> &mut sqlx::PgConnection {
+        use std::ops::DerefMut;
+        self.transaction().deref_mut()
+    }
+
+    /// Transitional accessor returning the pool the scope was opened on.
+    ///
+    /// Used by SemOS-migrated ops whose downstream service-trait dispatch
+    /// still takes `&PgPool` (the nine Phase 5a service traits —
+    /// `PhraseService`, `AttributeService`, `ViewService`, `SessionService`,
+    /// `ServicePipelineService`, `StewardshipDispatch`, etc.). Queries
+    /// executed via the returned pool reference acquire fresh connections
+    /// — they do NOT participate in `self.transaction()`; commit/rollback
+    /// on the scope has no effect on them. Removed once every service
+    /// takes `&mut dyn TransactionScope` or `&mut Transaction` directly.
+    fn pool(&self) -> &sqlx::PgPool;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // We can't instantiate a real `sqlx::Transaction` without a live
-    // database, so the dyn-compatibility proof here uses a borrowed
-    // reference to a hypothetical one via a helper trait technique —
-    // construction goes via the ob-poc-side `PgTransactionScope` impl
-    // exercised against a real pool in ob-poc integration tests.
-
     #[test]
     fn trait_is_object_safe() {
         // Proof-by-compilation: if `&mut dyn TransactionScope` compiles,
-        // the trait is object-safe. Both methods are object-safe (no
-        // Self-by-value, no generics, no Self-in-return beyond &mut).
+        // the trait is object-safe.
         fn takes_dyn(_: &mut dyn TransactionScope) {}
-        // No construction — a compile-only check is sufficient. The
-        // actual trait-object dispatch is exercised in ob-poc's
-        // PgTransactionScope integration test where a real
-        // sqlx::Transaction is available.
         let _ = takes_dyn;
     }
 }

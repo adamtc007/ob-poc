@@ -2,12 +2,11 @@
 //! [`dsl_runtime::tx::TransactionScope`] wrapping a `sqlx::Transaction`.
 //!
 //! The Sequencer opens a `sqlx::Transaction` at stage 8, wraps it in a
-//! [`PgTransactionScope`], and (in the future Phase 5c-migrate) passes
-//! the scope as `&mut dyn TransactionScope` through dispatch. Phase 5c
-//! proper — the op-level migration that actually adopts the scope in
-//! plugin bodies — is a separate future slice. This file lands as part
-//! of Phase 5c-prep so the primitive exists and the Sequencer can start
-//! threading it through its stage-8 boundary.
+//! [`PgTransactionScope`], and passes the scope as
+//! `&mut dyn TransactionScope` through dispatch. Phase 5c-migrate Phase B
+//! drives ops through [`TransactionScope::executor`] for statement
+//! execution and [`TransactionScope::pool`] for services whose
+//! Phase 5a-era bridge methods still take `&PgPool`.
 //!
 //! # Scope lifecycle
 //!
@@ -15,7 +14,7 @@
 //! let mut scope = PgTransactionScope::begin(&pool).await?;
 //! // ... runtime dispatches against `&mut scope as &mut dyn TransactionScope` ...
 //! if step_ok {
-//!     scope.commit().await?;  // consumes self, commits the txn
+//!     scope.commit().await?;   // consumes self, commits the txn
 //! } else {
 //!     scope.rollback().await?; // consumes self, rolls back
 //! }
@@ -34,10 +33,16 @@ use dsl_runtime::tx::TransactionScope;
 use ob_poc_types::TransactionScopeId;
 use sqlx::{PgPool, Postgres, Transaction};
 
-/// Postgres-backed transaction scope. Owns a `sqlx::Transaction` and
-/// stable [`TransactionScopeId`]; implements [`TransactionScope`].
+/// Postgres-backed transaction scope. Owns a `sqlx::Transaction`, a
+/// clone of the pool the txn was opened on, and a stable
+/// [`TransactionScopeId`]; implements [`TransactionScope`].
+///
+/// The pool is held alongside the transaction so
+/// [`TransactionScope::pool`] can return a reference without
+/// allocation. Pool clones are Arc-internal — cheap.
 pub struct PgTransactionScope {
     tx: Transaction<'static, Postgres>,
+    pool: PgPool,
     id: TransactionScopeId,
 }
 
@@ -50,6 +55,7 @@ impl PgTransactionScope {
         let tx = pool.begin().await?;
         Ok(Self {
             tx,
+            pool: pool.clone(),
             id: TransactionScopeId::new(),
         })
     }
@@ -72,6 +78,10 @@ impl TransactionScope for PgTransactionScope {
 
     fn transaction(&mut self) -> &mut Transaction<'static, Postgres> {
         &mut self.tx
+    }
+
+    fn pool(&self) -> &PgPool {
+        &self.pool
     }
 }
 
