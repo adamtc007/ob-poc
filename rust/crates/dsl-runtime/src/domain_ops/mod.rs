@@ -42,7 +42,7 @@ pub mod document_ops;
 // Phase 5c-migrate Phase B slice #25: entity_ops → `sem_os_postgres::ops::entity`.
 pub mod entity_query;
 // Phase 5c-migrate Phase B slice #40: evidence_ops → `sem_os_postgres::ops::evidence`.
-pub mod graph_validate_ops;
+// Phase 5c-migrate Phase B slice #54: graph_validate_ops → `sem_os_postgres::ops::graph_validate`.
 // Phase 5c-migrate Phase B slice #23: import_run_ops → `sem_os_postgres::ops::import_run`.
 // Phase 5c-migrate Phase B slice #46: investor_ops → `sem_os_postgres::ops::investor`.
 // Phase 5c-migrate Phase B slice #28: investor_role_ops → `sem_os_postgres::ops::investor_role`.

@@ -1,60 +1,52 @@
-//! Graph Validation Operations (Phase 2.2)
+//! Graph validation (1 plugin verb) — YAML-first re-implementation of
+//! `graph.validate` from `rust/config/verbs/graph.yaml`.
 //!
-//! Implements ownership/control graph validation per KYC/UBO architecture spec section 6.4:
-//! - Cycle detection (Tarjan-style SCC via DFS)
-//! - Missing percentages check
-//! - Supply >100% check (ownership per target entity)
-//! - Terminus integrity check (chains must end at natural persons or known terminators)
-//! - Source conflicts check (conflicting ownership data from different sources)
-//! - Orphan entities check (entities with no inbound or outbound relationships)
+//! Ownership/control graph validation per KYC/UBO architecture spec
+//! section 6.4:
 //!
-//! The op queries `entity_relationships` from the database, runs all validation checks,
-//! and persists any anomalies found into `"ob-poc".research_anomalies`.
+//! - Cycle detection (Tarjan-style SCC via iterative DFS)
+//! - Missing percentages on ownership edges
+//! - Per-target supply > 100% aggregation
+//! - Terminus integrity (chains must terminate at natural persons or
+//!   regulated entities)
+//! - Source conflicts (conflicting ownership % from distinct sources)
+//! - Orphan entities (isolated nodes)
+//!
+//! Loads `entity_relationships` (scoped to the case when `case-id` is
+//! supplied), runs checks in-memory, persists anomalies into
+//! `research_anomalies` anchored to a freshly-created
+//! `research_actions` row.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::domain_ops::helpers::json_extract_uuid_opt;
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-// ============================================================================
-// Types
-// ============================================================================
+use super::SemOsVerbOp;
 
-/// A single graph anomaly discovered during validation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphAnomaly {
-    /// Type of anomaly detected.
     pub anomaly_type: String,
-    /// Entity IDs involved in this anomaly.
     pub entity_ids: Vec<Uuid>,
-    /// Human-readable detail describing the anomaly.
     pub detail: String,
-    /// Severity: ERROR or WARNING.
     pub severity: String,
 }
 
-/// Top-level result returned by graph.validate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphValidateResult {
-    /// Number of anomalies found across all checks.
     pub anomalies_found: i32,
-    /// The list of anomalies.
     pub anomalies: Vec<GraphAnomaly>,
-    /// Number of edges analysed.
     pub edges_analysed: i32,
-    /// Number of distinct entities in the graph.
     pub entities_analysed: i32,
-    /// Number of anomalies persisted to "ob-poc".research_anomalies.
     pub anomalies_persisted: i32,
 }
 
-/// Internal edge representation loaded from the database.
 #[derive(Debug, Clone)]
 struct Edge {
     relationship_id: Uuid,
@@ -65,83 +57,6 @@ struct Edge {
     source: Option<String>,
 }
 
-// ============================================================================
-// GraphValidateOp
-// ============================================================================
-
-#[register_custom_op]
-pub struct GraphValidateOp;
-
-async fn graph_validate_impl(case_id: Option<Uuid>, pool: &PgPool) -> Result<GraphValidateResult> {
-    let edges = load_edges(pool, case_id).await?;
-
-    let mut all_entity_ids: HashSet<Uuid> = HashSet::new();
-    for edge in &edges {
-        all_entity_ids.insert(edge.from_entity_id);
-        all_entity_ids.insert(edge.to_entity_id);
-    }
-
-    let entities_analysed = all_entity_ids.len() as i32;
-    let edges_analysed = edges.len() as i32;
-
-    let mut anomalies: Vec<GraphAnomaly> = Vec::new();
-
-    detect_cycles(&edges, &mut anomalies);
-    check_missing_percentages(&edges, &mut anomalies);
-    check_supply_exceeds_100(&edges, &mut anomalies);
-    check_source_conflicts(&edges, &mut anomalies);
-    check_orphan_entities(&edges, &all_entity_ids, &mut anomalies);
-    check_terminus_integrity(&edges, &all_entity_ids, pool, &mut anomalies).await?;
-
-    let anomalies_found = anomalies.len() as i32;
-    let anomalies_persisted = persist_anomalies(pool, &anomalies, case_id, &all_entity_ids).await?;
-
-    Ok(GraphValidateResult {
-        anomalies_found,
-        anomalies,
-        edges_analysed,
-        entities_analysed,
-        anomalies_persisted,
-    })
-}
-
-#[async_trait]
-impl CustomOperation for GraphValidateOp {
-    fn domain(&self) -> &'static str {
-        "graph"
-    }
-
-    fn verb(&self) -> &'static str {
-        "validate"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Graph validation requires traversal algorithms (cycle detection, supply aggregation, \
-         terminus reachability) that cannot be expressed as data-driven CRUD"
-    }
-
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<VerbExecutionOutcome> {
-        use crate::domain_ops::helpers::json_extract_uuid_opt;
-
-        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
-        let result = graph_validate_impl(case_id, pool).await?;
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-
-// ============================================================================
-// Edge Loading
-// ============================================================================
-
 type EdgeRow = (
     Uuid,
     Uuid,
@@ -151,51 +66,52 @@ type EdgeRow = (
     Option<String>,
 );
 
-async fn load_edges(pool: &PgPool, case_id: Option<Uuid>) -> Result<Vec<Edge>> {
+async fn load_edges(
+    scope: &mut dyn TransactionScope,
+    case_id: Option<Uuid>,
+) -> Result<Vec<Edge>> {
     let rows: Vec<EdgeRow> = if let Some(cid) = case_id {
-        // Scope to entities linked to this KYC case via entity_workstreams.
-        sqlx::query_as(
-                r#"
-                SELECT
-                    er.relationship_id,
-                    er.from_entity_id,
-                    er.to_entity_id,
-                    er.relationship_type,
-                    er.percentage,
-                    er.source
-                FROM "ob-poc".entity_relationships er
-                WHERE (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
-                  AND (
-                      er.from_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
-                      OR er.to_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
-                  )
-                ORDER BY er.to_entity_id, er.from_entity_id
-                "#,
-            )
-            .bind(cid)
-            .fetch_all(pool)
-            .await?
-    } else {
-        // All active edges.
         sqlx::query_as(
             r#"
-                SELECT
-                    er.relationship_id,
-                    er.from_entity_id,
-                    er.to_entity_id,
-                    er.relationship_type,
-                    er.percentage,
-                    er.source
-                FROM "ob-poc".entity_relationships er
-                WHERE (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
-                ORDER BY er.to_entity_id, er.from_entity_id
-                "#,
+            SELECT
+                er.relationship_id,
+                er.from_entity_id,
+                er.to_entity_id,
+                er.relationship_type,
+                er.percentage,
+                er.source
+            FROM "ob-poc".entity_relationships er
+            WHERE (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
+              AND (
+                  er.from_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
+                  OR er.to_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
+              )
+            ORDER BY er.to_entity_id, er.from_entity_id
+            "#,
         )
-        .fetch_all(pool)
+        .bind(cid)
+        .fetch_all(scope.executor())
+        .await?
+    } else {
+        sqlx::query_as(
+            r#"
+            SELECT
+                er.relationship_id,
+                er.from_entity_id,
+                er.to_entity_id,
+                er.relationship_type,
+                er.percentage,
+                er.source
+            FROM "ob-poc".entity_relationships er
+            WHERE (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
+            ORDER BY er.to_entity_id, er.from_entity_id
+            "#,
+        )
+        .fetch_all(scope.executor())
         .await?
     };
 
-    let edges = rows
+    Ok(rows
         .into_iter()
         .map(
             |(
@@ -205,33 +121,21 @@ async fn load_edges(pool: &PgPool, case_id: Option<Uuid>) -> Result<Vec<Edge>> {
                 relationship_type,
                 percentage,
                 source,
-            )| {
-                Edge {
-                    relationship_id,
-                    from_entity_id,
-                    to_entity_id,
-                    relationship_type,
-                    percentage: percentage.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
-                    source,
-                }
+            )| Edge {
+                relationship_id,
+                from_entity_id,
+                to_entity_id,
+                relationship_type,
+                percentage: percentage.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
+                source,
             },
         )
-        .collect();
-
-    Ok(edges)
+        .collect())
 }
 
-// ============================================================================
-// Check 1: Cycle Detection (DFS-based SCC)
-// ============================================================================
-
-/// Detects cycles in the ownership/control graph using iterative DFS.
-/// Any strongly connected component with more than one node is a cycle.
 fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
-    // Build adjacency list: from -> [to]
     let mut adj: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
     let mut all_nodes: HashSet<Uuid> = HashSet::new();
-
     for edge in edges {
         adj.entry(edge.from_entity_id)
             .or_default()
@@ -240,7 +144,6 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
         all_nodes.insert(edge.to_entity_id);
     }
 
-    // Tarjan's SCC algorithm (iterative variant)
     let mut index_counter: u32 = 0;
     let mut stack: Vec<Uuid> = Vec::new();
     let mut on_stack: HashSet<Uuid> = HashSet::new();
@@ -248,14 +151,10 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     let mut lowlinks: HashMap<Uuid, u32> = HashMap::new();
     let mut sccs: Vec<Vec<Uuid>> = Vec::new();
 
-    // We use a recursive-style DFS via an explicit call stack.
-    // Each frame: (node, neighbor_index, is_root_call)
     for start_node in &all_nodes {
         if indices.contains_key(start_node) {
             continue;
         }
-
-        // DFS stack frames: (node, neighbor_iterator_index)
         let mut dfs_stack: Vec<(Uuid, usize)> = vec![(*start_node, 0)];
         indices.insert(*start_node, index_counter);
         lowlinks.insert(*start_node, index_counter);
@@ -266,13 +165,10 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
         while let Some((node, ni)) = dfs_stack.last_mut() {
             let node = *node;
             let neighbors = adj.get(&node).cloned().unwrap_or_default();
-
             if *ni < neighbors.len() {
                 let neighbor = neighbors[*ni];
                 *ni += 1;
-
                 if let std::collections::hash_map::Entry::Vacant(e) = indices.entry(neighbor) {
-                    // Tree edge — push neighbor.
                     e.insert(index_counter);
                     lowlinks.insert(neighbor, index_counter);
                     index_counter += 1;
@@ -280,7 +176,6 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
                     on_stack.insert(neighbor);
                     dfs_stack.push((neighbor, 0));
                 } else if on_stack.contains(&neighbor) {
-                    // Back edge — update lowlink.
                     let neighbor_idx = indices[&neighbor];
                     let current_low = lowlinks[&node];
                     if neighbor_idx < current_low {
@@ -288,9 +183,7 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
                     }
                 }
             } else {
-                // All neighbors explored — pop and propagate lowlink.
                 dfs_stack.pop();
-
                 if let Some((parent, _)) = dfs_stack.last() {
                     let parent = *parent;
                     let node_low = lowlinks[&node];
@@ -299,8 +192,6 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
                         lowlinks.insert(parent, node_low);
                     }
                 }
-
-                // If node is root of an SCC, pop the SCC from stack.
                 if lowlinks[&node] == indices[&node] {
                     let mut scc: Vec<Uuid> = Vec::new();
                     loop {
@@ -334,11 +225,6 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     }
 }
 
-// ============================================================================
-// Check 2: Missing Percentages
-// ============================================================================
-
-/// Flags ownership/control edges that have no percentage value.
 fn check_missing_percentages(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     for edge in edges {
         if edge.relationship_type == "ownership" && edge.percentage.is_none() {
@@ -355,17 +241,9 @@ fn check_missing_percentages(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) 
     }
 }
 
-// ============================================================================
-// Check 3: Supply > 100%
-// ============================================================================
-
-/// For each target entity, sums all inbound ownership percentages.
-/// If total exceeds 100%, flags as an anomaly.
 fn check_supply_exceeds_100(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
-    // Group ownership edges by to_entity_id and sum percentages.
     let mut supply_map: HashMap<Uuid, f64> = HashMap::new();
     let mut holders_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
-
     for edge in edges {
         if edge.relationship_type == "ownership" {
             if let Some(pct) = edge.percentage {
@@ -377,7 +255,6 @@ fn check_supply_exceeds_100(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
             }
         }
     }
-
     for (to_entity_id, total) in &supply_map {
         if *total > 100.0 {
             let mut entity_ids = vec![*to_entity_id];
@@ -397,87 +274,61 @@ fn check_supply_exceeds_100(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     }
 }
 
-// ============================================================================
-// Check 4: Terminus Integrity
-// ============================================================================
-
-/// Ownership chains should terminate at natural persons (entity_proper_persons)
-/// or known regulated entities. Entities that are leaf sources (no inbound ownership)
-/// and are NOT natural persons are flagged.
 async fn check_terminus_integrity(
     edges: &[Edge],
     _all_entity_ids: &HashSet<Uuid>,
-    pool: &PgPool,
+    scope: &mut dyn TransactionScope,
     anomalies: &mut Vec<GraphAnomaly>,
 ) -> Result<()> {
-    // Find entities that have outbound ownership edges but no inbound ownership edges.
-    // These are the "roots" of ownership chains and should be natural persons.
     let mut has_inbound: HashSet<Uuid> = HashSet::new();
     let mut has_outbound: HashSet<Uuid> = HashSet::new();
-
     for edge in edges {
         if edge.relationship_type == "ownership" || edge.relationship_type == "control" {
             has_inbound.insert(edge.to_entity_id);
             has_outbound.insert(edge.from_entity_id);
         }
     }
-
-    // Root entities: have outbound but no inbound ownership.
     let root_entities: Vec<Uuid> = has_outbound
         .iter()
         .filter(|id| !has_inbound.contains(id))
         .copied()
         .collect();
-
     if root_entities.is_empty() {
         return Ok(());
     }
 
-    // Check which root entities are natural persons.
-    let natural_persons: HashSet<Uuid> = {
-        let ids: Vec<Uuid> = root_entities.clone();
-        let rows: Vec<(Uuid,)> = sqlx::query_as(
-            r#"
-            SELECT pp.entity_id
-            FROM "ob-poc".entity_proper_persons pp
-            WHERE pp.entity_id = ANY($1)
-            "#,
-        )
-        .bind(&ids)
-        .fetch_all(pool)
-        .await?;
+    let natural_rows: Vec<(Uuid,)> = sqlx::query_as(
+        r#"SELECT pp.entity_id
+           FROM "ob-poc".entity_proper_persons pp
+           WHERE pp.entity_id = ANY($1)"#,
+    )
+    .bind(&root_entities)
+    .fetch_all(scope.executor())
+    .await?;
+    let natural_persons: HashSet<Uuid> = natural_rows.into_iter().map(|(id,)| id).collect();
 
-        rows.into_iter().map(|(id,)| id).collect()
-    };
+    let regulated_rows: Vec<(Uuid,)> = sqlx::query_as(
+        r#"
+        SELECT er.entity_id
+        FROM "ob-poc".entity_relationships er2
+        JOIN "ob-poc".entities er ON er.entity_id = er2.from_entity_id
+        WHERE er.entity_id = ANY($1)
+          AND er.deleted_at IS NULL
+          AND er2.is_regulated = true
+        UNION
+        SELECT e.entity_id
+        FROM "ob-poc".entities e
+        JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
+        WHERE e.entity_id = ANY($1)
+          AND e.deleted_at IS NULL
+          AND et.type_code IN ('government', 'public_authority', 'listed_company')
+        "#,
+    )
+    .bind(&root_entities)
+    .fetch_all(scope.executor())
+    .await?;
+    let regulated_entities: HashSet<Uuid> = regulated_rows.into_iter().map(|(id,)| id).collect();
 
-    // Also check for known regulated entities (these are acceptable terminators).
-    let regulated_entities: HashSet<Uuid> = {
-        let ids: Vec<Uuid> = root_entities.clone();
-        let rows: Vec<(Uuid,)> = sqlx::query_as(
-            r#"
-            SELECT er.entity_id
-            FROM "ob-poc".entity_relationships er2
-            JOIN "ob-poc".entities er ON er.entity_id = er2.from_entity_id
-            WHERE er.entity_id = ANY($1)
-              AND er.deleted_at IS NULL
-              AND er2.is_regulated = true
-            UNION
-            SELECT e.entity_id
-            FROM "ob-poc".entities e
-            JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-            WHERE e.entity_id = ANY($1)
-              AND e.deleted_at IS NULL
-              AND et.type_code IN ('government', 'public_authority', 'listed_company')
-            "#,
-        )
-        .bind(&ids)
-        .fetch_all(pool)
-        .await?;
-
-        rows.into_iter().map(|(id,)| id).collect()
-    };
-
-    // Flag root entities that are neither natural persons nor regulated terminators.
     for root_id in &root_entities {
         if !natural_persons.contains(root_id) && !regulated_entities.contains(root_id) {
             anomalies.push(GraphAnomaly {
@@ -492,21 +343,11 @@ async fn check_terminus_integrity(
             });
         }
     }
-
     Ok(())
 }
 
-// ============================================================================
-// Check 5: Source Conflicts
-// ============================================================================
-
-/// Detects conflicting ownership data from different sources for the same edge pair.
-/// If two edges between the same (from, to) pair have different percentages from
-/// different sources, flag it.
 fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
-    // Group edges by (from_entity_id, to_entity_id, relationship_type).
     let mut edge_groups: HashMap<(Uuid, Uuid, String), Vec<&Edge>> = HashMap::new();
-
     for edge in edges {
         let key = (
             edge.from_entity_id,
@@ -515,19 +356,15 @@ fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
         );
         edge_groups.entry(key).or_default().push(edge);
     }
-
     for ((from_id, to_id, rel_type), group) in &edge_groups {
         if group.len() < 2 {
             continue;
         }
-
-        // Check if different sources report different percentages.
         let mut source_pcts: HashMap<String, f64> = HashMap::new();
         for edge in group {
             let src = edge.source.clone().unwrap_or_else(|| "unknown".to_string());
             if let Some(pct) = edge.percentage {
                 if let Some(existing_pct) = source_pcts.get(&src) {
-                    // Same source, different percentage — also a conflict.
                     if (*existing_pct - pct).abs() > 0.01 {
                         anomalies.push(GraphAnomaly {
                             anomaly_type: "SOURCE_CONFLICT".to_string(),
@@ -545,8 +382,6 @@ fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
                 }
             }
         }
-
-        // Cross-source conflicts: compare pairs of distinct sources.
         let sources: Vec<(&String, &f64)> = source_pcts.iter().collect();
         for i in 0..sources.len() {
             for j in (i + 1)..sources.len() {
@@ -569,12 +404,6 @@ fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     }
 }
 
-// ============================================================================
-// Check 6: Orphan Entities
-// ============================================================================
-
-/// Detects entities that appear in the graph but have neither inbound nor outbound
-/// ownership/control edges (isolated nodes). These are suspicious in a relationship graph.
 fn check_orphan_entities(
     edges: &[Edge],
     all_entity_ids: &HashSet<Uuid>,
@@ -585,20 +414,6 @@ fn check_orphan_entities(
         connected.insert(edge.from_entity_id);
         connected.insert(edge.to_entity_id);
     }
-
-    // Orphans are entities referenced somewhere but not in any edge.
-    // In practice this fires when a case's entity_workstreams references entities
-    // that have no relationships at all.
-    // Since all_entity_ids is built from edges, orphans only appear if we loaded
-    // extra entity IDs from the case. For the all-edges path, this check finds
-    // nothing by construction. We still keep it for case-scoped mode where we could
-    // extend loading to include workstream entities.
-
-    // For now, we flag entities that ONLY appear as self-loops (from == to), which
-    // is itself an anomaly, or entities that appear on exactly one side (only source
-    // or only target) with no meaningful peer — this is handled by terminus integrity.
-    // This section flags true isolates if we ever load extra entity IDs.
-
     for entity_id in all_entity_ids {
         if !connected.contains(entity_id) {
             anomalies.push(GraphAnomaly {
@@ -614,15 +429,8 @@ fn check_orphan_entities(
     }
 }
 
-// ============================================================================
-// Anomaly Persistence
-// ============================================================================
-
-/// Persists anomalies to "ob-poc".research_anomalies.
-/// Creates a research_action record to serve as the parent for anomaly rows.
-/// Returns the number of anomalies persisted.
 async fn persist_anomalies(
-    pool: &PgPool,
+    scope: &mut dyn TransactionScope,
     anomalies: &[GraphAnomaly],
     case_id: Option<Uuid>,
     all_entity_ids: &HashSet<Uuid>,
@@ -631,14 +439,12 @@ async fn persist_anomalies(
         return Ok(0);
     }
 
-    // We need a target_entity_id for the research_action. Use the first entity from
-    // the case, or the first entity from the graph if no case.
     let representative_entity_id = if let Some(cid) = case_id {
         let row: Option<(Uuid,)> = sqlx::query_as(
             r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1 LIMIT 1"#,
         )
         .bind(cid)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
         row.map(|(id,)| id)
     } else {
@@ -648,7 +454,6 @@ async fn persist_anomalies(
     let target_entity_id = representative_entity_id
         .ok_or_else(|| anyhow!("No entities found to anchor research action"))?;
 
-    // Create a research_action as parent for the anomaly records.
     let action_id: Uuid = sqlx::query_scalar(
         r#"
         INSERT INTO "ob-poc".research_actions (
@@ -673,30 +478,24 @@ async fn persist_anomalies(
             'graph',
             'validate',
             '{}'::jsonb,
-            true,
-            0,
-            0,
-            0
+            true, 0, 0, 0
         )
         RETURNING action_id
         "#,
     )
     .bind(target_entity_id)
     .bind(case_id.map(|id| id.to_string()))
-    .fetch_one(pool)
+    .fetch_one(scope.executor())
     .await?;
 
     let mut persisted = 0i32;
-
     for anomaly in anomalies {
-        // Use the first entity_id from the anomaly as the entity reference.
         let entity_id = anomaly
             .entity_ids
             .first()
             .copied()
             .unwrap_or(target_entity_id);
 
-        // Map anomaly_type to a rule_code that fits the VARCHAR(50) constraint.
         let rule_code = match anomaly.anomaly_type.as_str() {
             "CYCLE" => "GRAPH_CYCLE_DETECTED",
             "MISSING_PERCENTAGE" => "GRAPH_MISSING_PCT",
@@ -707,14 +506,12 @@ async fn persist_anomalies(
             other => other,
         };
 
-        // Map severity: our types use ERROR/WARNING, the DB allows ERROR/WARNING/INFO.
         let db_severity = match anomaly.severity.as_str() {
             "ERROR" => "ERROR",
             "WARNING" => "WARNING",
             _ => "INFO",
         };
 
-        // Build expected/actual values for context.
         let expected_value: Option<String> = match anomaly.anomaly_type.as_str() {
             "SUPPLY_EXCEEDS_100" => Some("<=100%".to_string()),
             "MISSING_PERCENTAGE" => Some("numeric percentage".to_string()),
@@ -722,20 +519,13 @@ async fn persist_anomalies(
             "CYCLE" => Some("acyclic graph".to_string()),
             _ => None,
         };
-
         let actual_value: Option<String> = Some(anomaly.detail.clone());
 
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".research_anomalies (
-                action_id,
-                entity_id,
-                rule_code,
-                severity,
-                description,
-                expected_value,
-                actual_value,
-                status
+                action_id, entity_id, rule_code, severity,
+                description, expected_value, actual_value, status
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'OPEN')
             "#,
         )
@@ -746,9 +536,8 @@ async fn persist_anomalies(
         .bind(&anomaly.detail)
         .bind(&expected_value)
         .bind(&actual_value)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
-
         persisted += 1;
     }
 
@@ -757,6 +546,52 @@ async fn persist_anomalies(
         persisted,
         action_id
     );
-
     Ok(persisted)
+}
+
+pub struct Validate;
+
+#[async_trait]
+impl SemOsVerbOp for Validate {
+    fn fqn(&self) -> &str {
+        "graph.validate"
+    }
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
+
+        let edges = load_edges(scope, case_id).await?;
+        let mut all_entity_ids: HashSet<Uuid> = HashSet::new();
+        for edge in &edges {
+            all_entity_ids.insert(edge.from_entity_id);
+            all_entity_ids.insert(edge.to_entity_id);
+        }
+        let entities_analysed = all_entity_ids.len() as i32;
+        let edges_analysed = edges.len() as i32;
+
+        let mut anomalies: Vec<GraphAnomaly> = Vec::new();
+        detect_cycles(&edges, &mut anomalies);
+        check_missing_percentages(&edges, &mut anomalies);
+        check_supply_exceeds_100(&edges, &mut anomalies);
+        check_source_conflicts(&edges, &mut anomalies);
+        check_orphan_entities(&edges, &all_entity_ids, &mut anomalies);
+        check_terminus_integrity(&edges, &all_entity_ids, scope, &mut anomalies).await?;
+
+        let anomalies_found = anomalies.len() as i32;
+        let anomalies_persisted =
+            persist_anomalies(scope, &anomalies, case_id, &all_entity_ids).await?;
+
+        let result = GraphValidateResult {
+            anomalies_found,
+            anomalies,
+            edges_analysed,
+            entities_analysed,
+            anomalies_persisted,
+        };
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
+    }
 }

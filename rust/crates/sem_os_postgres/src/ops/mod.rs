@@ -49,6 +49,7 @@ pub mod entity;
 pub mod evidence;
 pub mod focus;
 pub mod governance;
+pub mod graph_validate;
 pub mod import_run;
 pub mod investor;
 pub mod investor_role;
@@ -625,6 +626,11 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #54: graph.validate (1 plugin verb — cycle detection +
+    // terminus integrity + per-target supply + source conflict +
+    // orphan-entity + anomaly persistence).
+    registry.register(Arc::new(graph_validate::Validate));
 
     // Phase B slice #53: cbu-specialist-roles (7 plugin verbs —
     // dual-write into cbu_entity_roles + entity_relationships edge).
