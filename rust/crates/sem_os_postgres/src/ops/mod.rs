@@ -43,6 +43,7 @@ pub mod pack_select;
 pub mod phrase;
 pub mod registry;
 pub mod registry_ops;
+pub mod requirement;
 pub mod semantic;
 pub mod service_pipeline;
 pub mod session;
@@ -259,6 +260,10 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
 
     // Phase B slice #10: team domain (direct-sqlx, multi-step txn).
     registry.register(Arc::new(team::TransferMember));
+
+    // Phase B slice #11: requirement domain (direct-sqlx batch).
+    registry.register(Arc::new(requirement::CreateSet));
+    registry.register(Arc::new(requirement::ListOutstanding));
 
     registry
 }

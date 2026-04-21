@@ -1,57 +1,46 @@
-//! Requirement custom operations
+//! Requirement verbs — SemOS-side YAML-first re-implementation.
 //!
-//! Operations for document requirement management that integrate with
-//! the workflow task queue (Migration 049).
+//! Two plugin verbs backing document-requirement management
+//! (Migration 049 workflow task queue):
+//! - `requirement.create-set` — batch create/upsert of requirements.
+//! - `requirement.list-outstanding` — list unsatisfied requirements
+//!   for workflow progress display.
 //!
-//! - `requirement.create-set` - Create multiple requirements in batch
-//! - `requirement.list-outstanding` - List unsatisfied requirements for workflow
+//! Writes + reads all route through `scope.executor()` so the batch
+//! insert in `create-set` commits atomically inside the Sequencer's txn.
 
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use dsl_runtime_macros::register_custom_op;
-use sqlx::PgPool;
+use sqlx::Row;
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_string_list, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-/// Create multiple document requirements for an entity
-///
-/// Rationale: Batch creation is more efficient than individual creates,
-/// and all requirements share the same workflow context.
-#[register_custom_op]
-pub struct RequirementCreateSetOp;
+use super::SemOsVerbOp;
+
+pub struct CreateSet;
 
 #[async_trait]
-impl CustomOperation for RequirementCreateSetOp {
-    fn domain(&self) -> &'static str {
-        "requirement"
-    }
-    fn verb(&self) -> &'static str {
-        "create-set"
-    }
-    fn rationale(&self) -> &'static str {
-        "Batch creation of requirements with shared workflow context"
+impl SemOsVerbOp for CreateSet {
+    fn fqn(&self) -> &str {
+        "requirement.create-set"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use crate::domain_ops::helpers::{
-            json_extract_string_list, json_extract_string_opt, json_extract_uuid,
-            json_extract_uuid_opt,
-        };
-        use sqlx::Row;
-
         let subject_entity_id = json_extract_uuid(args, ctx, "subject-entity-id")
             .or_else(|_| json_extract_uuid(args, ctx, "entity-id"))?;
 
         let doc_types = json_extract_string_list(args, "doc-types")?;
-
         if doc_types.is_empty() {
             return Err(anyhow::anyhow!("doc-types cannot be empty"));
         }
@@ -62,8 +51,8 @@ impl CustomOperation for RequirementCreateSetOp {
         let due_date: Option<NaiveDate> = json_extract_string_opt(args, "due-date")
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
 
-        let required_state = json_extract_string_opt(args, "required-state")
-            .unwrap_or_else(|| "verified".to_string());
+        let required_state =
+            json_extract_string_opt(args, "required-state").unwrap_or_else(|| "verified".to_string());
 
         let mut requirement_ids: Vec<Uuid> = Vec::with_capacity(doc_types.len());
 
@@ -85,53 +74,35 @@ impl CustomOperation for RequirementCreateSetOp {
             .bind(doc_type)
             .bind(&required_state)
             .bind(due_date)
-            .fetch_one(pool)
+            .fetch_one(scope.executor())
             .await?;
 
             let requirement_id: Uuid = requirement_row.get("requirement_id");
             requirement_ids.push(requirement_id);
         }
 
-        let result = serde_json::json!({
+        let count = requirement_ids.len();
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
             "requirement_ids": requirement_ids,
-            "count": requirement_ids.len()
-        });
-
-        Ok(VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+            "count": count,
+        })))
     }
 }
 
-/// List unsatisfied requirements for a workflow
-///
-/// Rationale: Complex query with joined fields for workflow progress display.
-#[register_custom_op]
-pub struct RequirementUnsatisfiedOp;
+pub struct ListOutstanding;
 
 #[async_trait]
-impl CustomOperation for RequirementUnsatisfiedOp {
-    fn domain(&self) -> &'static str {
-        "requirement"
-    }
-    fn verb(&self) -> &'static str {
-        "list-outstanding"
-    }
-    fn rationale(&self) -> &'static str {
-        "Complex query for workflow progress tracking"
+impl SemOsVerbOp for ListOutstanding {
+    fn fqn(&self) -> &str {
+        "requirement.list-outstanding"
     }
 
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use crate::domain_ops::helpers::json_extract_uuid;
-        use sqlx::Row;
-
         let workflow_instance_id = json_extract_uuid(args, ctx, "workflow-instance-id")?;
 
         let rows = sqlx::query(
@@ -152,7 +123,7 @@ impl CustomOperation for RequirementUnsatisfiedOp {
             "#,
         )
         .bind(workflow_instance_id)
-        .fetch_all(pool)
+        .fetch_all(scope.executor())
         .await?;
 
         let results: Vec<serde_json::Value> = rows
@@ -166,15 +137,11 @@ impl CustomOperation for RequirementUnsatisfiedOp {
                     "required_state": row.get::<String, _>("required_state"),
                     "attempt_count": row.get::<i32, _>("attempt_count"),
                     "last_rejection_code": row.get::<Option<String>, _>("last_rejection_code"),
-                    "last_rejection_reason": row.get::<Option<String>, _>("last_rejection_reason")
+                    "last_rejection_reason": row.get::<Option<String>, _>("last_rejection_reason"),
                 })
             })
             .collect();
 
         Ok(VerbExecutionOutcome::RecordSet(results))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
