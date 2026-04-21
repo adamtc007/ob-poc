@@ -43,7 +43,7 @@ pub mod entity_ops;
 pub mod entity_query;
 pub mod evidence_ops;
 pub mod graph_validate_ops;
-pub mod import_run_ops;
+// Phase 5c-migrate Phase B slice #23: import_run_ops → `sem_os_postgres::ops::import_run`.
 pub mod investor_ops;
 pub mod investor_role_ops;
 pub mod kyc_case_ops;

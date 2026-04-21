@@ -38,6 +38,7 @@ pub mod constellation;
 pub mod docs_bundle;
 pub mod focus;
 pub mod governance;
+pub mod import_run;
 pub mod maintenance;
 pub mod matrix_overlay;
 pub mod nav;
@@ -341,6 +342,12 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(shared_atom::ListConsumers));
     registry.register(Arc::new(shared_atom::ReplayConstellation));
     registry.register(Arc::new(shared_atom::AcknowledgeSharedUpdate));
+
+    // Phase B slice #23: research.import-run domain (3 plugin verbs —
+    // begin/complete/supersede, supersession cascade).
+    registry.register(Arc::new(import_run::Begin));
+    registry.register(Arc::new(import_run::Complete));
+    registry.register(Arc::new(import_run::Supersede));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
