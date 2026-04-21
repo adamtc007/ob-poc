@@ -33,7 +33,7 @@ pub mod client_group_ops;
 // Phase 5c-migrate Phase B slice #33: control_ops → `sem_os_postgres::ops::control`.
 // Phase 5c-migrate Phase B slice #50: custody → `sem_os_postgres::ops::custody`.
 pub mod deal_ops;
-pub mod dilution_ops;
+// Phase 5c-migrate Phase B slice #59: dilution_ops → `sem_os_postgres::ops::dilution`.
 pub mod discovery_ops;
 // Phase 5c-migrate Phase B slice #13: docs_bundle_ops → `sem_os_postgres::ops::docs_bundle`.
 pub mod document_ops;

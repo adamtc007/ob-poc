@@ -752,14 +752,16 @@ mod tests {
         assert!(registry.has("capital", "cap-table"));
         assert!(registry.has("capital", "holders"));
         // Dilution instrument operations
-        assert!(registry.has("capital", "dilution.grant-options"));
-        assert!(registry.has("capital", "dilution.issue-warrant"));
-        assert!(registry.has("capital", "dilution.create-safe"));
-        assert!(registry.has("capital", "dilution.create-convertible-note"));
-        assert!(registry.has("capital", "dilution.exercise"));
-        assert!(registry.has("capital", "dilution.forfeit"));
-        assert!(registry.has("capital", "dilution.list"));
-        assert!(registry.has("capital", "dilution.get-summary"));
+        // Phase 5c-migrate Phase B slice #59: dilution_ops moved to
+        // `sem_os_postgres::ops::dilution::*`.
+        assert!(!registry.has("capital", "dilution.grant-options"));
+        assert!(!registry.has("capital", "dilution.issue-warrant"));
+        assert!(!registry.has("capital", "dilution.create-safe"));
+        assert!(!registry.has("capital", "dilution.create-convertible-note"));
+        assert!(!registry.has("capital", "dilution.exercise"));
+        assert!(!registry.has("capital", "dilution.forfeit"));
+        assert!(!registry.has("capital", "dilution.list"));
+        assert!(!registry.has("capital", "dilution.get-summary"));
         // Ownership operations
         // Phase 5c-migrate Phase B slice #55: ownership_ops moved to
         // `sem_os_postgres::ops::ownership::*`.

@@ -42,6 +42,7 @@ pub mod control;
 pub mod control_compute;
 pub mod coverage_compute;
 pub mod custody;
+pub mod dilution;
 pub mod docs_bundle;
 pub mod economic_exposure;
 pub mod edge;
@@ -630,6 +631,19 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #59: capital.dilution.* (8 plugin verbs —
+    // option grants, warrants, SAFEs, convertible notes, exercise with
+    // FOR UPDATE + idempotency, forfeit, list, summary). The legacy
+    // retry-on-serialization loop is dropped — Sequencer owns retry.
+    registry.register(Arc::new(dilution::GrantOptions));
+    registry.register(Arc::new(dilution::IssueWarrant));
+    registry.register(Arc::new(dilution::CreateSafe));
+    registry.register(Arc::new(dilution::CreateConvertibleNote));
+    registry.register(Arc::new(dilution::Exercise));
+    registry.register(Arc::new(dilution::Forfeit));
+    registry.register(Arc::new(dilution::List));
+    registry.register(Arc::new(dilution::GetSummary));
 
     // Phase B slice #58: research.workflow.* (4 plugin verbs —
     // confirm-decision, reject-decision, audit-trail (multi-table
