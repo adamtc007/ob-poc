@@ -1,0 +1,111 @@
+gate_version: 1
+phase: "1"
+phase_name: "Create dsl-runtime crate (skeleton) + move VerbExecutionPort trait"
+opened_at: 2026-04-18T14:00:00Z
+opened_by: adamtc007
+depends_on: ["0", "0g", "0h"]
+scope_statement: |
+  Per implementation plan §3 Phase 1. Create dsl-runtime crate. Move
+  VerbExecutionPort trait (and its MockVerbExecutor test support) from
+  sem_os_core::execution to dsl-runtime. Phase 1 does NOT move supporting
+  types (VerbExecutionContext, VerbExecutionResult, VerbSideEffects,
+  VerbExecutionOutcome) — those stay in sem_os_core until Phase 2.
+  Because Phase 2 hasn't moved those types yet, dsl-runtime imports them
+  from sem_os_core. This creates a TRANSITIONAL dsl-runtime → sem_os_core
+  Cargo dep that Phase 2 reverses.
+
+  No deprecated re-export in sem_os_core::execution because that would
+  create a circular dep (sem_os_core → dsl-runtime → sem_os_core). The
+  re-export lands in Phase 2 after the dep direction inverts. Call sites
+  updated directly.
+
+criteria:
+  - id: dsl-runtime-crate-exists
+    description: "rust/crates/dsl-runtime/ created with Cargo.toml + src/lib.rs + src/port.rs"
+    check_command: "test -f rust/crates/dsl-runtime/Cargo.toml && test -f rust/crates/dsl-runtime/src/lib.rs && test -f rust/crates/dsl-runtime/src/port.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "3 files created; workspace member added to rust/Cargo.toml"
+    closed_at: 2026-04-18T14:10:00Z
+
+  - id: trait-moved
+    description: "VerbExecutionPort removed from sem_os_core::execution and owned by dsl-runtime"
+    check_command: "! grep -q 'pub trait VerbExecutionPort' rust/crates/sem_os_core/src/execution.rs && grep -q 'pub trait VerbExecutionPort' rust/crates/dsl-runtime/src/port.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "sem_os_core::execution contains only a NOTE comment in place of the trait; dsl_runtime::port owns the definition"
+    closed_at: 2026-04-18T14:15:00Z
+
+  - id: mock-verb-executor-moved
+    description: "test_support::MockVerbExecutor moved with the trait"
+    check_command: "! grep -q 'impl VerbExecutionPort for MockVerbExecutor' rust/crates/sem_os_core/src/execution.rs && grep -q 'impl VerbExecutionPort for MockVerbExecutor' rust/crates/dsl-runtime/src/port.rs"
+    status: passed
+    signed_by: adamtc007
+    evidence: "3 mock_executor_* tests moved from sem_os_core tests to dsl-runtime::port::tests; all 3 pass"
+    closed_at: 2026-04-18T14:20:00Z
+
+  - id: call-sites-updated
+    description: "6 call-site references updated to use dsl_runtime::VerbExecutionPort"
+    check_command: "! grep -qr 'sem_os_core::execution::VerbExecutionPort' rust/src rust/tests rust/crates/sem_os_harness"
+    status: passed
+    signed_by: adamtc007
+    evidence: "Updated: tests/verb_execution_port_test.rs, crates/sem_os_harness/src/lib.rs (5 inline + 1 use), src/sem_os_runtime/verb_executor_adapter.rs, src/repl/orchestrator_v2.rs (2), src/runbook/step_executor_bridge.rs (2)"
+    closed_at: 2026-04-18T14:25:00Z
+
+  - id: workspace-compiles-clean
+    description: "cargo build --workspace returns zero errors after Phase 1 changes"
+    check_command: "cargo build --workspace"
+    status: passed
+    signed_by: adamtc007
+    evidence: "Build finished in 12m 43s, zero errors. Same pre-existing warning in sem_os_postgres/src/crud_executor.rs:1354 (unused `crud` variable) — unrelated to Phase 1."
+    closed_at: 2026-04-18T14:30:00Z
+
+  - id: dsl-runtime-tests-pass
+    description: "dsl-runtime own tests green (3 mock executor tests)"
+    check_command: "cargo test -p dsl-runtime"
+    status: passed
+    signed_by: adamtc007
+    evidence: "3/3 tests pass — mock_executor_symbol_propagation, mock_executor_unknown_verb_returns_error, mock_executor_returns_preloaded_result"
+    closed_at: 2026-04-18T14:30:00Z
+
+  - id: determinism-harness-identical
+    description: "Phase 0 harnesses still green, no drift in their output"
+    check_command: "cargo test -p determinism-harness -p round-trip-harness -p ob-poc-types"
+    status: passed
+    signed_by: adamtc007
+    evidence: "determinism-harness 6/6 pass, round-trip-harness 4/4 pass, ob-poc-types::gated_envelope 19/19 pass — StateGateHash frozen vectors still match"
+    closed_at: 2026-04-18T14:30:00Z
+
+  - id: no-new-regressions
+    description: "sem_os_core test failures are pre-existing (not introduced by Phase 1)"
+    check_command: "# verified via git stash + rebuild: 4 abac/gates failures reproduce on 6bbf134e baseline"
+    status: passed
+    signed_by: adamtc007
+    evidence: "Incident 2026-04-18-tier-0-preexisting-sem-os-core-test-failures.md documents the pre-existing state. The v0.3 §4.1 '1194 passing' claim was already stale; B3 baseline correction applies."
+    closed_at: 2026-04-18T14:32:00Z
+
+exit_conditions:
+  phase_2_unblocked: true
+
+closed_at: 2026-04-18T14:35:00Z
+closed_by: adamtc007
+sign_off_commit_sha: pending-commit
+
+# ---
+# Final summary:
+#   [PASS] dsl-runtime crate exists with trait + test support
+#   [PASS] VerbExecutionPort moved; MockVerbExecutor moved
+#   [PASS] 11 call-site references updated (2 `use` statements + 9 inline paths)
+#   [PASS] Workspace build clean
+#   [PASS] dsl-runtime tests pass (3/3)
+#   [PASS] Phase 0 harnesses unchanged
+#   [PASS] 4 sem_os_core pre-existing failures logged as Tier-0 incident, not a regression
+#
+# Deferred to Phase 2:
+#   - Move VerbExecutionContext, VerbExecutionResult, VerbSideEffects,
+#     VerbExecutionOutcome, VerbCall to dsl-runtime
+#   - Invert crate-dep direction (remove sem_os_core from dsl-runtime deps)
+#   - Add deprecated re-export in sem_os_core::execution
+#   - Move CustomOperation trait + CustomOperationRegistry + VerbRegistrar
+#   - Move #[register_custom_op] macro to dsl-runtime-macros (D3)
+# ---

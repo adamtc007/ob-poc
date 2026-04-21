@@ -1,0 +1,117 @@
+snapshot_version: 1
+captured_at: 2026-04-18T14:35:00Z
+captured_by: phase-1-close
+git_sha: pending-commit
+framework_version: 0.1
+previous_baseline: phase-0-2026-04-18.yaml
+
+workspace:
+  crate_count: 23             # 20 pre-refactor + dsl-runtime + determinism-harness + round-trip-harness
+  delta_from_previous: +3
+
+tests:
+  # Post-Phase-1 test changes:
+  # - sem_os_core: -3 tests (mock_executor_* removed, moved to dsl-runtime)
+  # - dsl-runtime: +3 tests (mock_executor_* added, same assertions)
+  # Net: 0 change in total workspace tests.
+  ob_poc_types_passing: 106   # unchanged from phase-0
+  dsl_runtime_passing: 3      # new — 3 mock executor tests
+  determinism_harness_passing: 6
+  round_trip_harness_passing: 4
+  sem_os_core_passing: 432    # 436 - 4 pre-existing failures (incident filed)
+  sem_os_core_preexisting_failures: 4
+  workspace_passing_tracked_here: 551
+  # Full workspace-wide count deferred to Phase 0h xtask.
+
+metrics:
+  # Unchanged from Phase 0 (no behavioural change in Phase 1 — trait relocated only).
+  intent_hit_rate_first_attempt_pct: null
+  intent_hit_rate_two_attempt_pct: null
+  scenario_verb_rate_pct: null
+  narration_round_trip_ms_p95: null
+  outbox_drain_lag_ms_p95: null
+  determinism_harness_coverage_pct: null
+
+code:
+  domain_ops_file_count: 91
+  custom_operation_impl_count: 650
+  ob_poc_types_module_count: 21
+  dsl_runtime_crate_exists: true
+  dsl_runtime_owns_verb_execution_port: true
+  sem_os_core_owns_verb_execution_port: false
+
+  trait_signature_hashes:
+    VerbExecutionPort: moved_to_dsl_runtime
+    CustomOperation: null           # still in ob-poc domain_ops (Phase 2)
+    VerbRegistrar: null             # Phase 2
+    GatedVerbEnvelope: defined
+    PendingStateAdvance: defined
+    TransactionScope: defined
+    OutboxDraft: defined
+    OutboxEffectKind: defined
+    VerbExecutionOutcome: sem_os_core_phase1
+    VerbExecutionContext: sem_os_core_phase1  # moves in Phase 2
+    StateGateHash: defined
+
+schema:
+  migrations_head: 131    # 128 pre-refactor + 129/130 pre-existing + 131 (outbox)
+  entity_tables_with_row_version: 0
+  entity_tables_total: 147
+  outbox_tables:
+    - sem_reg.outbox_events
+    - public.outbox        # added Phase 0d, scaffolded — not yet wired
+
+pattern_b_ledger:
+  pattern_a_open: 0       # CLOSED in Phase 0g
+  pattern_b_open: 38
+  total_closed: 1
+  delta_from_previous: +1 closed
+  file_status:
+    sem_os_maintenance_ops.rs: CLOSED
+    bpmn_lite_ops.rs: OPEN
+    source_loader_ops.rs: OPEN
+    gleif_ops.rs: OPEN
+
+decisions_honoured:
+  D1_row_version_bigint_everywhere: null
+  D2_row_version_per_entity_group_rollout: null
+  D3_macro_in_dsl_runtime_macros: false   # Phase 2 work
+  D4_websocket_per_session: null
+  D5_chat_response_narration_populated: true
+  D6_no_pg_crud_executor_subcrate: null
+  D7_alternate_step_executors_removed: false
+  D8_no_new_a1_violations: true
+  D9_determinism_harness_every_pr: null  # not yet wired to CI
+  D10_separate_outbox_table: true         # public.outbox created in Phase 0d
+  D11_pattern_b_ledger_exists: true
+
+invariants_honoured:
+  closed_loop_rehydrate_after_writes: true
+  single_dispatch_site: false             # D7, Phase 5b
+  three_plane_dependency_direction: partial  # dsl-runtime → sem_os_core is a TEMPORARY Phase-1 dep, reversed Phase 2
+  no_nlp_in_control_plane: partial
+  no_external_effects_in_verb_bodies_except_ledgered: partial
+
+phase_1_completion:
+  crate_created: true
+  trait_moved: true
+  mock_executor_moved: true
+  call_sites_updated: true
+  workspace_build_clean: true
+  dsl_runtime_tests_pass: true
+  phase_0_harness_regression: none
+
+notes: |
+  Phase 1 complete. All criteria on phase-1 gate YAML passed.
+
+  One finding: sem_os_core has 4 pre-existing test failures in abac::enforce
+  and gates modules that are unrelated to Phase 1. Incident
+  `2026-04-18-tier-0-preexisting-sem-os-core-test-failures.md` logs the
+  details; these are grandfathered, not Phase 1 regressions, confirmed
+  via git stash + rebuild on 6bbf134e.
+
+  Next: Phase 2 moves VerbExecutionContext, VerbExecutionResult, etc. to
+  dsl-runtime, reverses the transitional dsl-runtime → sem_os_core dep,
+  introduces the deprecated re-export in sem_os_core::execution, and
+  expands VerbExecutionOutcome with PendingStateAdvance + OutboxDraft
+  fields (additive, empty initial vectors for all 625 ops).

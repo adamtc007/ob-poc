@@ -1,0 +1,147 @@
+snapshot_version: 1
+captured_at: 2026-04-18T12:45:00Z
+captured_by: phase-0-entry
+git_sha: 6bbf134e
+framework_version: 0.1
+
+workspace:
+  crate_count: 20
+  crate_list:
+    - dsl-core
+    - dsl-lsp
+    - entity-gateway
+    - governed_query_proc
+    - inspector-projection
+    - ob-agentic
+    - ob-poc-macros
+    - ob-poc-types
+    - ob-poc-web
+    - ob-semantic-matcher
+    - ob-templates
+    - ob-workflow
+    - playbook-core
+    - playbook-lower
+    - sem_os_client
+    - sem_os_core
+    - sem_os_harness
+    - sem_os_obpoc_adapter
+    - sem_os_postgres
+    - sem_os_server
+
+# NOTE: Phase-0-entry baseline. Captured at the moment Phase 0b
+# (gated_envelope types) was introduced. Full metric harness not yet
+# implemented — this baseline records only values the current repo state
+# can deterministically yield.
+#
+# Remaining metric capture deferred to Phase 0e (harness builds) and the
+# `cargo x baseline-snapshot` xtask to be implemented as part of Phase 0h.
+
+tests:
+  # ob-poc-types crate specifically — this is what Phase 0b touched.
+  # Full workspace test count captured when baseline-snapshot xtask exists.
+  ob_poc_types_passing: 106  # 87 pre-existing + 19 new gated_envelope tests
+  ob_poc_types_failing: 0
+  ob_poc_types_new: 19
+  workspace_passing: null  # to be filled at next baseline (Phase 0h xtask)
+  workspace_failing: null
+  workspace_ignored: null
+
+metrics:
+  # Hit rate and scenario metrics are captured by harnesses that don't yet
+  # exist as one-shot commands. Will populate at Phase 0e completion.
+  intent_hit_rate_first_attempt_pct: null  # last measured 78.2 (CLAUDE.md)
+  intent_hit_rate_two_attempt_pct: null    # last measured 99.4
+  scenario_verb_rate_pct: null             # last measured 91.7
+  narration_round_trip_ms_p95: null        # no harness yet
+  outbox_drain_lag_ms_p95: null            # not yet wired
+  determinism_harness_coverage_pct: null   # harness not yet built
+  round_trip_harness_coverage_ops_tested: null
+
+code:
+  domain_ops_file_count: 91  # includes mod.rs + utility files (89 audited + 2)
+  custom_operation_impl_count: 650  # approximate, from Phase 0a matrix
+  ob_poc_types_module_count: 21  # was 20 before Phase 0b (gated_envelope added)
+  ob_poc_types_gated_envelope_lines: 1032
+  # Trait signature hashes to be populated when contract-shape crate exists
+  # (Phase 0h). For now, the trait text itself lives in the golden file when
+  # the insta-snapshot crate is scaffolded.
+  trait_signature_hashes:
+    VerbExecutionPort: null         # still in sem_os_core::execution
+    CustomOperation: null           # still in ob-poc domain_ops
+    VerbRegistrar: null             # not yet introduced
+    GatedVerbEnvelope: defined      # in ob-poc-types::gated_envelope (Phase 0b)
+    PendingStateAdvance: defined    # ditto
+    TransactionScope: defined       # trait skeleton, executor() deferred to Phase 5c
+    OutboxDraft: defined
+    OutboxEffectKind: defined
+    VerbExecutionOutcome: defined
+    VerbExecutionContext: null      # still in sem_os_core (moves to dsl-runtime at Phase 2)
+    StateGateHash: defined
+
+schema:
+  migrations_head: 128
+  entity_tables_with_row_version: 0
+  entity_tables_total: 147        # approximate; precise Stream-2 audit pending
+  outbox_tables:
+    - sem_reg.outbox_events       # pre-existing (migration 092)
+
+pattern_b_ledger:
+  pattern_a_open: 1               # sem_os_maintenance_ops.rs (MaintenanceReindexEmbeddingsOp)
+  pattern_b_open: 38              # 5 bpmn_lite + 16 source_loader + 17 gleif
+  total_closed: 0
+  file_status:
+    sem_os_maintenance_ops.rs: OPEN
+    bpmn_lite_ops.rs: OPEN
+    source_loader_ops.rs: OPEN
+    gleif_ops.rs: OPEN
+
+decisions_honoured:
+  D1_row_version_bigint_everywhere: null   # Stream-2 pending
+  D2_row_version_per_entity_group_rollout: null
+  D3_macro_in_dsl_runtime_macros: false    # still in ob-poc-macros; moves at Phase 2
+  D4_websocket_per_session: null           # Phase 5e
+  D5_chat_response_narration_populated: true  # pre-existing; holds through 5e per D5
+  D6_no_pg_crud_executor_subcrate: null    # PgCrudExecutor still in sem_os_postgres; moves Phase 3
+  D7_alternate_step_executors_removed: false
+  D8_no_new_a1_violations: true            # Phase 0b introduced no new A1 violations
+  D9_determinism_harness_every_pr: null    # harness not yet live
+  D10_separate_outbox_table: null          # public.outbox migration deferred to Phase 0d
+  D11_pattern_b_ledger_exists: true        # /docs/todo/pattern-b-a1-remediation-ledger.md
+
+invariants_honoured:
+  closed_loop_rehydrate_after_writes: true     # pre-existing writes_since_push mechanism
+  single_dispatch_site: false                  # 3 alternate step executors exist (D7, Phase 5b)
+  three_plane_dependency_direction: true       # verified by Audit 1 — no sem_os_* → ob-poc edge
+  no_nlp_in_control_plane: partial             # SessionVerbSurface NLP straddle (Q3, Phase 5b)
+  no_external_effects_in_verb_bodies_except_ledgered: partial  # 4 A1 violations, all ledgered
+
+phase_0_completion:
+  0a_ownership_matrix: complete    # docs/todo/phase-0a-ownership-matrix.md
+  0a_a1_clarification: complete    # §9 of matrix document
+  0b_envelope_types: complete      # rust/crates/ob-poc-types/src/gated_envelope.rs (1032 lines, 19 tests)
+  0c_state_gate_hash_spec: partial # encoding implemented; vectors frozen at Phase 0c review
+  0d_outbox_migration: pending     # public.outbox migration not yet drafted
+  0e_harnesses: pending            # determinism + round-trip harnesses not yet scaffolded
+  0f_row_version_audit: pending    # Stream 2 audit not yet started
+  0g_pattern_a_remediation: pending
+  0h_drift_framework: in_progress  # framework doc + directory structure + first baseline done
+
+notes: |
+  Phase 0b landed successfully. gated_envelope module compiles clean, 19
+  unit tests pass (serde round-trips + StateGateHash determinism vectors +
+  canonical encoding length assertion).
+
+  First baseline captured as part of Phase 0h framework activation. The
+  xtask-based baseline-snapshot command is not yet implemented — this file
+  was captured manually. Phase 0h deliverable #2 (baseline script) will
+  produce the next baseline programmatically.
+
+  StateGateHash hex vectors in gated_envelope::tests are anchored to
+  determinism across runs (same hash across calls) but NOT yet frozen to
+  specific hex values. Phase 0c review will pick specific hex strings and
+  change the test assertions to check them, freezing the canonical
+  encoding contract.
+
+  Pattern B ledger status: 0/39 closed. Phase 0g Pattern A remediation
+  will move sem_os_maintenance_ops row to CLOSED. Phase 5f will close the
+  remaining 38.

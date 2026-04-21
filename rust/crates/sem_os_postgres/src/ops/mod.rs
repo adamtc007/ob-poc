@@ -81,6 +81,7 @@ pub mod stewardship_helper;
 pub mod team;
 pub mod temporal;
 pub mod tollgate;
+pub mod tollgate_evaluate;
 pub mod trading_matrix;
 pub mod trust;
 pub mod ubo_analysis;
@@ -618,6 +619,10 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(schema::SchemaGenerateErd));
     registry.register(Arc::new(schema::SchemaGenerateVerbFlow));
     registry.register(Arc::new(schema::SchemaGenerateDiscoveryMap));
+
+    // Phase B slice #51: tollgate.check-gate — decision gate evaluation
+    // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
+    registry.register(Arc::new(tollgate_evaluate::CheckGate));
 
     registry
 }
