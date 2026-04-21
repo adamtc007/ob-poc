@@ -36,6 +36,7 @@ pub mod board;
 pub mod changeset;
 pub mod constellation;
 pub mod control;
+pub mod control_compute;
 pub mod docs_bundle;
 pub mod economic_exposure;
 pub mod edge;
@@ -452,6 +453,10 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(control::ClearBoardControllerOverride));
     registry.register(Arc::new(control::ImportPscRegister));
     registry.register(Arc::new(control::ImportGleifControl));
+
+    // Phase B slice #34: control.compute-controllers (remaining
+    // legacy control op — KYC case controller aggregation).
+    registry.register(Arc::new(control_compute::ComputeControllers));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

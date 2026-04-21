@@ -775,13 +775,11 @@ mod tests {
         // Coverage computation (KYC prong analysis)
         assert!(registry.has("coverage", "compute"));
         // KYC Control Enhancement: Unified control operations
-        // Phase 5c-migrate Phase B slice #33: control ops moved to
-        // `sem_os_postgres::ops::control::*` (analyze/build-graph/
-        // identify-ubos/trace-chain/reconcile-ownership). `compute-
-        // controllers` lives in `control_compute_ops.rs` (still legacy).
+        // Phase 5c-migrate Phase B slices #33 + #34: all control ops
+        // moved to `sem_os_postgres::ops::{control,control_compute}::*`.
         assert!(!registry.has("control", "analyze"));
         assert!(!registry.has("control", "build-graph"));
-        assert!(registry.has("control", "compute-controllers"));
+        assert!(!registry.has("control", "compute-controllers"));
         assert!(!registry.has("control", "identify-ubos"));
         assert!(!registry.has("control", "trace-chain"));
         assert!(!registry.has("control", "reconcile-ownership"));

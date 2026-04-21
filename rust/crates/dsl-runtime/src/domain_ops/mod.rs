@@ -29,7 +29,7 @@ pub mod client_group_ops;
 // Phase 5c-migrate Phase B slice #3 (2026-04-21): constellation_ops
 // relocated to `sem_os_postgres::ops::constellation::*` as YAML-first
 // re-implementations; legacy file deleted.
-pub mod control_compute_ops;
+// Phase 5c-migrate Phase B slice #34: control_compute_ops → `sem_os_postgres::ops::control_compute`.
 // Phase 5c-migrate Phase B slice #33: control_ops → `sem_os_postgres::ops::control`.
 pub mod custody;
 pub mod deal_ops;
