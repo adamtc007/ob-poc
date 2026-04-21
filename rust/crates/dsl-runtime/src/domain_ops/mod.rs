@@ -39,7 +39,7 @@ pub mod discovery_ops;
 pub mod document_ops;
 pub mod economic_exposure_ops;
 pub mod edge_ops;
-pub mod entity_ops;
+// Phase 5c-migrate Phase B slice #25: entity_ops → `sem_os_postgres::ops::entity`.
 pub mod entity_query;
 pub mod evidence_ops;
 pub mod graph_validate_ops;

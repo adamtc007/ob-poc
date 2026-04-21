@@ -1,43 +1,44 @@
-//! Entity custom operations.
+//! Entity domain verbs (6 plugin verbs) — SemOS-side YAML-first
+//! re-implementation of the plugin subset of
+//! `rust/config/verbs/entity.yaml`.
 //!
-//! Ghost entity lifecycle (ghost → identified → verified) and placeholder
-//! entity lifecycle (pending → resolved → verified). Ghost/placeholder
-//! semantics are stubs used during progressive refinement, document
-//! extraction, and macro expansion where the real entity is not yet known.
+//! Two lifecycles share the domain:
+//! - **Ghost entity** (`ghost`, `identify`) — person entity
+//!   created in GHOST state with minimal attrs, later transitioned
+//!   to IDENTIFIED.
+//! - **Placeholder** (`ensure-or-placeholder`, `resolve-placeholder`,
+//!   `list-placeholders`, `placeholder-summary`) — stub entity used
+//!   during progressive refinement / macro expansion; resolved to a
+//!   real entity later via `PlaceholderResolver`.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
-use sqlx::PgPool;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::{
+use dsl_runtime::domain_ops::helpers::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
-use crate::placeholder::{PlaceholderResolver, ResolvePlaceholderRequest};
+use dsl_runtime::placeholder::{PlaceholderResolver, ResolvePlaceholderRequest};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-#[register_custom_op]
-pub struct EntityGhostOp;
+use super::SemOsVerbOp;
+
+// ── entity.ghost ──────────────────────────────────────────────────────────────
+
+pub struct Ghost;
 
 #[async_trait]
-impl CustomOperation for EntityGhostOp {
-    fn domain(&self) -> &'static str {
-        "entity"
+impl SemOsVerbOp for Ghost {
+    fn fqn(&self) -> &str {
+        "entity.ghost"
     }
-    fn verb(&self) -> &'static str {
-        "ghost"
-    }
-    fn rationale(&self) -> &'static str {
-        "Creates person entity in GHOST state with minimal attributes; requires state management"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let name = json_extract_string(args, "name")?;
         let source = json_extract_string_opt(args, "source");
@@ -57,7 +58,7 @@ impl CustomOperation for EntityGhostOp {
         )
         .bind(&first_name)
         .bind(&last_name)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
 
         if let Some(existing_id) = existing {
@@ -65,12 +66,12 @@ impl CustomOperation for EntityGhostOp {
             return Ok(VerbExecutionOutcome::Uuid(existing_id));
         }
 
-        let type_row: (Uuid,) = sqlx::query_as(
+        let type_row: Option<(Uuid,)> = sqlx::query_as(
             r#"SELECT entity_type_id FROM "ob-poc".entity_types WHERE name = 'PROPER_PERSON_NATURAL'"#,
         )
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Entity type PROPER_PERSON_NATURAL not found"))?;
+        .fetch_optional(scope.executor())
+        .await?;
+        let type_row = type_row.ok_or_else(|| anyhow!("Entity type PROPER_PERSON_NATURAL not found"))?;
 
         let entity_id = Uuid::new_v4();
 
@@ -80,7 +81,7 @@ impl CustomOperation for EntityGhostOp {
         )
         .bind(entity_id)
         .bind(type_row.0)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         let search_name = format!("{} {}", first_name, last_name).trim().to_string();
@@ -94,7 +95,7 @@ impl CustomOperation for EntityGhostOp {
         .bind(&first_name)
         .bind(&last_name)
         .bind(&search_name)
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
         if source.is_some() || source_reference.is_some() {
@@ -109,32 +110,22 @@ impl CustomOperation for EntityGhostOp {
         ctx.bind("entity", entity_id);
         Ok(VerbExecutionOutcome::Uuid(entity_id))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-#[register_custom_op]
-pub struct EntityIdentifyOp;
+// ── entity.identify ───────────────────────────────────────────────────────────
+
+pub struct Identify;
 
 #[async_trait]
-impl CustomOperation for EntityIdentifyOp {
-    fn domain(&self) -> &'static str {
-        "entity"
+impl SemOsVerbOp for Identify {
+    fn fqn(&self) -> &str {
+        "entity.identify"
     }
-    fn verb(&self) -> &'static str {
-        "identify"
-    }
-    fn rationale(&self) -> &'static str {
-        "Transitions entity from GHOST to IDENTIFIED state with validation; requires state machine logic"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
 
@@ -144,15 +135,14 @@ impl CustomOperation for EntityIdentifyOp {
                WHERE entity_id = $1"#,
         )
         .bind(entity_id)
-        .fetch_optional(pool)
+        .fetch_optional(scope.executor())
         .await?;
 
-        let (current_state, first_name, last_name) = current.ok_or_else(|| {
-            anyhow::anyhow!("Entity {} not found in entity_proper_persons", entity_id)
-        })?;
+        let (current_state, first_name, last_name) = current
+            .ok_or_else(|| anyhow!("Entity {} not found in entity_proper_persons", entity_id))?;
 
         if current_state != "GHOST" {
-            return Err(anyhow::anyhow!(
+            return Err(anyhow!(
                 "Entity {} is already in state {} - cannot identify (only GHOST entities can be identified)",
                 entity_id,
                 current_state
@@ -170,15 +160,13 @@ impl CustomOperation for EntityIdentifyOp {
         let final_first_name = new_first_name.unwrap_or_else(|| first_name.unwrap_or_default());
         let final_last_name = new_last_name.unwrap_or_else(|| last_name.unwrap_or_default());
 
-        let dob: Option<chrono::NaiveDate> = if let Some(dob_str) = &date_of_birth {
-            Some(
-                chrono::NaiveDate::parse_from_str(dob_str, "%Y-%m-%d").map_err(|e| {
-                    anyhow::anyhow!("Invalid date-of-birth format (expected YYYY-MM-DD): {}", e)
-                })?,
-            )
-        } else {
-            None
-        };
+        let dob: Option<chrono::NaiveDate> = date_of_birth
+            .as_deref()
+            .map(|s| {
+                chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                    .map_err(|e| anyhow!("Invalid date-of-birth format (expected YYYY-MM-DD): {}", e))
+            })
+            .transpose()?;
 
         let search_name = format!("{} {}", final_first_name, final_last_name)
             .trim()
@@ -207,94 +195,69 @@ impl CustomOperation for EntityIdentifyOp {
         .bind(residence_address.as_deref())
         .bind(id_document_type.as_deref())
         .bind(id_document_number.as_deref())
-        .execute(pool)
+        .execute(scope.executor())
         .await?;
 
-        tracing::info!(
-            entity_id = %entity_id,
-            "Entity transitioned from GHOST to IDENTIFIED"
-        );
-
+        tracing::info!(entity_id = %entity_id, "Entity transitioned from GHOST to IDENTIFIED");
         ctx.bind("entity", entity_id);
         Ok(VerbExecutionOutcome::Uuid(entity_id))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-#[register_custom_op]
-pub struct EntityEnsureOrPlaceholderOp;
+// ── entity.ensure-or-placeholder ──────────────────────────────────────────────
+
+pub struct EnsureOrPlaceholder;
 
 #[async_trait]
-impl CustomOperation for EntityEnsureOrPlaceholderOp {
-    fn domain(&self) -> &'static str {
-        "entity"
+impl SemOsVerbOp for EnsureOrPlaceholder {
+    fn fqn(&self) -> &str {
+        "entity.ensure-or-placeholder"
     }
-    fn verb(&self) -> &'static str {
-        "ensure-or-placeholder"
-    }
-    fn rationale(&self) -> &'static str {
-        "Creates placeholder entities for deferred resolution in macro expansion; requires state management"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let entity_ref = json_extract_uuid_opt(args, ctx, "ref");
         let kind = json_extract_string(args, "kind")?;
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let name_hint = json_extract_string_opt(args, "name-hint");
 
-        let resolver = PlaceholderResolver::new(pool.clone());
+        let resolver = PlaceholderResolver::new(scope.pool().clone());
         let (entity_id, is_placeholder) = resolver
             .ensure_or_placeholder(entity_ref, &kind, cbu_id, name_hint)
             .await?;
 
         ctx.bind("entity", entity_id);
-
-        Ok(VerbExecutionOutcome::Record(serde_json::json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "entity_id": entity_id,
-            "is_placeholder": is_placeholder
+            "is_placeholder": is_placeholder,
         })))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
-#[register_custom_op]
-pub struct EntityResolvePlaceholderOp;
+// ── entity.resolve-placeholder ────────────────────────────────────────────────
+
+pub struct ResolvePlaceholder;
 
 #[async_trait]
-impl CustomOperation for EntityResolvePlaceholderOp {
-    fn domain(&self) -> &'static str {
-        "entity"
+impl SemOsVerbOp for ResolvePlaceholder {
+    fn fqn(&self) -> &str {
+        "entity.resolve-placeholder"
     }
-    fn verb(&self) -> &'static str {
-        "resolve-placeholder"
-    }
-    fn rationale(&self) -> &'static str {
-        "Resolves placeholder to real entity with role transfer; requires transaction and state management"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let placeholder_id = json_extract_uuid(args, ctx, "placeholder-id")?;
         let resolved_entity_id = json_extract_uuid(args, ctx, "resolved-entity-id")?;
         let resolved_by =
             json_extract_string_opt(args, "resolved-by").unwrap_or_else(|| "system".to_string());
 
-        let resolver = PlaceholderResolver::new(pool.clone());
+        let resolver = PlaceholderResolver::new(scope.pool().clone());
         let result = resolver
             .resolve(ResolvePlaceholderRequest {
                 placeholder_entity_id: placeholder_id,
@@ -305,46 +268,36 @@ impl CustomOperation for EntityResolvePlaceholderOp {
 
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-#[register_custom_op]
-pub struct EntityListPlaceholdersOp;
+// ── entity.list-placeholders ──────────────────────────────────────────────────
+
+pub struct ListPlaceholders;
 
 #[async_trait]
-impl CustomOperation for EntityListPlaceholdersOp {
-    fn domain(&self) -> &'static str {
-        "entity"
+impl SemOsVerbOp for ListPlaceholders {
+    fn fqn(&self) -> &str {
+        "entity.list-placeholders"
     }
-    fn verb(&self) -> &'static str {
-        "list-placeholders"
-    }
-    fn rationale(&self) -> &'static str {
-        "Lists placeholders with details from custom view; requires join logic"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid_opt(args, ctx, "cbu-id");
 
-        let resolver = PlaceholderResolver::new(pool.clone());
+        let resolver = PlaceholderResolver::new(scope.pool().clone());
         let placeholders = if let Some(cbu_id) = cbu_id {
             resolver.list_pending_for_cbu(cbu_id).await?
         } else {
             resolver.list_all_pending().await?
         };
 
-        let records: Vec<serde_json::Value> = placeholders
+        let records: Vec<Value> = placeholders
             .into_iter()
             .map(|p| {
-                serde_json::json!({
+                json!({
                     "entity_id": p.placeholder.entity_id,
                     "status": p.placeholder.status.to_string(),
                     "kind": p.placeholder.kind,
@@ -352,64 +305,45 @@ impl CustomOperation for EntityListPlaceholdersOp {
                     "entity_name": p.entity_name,
                     "cbu_name": p.cbu_name,
                     "kind_label": p.kind_label,
-                    "created_at": p.placeholder.created_at.to_rfc3339()
+                    "created_at": p.placeholder.created_at.to_rfc3339(),
                 })
             })
             .collect();
 
         Ok(VerbExecutionOutcome::RecordSet(records))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-#[register_custom_op]
-pub struct EntityPlaceholderSummaryOp;
+// ── entity.placeholder-summary ────────────────────────────────────────────────
+
+pub struct PlaceholderSummary;
 
 #[async_trait]
-impl CustomOperation for EntityPlaceholderSummaryOp {
-    fn domain(&self) -> &'static str {
-        "entity"
+impl SemOsVerbOp for PlaceholderSummary {
+    fn fqn(&self) -> &str {
+        "entity.placeholder-summary"
     }
-    fn verb(&self) -> &'static str {
-        "placeholder-summary"
-    }
-    fn rationale(&self) -> &'static str {
-        "Aggregates placeholder stats with grouping; requires custom query"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
 
-        let resolver = PlaceholderResolver::new(pool.clone());
+        let resolver = PlaceholderResolver::new(scope.pool().clone());
         let summary = resolver.get_summary(cbu_id).await?;
 
-        let by_kind: Vec<serde_json::Value> = summary
+        let by_kind: Vec<Value> = summary
             .by_kind
             .into_iter()
-            .map(|k| {
-                serde_json::json!({
-                    "kind": k.kind,
-                    "count": k.count
-                })
-            })
+            .map(|k| json!({"kind": k.kind, "count": k.count}))
             .collect();
 
-        Ok(VerbExecutionOutcome::Record(serde_json::json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "cbu_id": summary.cbu_id,
             "pending_count": summary.pending_count,
-            "by_kind": by_kind
+            "by_kind": by_kind,
         })))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }

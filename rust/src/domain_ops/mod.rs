@@ -573,8 +573,10 @@ mod tests {
     fn test_registry_creation() {
         let registry = CustomOperationRegistry::new();
         // Entity ghost lifecycle operations
-        assert!(registry.has("entity", "ghost"));
-        assert!(registry.has("entity", "identify"));
+        // Phase 5c-migrate Phase B slice #25: entity ops moved to
+        // `sem_os_postgres::ops::entity::*`.
+        assert!(!registry.has("entity", "ghost"));
+        assert!(!registry.has("entity", "identify"));
         assert!(registry.has("document", "catalog"));
         assert!(registry.has("document", "extract"));
         // Phase 5c-migrate Phase B slice #5: attribute + document.list-attributes +

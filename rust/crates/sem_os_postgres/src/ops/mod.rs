@@ -36,6 +36,7 @@ pub mod board;
 pub mod changeset;
 pub mod constellation;
 pub mod docs_bundle;
+pub mod entity;
 pub mod focus;
 pub mod governance;
 pub mod import_run;
@@ -357,6 +358,15 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(ubo_registry::Waive));
     registry.register(Arc::new(ubo_registry::Reject));
     registry.register(Arc::new(ubo_registry::Expire));
+
+    // Phase B slice #25: entity domain (6 plugin verbs — ghost/
+    // identify person lifecycle + placeholder resolution).
+    registry.register(Arc::new(entity::Ghost));
+    registry.register(Arc::new(entity::Identify));
+    registry.register(Arc::new(entity::EnsureOrPlaceholder));
+    registry.register(Arc::new(entity::ResolvePlaceholder));
+    registry.register(Arc::new(entity::ListPlaceholders));
+    registry.register(Arc::new(entity::PlaceholderSummary));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
