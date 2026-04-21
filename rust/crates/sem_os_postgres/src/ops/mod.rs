@@ -86,6 +86,7 @@ pub mod service_pipeline;
 pub mod service_resource;
 pub mod shared_atom;
 pub mod session;
+pub mod skeleton_build;
 pub mod state;
 pub mod stewardship_helper;
 pub mod team;
@@ -634,6 +635,12 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #63: skeleton.build (1 plugin verb — 7-step KYC
+    // pipeline: import-run.begin → graph.validate → ubo.compute-chains
+    // → coverage.compute → outreach.plan-generate → tollgate SKELETON_READY
+    // → import-run.complete, all in the ambient Sequencer transaction).
+    registry.register(Arc::new(skeleton_build::Build));
 
     // Phase B slice #62: kyc-case.* + entity-workstream.state (5 plugin
     // verbs — deal-aware create, FSM-gated update-status, close with

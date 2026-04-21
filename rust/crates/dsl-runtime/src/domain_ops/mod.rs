@@ -86,7 +86,7 @@ pub mod entity_query;
 // Phase 5c-migrate Phase B slice #5 (2026-04-21): session_ops relocated to
 // `sem_os_postgres::ops::session::*`.
 // Phase 5c-migrate Phase B slice #22: shared_atom_ops → `sem_os_postgres::ops::shared_atom`.
-pub mod skeleton_build_ops;
+// Phase 5c-migrate Phase B slice #63: skeleton_build_ops → `sem_os_postgres::ops::skeleton_build`.
 // Phase 5c-migrate Phase B slice #21: state_ops → `sem_os_postgres::ops::state`.
 // Phase 5c-migrate Phase B slice #10: team_ops → `sem_os_postgres::ops::team`.
 // Phase 5c-migrate Phase B slice #32: temporal_ops → `sem_os_postgres::ops::temporal`.

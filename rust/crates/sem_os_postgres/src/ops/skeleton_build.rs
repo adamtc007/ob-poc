@@ -1,27 +1,43 @@
-//! Skeleton Build Pipeline Operations
+//! Skeleton build pipeline verb (1 plugin verb) — YAML-first
+//! re-implementation of `skeleton.build` from
+//! `rust/config/verbs/skeleton.yaml`.
 //!
-//! Orchestrates the full KYC skeleton build: import-run begin → graph validate →
-//! UBO compute chains → coverage compute → outreach plan generate → tollgate evaluate →
-//! import-run complete. Each step performs real computation matching the logic in the
-//! corresponding individual ops (graph_validate_ops, ubo_compute_ops, coverage_compute_ops,
-//! outreach_plan_ops, tollgate_evaluate_ops).
+//! Orchestrates the 7-step KYC skeleton pipeline in a single ambient
+//! Sequencer transaction (the legacy `pool.begin()`/`tx.commit()` pair
+//! is dropped — all steps ride the outer scope):
+//!
+//! 1. `import-run.begin`: create `graph_import_runs` + `case_import_runs`
+//! 2. `graph.validate`: cycle/missing-pct/supply>100/source-conflicts +
+//!    anomaly persistence
+//! 3. `ubo.compute-chains`: DFS upward walk + cumulative pct + threshold
+//!    filter, persists `ubo_determination_runs`
+//! 4. `coverage.compute`: 4-prong coverage (OWNERSHIP / IDENTITY /
+//!    CONTROL / SOURCE_OF_WEALTH) + per-candidate gap list
+//! 5. `outreach.plan-generate`: gap → doc-type mapping + priority sort
+//!    + cap at `max-outreach-items` (default 8)
+//! 6. `tollgate.check-gate`: SKELETON_READY (ownership coverage ≥
+//!    threshold + every entity has ≥ 1 ownership edge)
+//! 7. `import-run.complete`
+//!
+//! Each step's in-memory algorithms are ported verbatim from the
+//! standalone ops in `sem_os_postgres::ops::{graph_validate, ubo_compute,
+//! coverage_compute, outreach_plan, tollgate_evaluate}`. The
+//! standalone ops remain usable independently; this op runs the whole
+//! pipeline in one verb call.
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
 use rust_decimal::prelude::ToPrimitive;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-// ============================================================================
-// Types
-// ============================================================================
+use super::SemOsVerbOp;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkeletonBuildResult {
@@ -38,148 +54,12 @@ pub struct SkeletonBuildResult {
     pub steps_completed: Vec<String>,
 }
 
-// ============================================================================
-// SkeletonBuildOp
-// ============================================================================
+// ===========================================================================
+// Step 2 — graph.validate
+// ===========================================================================
 
-#[register_custom_op]
-pub struct SkeletonBuildOp;
-
-async fn skeleton_build_impl(
-    case_id: Uuid,
-    source: String,
-    threshold: f64,
-    max_outreach_items: usize,
-    pool: &PgPool,
-) -> Result<SkeletonBuildResult> {
-    let mut tx = pool.begin().await?;
-
-    let mut steps_completed = Vec::new();
-
-    let run_id = Uuid::new_v4();
-    sqlx::query(
-        r#"INSERT INTO "ob-poc".graph_import_runs
-           (run_id, run_kind, source, scope_root_entity_id, status, started_at)
-           SELECT $1, 'SKELETON_BUILD', $2, c.client_group_id, 'ACTIVE', NOW()
-           FROM "ob-poc".cases c WHERE c.case_id = $3"#,
-    )
-    .bind(run_id)
-    .bind(&source)
-    .bind(case_id)
-    .execute(&mut *tx)
-    .await?;
-
-    sqlx::query(
-        r#"INSERT INTO "ob-poc".case_import_runs (case_id, run_id)
-           VALUES ($1, $2)
-           ON CONFLICT DO NOTHING"#,
-    )
-    .bind(case_id)
-    .bind(run_id)
-    .execute(&mut *tx)
-    .await?;
-    steps_completed.push("import-run.begin".to_string());
-
-    let anomalies_found = run_graph_validate(&mut tx, case_id).await?;
-    steps_completed.push("graph.validate".to_string());
-
-    let (determination_run_id, ubo_candidates_found) =
-        run_ubo_compute(&mut tx, case_id, threshold).await?;
-    steps_completed.push("ubo.compute-chains".to_string());
-
-    let coverage_pct = run_coverage_compute(&mut tx, case_id, determination_run_id).await?;
-    steps_completed.push("coverage.compute".to_string());
-
-    let (outreach_plan_id, total_gaps_before_cap) =
-        run_outreach_plan(&mut tx, case_id, determination_run_id, max_outreach_items).await?;
-    steps_completed.push("outreach.plan-generate".to_string());
-
-    let skeleton_ready = run_tollgate_evaluate(&mut tx, case_id).await?;
-    steps_completed.push("tollgate.check-gate".to_string());
-
-    sqlx::query(
-        r#"UPDATE "ob-poc".graph_import_runs
-           SET status = 'COMPLETED', completed_at = NOW()
-           WHERE run_id = $1"#,
-    )
-    .bind(run_id)
-    .execute(&mut *tx)
-    .await?;
-    steps_completed.push("import-run.complete".to_string());
-
-    tx.commit().await?;
-
-    Ok(SkeletonBuildResult {
-        case_id,
-        import_run_id: run_id,
-        determination_run_id,
-        anomalies_found,
-        ubo_candidates_found,
-        coverage_pct,
-        outreach_plan_id,
-        skeleton_ready,
-        items_capped: total_gaps_before_cap > max_outreach_items as i32,
-        total_gaps_before_cap,
-        steps_completed,
-    })
-}
-
-#[async_trait]
-impl CustomOperation for SkeletonBuildOp {
-    fn domain(&self) -> &'static str {
-        "skeleton"
-    }
-    fn verb(&self) -> &'static str {
-        "build"
-    }
-    fn rationale(&self) -> &'static str {
-        "Orchestrates the full skeleton build pipeline across 7 steps"
-    }
-
-    async fn execute_json(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<VerbExecutionOutcome> {
-        let case_id = json_extract_uuid(args, ctx, "case-id")?;
-        let source =
-            json_extract_string_opt(args, "source").unwrap_or_else(|| "MANUAL".to_string());
-        let threshold: f64 = json_extract_string_opt(args, "threshold")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(5.0);
-        let max_outreach_items: usize = json_extract_string_opt(args, "max-outreach-items")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(8)
-            .clamp(1, 50);
-
-        let result =
-            skeleton_build_impl(case_id, source, threshold, max_outreach_items, pool).await?;
-        ctx.bind("run", result.import_run_id);
-
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-
-// ============================================================================
-// Step 2: Graph Validate — Cycle detection, supply checks, anomaly persistence
-//
-// Mirrors the logic in graph_validate_ops.rs:
-//   1. Load edges scoped to case entities
-//   2. Tarjan-style cycle detection (DFS SCC)
-//   3. Missing percentage check on ownership edges
-//   4. Supply >100% check per target entity
-//   5. Source conflict check (different sources, different percentages)
-//   6. Persist anomalies to "ob-poc".research_anomalies
-// ============================================================================
-
-/// Edge representation for graph validation.
 #[derive(Debug, Clone)]
-pub(crate) struct Edge {
+struct Edge {
     relationship_id: Uuid,
     from_entity_id: Uuid,
     to_entity_id: Uuid,
@@ -188,53 +68,43 @@ pub(crate) struct Edge {
     source: Option<String>,
 }
 
-/// A single graph anomaly detected during validation.
 #[derive(Debug, Clone)]
-pub(crate) struct GraphAnomaly {
+struct GraphAnomaly {
     anomaly_type: String,
     entity_ids: Vec<Uuid>,
     detail: String,
     severity: String,
 }
 
-/// Shared skeleton build step 2: validate entity relationship graph for a case.
-/// Returns the number of anomalies found.
-/// NOTE: standalone ops in graph_validate_ops.rs have their own pool-based implementation.
-pub async fn run_graph_validate(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+async fn run_graph_validate(
+    scope: &mut dyn TransactionScope,
     case_id: Uuid,
 ) -> Result<i64> {
     type EdgeRow = (
-        Uuid,
-        Uuid,
-        Uuid,
-        String,
-        Option<rust_decimal::Decimal>,
-        Option<String>,
+        Uuid, Uuid, Uuid, String,
+        Option<rust_decimal::Decimal>, Option<String>,
     );
-    // 1. Load edges scoped to this case's entity workstreams
-    let rows: Vec<EdgeRow> =
-        sqlx::query_as(
-            r#"
-            SELECT
-                er.relationship_id,
-                er.from_entity_id,
-                er.to_entity_id,
-                er.relationship_type,
-                er.percentage,
-                er.source
-            FROM "ob-poc".entity_relationships er
-            WHERE (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
-              AND (
-                  er.from_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
-                  OR er.to_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
-              )
-            ORDER BY er.to_entity_id, er.from_entity_id
-            "#,
-        )
-        .bind(case_id)
-        .fetch_all(&mut **tx)
-        .await?;
+    let rows: Vec<EdgeRow> = sqlx::query_as(
+        r#"
+        SELECT
+            er.relationship_id,
+            er.from_entity_id,
+            er.to_entity_id,
+            er.relationship_type,
+            er.percentage,
+            er.source
+        FROM "ob-poc".entity_relationships er
+        WHERE (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
+          AND (
+              er.from_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
+              OR er.to_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1)
+          )
+        ORDER BY er.to_entity_id, er.from_entity_id
+        "#,
+    )
+    .bind(case_id)
+    .fetch_all(scope.executor())
+    .await?;
 
     let edges: Vec<Edge> = rows
         .into_iter()
@@ -248,116 +118,94 @@ pub async fn run_graph_validate(
         })
         .collect();
 
-    let mut all_entity_ids: HashSet<Uuid> = HashSet::new();
-    for edge in &edges {
-        all_entity_ids.insert(edge.from_entity_id);
-        all_entity_ids.insert(edge.to_entity_id);
-    }
-
     let mut anomalies: Vec<GraphAnomaly> = Vec::new();
-
-    // 2. Cycle detection (Tarjan SCC)
     detect_cycles(&edges, &mut anomalies);
-
-    // 3. Missing percentages
     check_missing_percentages(&edges, &mut anomalies);
-
-    // 4. Supply >100%
     check_supply_exceeds_100(&edges, &mut anomalies);
-
-    // 5. Source conflicts
     check_source_conflicts(&edges, &mut anomalies);
 
     let anomalies_found = anomalies.len() as i64;
+    if anomalies.is_empty() {
+        return Ok(0);
+    }
 
-    // 6. Persist anomalies
-    if !anomalies.is_empty() {
-        let representative_entity_id: Option<Uuid> = {
-            let row: Option<(Uuid,)> = sqlx::query_as(
-                r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1 LIMIT 1"#,
+    let representative_entity_id: Option<Uuid> = {
+        let row: Option<(Uuid,)> = sqlx::query_as(
+            r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1 LIMIT 1"#,
+        )
+        .bind(case_id)
+        .fetch_optional(scope.executor())
+        .await?;
+        row.map(|(id,)| id)
+    };
+
+    if let Some(target_entity_id) = representative_entity_id {
+        let action_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".research_actions (
+                target_entity_id, action_type, source_provider, source_key,
+                source_key_type, verb_domain, verb_name, verb_args,
+                success, entities_created, entities_updated, relationships_created
+            ) VALUES (
+                $1, 'GRAPH_VALIDATION', 'internal', $2::text,
+                'skeleton_build', 'skeleton', 'build', '{}'::jsonb,
+                true, 0, 0, 0
             )
-            .bind(case_id)
-            .fetch_optional(&mut **tx)
-            .await?;
-            row.map(|(id,)| id)
-        };
+            RETURNING action_id
+            "#,
+        )
+        .bind(target_entity_id)
+        .bind(case_id.to_string())
+        .fetch_one(scope.executor())
+        .await?;
 
-        if let Some(target_entity_id) = representative_entity_id {
-            let action_id: Uuid = sqlx::query_scalar(
+        for anomaly in &anomalies {
+            let entity_id = anomaly
+                .entity_ids
+                .first()
+                .copied()
+                .unwrap_or(target_entity_id);
+            let rule_code = match anomaly.anomaly_type.as_str() {
+                "CYCLE" => "GRAPH_CYCLE_DETECTED",
+                "MISSING_PERCENTAGE" => "GRAPH_MISSING_PCT",
+                "SUPPLY_EXCEEDS_100" => "GRAPH_SUPPLY_GT_100",
+                "SOURCE_CONFLICT" => "GRAPH_SOURCE_CONFLICT",
+                other => other,
+            };
+            let db_severity = match anomaly.severity.as_str() {
+                "ERROR" => "ERROR",
+                "WARNING" => "WARNING",
+                _ => "INFO",
+            };
+            sqlx::query(
                 r#"
-                INSERT INTO "ob-poc".research_actions (
-                    target_entity_id, action_type, source_provider, source_key,
-                    source_key_type, verb_domain, verb_name, verb_args,
-                    success, entities_created, entities_updated, relationships_created
-                ) VALUES (
-                    $1, 'GRAPH_VALIDATION', 'internal', $2::text,
-                    'skeleton_build', 'skeleton', 'build', '{}'::jsonb,
-                    true, 0, 0, 0
-                )
-                RETURNING action_id
+                INSERT INTO "ob-poc".research_anomalies (
+                    action_id, entity_id, rule_code, severity,
+                    description, status
+                ) VALUES ($1, $2, $3, $4, $5, 'OPEN')
                 "#,
             )
-            .bind(target_entity_id)
-            .bind(case_id.to_string())
-            .fetch_one(&mut **tx)
+            .bind(action_id)
+            .bind(entity_id)
+            .bind(rule_code)
+            .bind(db_severity)
+            .bind(&anomaly.detail)
+            .execute(scope.executor())
             .await?;
-
-            for anomaly in &anomalies {
-                let entity_id = anomaly
-                    .entity_ids
-                    .first()
-                    .copied()
-                    .unwrap_or(target_entity_id);
-
-                let rule_code = match anomaly.anomaly_type.as_str() {
-                    "CYCLE" => "GRAPH_CYCLE_DETECTED",
-                    "MISSING_PERCENTAGE" => "GRAPH_MISSING_PCT",
-                    "SUPPLY_EXCEEDS_100" => "GRAPH_SUPPLY_GT_100",
-                    "SOURCE_CONFLICT" => "GRAPH_SOURCE_CONFLICT",
-                    other => other,
-                };
-
-                let db_severity = match anomaly.severity.as_str() {
-                    "ERROR" => "ERROR",
-                    "WARNING" => "WARNING",
-                    _ => "INFO",
-                };
-
-                sqlx::query(
-                    r#"
-                    INSERT INTO "ob-poc".research_anomalies (
-                        action_id, entity_id, rule_code, severity,
-                        description, status
-                    ) VALUES ($1, $2, $3, $4, $5, 'OPEN')
-                    "#,
-                )
-                .bind(action_id)
-                .bind(entity_id)
-                .bind(rule_code)
-                .bind(db_severity)
-                .bind(&anomaly.detail)
-                .execute(&mut **tx)
-                .await?;
-            }
         }
     }
 
     tracing::info!(
-        "skeleton.build step 2: graph.validate found {} anomalies across {} edges for case {}",
+        "skeleton.build step 2: graph.validate found {} anomalies for case {}",
         anomalies_found,
-        edges.len(),
         case_id
     );
-
     Ok(anomalies_found)
 }
 
-/// Cycle detection via iterative Tarjan SCC algorithm.
-/// SCCs with more than one node are cycles.
 fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     let mut adj: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
     let mut all_nodes: HashSet<Uuid> = HashSet::new();
-
     for edge in edges {
         adj.entry(edge.from_entity_id)
             .or_default()
@@ -376,7 +224,6 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
         if indices.contains_key(start_node) {
             continue;
         }
-
         let mut dfs_stack: Vec<(Uuid, usize)> = vec![(*start_node, 0)];
         indices.insert(*start_node, index_counter);
         lowlinks.insert(*start_node, index_counter);
@@ -387,11 +234,9 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
         while let Some((node, ni)) = dfs_stack.last_mut() {
             let node = *node;
             let neighbors = adj.get(&node).cloned().unwrap_or_default();
-
             if *ni < neighbors.len() {
                 let neighbor = neighbors[*ni];
                 *ni += 1;
-
                 if let std::collections::hash_map::Entry::Vacant(e) = indices.entry(neighbor) {
                     e.insert(index_counter);
                     lowlinks.insert(neighbor, index_counter);
@@ -408,7 +253,6 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
                 }
             } else {
                 dfs_stack.pop();
-
                 if let Some((parent, _)) = dfs_stack.last() {
                     let parent = *parent;
                     let node_low = lowlinks[&node];
@@ -417,7 +261,6 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
                         lowlinks.insert(parent, node_low);
                     }
                 }
-
                 if lowlinks[&node] == indices[&node] {
                     let mut scc: Vec<Uuid> = Vec::new();
                     loop {
@@ -447,7 +290,6 @@ fn detect_cycles(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     }
 }
 
-/// Flags ownership edges that have no percentage value.
 fn check_missing_percentages(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     for edge in edges {
         if edge.relationship_type == "ownership" && edge.percentage.is_none() {
@@ -464,11 +306,9 @@ fn check_missing_percentages(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) 
     }
 }
 
-/// For each target entity, sums inbound ownership percentages and flags >100%.
 fn check_supply_exceeds_100(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     let mut supply_map: HashMap<Uuid, f64> = HashMap::new();
     let mut holders_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
-
     for edge in edges {
         if edge.relationship_type == "ownership" {
             if let Some(pct) = edge.percentage {
@@ -480,7 +320,6 @@ fn check_supply_exceeds_100(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
             }
         }
     }
-
     for (to_entity_id, total) in &supply_map {
         if *total > 100.0 {
             let mut entity_ids = vec![*to_entity_id];
@@ -500,10 +339,8 @@ fn check_supply_exceeds_100(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     }
 }
 
-/// Detects conflicting ownership data from different sources.
 fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     let mut edge_groups: HashMap<(Uuid, Uuid, String), Vec<&Edge>> = HashMap::new();
-
     for edge in edges {
         let key = (
             edge.from_entity_id,
@@ -512,12 +349,10 @@ fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
         );
         edge_groups.entry(key).or_default().push(edge);
     }
-
     for ((from_id, to_id, rel_type), group) in &edge_groups {
         if group.len() < 2 {
             continue;
         }
-
         let mut source_pcts: HashMap<String, f64> = HashMap::new();
         for edge in group {
             let src = edge.source.clone().unwrap_or_else(|| "unknown".to_string());
@@ -539,8 +374,6 @@ fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
                 }
             }
         }
-
-        // Cross-source conflicts
         let sources: Vec<(&String, &f64)> = source_pcts.iter().collect();
         for i in 0..sources.len() {
             for j in (i + 1)..sources.len() {
@@ -562,40 +395,27 @@ fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
     }
 }
 
-// ============================================================================
-// Step 3: UBO Compute Chains — DFS traversal with percentage multiplication
-//
-// Mirrors the logic in ubo_compute_ops.rs:
-//   1. Load subject entities from entity_workstreams
-//   2. Load all active ownership edges
-//   3. Build upward adjacency list
-//   4. DFS with cycle detection and depth guard (20 hops)
-//   5. Percentage multiplication along chains
-//   6. Threshold filter
-//   7. Persist to ubo_determination_runs with JSONB snapshots
-// ============================================================================
+// ===========================================================================
+// Step 3 — ubo.compute-chains
+// ===========================================================================
 
-/// Shared skeleton build step 3: compute UBO chains via DFS ownership walk.
-/// Returns the number of UBO candidates found.
-/// NOTE: standalone ops in ubo_compute_ops.rs have their own pool-based implementation.
-pub async fn run_ubo_compute(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+async fn run_ubo_compute(
+    scope: &mut dyn TransactionScope,
     case_id: Uuid,
     threshold: f64,
 ) -> Result<(Uuid, i64)> {
     let start = std::time::Instant::now();
 
-    // 1. Load subject entities
-    let subject_entities: Vec<(Uuid,)> =
-        sqlx::query_as(r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1"#)
-            .bind(case_id)
-            .fetch_all(&mut **tx)
-            .await?;
+    let subject_entities: Vec<(Uuid,)> = sqlx::query_as(
+        r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1"#,
+    )
+    .bind(case_id)
+    .fetch_all(scope.executor())
+    .await?;
 
     let subject_entity_ids: Vec<Uuid> = subject_entities.iter().map(|(eid,)| *eid).collect();
 
     if subject_entity_ids.is_empty() {
-        // No workstream entities — create an empty determination run
         let run_id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO "ob-poc".ubo_determination_runs (
                    subject_entity_id, case_id, as_of, config_version, threshold_pct,
@@ -612,13 +432,11 @@ pub async fn run_ubo_compute(
             rust_decimal::Decimal::from_f64_retain(threshold)
                 .unwrap_or_else(|| rust_decimal::Decimal::new(500, 2)),
         )
-        .fetch_one(&mut **tx)
+        .fetch_one(scope.executor())
         .await?;
-
         return Ok((run_id, 0));
     }
 
-    // 2. Load all active ownership edges
     let edge_rows: Vec<(Uuid, Uuid, Option<rust_decimal::Decimal>)> = sqlx::query_as(
         r#"SELECT from_entity_id, to_entity_id, percentage
            FROM "ob-poc".entity_relationships
@@ -626,10 +444,9 @@ pub async fn run_ubo_compute(
              AND (effective_to IS NULL OR effective_to > CURRENT_DATE)
            ORDER BY from_entity_id"#,
     )
-    .fetch_all(&mut **tx)
+    .fetch_all(scope.executor())
     .await?;
 
-    // 3. Build upward adjacency list: to_entity_id → Vec<(from_entity_id, pct)>
     let mut upward_adj: HashMap<Uuid, Vec<(Uuid, f64)>> = HashMap::new();
     for (from_id, to_id, pct) in &edge_rows {
         let pct_val = pct.map(|d| d.to_f64().unwrap_or(0.0)).unwrap_or(0.0);
@@ -639,7 +456,6 @@ pub async fn run_ubo_compute(
             .push((*from_id, pct_val));
     }
 
-    // 4. Load entity metadata for terminus detection
     let mut all_entity_ids: HashSet<Uuid> = HashSet::new();
     for (from_id, to_id, _) in &edge_rows {
         all_entity_ids.insert(*from_id);
@@ -657,7 +473,7 @@ pub async fn run_ubo_compute(
            WHERE e.entity_id = ANY($1)"#,
     )
     .bind(&entity_id_vec)
-    .fetch_all(&mut **tx)
+    .fetch_all(scope.executor())
     .await?;
 
     let entity_meta: HashMap<Uuid, (Option<String>, bool)> = entity_meta_rows
@@ -665,7 +481,6 @@ pub async fn run_ubo_compute(
         .map(|(eid, name, category)| (eid, (name, category == "PERSON")))
         .collect();
 
-    // 5. DFS chain traversal per subject entity
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct ChainCandidate {
         entity_id: Uuid,
@@ -687,8 +502,6 @@ pub async fn run_ubo_compute(
 
     for subject_entity_id in &subject_entity_ids {
         let mut owner_chains: HashMap<Uuid, Vec<ChainPath>> = HashMap::new();
-
-        // DFS: (current_entity, path, cumulative_pct)
         let mut dfs_stack: Vec<(Uuid, Vec<Uuid>, f64)> = Vec::new();
 
         if let Some(owners) = upward_adj.get(subject_entity_id) {
@@ -710,10 +523,8 @@ pub async fn run_ubo_compute(
                 });
                 continue;
             }
-
             if let Some(owners) = upward_adj.get(&current) {
                 for (owner_id, pct) in owners {
-                    // Cycle detection
                     if path.contains(owner_id) {
                         let mut cycle_path = path.clone();
                         cycle_path.push(*owner_id);
@@ -723,8 +534,6 @@ pub async fn run_ubo_compute(
                         });
                         continue;
                     }
-
-                    // Depth guard: max 20 hops
                     if path.len() >= 20 {
                         owner_chains.entry(current).or_default().push(ChainPath {
                             path: path.clone(),
@@ -732,7 +541,6 @@ pub async fn run_ubo_compute(
                         });
                         continue;
                     }
-
                     let mut new_path = path.clone();
                     new_path.push(*owner_id);
                     let new_pct = cumulative_pct * pct / 100.0;
@@ -741,7 +549,6 @@ pub async fn run_ubo_compute(
             }
         }
 
-        // 6. Aggregate chains and apply threshold filter
         for (owner_id, chains) in owner_chains {
             let total_pct: f64 = chains.iter().map(|c| c.effective_pct).sum();
             let chain_count = chains.len() as i32;
@@ -766,7 +573,6 @@ pub async fn run_ubo_compute(
         }
     }
 
-    // Sort by ownership descending
     all_candidates.sort_by(|a, b| {
         b.total_ownership_pct
             .partial_cmp(&a.total_ownership_pct)
@@ -776,14 +582,13 @@ pub async fn run_ubo_compute(
     let candidates_found = all_candidates.len() as i32;
     let computation_ms = start.elapsed().as_millis() as i32;
 
-    // 7. Build JSONB snapshots and persist
     let output_snapshot = serde_json::to_value(&all_candidates)?;
     let chains_snapshot = serde_json::to_value(
         all_candidates
             .iter()
             .flat_map(|c| {
                 c.chains.iter().map(move |chain| {
-                    serde_json::json!({
+                    json!({
                         "owner_entity_id": c.entity_id,
                         "path": chain.path,
                         "effective_pct": chain.effective_pct
@@ -813,7 +618,7 @@ pub async fn run_ubo_compute(
     .bind(&output_snapshot)
     .bind(&chains_snapshot)
     .bind(computation_ms)
-    .fetch_one(&mut **tx)
+    .fetch_one(scope.executor())
     .await?;
 
     tracing::info!(
@@ -824,85 +629,91 @@ pub async fn run_ubo_compute(
         total_chains,
         computation_ms
     );
-
     Ok((run_id, candidates_found as i64))
 }
 
-// ============================================================================
-// Step 4: Coverage Compute — 4-prong coverage checks
-//
-// Mirrors coverage_compute_ops.rs:
-//   1. Load candidates from determination run output_snapshot
-//   2. Check OWNERSHIP prong (ownership edges with percentages)
-//   3. Check IDENTITY prong (verified evidence or workstream flag)
-//   4. Check CONTROL prong (control edges documented)
-//   5. Check SOURCE_OF_WEALTH prong (SOW evidence)
-//   6. Build prong summaries, compute overall coverage
-//   7. Persist coverage_snapshot to determination run
-// ============================================================================
+// ===========================================================================
+// Step 4 — coverage.compute
+// ===========================================================================
 
-/// Shared skeleton build step 4: compute 4-prong coverage for a case.
-/// Returns overall coverage percentage.
-/// NOTE: standalone ops in coverage_compute_ops.rs have their own pool-based implementation.
-pub async fn run_coverage_compute(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+fn extract_candidate_entity_ids(snapshot: &Value) -> Vec<Uuid> {
+    let arr = snapshot
+        .as_array()
+        .or_else(|| snapshot.get("candidates").and_then(|v| v.as_array()));
+    let Some(arr) = arr else {
+        return vec![];
+    };
+    arr.iter()
+        .filter_map(|item| {
+            item.get("entity_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok())
+        })
+        .collect()
+}
+
+fn update_prong(totals: &mut HashMap<&str, (i32, i32)>, prong: &str, is_covered: bool) {
+    if let Some(counts) = totals.get_mut(prong) {
+        counts.1 += 1;
+        if is_covered {
+            counts.0 += 1;
+        }
+    }
+}
+
+async fn run_coverage_compute(
+    scope: &mut dyn TransactionScope,
     case_id: Uuid,
     determination_run_id: Uuid,
 ) -> Result<f64> {
-    // 1. Load candidates from determination run's output_snapshot
-    let run_row: Option<(serde_json::Value,)> = sqlx::query_as(
+    let run_row: Option<(Value,)> = sqlx::query_as(
         r#"SELECT output_snapshot FROM "ob-poc".ubo_determination_runs
            WHERE run_id = $1 AND case_id = $2"#,
     )
     .bind(determination_run_id)
     .bind(case_id)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(scope.executor())
     .await?;
 
     let output_snapshot = match run_row {
         Some((snap,)) => snap,
         None => {
-            // No determination run found — write 0% coverage
             sqlx::query(
                 r#"UPDATE "ob-poc".ubo_determination_runs
                    SET coverage_snapshot = $2
                    WHERE run_id = $1"#,
             )
             .bind(determination_run_id)
-            .bind(serde_json::json!({"overall_coverage_pct": 0.0, "gaps": []}))
-            .execute(&mut **tx)
+            .bind(json!({"overall_coverage_pct": 0.0, "gaps": []}))
+            .execute(scope.executor())
             .await?;
             return Ok(0.0);
         }
     };
 
-    // Extract candidate entity IDs from the output_snapshot
     let candidate_entity_ids: Vec<Uuid> = extract_candidate_entity_ids(&output_snapshot);
 
     if candidate_entity_ids.is_empty() {
-        let snapshot = serde_json::json!({"overall_coverage_pct": 100.0, "gaps": []});
+        let snapshot = json!({"overall_coverage_pct": 100.0, "gaps": []});
         sqlx::query(
             r#"UPDATE "ob-poc".ubo_determination_runs SET coverage_snapshot = $2 WHERE run_id = $1"#,
         )
         .bind(determination_run_id)
         .bind(&snapshot)
-        .execute(&mut **tx)
+        .execute(scope.executor())
         .await?;
         return Ok(100.0);
     }
 
-    // 2-5. Check coverage across 4 prongs for each candidate
     let prongs = ["OWNERSHIP", "IDENTITY", "CONTROL", "SOURCE_OF_WEALTH"];
-    let mut prong_covered: HashMap<&str, (i32, i32)> = HashMap::new(); // (covered, total)
+    let mut prong_covered: HashMap<&str, (i32, i32)> = HashMap::new();
     for p in &prongs {
         prong_covered.insert(p, (0, 0));
     }
-
-    let mut gaps: Vec<serde_json::Value> = Vec::new();
+    let mut gaps: Vec<Value> = Vec::new();
 
     for entity_id in &candidate_entity_ids {
-        // OWNERSHIP: check if entity has ownership edges to case entities with percentages
-        let ownership_count: (i64,) = sqlx::query_as(
+        let (ownership_count,): (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM "ob-poc".entity_relationships
                WHERE from_entity_id = $1
                  AND to_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $2)
@@ -912,14 +723,13 @@ pub async fn run_coverage_compute(
         )
         .bind(entity_id)
         .bind(case_id)
-        .fetch_one(&mut **tx)
+        .fetch_one(scope.executor())
         .await
         .unwrap_or((0,));
-
-        let ownership_covered = ownership_count.0 > 0;
+        let ownership_covered = ownership_count > 0;
         update_prong(&mut prong_covered, "OWNERSHIP", ownership_covered);
         if !ownership_covered {
-            gaps.push(serde_json::json!({
+            gaps.push(json!({
                 "gap_id": format!("{}:OWNERSHIP", entity_id),
                 "prong": "OWNERSHIP",
                 "entity_id": entity_id.to_string(),
@@ -928,8 +738,7 @@ pub async fn run_coverage_compute(
             }));
         }
 
-        // IDENTITY: check verified evidence or workstream flag
-        let identity_count: (i64,) = sqlx::query_as(
+        let (identity_count,): (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM "ob-poc".kyc_ubo_evidence ue
                JOIN "ob-poc".kyc_ubo_registry ur ON ur.ubo_id = ue.ubo_id
                WHERE ur.ubo_person_id = $1 AND ur.case_id = $2
@@ -938,7 +747,7 @@ pub async fn run_coverage_compute(
         )
         .bind(entity_id)
         .bind(case_id)
-        .fetch_one(&mut **tx)
+        .fetch_one(scope.executor())
         .await
         .unwrap_or((0,));
 
@@ -949,13 +758,13 @@ pub async fn run_coverage_compute(
         )
         .bind(entity_id)
         .bind(case_id)
-        .fetch_optional(&mut **tx)
+        .fetch_optional(scope.executor())
         .await?;
 
-        let identity_covered = identity_count.0 > 0 || ws_verified.is_some();
+        let identity_covered = identity_count > 0 || ws_verified.is_some();
         update_prong(&mut prong_covered, "IDENTITY", identity_covered);
         if !identity_covered {
-            gaps.push(serde_json::json!({
+            gaps.push(json!({
                 "gap_id": format!("{}:IDENTITY", entity_id),
                 "prong": "IDENTITY",
                 "entity_id": entity_id.to_string(),
@@ -964,8 +773,7 @@ pub async fn run_coverage_compute(
             }));
         }
 
-        // CONTROL: check control edges to case entities documented
-        let control_count: (i64,) = sqlx::query_as(
+        let (control_count,): (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM "ob-poc".entity_relationships
                WHERE from_entity_id = $1
                  AND to_entity_id IN (SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $2)
@@ -974,14 +782,13 @@ pub async fn run_coverage_compute(
         )
         .bind(entity_id)
         .bind(case_id)
-        .fetch_one(&mut **tx)
+        .fetch_one(scope.executor())
         .await
         .unwrap_or((0,));
-
-        let control_covered = control_count.0 > 0;
+        let control_covered = control_count > 0;
         update_prong(&mut prong_covered, "CONTROL", control_covered);
         if !control_covered {
-            gaps.push(serde_json::json!({
+            gaps.push(json!({
                 "gap_id": format!("{}:CONTROL", entity_id),
                 "prong": "CONTROL",
                 "entity_id": entity_id.to_string(),
@@ -990,8 +797,7 @@ pub async fn run_coverage_compute(
             }));
         }
 
-        // SOURCE_OF_WEALTH: check SOW evidence
-        let sow_count: (i64,) = sqlx::query_as(
+        let (sow_count,): (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM "ob-poc".kyc_ubo_evidence ue
                JOIN "ob-poc".kyc_ubo_registry ur ON ur.ubo_id = ue.ubo_id
                WHERE ur.ubo_person_id = $1 AND ur.case_id = $2
@@ -1001,14 +807,13 @@ pub async fn run_coverage_compute(
         )
         .bind(entity_id)
         .bind(case_id)
-        .fetch_one(&mut **tx)
+        .fetch_one(scope.executor())
         .await
         .unwrap_or((0,));
-
-        let sow_covered = sow_count.0 > 0;
+        let sow_covered = sow_count > 0;
         update_prong(&mut prong_covered, "SOURCE_OF_WEALTH", sow_covered);
         if !sow_covered {
-            gaps.push(serde_json::json!({
+            gaps.push(json!({
                 "gap_id": format!("{}:SOURCE_OF_WEALTH", entity_id),
                 "prong": "SOURCE_OF_WEALTH",
                 "entity_id": entity_id.to_string(),
@@ -1018,10 +823,8 @@ pub async fn run_coverage_compute(
         }
     }
 
-    // 6. Compute prong summaries and overall coverage
-    let mut prong_summaries: Vec<serde_json::Value> = Vec::new();
+    let mut prong_summaries: Vec<Value> = Vec::new();
     let mut overall_sum = 0.0f64;
-
     for prong in &prongs {
         let (covered, total) = prong_covered.get(prong).copied().unwrap_or((0, 0));
         let pct = if total > 0 {
@@ -1030,22 +833,20 @@ pub async fn run_coverage_compute(
             100.0
         };
         overall_sum += pct;
-        prong_summaries.push(serde_json::json!({
+        prong_summaries.push(json!({
             "prong": prong,
             "covered": covered,
             "total": total,
             "coverage_pct": pct
         }));
     }
-
     let overall_coverage_pct = if prongs.is_empty() {
         100.0
     } else {
         overall_sum / prongs.len() as f64
     };
 
-    // 7. Persist coverage snapshot
-    let coverage_snapshot = serde_json::json!({
+    let coverage_snapshot = json!({
         "overall_coverage_pct": overall_coverage_pct,
         "prong_coverage": prong_summaries,
         "gaps": gaps,
@@ -1059,7 +860,7 @@ pub async fn run_coverage_compute(
     )
     .bind(determination_run_id)
     .bind(&coverage_snapshot)
-    .execute(&mut **tx)
+    .execute(scope.executor())
     .await?;
 
     tracing::info!(
@@ -1068,74 +869,30 @@ pub async fn run_coverage_compute(
         overall_coverage_pct,
         gaps.len()
     );
-
     Ok(overall_coverage_pct)
 }
 
-/// Extract candidate entity IDs from a determination run's output_snapshot JSON.
-pub(crate) fn extract_candidate_entity_ids(snapshot: &serde_json::Value) -> Vec<Uuid> {
-    // The snapshot may be an array of candidates or have a "candidates" key
-    let arr = snapshot
-        .as_array()
-        .or_else(|| snapshot.get("candidates").and_then(|v| v.as_array()));
+// ===========================================================================
+// Step 5 — outreach.plan-generate
+// ===========================================================================
 
-    let Some(arr) = arr else {
-        return vec![];
-    };
-
-    arr.iter()
-        .filter_map(|item| {
-            item.get("entity_id")
-                .and_then(|v| v.as_str())
-                .and_then(|s| Uuid::parse_str(s).ok())
-        })
-        .collect()
-}
-
-/// Update prong (covered, total) counter.
-pub(crate) fn update_prong(totals: &mut HashMap<&str, (i32, i32)>, prong: &str, is_covered: bool) {
-    if let Some(counts) = totals.get_mut(prong) {
-        counts.1 += 1;
-        if is_covered {
-            counts.0 += 1;
-        }
-    }
-}
-
-// ============================================================================
-// Step 5: Outreach Plan Generate — gap-to-doc mapping
-//
-// Mirrors outreach_plan_ops.rs:
-//   1. Read gaps from determination run coverage_snapshot
-//   2. Map each gap to required document type per spec 2A.2
-//   3. Sort by priority (identity=1, ownership=2, control=3, SOW=4)
-//   4. Cap at 8 items per plan
-//   5. Insert plan + items
-// ============================================================================
-
-/// Shared skeleton build step 5: generate outreach plan from coverage gaps.
-/// Returns (plan_id, total_gaps_before_cap).
-/// NOTE: standalone ops in outreach_plan_ops.rs have their own pool-based implementation.
-pub async fn run_outreach_plan(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+async fn run_outreach_plan(
+    scope: &mut dyn TransactionScope,
     case_id: Uuid,
     determination_run_id: Uuid,
     max_outreach_items: usize,
 ) -> Result<(Option<Uuid>, i32)> {
-    // 1. Read coverage snapshot to get gaps
-    let snapshot_row: Option<(Option<serde_json::Value>,)> = sqlx::query_as(
+    let snapshot_row: Option<(Option<Value>,)> = sqlx::query_as(
         r#"SELECT coverage_snapshot FROM "ob-poc".ubo_determination_runs
            WHERE run_id = $1 AND case_id = $2"#,
     )
     .bind(determination_run_id)
     .bind(case_id)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(scope.executor())
     .await?;
 
     let coverage_snapshot = snapshot_row.and_then(|(snap,)| snap);
-
-    // Extract gaps from the coverage snapshot
-    let gaps: Vec<serde_json::Value> = match &coverage_snapshot {
+    let gaps: Vec<Value> = match &coverage_snapshot {
         Some(snap) => snap
             .get("gaps")
             .and_then(|v| v.as_array())
@@ -1145,21 +902,18 @@ pub async fn run_outreach_plan(
     };
 
     if gaps.is_empty() {
-        // No gaps — create empty plan
-        let plan_id: (Uuid,) = sqlx::query_as(
+        let (plan_id,): (Uuid,) = sqlx::query_as(
             r#"INSERT INTO "ob-poc".outreach_plans (case_id, determination_run_id, status, total_items)
                VALUES ($1, $2, 'DRAFT', 0)
                RETURNING plan_id"#,
         )
         .bind(case_id)
         .bind(determination_run_id)
-        .fetch_one(&mut **tx)
+        .fetch_one(scope.executor())
         .await?;
-
-        return Ok((Some(plan_id.0), 0));
+        return Ok((Some(plan_id), 0));
     }
 
-    // 2. Map gaps to outreach items with doc type mapping per spec 2A.2
     struct PlannedItem {
         entity_id: Uuid,
         prong: String,
@@ -1174,7 +928,7 @@ pub async fn run_outreach_plan(
         r#"SELECT subject_entity_id FROM "ob-poc".ubo_determination_runs WHERE run_id = $1"#,
     )
     .bind(determination_run_id)
-    .fetch_one(&mut **tx)
+    .fetch_one(scope.executor())
     .await?;
 
     let mut planned_items: Vec<PlannedItem> = gaps
@@ -1193,7 +947,6 @@ pub async fn run_outreach_plan(
                 .get("description")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Coverage gap identified");
-
             let doc_type: &'static str = match prong {
                 "OWNERSHIP" => "SHARE_REGISTER",
                 "IDENTITY" => "PASSPORT",
@@ -1201,7 +954,6 @@ pub async fn run_outreach_plan(
                 "SOURCE_OF_WEALTH" => "SOURCE_OF_WEALTH_DECLARATION",
                 _ => "SUPPORTING_EVIDENCE",
             };
-
             let priority: i32 = match prong {
                 "IDENTITY" => 1,
                 "OWNERSHIP" => 2,
@@ -1209,16 +961,13 @@ pub async fn run_outreach_plan(
                 "SOURCE_OF_WEALTH" => 4,
                 _ => 5,
             };
-
             let request_text = format!(
                 "Please provide {} for {} verification. Gap: {}",
                 doc_type.to_lowercase().replace('_', " "),
                 prong.to_lowercase().replace('_', " "),
                 description
             );
-
             let gap_ref = format!("{}:{}", prong, entity_id);
-
             PlannedItem {
                 entity_id,
                 prong: prong.to_string(),
@@ -1231,14 +980,11 @@ pub async fn run_outreach_plan(
         })
         .collect();
 
-    // 3. Sort by priority, then entity
     planned_items.sort_by(|a, b| {
         a.priority
             .cmp(&b.priority)
             .then(a.entity_id.cmp(&b.entity_id))
     });
-
-    // 4. Cap at max_outreach_items (configurable, default 8)
     let total_gaps_before_cap = planned_items.len() as i32;
     planned_items.truncate(max_outreach_items);
     if total_gaps_before_cap > max_outreach_items as i32 {
@@ -1248,11 +994,9 @@ pub async fn run_outreach_plan(
             total_gaps_before_cap - max_outreach_items as i32
         );
     }
-
     let items_count = planned_items.len() as i32;
 
-    // 5. Insert plan + items
-    let plan_id: (Uuid,) = sqlx::query_as(
+    let (plan_id,): (Uuid,) = sqlx::query_as(
         r#"INSERT INTO "ob-poc".outreach_plans (case_id, determination_run_id, status, total_items)
            VALUES ($1, $2, 'DRAFT', $3)
            RETURNING plan_id"#,
@@ -1260,7 +1004,7 @@ pub async fn run_outreach_plan(
     .bind(case_id)
     .bind(determination_run_id)
     .bind(items_count)
-    .fetch_one(&mut **tx)
+    .fetch_one(scope.executor())
     .await?;
 
     for item in &planned_items {
@@ -1270,7 +1014,7 @@ pub async fn run_outreach_plan(
                    request_text, doc_type_requested, priority, closes_gap_ref, status
                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')"#,
         )
-        .bind(plan_id.0)
+        .bind(plan_id)
         .bind(&item.prong)
         .bind(item.entity_id)
         .bind(&item.gap_description)
@@ -1278,58 +1022,44 @@ pub async fn run_outreach_plan(
         .bind(item.doc_type)
         .bind(item.priority)
         .bind(&item.gap_ref)
-        .execute(&mut **tx)
+        .execute(scope.executor())
         .await?;
     }
 
     tracing::info!(
         "skeleton.build step 5: outreach.plan-generate case={} plan={} items={} total_gaps={}",
         case_id,
-        plan_id.0,
+        plan_id,
         items_count,
         total_gaps_before_cap
     );
-
-    Ok((Some(plan_id.0), total_gaps_before_cap))
+    Ok((Some(plan_id), total_gaps_before_cap))
 }
 
-// ============================================================================
-// Step 6: Tollgate Evaluate — SKELETON_READY gate evaluation
-//
-// Mirrors tollgate_evaluate_ops.rs evaluate_skeleton_ready():
-//   1. Load gate definition from "ob-poc".tollgate_definitions
-//   2. Check ownership coverage >= threshold (default 70%)
-//   3. Check all entities have at least one ownership edge
-//   4. Record evaluation in "ob-poc".tollgate_evaluations
-// ============================================================================
+// ===========================================================================
+// Step 6 — tollgate.check-gate (SKELETON_READY only)
+// ===========================================================================
 
-/// Shared skeleton build step 6: evaluate SKELETON_READY tollgate.
-/// Returns true if the skeleton is ready (all gates passed).
-/// NOTE: standalone ops in tollgate_evaluate_ops.rs have their own pool-based implementation.
-pub async fn run_tollgate_evaluate(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+async fn run_tollgate_evaluate(
+    scope: &mut dyn TransactionScope,
     case_id: Uuid,
 ) -> Result<bool> {
-    // 1. Load gate definition (with fallback defaults if ref data not seeded)
-    let gate_row: Option<(String, serde_json::Value)> = sqlx::query_as(
+    let gate_row: Option<(String, Value)> = sqlx::query_as(
         r#"SELECT tollgate_id, default_thresholds
            FROM "ob-poc".tollgate_definitions
            WHERE tollgate_id = 'SKELETON_READY'"#,
     )
-    .bind(case_id)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(scope.executor())
     .await?;
 
     let thresholds = gate_row
         .map(|(_, t)| t)
-        .unwrap_or_else(|| serde_json::json!({"ownership_coverage_pct": 70.0}));
-
+        .unwrap_or_else(|| json!({"ownership_coverage_pct": 70.0}));
     let ownership_threshold = thresholds
         .get("ownership_coverage_pct")
         .and_then(|v| v.as_f64())
         .unwrap_or(70.0);
 
-    // 2. Check ownership coverage
     let coverage_stats: (i64, i64) = sqlx::query_as(
         r#"SELECT
                COUNT(*) AS total_entities,
@@ -1338,7 +1068,7 @@ pub async fn run_tollgate_evaluate(
            WHERE case_id = $1"#,
     )
     .bind(case_id)
-    .fetch_one(&mut **tx)
+    .fetch_one(scope.executor())
     .await
     .unwrap_or((0, 0));
 
@@ -1347,11 +1077,9 @@ pub async fn run_tollgate_evaluate(
     } else {
         0.0
     };
-
     let ownership_passed = ownership_pct >= ownership_threshold;
 
-    // 3. Check all entities have at least one ownership edge
-    let entities_without_edges: (i64,) = sqlx::query_as(
+    let (entities_without_edges,): (i64,) = sqlx::query_as(
         r#"SELECT COUNT(*)
            FROM "ob-poc".entity_workstreams ew
            WHERE ew.case_id = $1
@@ -1363,15 +1091,14 @@ pub async fn run_tollgate_evaluate(
              )"#,
     )
     .bind(case_id)
-    .fetch_one(&mut **tx)
+    .fetch_one(scope.executor())
     .await
     .unwrap_or((0,));
 
-    let edges_passed = entities_without_edges.0 == 0;
+    let edges_passed = entities_without_edges == 0;
     let passed = ownership_passed && edges_passed;
 
-    // 4. Record evaluation
-    let evaluation_detail = serde_json::json!({
+    let evaluation_detail = json!({
         "gate_name": "SKELETON_READY",
         "passed": passed,
         "checks": [
@@ -1388,11 +1115,11 @@ pub async fn run_tollgate_evaluate(
             {
                 "criterion": "all_entities_have_ownership_edge",
                 "passed": edges_passed,
-                "actual_value": entities_without_edges.0,
+                "actual_value": entities_without_edges,
                 "threshold_value": 0,
                 "detail": format!(
                     "{} workstream entities without ownership edges",
-                    entities_without_edges.0
+                    entities_without_edges
                 )
             }
         ]
@@ -1406,7 +1133,7 @@ pub async fn run_tollgate_evaluate(
     .bind(case_id)
     .bind(passed)
     .bind(&evaluation_detail)
-    .execute(&mut **tx)
+    .execute(scope.executor())
     .await?;
 
     tracing::info!(
@@ -1414,8 +1141,106 @@ pub async fn run_tollgate_evaluate(
         case_id,
         passed,
         ownership_pct,
-        entities_without_edges.0
+        entities_without_edges
     );
-
     Ok(passed)
+}
+
+// ===========================================================================
+// SemOsVerbOp impl
+// ===========================================================================
+
+pub struct Build;
+
+#[async_trait]
+impl SemOsVerbOp for Build {
+    fn fqn(&self) -> &str {
+        "skeleton.build"
+    }
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let source = json_extract_string_opt(args, "source").unwrap_or_else(|| "MANUAL".to_string());
+        let threshold: f64 = json_extract_string_opt(args, "threshold")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(5.0);
+        let max_outreach_items: usize = json_extract_string_opt(args, "max-outreach-items")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(8)
+            .clamp(1, 50);
+
+        let mut steps_completed = Vec::new();
+
+        let run_id = Uuid::new_v4();
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".graph_import_runs
+               (run_id, run_kind, source, scope_root_entity_id, status, started_at)
+               SELECT $1, 'SKELETON_BUILD', $2, c.client_group_id, 'ACTIVE', NOW()
+               FROM "ob-poc".cases c WHERE c.case_id = $3"#,
+        )
+        .bind(run_id)
+        .bind(&source)
+        .bind(case_id)
+        .execute(scope.executor())
+        .await?;
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".case_import_runs (case_id, run_id)
+               VALUES ($1, $2)
+               ON CONFLICT DO NOTHING"#,
+        )
+        .bind(case_id)
+        .bind(run_id)
+        .execute(scope.executor())
+        .await?;
+        steps_completed.push("import-run.begin".to_string());
+
+        let anomalies_found = run_graph_validate(scope, case_id).await?;
+        steps_completed.push("graph.validate".to_string());
+
+        let (determination_run_id, ubo_candidates_found) =
+            run_ubo_compute(scope, case_id, threshold).await?;
+        steps_completed.push("ubo.compute-chains".to_string());
+
+        let coverage_pct = run_coverage_compute(scope, case_id, determination_run_id).await?;
+        steps_completed.push("coverage.compute".to_string());
+
+        let (outreach_plan_id, total_gaps_before_cap) =
+            run_outreach_plan(scope, case_id, determination_run_id, max_outreach_items).await?;
+        steps_completed.push("outreach.plan-generate".to_string());
+
+        let skeleton_ready = run_tollgate_evaluate(scope, case_id).await?;
+        steps_completed.push("tollgate.check-gate".to_string());
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".graph_import_runs
+               SET status = 'COMPLETED', completed_at = NOW()
+               WHERE run_id = $1"#,
+        )
+        .bind(run_id)
+        .execute(scope.executor())
+        .await?;
+        steps_completed.push("import-run.complete".to_string());
+
+        let result = SkeletonBuildResult {
+            case_id,
+            import_run_id: run_id,
+            determination_run_id,
+            anomalies_found,
+            ubo_candidates_found,
+            coverage_pct,
+            outreach_plan_id,
+            skeleton_ready,
+            items_capped: total_gaps_before_cap > max_outreach_items as i32,
+            total_gaps_before_cap,
+            steps_completed,
+        };
+        ctx.bind("run", result.import_run_id);
+
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
+    }
 }
