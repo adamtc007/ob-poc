@@ -69,7 +69,7 @@ pub mod refdata_ops;
 // Phase 5c-migrate Phase B slice #18: regulatory_ops → `sem_os_postgres::ops::regulatory`.
 // Phase 5c-migrate Phase B slice #14: remediation_ops → `sem_os_postgres::ops::remediation`.
 // Phase 5c-migrate Phase B slice #11: requirement_ops → `sem_os_postgres::ops::requirement`.
-pub mod resource_ops;
+// Phase 5c-migrate Phase B slice #27: resource_ops → `sem_os_postgres::ops::service_resource`.
 // Phase 5c-migrate Phase B slice #19: screening_ops → `sem_os_postgres::ops::screening`.
 // Phase 5c-migrate Phase B slice #12: research_normalize_ops → `sem_os_postgres::ops::research_normalize`.
 pub mod research_workflow_ops;

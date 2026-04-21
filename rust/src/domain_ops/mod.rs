@@ -597,12 +597,14 @@ mod tests {
         assert!(!registry.has("screening", "pep"));
         assert!(!registry.has("screening", "sanctions"));
         // Service resource instance operations
-        assert!(registry.has("service-resource", "provision"));
-        assert!(registry.has("service-resource", "set-attr"));
-        assert!(registry.has("service-resource", "activate"));
-        assert!(registry.has("service-resource", "suspend"));
-        assert!(registry.has("service-resource", "decommission"));
-        assert!(registry.has("service-resource", "validate-attrs"));
+        // Phase 5c-migrate Phase B slice #27: service-resource ops moved to
+        // `sem_os_postgres::ops::service_resource::*`.
+        assert!(!registry.has("service-resource", "provision"));
+        assert!(!registry.has("service-resource", "set-attr"));
+        assert!(!registry.has("service-resource", "activate"));
+        assert!(!registry.has("service-resource", "suspend"));
+        assert!(!registry.has("service-resource", "decommission"));
+        assert!(!registry.has("service-resource", "validate-attrs"));
         // Delivery operations are now CRUD-based (delivery.yaml)
         // Custody operations
         assert!(registry.has("subcustodian", "lookup"));

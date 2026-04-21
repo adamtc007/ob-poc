@@ -57,6 +57,7 @@ pub mod schema;
 pub mod screening;
 pub mod semantic;
 pub mod service_pipeline;
+pub mod service_resource;
 pub mod shared_atom;
 pub mod session;
 pub mod state;
@@ -376,6 +377,15 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(trading_matrix::FindImForTrade));
     registry.register(Arc::new(trading_matrix::FindPricingForInstrument));
     registry.register(Arc::new(trading_matrix::ListOpenSlaBreaches));
+
+    // Phase B slice #27: service-resource domain (6 plugin verbs —
+    // provision/set-attr/activate/suspend/decommission/validate-attrs).
+    registry.register(Arc::new(service_resource::Provision));
+    registry.register(Arc::new(service_resource::SetAttr));
+    registry.register(Arc::new(service_resource::Activate));
+    registry.register(Arc::new(service_resource::Suspend));
+    registry.register(Arc::new(service_resource::Decommission));
+    registry.register(Arc::new(service_resource::ValidateAttrs));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).
