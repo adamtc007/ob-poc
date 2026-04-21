@@ -37,6 +37,7 @@ pub mod changeset;
 pub mod constellation;
 pub mod docs_bundle;
 pub mod economic_exposure;
+pub mod edge;
 pub mod entity;
 pub mod focus;
 pub mod governance;
@@ -404,6 +405,10 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // addition to sem_os_postgres.
     registry.register(Arc::new(economic_exposure::Compute));
     registry.register(Arc::new(economic_exposure::Summary));
+
+    // Phase B slice #30: edge domain (1 plugin verb — `upsert` with
+    // end-and-insert semantics on entity_relationships).
+    registry.register(Arc::new(edge::Upsert));
 
     // Phase B slice #15: schema domain (structure semantics + stewardship
     // dispatch + AffinityGraph-backed diagram generation).

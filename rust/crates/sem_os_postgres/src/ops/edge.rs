@@ -1,108 +1,92 @@
-//! Edge Operations — End-and-Insert Semantics
+//! Edge (entity relationship) verbs (1 plugin verb) — SemOS-side
+//! YAML-first re-implementation of the plugin subset of
+//! `rust/config/verbs/edge.yaml`.
 //!
-//! Implements upsert for entity relationship edges with provenance tracking.
-//! Natural key: (from_entity_id, to_entity_id, relationship_type, effective_from)
+//! `edge.upsert` implements end-and-insert semantics for
+//! `entity_relationships`:
+//! - same natural key + same attrs → no-op
+//! - same natural key + different attrs → end old + insert new
+//! - new natural key → insert
 //!
-//! Behavior per KYC/UBO architecture spec section 2A.1:
-//! - Same key + same attrs -> no-op
-//! - Same key + different attrs -> end old edge, insert new
-//! - New key -> insert
+//! Natural key: `(from_entity_id, to_entity_id, relationship_type,
+//! effective_from)`.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use dsl_runtime_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use serde_json::Value;
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::domain_ops::helpers::{
+use dsl_runtime::domain_ops::helpers::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-// ============================================================================
-// Result Type
-// ============================================================================
+use super::SemOsVerbOp;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EdgeUpsertResult {
-    pub relationship_id: Uuid,
-    pub action: String,
-    pub from_entity_id: Uuid,
-    pub to_entity_id: Uuid,
-    pub relationship_type: String,
-    pub superseded_id: Option<Uuid>,
+struct EdgeUpsertResult {
+    relationship_id: Uuid,
+    action: String,
+    from_entity_id: Uuid,
+    to_entity_id: Uuid,
+    relationship_type: String,
+    superseded_id: Option<Uuid>,
 }
 
-// ============================================================================
-// EdgeUpsertOp
-// ============================================================================
-
-#[register_custom_op]
-pub struct EdgeUpsertOp;
+pub struct Upsert;
 
 #[async_trait]
-impl CustomOperation for EdgeUpsertOp {
-    fn domain(&self) -> &'static str {
-        "edge"
+impl SemOsVerbOp for Upsert {
+    fn fqn(&self) -> &str {
+        "edge.upsert"
     }
-
-    fn verb(&self) -> &'static str {
-        "upsert"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "End-and-insert semantics require natural key lookup, attribute comparison, and conditional update/insert"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        // 1. Extract arguments
         let from_entity_id = json_extract_uuid(args, ctx, "from-entity-id")?;
         let to_entity_id = json_extract_uuid(args, ctx, "to-entity-id")?;
         let relationship_type = json_extract_string(args, "relationship-type")?;
 
-        let percentage_str = json_extract_string_opt(args, "percentage");
-        let percentage: Option<f64> = match percentage_str {
-            Some(ref s) => Some(
+        let percentage: Option<f64> = json_extract_string_opt(args, "percentage")
+            .as_deref()
+            .map(|s| {
                 s.parse::<f64>()
-                    .map_err(|e| anyhow!("Invalid percentage value '{}': {}", s, e))?,
-            ),
-            None => None,
-        };
+                    .map_err(|e| anyhow!("Invalid percentage value '{}': {}", s, e))
+            })
+            .transpose()?;
+        let incoming_pct: Option<rust_decimal::Decimal> = percentage
+            .map(rust_decimal::Decimal::try_from)
+            .transpose()
+            .map_err(|e| anyhow!("Failed to convert percentage to decimal: {}", e))?;
 
         let ownership_type = json_extract_string_opt(args, "ownership-type");
         let control_type = json_extract_string_opt(args, "control-type");
-
-        let effective_from_str = json_extract_string_opt(args, "effective-from");
-        let effective_from: Option<NaiveDate> = match effective_from_str {
-            Some(ref s) => Some(NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|e| {
-                anyhow!(
-                    "Invalid effective-from date '{}': expected YYYY-MM-DD format: {}",
-                    s,
-                    e
-                )
-            })?),
-            None => None,
-        };
-
+        let effective_from: Option<NaiveDate> = json_extract_string_opt(args, "effective-from")
+            .as_deref()
+            .map(|s| {
+                NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|e| {
+                    anyhow!(
+                        "Invalid effective-from date '{}': expected YYYY-MM-DD format: {}",
+                        s,
+                        e
+                    )
+                })
+            })
+            .transpose()?;
         let source = json_extract_string(args, "source")?;
         let source_document_ref = json_extract_string_opt(args, "source-document-ref");
-
         let confidence =
             json_extract_string_opt(args, "confidence").unwrap_or_else(|| "MEDIUM".to_string());
-
         let import_run_id = json_extract_uuid_opt(args, ctx, "import-run-id");
         let evidence_hint = json_extract_string_opt(args, "evidence-hint");
 
-        // 2. Look up existing edge by natural key
-        let existing: Option<(
+        type ExistingRow = (
             Uuid,
             Option<rust_decimal::Decimal>,
             Option<String>,
@@ -110,7 +94,9 @@ impl CustomOperation for EdgeUpsertOp {
             String,
             Option<String>,
             String,
-        )> = if effective_from.is_some() {
+        );
+
+        let existing: Option<ExistingRow> = if effective_from.is_some() {
             sqlx::query_as(
                 r#"SELECT relationship_id, percentage, ownership_type, control_type,
                           source, source_document_ref, confidence
@@ -125,7 +111,7 @@ impl CustomOperation for EdgeUpsertOp {
             .bind(to_entity_id)
             .bind(&relationship_type)
             .bind(effective_from)
-            .fetch_optional(pool)
+            .fetch_optional(scope.executor())
             .await?
         } else {
             sqlx::query_as(
@@ -141,11 +127,10 @@ impl CustomOperation for EdgeUpsertOp {
             .bind(from_entity_id)
             .bind(to_entity_id)
             .bind(&relationship_type)
-            .fetch_optional(pool)
+            .fetch_optional(scope.executor())
             .await?
         };
 
-        // 3. Compare and act
         if let Some((
             existing_id,
             existing_pct,
@@ -156,11 +141,6 @@ impl CustomOperation for EdgeUpsertOp {
             _existing_confidence,
         )) = existing
         {
-            let incoming_pct: Option<rust_decimal::Decimal> = percentage
-                .map(rust_decimal::Decimal::try_from)
-                .transpose()
-                .map_err(|e| anyhow!("Failed to convert percentage to decimal: {}", e))?;
-
             let same_pct = match (&existing_pct, &incoming_pct) {
                 (None, None) => true,
                 (Some(a), Some(b)) => a == b,
@@ -179,23 +159,17 @@ impl CustomOperation for EdgeUpsertOp {
                     relationship_type,
                     superseded_id: None,
                 };
-                return Ok(VerbExecutionOutcome::Record(
-                    serde_json::to_value(result)?,
-                ));
+                return Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?));
             }
 
-            // End old edge
             sqlx::query(
                 r#"UPDATE "ob-poc".entity_relationships
                    SET effective_to = CURRENT_DATE, updated_at = NOW()
                    WHERE relationship_id = $1"#,
             )
             .bind(existing_id)
-            .execute(pool)
+            .execute(scope.executor())
             .await?;
-
-            // Insert new edge
-            let new_pct_decimal: Option<rust_decimal::Decimal> = incoming_pct;
 
             let new_id: Uuid = sqlx::query_scalar(
                 r#"INSERT INTO "ob-poc".entity_relationships (
@@ -208,7 +182,7 @@ impl CustomOperation for EdgeUpsertOp {
             .bind(from_entity_id)
             .bind(to_entity_id)
             .bind(&relationship_type)
-            .bind(new_pct_decimal)
+            .bind(incoming_pct)
             .bind(&ownership_type)
             .bind(&control_type)
             .bind(effective_from)
@@ -217,7 +191,7 @@ impl CustomOperation for EdgeUpsertOp {
             .bind(&confidence)
             .bind(import_run_id)
             .bind(&evidence_hint)
-            .fetch_one(pool)
+            .fetch_one(scope.executor())
             .await?;
 
             let result = EdgeUpsertResult {
@@ -228,16 +202,8 @@ impl CustomOperation for EdgeUpsertOp {
                 relationship_type,
                 superseded_id: Some(existing_id),
             };
-            return Ok(VerbExecutionOutcome::Record(
-                serde_json::to_value(result)?,
-            ));
+            return Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?));
         }
-
-        // 3c. Not found — insert new edge
-        let pct_decimal: Option<rust_decimal::Decimal> = percentage
-            .map(rust_decimal::Decimal::try_from)
-            .transpose()
-            .map_err(|e| anyhow!("Failed to convert percentage to decimal: {}", e))?;
 
         let new_id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO "ob-poc".entity_relationships (
@@ -250,7 +216,7 @@ impl CustomOperation for EdgeUpsertOp {
         .bind(from_entity_id)
         .bind(to_entity_id)
         .bind(&relationship_type)
-        .bind(pct_decimal)
+        .bind(incoming_pct)
         .bind(&ownership_type)
         .bind(&control_type)
         .bind(effective_from)
@@ -259,7 +225,7 @@ impl CustomOperation for EdgeUpsertOp {
         .bind(&confidence)
         .bind(import_run_id)
         .bind(&evidence_hint)
-        .fetch_one(pool)
+        .fetch_one(scope.executor())
         .await?;
 
         let result = EdgeUpsertResult {
@@ -270,12 +236,6 @@ impl CustomOperation for EdgeUpsertOp {
             relationship_type,
             superseded_id: None,
         };
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::to_value(result)?,
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }

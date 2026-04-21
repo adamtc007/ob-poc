@@ -38,7 +38,7 @@ pub mod discovery_ops;
 // Phase 5c-migrate Phase B slice #13: docs_bundle_ops → `sem_os_postgres::ops::docs_bundle`.
 pub mod document_ops;
 // Phase 5c-migrate Phase B slice #29: economic_exposure_ops → `sem_os_postgres::ops::economic_exposure`.
-pub mod edge_ops;
+// Phase 5c-migrate Phase B slice #30: edge_ops → `sem_os_postgres::ops::edge`.
 // Phase 5c-migrate Phase B slice #25: entity_ops → `sem_os_postgres::ops::entity`.
 pub mod entity_query;
 pub mod evidence_ops;
