@@ -35,6 +35,7 @@ pub mod changeset;
 pub mod constellation;
 pub mod focus;
 pub mod governance;
+pub mod maintenance;
 pub mod nav;
 pub mod pack_answer;
 pub mod pack_select;
@@ -227,6 +228,15 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(registry_ops::DescribeObject));
     registry.register(Arc::new(registry_ops::ListObjects));
     registry.register(Arc::new(registry_ops::ActiveManifest));
+
+    // Phase B slice #7: sem_os_maintenance domain (direct-sqlx Category B).
+    registry.register(Arc::new(maintenance::HealthPending));
+    registry.register(Arc::new(maintenance::HealthStaleDryruns));
+    registry.register(Arc::new(maintenance::Cleanup));
+    registry.register(Arc::new(maintenance::BootstrapSeeds));
+    registry.register(Arc::new(maintenance::DrainOutbox));
+    registry.register(Arc::new(maintenance::ReindexEmbeddings));
+    registry.register(Arc::new(maintenance::ValidateSchemaSync));
 
     registry
 }
