@@ -5246,10 +5246,86 @@ impl ReplOrchestratorV2 {
             progress: ExecutionProgress::new(total),
         });
 
+        // Phase B.2b-ζ (2026-04-22): open a single outer transaction scope
+        // for the whole batch. Every entry dispatches through it; at the
+        // end of the batch we commit (clean completion + park per Q1.1a)
+        // or rollback (failure per Q1.2a). Advisory locks are acquired on
+        // the same scope (Q1.3) so locks + data share one txn.
+        //
+        // When no DB pool is configured (in-memory / test paths), scope
+        // stays None and all per-entry dispatch falls back to the legacy
+        // self-scoping path — behavior preserved.
+        #[cfg(feature = "database")]
+        let mut outer_scope: Option<crate::sequencer_tx::PgTransactionScope> =
+            if let Some(pool) = self.pool.as_ref() {
+                match crate::sequencer_tx::PgTransactionScope::begin(pool).await {
+                    Ok(s) => Some(s),
+                    Err(e) => {
+                        tracing::error!(
+                            session_id = %session.id,
+                            runbook_id = %runbook_id,
+                            error = %e,
+                            "B.2b-ζ: failed to begin outer scope — falling back to per-entry txns"
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+        #[cfg(not(feature = "database"))]
+        let mut outer_scope: Option<crate::sequencer_tx::PgTransactionScope> = None;
+
+        // Aggregate write_set over pending entries, then acquire locks
+        // on the outer scope so locks + data share the same txn lifetime.
+        #[cfg(feature = "database")]
+        if let Some(ref mut scope) = outer_scope {
+            let mut aggregate_write_set = std::collections::BTreeSet::new();
+            for entry in session.runbook.entries[start_index..].iter() {
+                let args_map: std::collections::BTreeMap<String, String> =
+                    entry.args.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                let entry_ws =
+                    crate::runbook::derive_write_set(&entry.verb, &args_map, None);
+                aggregate_write_set.extend(entry_ws);
+            }
+
+            if !aggregate_write_set.is_empty() {
+                let fallback_store = crate::runbook::RunbookStore::new();
+                let store: &dyn crate::runbook::RunbookStoreBackend =
+                    self.runbook_store.as_deref().unwrap_or(&fallback_store);
+
+                if let Err(e) = crate::runbook::acquire_advisory_locks_on_scope(
+                    scope,
+                    &aggregate_write_set,
+                    store,
+                )
+                .await
+                {
+                    tracing::error!(
+                        session_id = %session.id,
+                        runbook_id = %runbook_id,
+                        error = %e,
+                        "B.2b-ζ: advisory lock acquisition failed on outer scope"
+                    );
+                    // Rollback the scope (clears the lock attempt) and
+                    // fall back to None so downstream dispatch uses the
+                    // per-entry path. Alternative: return an error
+                    // response here. For now, we degrade rather than
+                    // block the runbook.
+                    if let Some(s) = outer_scope.take() {
+                        let _ = s.rollback().await;
+                    }
+                }
+            }
+        }
+
         // Execute entries starting from start_index.
         // Stop-on-first-park: when any entry parks, we stop the loop.
+        // B.2b-ζ: stop-on-first-fail — rollback + break on failed entry
+        // so the outer scope rolls back everything in the batch.
         let mut results = Vec::new();
         let mut parked = false;
+        let mut runbook_failed = false;
 
         for idx in start_index..session.runbook.entries.len() {
             let entry = &session.runbook.entries[idx];
@@ -5301,7 +5377,11 @@ impl ReplOrchestratorV2 {
                     message: Some(recheck_failure_message(&outcome)),
                     result: None,
                 });
-                continue;
+                // B.2b-ζ (Q1.2a): halt the runbook on any step failure.
+                // Recheck blocks are semantically failures — rolling back
+                // prior entries keeps the whole-runbook atomicity contract.
+                runbook_failed = true;
+                break;
             }
 
             // Allocate a version for fallback compilation (only consumed if
@@ -5342,14 +5422,19 @@ impl ReplOrchestratorV2 {
                 ExecutionMode::Durable => {
                     // Route through execution gate (INV-3).
                     let entry_snapshot = session.runbook.entries[idx].clone();
+                    // B.2b-ζ: route through the outer scope when available.
+                    let scope_for_entry = outer_scope
+                        .as_mut()
+                        .map(|s| s as &mut dyn dsl_runtime::tx::TransactionScope);
                     let gate_outcome = self
-                        .execute_entry_via_gate(
+                        .execute_entry_via_gate_impl(
                             &entry_snapshot,
                             session.id,
                             true, // is_durable
                             runbook_id,
                             fallback_version,
                             Some(session.session_stack.clone()),
+                            scope_for_entry,
                         )
                         .await;
 
@@ -5446,6 +5531,9 @@ impl ReplOrchestratorV2 {
                                 message: Some(error),
                                 result: None,
                             });
+                            // B.2b-ζ (Q1.2a): halt + rollback on failure.
+                            runbook_failed = true;
+                            break;
                         }
                         StepOutcome::Skipped { reason } => {
                             tracing::info!(
@@ -5475,14 +5563,19 @@ impl ReplOrchestratorV2 {
                     let entry = &mut session.runbook.entries[idx];
                     entry.status = EntryStatus::Executing;
 
+                    // B.2b-ζ: route through the outer scope when available.
+                    let scope_for_entry = outer_scope
+                        .as_mut()
+                        .map(|s| s as &mut dyn dsl_runtime::tx::TransactionScope);
                     let gate_outcome = self
-                        .execute_entry_via_gate(
+                        .execute_entry_via_gate_impl(
                             &entry_snapshot,
                             session.id,
                             false, // not durable
                             runbook_id,
                             fallback_version,
                             Some(session.session_stack.clone()),
+                            scope_for_entry,
                         )
                         .await;
 
@@ -5560,6 +5653,9 @@ impl ReplOrchestratorV2 {
                                 message: Some(error),
                                 result: None,
                             });
+                            // B.2b-ζ (Q1.2a): halt + rollback on failure.
+                            runbook_failed = true;
+                            break;
                         }
                         StepOutcome::Parked {
                             correlation_key,
@@ -5620,6 +5716,43 @@ impl ReplOrchestratorV2 {
                             });
                         }
                     }
+                }
+            }
+        }
+
+        // B.2b-ζ: close the outer scope. Commit on clean completion or
+        // park (Q1.1a — entries 1..N-1 persist when N parks); rollback
+        // on any step failure (Q1.2a — whole batch undone).
+        #[cfg(feature = "database")]
+        if let Some(scope) = outer_scope.take() {
+            if runbook_failed {
+                tracing::info!(
+                    session_id = %session.id,
+                    runbook_id = %runbook_id,
+                    "B.2b-ζ: rolling back outer scope after runbook failure"
+                );
+                if let Err(e) = scope.rollback().await {
+                    tracing::error!(
+                        session_id = %session.id,
+                        runbook_id = %runbook_id,
+                        error = %e,
+                        "B.2b-ζ: outer scope rollback failed"
+                    );
+                }
+            } else {
+                tracing::debug!(
+                    session_id = %session.id,
+                    runbook_id = %runbook_id,
+                    parked,
+                    "B.2b-ζ: committing outer scope"
+                );
+                if let Err(e) = scope.commit().await {
+                    tracing::error!(
+                        session_id = %session.id,
+                        runbook_id = %runbook_id,
+                        error = %e,
+                        "B.2b-ζ: outer scope commit failed"
+                    );
                 }
             }
         }
