@@ -164,6 +164,14 @@ impl SemOsVerbOp for ActivateProfile {
         .execute(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: billing profile activated (DRAFT → ACTIVE).
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            profile_id,
+            "billing-profile:active",
+            "billing/profile",
+            &format!("billing.activate-profile — profile {} ACTIVE (deal {})", profile_id, deal_id),
+        );
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -210,6 +218,14 @@ impl SemOsVerbOp for SuspendProfile {
         .execute(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: billing profile suspended.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            profile_id,
+            "billing-profile:suspended",
+            "billing/profile",
+            &format!("billing.suspend-profile — profile {} SUSPENDED ({})", profile_id, reason),
+        );
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -242,6 +258,19 @@ impl SemOsVerbOp for CloseProfile {
         .execute(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: billing profile closed (terminal).
+        if result.rows_affected() > 0 {
+            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+                ctx,
+                profile_id,
+                "billing-profile:closed",
+                "billing/profile",
+                &format!(
+                    "billing.close-profile — profile {} CLOSED effective {}",
+                    profile_id, effective_to
+                ),
+            );
+        }
         Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
@@ -514,6 +543,18 @@ impl SemOsVerbOp for CalculatePeriod {
         .execute(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: billing period calculated.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            period_id,
+            "billing-period:calculated",
+            "billing/period",
+            &format!(
+                "billing.calculate-period — {} lines calculated, gross {:.2}",
+                line_count, gross_amount
+            ),
+        );
+
         let result = BillingCalculationResult {
             period_id,
             line_count,
@@ -552,6 +593,14 @@ impl SemOsVerbOp for ReviewPeriod {
         .execute(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: period CALCULATED → REVIEWED.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            period_id,
+            "billing-period:reviewed",
+            "billing/period",
+            &format!("billing.review-period — reviewed by {}", reviewed_by),
+        );
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -584,6 +633,14 @@ impl SemOsVerbOp for ApprovePeriod {
         .execute(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: period REVIEWED → APPROVED (gate before invoice).
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            period_id,
+            "billing-period:approved",
+            "billing/period",
+            &format!("billing.approve-period — approved by {}", approved_by),
+        );
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -650,6 +707,15 @@ impl SemOsVerbOp for GenerateInvoice {
         .execute(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: period APPROVED → INVOICED (terminal for the
+        // period's lifecycle; invoice is a separate downstream entity).
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            period_id,
+            "billing-period:invoiced",
+            "billing/period",
+            &format!("billing.generate-invoice — invoice {} issued", invoice_id),
+        );
         Ok(VerbExecutionOutcome::Uuid(invoice_id))
     }
 }
@@ -701,6 +767,15 @@ impl SemOsVerbOp for DisputePeriod {
         .execute(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: period transitions to DISPUTED (reason captures
+        // the dispute cause for operator review).
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            period_id,
+            "billing-period:disputed",
+            "billing/period",
+            &format!("billing.dispute-period — DISPUTED ({})", dispute_reason),
+        );
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
