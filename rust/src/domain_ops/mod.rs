@@ -323,7 +323,7 @@ pub use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 // Phase 5c — lifecycle_ops relocated to `dsl-runtime::domain_ops::lifecycle_ops`.
 // Registration flows through inventory automatically; external ob-poc code doesn't
 // import these types directly.
-pub use onboarding::OnboardingAutoCompleteOp;
+pub use onboarding::OnboardingAutoComplete;
 // Phase 5c — refdata_loader relocated. Types accessed via dsl_runtime::domain_ops::refdata_loader.
 // Phase 5c — refdata_ops relocated. Types accessed via dsl_runtime::domain_ops::refdata_ops.
 pub use request_ops::{
@@ -563,6 +563,26 @@ pub fn verify_plugin_verb_coverage_strict(
     }
 
     tracing::info!("{}", result.summary());
+}
+
+/// Register ob-poc's Pattern B plugin ops into the SemOS registry.
+///
+/// Phase 5c-migrate Phase B Pattern B slice (#72+) ports ops that reach
+/// into ob-poc internals from `CustomOperation` + `inventory` to
+/// `SemOsVerbOp`, but keeps the op bodies inside `rust/src/domain_ops/`
+/// because the internals (`crate::database::*`, `crate::ontology::*`,
+/// `crate::dsl_v2::*`, `crate::sem_os_runtime::*`) can't be inverted
+/// behind a service trait without a disproportionate refactor. This
+/// function is called from `ob-poc-web::main` right after
+/// `sem_os_postgres::ops::build_registry()` to merge the Pattern B
+/// ops into the single canonical registry.
+pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry) {
+    use std::sync::Arc;
+
+    // Phase B Pattern B slice #72: onboarding.auto-complete (bridges to
+    // crate::database::derive_semantic_state + crate::ontology::SemanticStageRegistry
+    // + crate::dsl_v2::executor::DslExecutor).
+    registry.register(Arc::new(onboarding::OnboardingAutoComplete));
 }
 
 #[cfg(test)]
@@ -907,10 +927,10 @@ mod tests {
         // source of truth for migrated FQNs — each Phase B slice extends it
         // in the same commit that deletes the corresponding dsl-runtime file.
         let registry = CustomOperationRegistry::new();
-        let sem_os_fqns: std::collections::HashSet<String> = sem_os_postgres::ops::build_registry()
-            .manifest()
-            .into_iter()
-            .collect();
+        let mut sem_os_registry = sem_os_postgres::ops::build_registry();
+        super::extend_registry(&mut sem_os_registry);
+        let sem_os_fqns: std::collections::HashSet<String> =
+            sem_os_registry.manifest().into_iter().collect();
         let result = super::verify_plugin_verb_coverage(&registry, &sem_os_fqns);
 
         // Print diagnostic info for debugging

@@ -997,7 +997,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Each Phase B commit adds a new op inside
             // `sem_os_postgres::ops::build_registry()`. The test suite uses
             // the same factory, so FQN coverage stays automatic.
-            let sem_os_ops = Arc::new(sem_os_postgres::ops::build_registry());
+            //
+            // Phase B Pattern B slices then extend the registry with ob-poc
+            // verb ops that live in `rust/src/domain_ops/` because they bridge
+            // to ob-poc internals (semantic-state derivation, DslExecutor,
+            // ontology loader, etc.) that can't be inverted behind a service
+            // trait without disproportionate refactor.
+            let sem_os_ops = {
+                let mut reg = sem_os_postgres::ops::build_registry();
+                ob_poc::domain_ops::extend_registry(&mut reg);
+                Arc::new(reg)
+            };
             tracing::info!(
                 registered_ops = sem_os_ops.len(),
                 fqns = ?sem_os_ops.manifest(),
@@ -1013,8 +1023,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 use ob_poc::domain_ops::verify_plugin_verb_coverage_strict;
                 use std::collections::HashSet;
 
-                let sem_os_fqns: HashSet<String> =
-                    sem_os_ops.manifest().into_iter().collect();
+                let sem_os_fqns: HashSet<String> = sem_os_ops.manifest().into_iter().collect();
                 let legacy_ops = CustomOperationRegistry::new();
                 verify_plugin_verb_coverage_strict(&legacy_ops, &sem_os_fqns);
             }
