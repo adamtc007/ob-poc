@@ -206,7 +206,14 @@ path = "src/bin/sem_os_footprint_audit.rs"
 
 # Features for conditional compilation
 [features]
-default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
+# Slice 4.1 (2026-04-22): runbook-gate-vnext added to default features.
+# After `dsl_api` retirement, no consumer builds with the feature OFF —
+# ob-poc-web explicitly listed it, and `cargo build -p ob-poc` defaulted
+# to `server` without it. Moving it into default means every build
+# goes through the vnext runbook gate path; the
+# `cfg(not(feature = "runbook-gate-vnext"))` branches in agent_service.rs
+# are now dead code awaiting Slice 4.1-c deletion.
+default = ["server", "runbook-gate-vnext"]  # Enable for sqlx prepare; use --no-default-features to disable
 
 database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector"]  # Only enable database functionality when needed
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
