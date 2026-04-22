@@ -122,12 +122,38 @@ impl SemOsVerbOp for BpmnStart {
     fn fqn(&self) -> &str {
         "bpmn.start"
     }
-    async fn execute(
+
+    /// Phase F.1d (Pattern B §3.1, 2026-04-22): start_process moves to
+    /// pre_fetch. Non-idempotent (bpmn-server generates a fresh
+    /// instance_id per call), so the saga surface is real:
+    ///
+    /// - If the outer transaction commits normally, the bpmn instance
+    ///   and any caller-side DB state that references its id are
+    ///   consistent. This is the happy path — same as pre-F.1d.
+    ///
+    /// - If the outer transaction rolls back (e.g. a later step in
+    ///   the runbook fails), the bpmn-server holds a live instance
+    ///   with no DB trail on the caller side. The instance is
+    ///   ORPHANED and would execute on its own schedule until a
+    ///   reaper detects it.
+    ///
+    /// - Comparison: the pre-F.1d implementation had the SAME orphan
+    ///   window — the gRPC call fired inside the verb body; if later
+    ///   steps in the same runbook failed, the bpmn instance was
+    ///   already live and the verb's own per-verb txn was irrelevant
+    ///   (the bpmn service sees no txn boundary).
+    ///
+    /// Net effect of this migration: the A1 invariant (no external
+    /// effects inside the inner txn) is satisfied. The saga risk is
+    /// unchanged. Closing the saga requires a separate reaper —
+    /// tracked in the pattern-b remediation ledger under §3.1
+    /// follow-ups and deferred to a later design slice.
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let process_key = json_extract_string(args, "process-key")?;
         let payload = json_extract_string_opt(args, "payload").unwrap_or_else(|| "{}".to_string());
 
@@ -151,6 +177,26 @@ impl SemOsVerbOp for BpmnStart {
             })
             .await?;
 
+        Ok(Some(serde_json::json!({
+            "_bpmn_start_instance_id": instance_id.to_string()
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let instance_id = args
+            .get("_bpmn_start_instance_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .ok_or_else(|| anyhow::anyhow!(
+                "bpmn.start: pre_fetch result missing \
+                 (`_bpmn_start_instance_id` absent from args — dispatcher \
+                 must have bypassed the pre_fetch hook)"
+            ))?;
         Ok(VerbExecutionOutcome::Uuid(instance_id))
     }
 }
