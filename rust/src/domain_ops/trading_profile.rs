@@ -1,4 +1,4 @@
-//! Trading Profile Custom Operations
+//! Trading Profile Custom Operations (36 plugin verbs) — `trading-profile.*`.
 //!
 //! Handles import and materialization of trading profile documents.
 //! The trading profile is a single JSONB document that is the source of truth
@@ -11,15 +11,28 @@
 //! - "ob-poc".isda_agreements
 //! - "ob-poc".csa_agreements
 //! - "ob-poc".subcustodian_network
+//!
+//! Phase 5c-migrate Phase B Pattern B slice #79: ported from
+//! `CustomOperation` + `inventory::collect!` to `SemOsVerbOp`. Stays in
+//! `ob-poc::domain_ops::trading_profile` because the ops bridge to
+//! `crate::trading_profile::{ast_db, document_ops, resolve, ...}` (upstream of
+//! `sem_os_postgres`) and depend on `ob_poc_types::trading_matrix::*`.
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
+use sem_os_postgres::ops::SemOsVerbOp;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::CustomOperation;
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_bool_opt, json_extract_int, json_extract_int_opt, json_extract_string,
+    json_extract_string_list_opt, json_extract_string_opt, json_extract_uuid,
+    json_extract_uuid_opt,
+};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+
 use crate::trading_profile::{
     ast_db, document_ops, resolve::resolve_entity_ref, BookingRule, IsdaAgreementConfig,
     MaterializationResult, StandingInstruction, TradingProfileDocument, TradingProfileImport,
@@ -54,37 +67,34 @@ fn forward_component_args(args: &serde_json::Value, strip_key: &str) -> serde_js
 ///
 /// Rationale: Requires file I/O, YAML parsing, hash computation, and
 /// document validation before storing to database.
-#[register_custom_op]
-pub struct TradingProfileImportOp;
+///
+/// Named `TradingProfileImportVerb` (not `TradingProfileImport`) because the
+/// module path `crate::trading_profile::TradingProfileImport` already names a
+/// YAML-deserializable import-document type, and we want to avoid shadowing.
+pub struct TradingProfileImportVerb;
 
 #[async_trait]
-impl CustomOperation for TradingProfileImportOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileImportVerb {
+    fn fqn(&self) -> &str {
+        "trading-profile.import"
     }
-    fn verb(&self) -> &'static str {
-        "import"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires file I/O, YAML parsing, hash computation, and validation"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         use sha2::{Digest, Sha256};
 
+        let pool = scope.pool().clone();
+
         // Get CBU ID (required)
-        let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
+        let cbu_id: Uuid = json_extract_uuid(args, ctx, "cbu-id")?;
 
         // Get file path or inline document
-        let file_path = super::helpers::json_extract_string_opt(args, "file-path")
-            .ok_or_else(|| {
-                anyhow::anyhow!("Missing :file-path argument. File-based import is required.")
-            })?;
+        let file_path = json_extract_string_opt(args, "file-path").ok_or_else(|| {
+            anyhow::anyhow!("Missing :file-path argument. File-based import is required.")
+        })?;
 
         // Read from file
         let content = std::fs::read_to_string(&file_path)
@@ -102,12 +112,12 @@ impl CustomOperation for TradingProfileImportOp {
         let hash = format!("{:x}", hasher.finalize());
 
         // Get optional args
-        let version: i32 = super::helpers::json_extract_int_opt(args, "version").unwrap_or(1) as i32;
+        let version: i32 = json_extract_int_opt(args, "version").unwrap_or(1) as i32;
 
-        let status_str = super::helpers::json_extract_string_opt(args, "status")
-            .unwrap_or_else(|| "DRAFT".to_string());
+        let status_str =
+            json_extract_string_opt(args, "status").unwrap_or_else(|| "DRAFT".to_string());
 
-        let notes = super::helpers::json_extract_string_opt(args, "notes");
+        let notes = json_extract_string_opt(args, "notes");
 
         // Convert to JSON for storage
         let document_json = serde_json::to_value(&document)?;
@@ -131,47 +141,35 @@ impl CustomOperation for TradingProfileImportOp {
         .bind(&document_json)
         .bind(&hash)
         .bind(&notes)
-        .execute(pool)
+        .execute(&pool)
         .await?;
 
         ctx.bind("profile", profile_id);
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(profile_id))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(profile_id))
     }
 }
-
 
 // =============================================================================
 // GET ACTIVE OPERATION
 // =============================================================================
 
 /// Get the active trading profile for a CBU
-#[register_custom_op]
-pub struct TradingProfileGetActiveOp;
+pub struct TradingProfileGetActive;
 
 #[async_trait]
-impl CustomOperation for TradingProfileGetActiveOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileGetActive {
+    fn fqn(&self) -> &str {
+        "trading-profile.get-active"
     }
-    fn verb(&self) -> &'static str {
-        "get-active"
-    }
-    fn rationale(&self) -> &'static str {
-        "Custom query to find ACTIVE status profile"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let cbu_id: Uuid = json_extract_uuid(args, ctx, "cbu-id")?;
 
         let row = sqlx::query!(
             r#"SELECT profile_id, version, document, document_hash, created_at, activated_at
@@ -180,11 +178,11 @@ impl CustomOperation for TradingProfileGetActiveOp {
                LIMIT 1"#,
             cbu_id
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?;
 
         match row {
-            Some(r) => Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+            Some(r) => Ok(VerbExecutionOutcome::Record(json!({
                 "profile_id": r.profile_id,
                 "version": r.version,
                 "document": r.document,
@@ -192,54 +190,42 @@ impl CustomOperation for TradingProfileGetActiveOp {
                 "created_at": r.created_at,
                 "activated_at": r.activated_at
             }))),
-            None => Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+            None => Ok(VerbExecutionOutcome::Record(json!({
                 "error": "No active trading profile found for CBU"
             }))),
         }
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // =============================================================================
 // ACTIVATE OPERATION
 // =============================================================================
 
 /// Activate a trading profile (sets status to ACTIVE, supersedes previous)
-#[register_custom_op]
-pub struct TradingProfileActivateOp;
+pub struct TradingProfileActivate;
 
 #[async_trait]
-impl CustomOperation for TradingProfileActivateOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileActivate {
+    fn fqn(&self) -> &str {
+        "trading-profile.activate"
     }
-    fn verb(&self) -> &'static str {
-        "activate"
-    }
-    fn rationale(&self) -> &'static str {
-        "Requires transaction to supersede previous active profile"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let activated_by = super::helpers::json_extract_string_opt(args, "activated-by");
+        let activated_by = json_extract_string_opt(args, "activated-by");
 
         // Get cbu_id for this profile
         let cbu_id: Uuid = sqlx::query_scalar(
             r#"SELECT cbu_id FROM "ob-poc".cbu_trading_profiles WHERE profile_id = $1"#,
         )
         .bind(profile_id)
-        .fetch_one(pool)
+        .fetch_one(&pool)
         .await?;
 
         let mut tx = pool.begin().await?;
@@ -267,18 +253,13 @@ impl CustomOperation for TradingProfileActivateOp {
 
         tx.commit().await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "status": "ACTIVE",
             "activated_at": chrono::Utc::now()
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // =============================================================================
 // MATERIALIZE OPERATION
@@ -292,36 +273,29 @@ impl CustomOperation for TradingProfileActivateOp {
 /// - "ob-poc".ssi_booking_rules (CRITICAL: specificity_score is GENERATED ALWAYS)
 /// - "ob-poc".isda_agreements
 /// - "ob-poc".csa_agreements
-#[register_custom_op]
-pub struct TradingProfileMaterializeOp;
+pub struct TradingProfileMaterialize;
 
 #[async_trait]
-impl CustomOperation for TradingProfileMaterializeOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileMaterialize {
+    fn fqn(&self) -> &str {
+        "trading-profile.materialize"
     }
-    fn verb(&self) -> &'static str {
-        "materialize"
-    }
-    fn rationale(&self) -> &'static str {
-        "Complex multi-table sync with FK lookups and transaction management"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
         let start = std::time::Instant::now();
 
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let dry_run = super::helpers::json_extract_bool_opt(args, "dry-run").unwrap_or(false);
+        let dry_run = json_extract_bool_opt(args, "dry-run").unwrap_or(false);
 
-        let force = super::helpers::json_extract_bool_opt(args, "force").unwrap_or(false);
+        let force = json_extract_bool_opt(args, "force").unwrap_or(false);
 
-        let sections: Vec<String> = super::helpers::json_extract_string_list_opt(args, "sections")
+        let sections: Vec<String> = json_extract_string_list_opt(args, "sections")
             .unwrap_or_else(|| vec!["universe".into(), "ssis".into(), "booking_rules".into()]);
 
         // Load the profile document
@@ -329,7 +303,7 @@ impl CustomOperation for TradingProfileMaterializeOp {
             r#"SELECT cbu_id, document FROM "ob-poc".cbu_trading_profiles WHERE profile_id = $1"#,
             profile_id
         )
-        .fetch_one(pool)
+        .fetch_one(&pool)
         .await?;
 
         let cbu_id = row
@@ -374,7 +348,7 @@ impl CustomOperation for TradingProfileMaterializeOp {
                 );
             }
             result.duration_ms = start.elapsed().as_millis() as i64;
-            return Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?));
+            return Ok(VerbExecutionOutcome::Record(serde_json::to_value(&result)?));
         }
 
         // Start transaction
@@ -486,7 +460,7 @@ impl CustomOperation for TradingProfileMaterializeOp {
         if sections.contains(&"isda".to_string()) {
             let created = materialize_isda_agreements(
                 &mut tx,
-                pool,
+                &pool,
                 cbu_id,
                 &document.isda_agreements,
                 &refs.ssi_name_to_id,
@@ -529,17 +503,12 @@ impl CustomOperation for TradingProfileMaterializeOp {
         .bind(serde_json::to_value(&result.records_updated)?)
         .bind(serde_json::to_value(&result.records_deleted)?)
         .bind(result.duration_ms as i32)
-        .execute(pool)
+        .execute(&pool)
         .await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
     }
 }
-
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -1207,33 +1176,27 @@ async fn materialize_corporate_actions(
 // =============================================================================
 
 /// Create a new draft trading profile for a CBU
-#[register_custom_op]
-pub struct TradingProfileCreateDraftOp;
+pub struct TradingProfileCreateDraft;
 
 #[async_trait]
-impl CustomOperation for TradingProfileCreateDraftOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileCreateDraft {
+    fn fqn(&self) -> &str {
+        "trading-profile.create-draft"
     }
-    fn verb(&self) -> &'static str {
-        "create-draft"
-    }
-    fn rationale(&self) -> &'static str {
-        "Creates new DRAFT profile document with optional cloning from existing"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         use crate::trading_profile::ast_db;
 
-        // Support both CBU-level instances (cbu-id) and group-level templates (group-id)
-        let cbu_id: Option<Uuid> = super::helpers::json_extract_uuid_opt(args, ctx, "cbu-id");
+        let pool = scope.pool().clone();
 
-        let group_id: Option<Uuid> = super::helpers::json_extract_uuid_opt(args, ctx, "group-id");
+        // Support both CBU-level instances (cbu-id) and group-level templates (group-id)
+        let cbu_id: Option<Uuid> = json_extract_uuid_opt(args, ctx, "cbu-id");
+
+        let group_id: Option<Uuid> = json_extract_uuid_opt(args, ctx, "group-id");
 
         let is_template = cbu_id.is_none() && group_id.is_some();
 
@@ -1241,7 +1204,7 @@ impl CustomOperation for TradingProfileCreateDraftOp {
             anyhow::bail!("Either cbu-id or group-id is required");
         }
 
-        let notes = super::helpers::json_extract_string_opt(args, "notes");
+        let notes = json_extract_string_opt(args, "notes");
 
         // For templates: insert directly with group_id and is_template=true
         // For CBU instances: use existing create_draft path
@@ -1266,13 +1229,13 @@ impl CustomOperation for TradingProfileCreateDraftOp {
             .bind(gid)
             .bind(&doc_json)
             .bind(&doc_hash)
-            .execute(pool)
+            .execute(&pool)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create template draft: {}", e))?;
             pid
         } else {
             let cid = cbu_id.unwrap();
-            let (pid, _doc) = ast_db::create_draft(pool, cid, notes)
+            let (pid, _doc) = ast_db::create_draft(&pool, cid, notes)
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to create draft: {}", e))?;
             pid
@@ -1280,94 +1243,71 @@ impl CustomOperation for TradingProfileCreateDraftOp {
 
         ctx.bind("profile", profile_id);
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Uuid(profile_id))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Uuid(profile_id))
     }
 }
-
 
 // =============================================================================
 // COMPONENT DISPATCH OPERATIONS
 // =============================================================================
 
-#[register_custom_op]
-pub struct TradingProfileAddComponentOp;
+pub struct TradingProfileAddComponent;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddComponentOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddComponent {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-component"
     }
-
-    fn verb(&self) -> &'static str {
-        "add-component"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Dispatches generic component additions to the existing trading-profile authoring ops"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let component_type = super::helpers::json_extract_string(args, "component-type")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let component_type = json_extract_string(args, "component-type")?;
         let forwarded = forward_component_args(args, "component-type");
 
         match component_type.as_str() {
             "instrument-class" => {
-                TradingProfileAddInstrumentClassOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileAddInstrumentClass
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
-            "market" => {
-                TradingProfileAddMarketOp
-                    .execute_json(&forwarded, ctx, pool)
-                    .await
-            }
+            "market" => TradingProfileAddMarket.execute(&forwarded, ctx, scope).await,
             "allowed-currency" => {
-                TradingProfileAddAllowedCurrencyOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileAddAllowedCurrency
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
-            "standing-instruction" => {
-                TradingProfileAddSsiOp
-                    .execute_json(&forwarded, ctx, pool)
-                    .await
-            }
+            "standing-instruction" => TradingProfileAddSsi.execute(&forwarded, ctx, scope).await,
             "booking-rule" => {
-                TradingProfileAddBookingRuleOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileAddBookingRule
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             "isda-config" => {
-                TradingProfileAddIsdaConfigOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileAddIsdaConfig
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             "isda-coverage" => {
-                TradingProfileAddIsdaCoverageOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileAddIsdaCoverage
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             "csa-config" => {
-                TradingProfileAddCsaConfigOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileAddCsaConfig
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             "csa-collateral" => {
-                TradingProfileAddCsaCollateralOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileAddCsaCollateral
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             "im-mandate" => {
-                TradingProfileAddImMandateOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileAddImMandate
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             other => Err(anyhow::anyhow!(
@@ -1376,73 +1316,54 @@ impl CustomOperation for TradingProfileAddComponentOp {
             )),
         }
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
-#[register_custom_op]
-pub struct TradingProfileRemoveComponentOp;
+pub struct TradingProfileRemoveComponent;
 
 #[async_trait]
-impl CustomOperation for TradingProfileRemoveComponentOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileRemoveComponent {
+    fn fqn(&self) -> &str {
+        "trading-profile.remove-component"
     }
-
-    fn verb(&self) -> &'static str {
-        "remove-component"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Dispatches generic component removals to the existing trading-profile authoring ops"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let component_type = super::helpers::json_extract_string(args, "component-type")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let component_type = json_extract_string(args, "component-type")?;
         let forwarded = forward_component_args(args, "component-type");
 
         match component_type.as_str() {
             "instrument-class" => {
-                TradingProfileRemoveInstrumentClassOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileRemoveInstrumentClass
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             "market" => {
-                TradingProfileRemoveMarketOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileRemoveMarket
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
-            "standing-instruction" => {
-                TradingProfileRemoveSsiOp
-                    .execute_json(&forwarded, ctx, pool)
-                    .await
-            }
+            "standing-instruction" => TradingProfileRemoveSsi.execute(&forwarded, ctx, scope).await,
             "booking-rule" => {
-                TradingProfileRemoveBookingRuleOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileRemoveBookingRule
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             "isda-config" => {
-                TradingProfileRemoveIsdaConfigOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileRemoveIsdaConfig
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             "csa-config" => {
-                TradingProfileRemoveCsaConfigOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileRemoveCsaConfig
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             "im-mandate" => {
-                TradingProfileRemoveImMandateOp
-                    .execute_json(&forwarded, ctx, pool)
+                TradingProfileRemoveImMandate
+                    .execute(&forwarded, ctx, scope)
                     .await
             }
             other => Err(anyhow::anyhow!(
@@ -1451,40 +1372,28 @@ impl CustomOperation for TradingProfileRemoveComponentOp {
             )),
         }
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Add instrument class to trading profile universe
-#[register_custom_op]
-pub struct TradingProfileAddInstrumentClassOp;
+pub struct TradingProfileAddInstrumentClass;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddInstrumentClassOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddInstrumentClass {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-instrument-class"
     }
-    fn verb(&self) -> &'static str {
-        "add-instrument-class"
-    }
-    fn rationale(&self) -> &'static str {
-        "Modifies JSONB document to add instrument class"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let class_code = super::helpers::json_extract_string(args, "class-code")?;
+        let class_code = json_extract_string(args, "class-code")?;
 
-        let cfi_prefix = super::helpers::json_extract_string_list_opt(args, "cfi-prefixes")
+        let cfi_prefix = json_extract_string_list_opt(args, "cfi-prefixes")
             .and_then(|list| list.into_iter().next());
 
         // Determine if OTC based on class code (IRS, FX, etc. are OTC)
@@ -1495,7 +1404,7 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::AddInstrumentClass {
                 class_code: class_code.clone(),
@@ -1506,102 +1415,75 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add instrument class: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "class_code": class_code,
             "version": doc.version,
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Remove instrument class from trading profile universe
-#[register_custom_op]
-pub struct TradingProfileRemoveInstrumentClassOp;
+pub struct TradingProfileRemoveInstrumentClass;
 
 #[async_trait]
-impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileRemoveInstrumentClass {
+    fn fqn(&self) -> &str {
+        "trading-profile.remove-instrument-class"
     }
-    fn verb(&self) -> &'static str {
-        "remove-instrument-class"
-    }
-    fn rationale(&self) -> &'static str {
-        "Modifies JSONB document to remove instrument class"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::trading_profile::ast_db;
-        use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
-
-        let class_code = super::helpers::json_extract_string(args, "class-code")?;
+        let class_code = json_extract_string(args, "class-code")?;
 
         // Build node ID: _Trading Universe / {class_code}
         let node_id = TradingMatrixNodeId::category(categories::UNIVERSE).child(&class_code);
 
-        let doc = ast_db::apply_and_save(pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
+        let doc = ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove instrument class: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "removed": class_code,
             "version": doc.version,
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Add market to trading profile universe under an instrument class
-#[register_custom_op]
-pub struct TradingProfileAddMarketOp;
+pub struct TradingProfileAddMarket;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddMarketOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddMarket {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-market"
     }
-    fn verb(&self) -> &'static str {
-        "add-market"
-    }
-    fn rationale(&self) -> &'static str {
-        "Modifies JSONB document to add market under instrument class"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let instrument_class = super::helpers::json_extract_string(args, "instrument-class")?;
+        let instrument_class = json_extract_string(args, "instrument-class")?;
 
-        let mic = super::helpers::json_extract_string(args, "mic")?;
+        let mic = json_extract_string(args, "mic")?;
 
         // Get market name from argument or look up from reference data
-        let market_name = super::helpers::json_extract_string_opt(args, "market-name");
+        let market_name = json_extract_string_opt(args, "market-name");
 
-        let country_code = super::helpers::json_extract_string_opt(args, "country-code");
+        let country_code = json_extract_string_opt(args, "country-code");
 
         // Look up market metadata from reference data if not provided
         let (resolved_name, resolved_country) = if let (Some(name), Some(code)) =
@@ -1612,7 +1494,7 @@ impl CustomOperation for TradingProfileAddMarketOp {
             let row =
                 sqlx::query(r#"SELECT name, country_code FROM "ob-poc".markets WHERE mic = $1"#)
                     .bind(&mic)
-                    .fetch_optional(pool)
+                    .fetch_optional(&pool)
                     .await?;
 
             match row {
@@ -1629,7 +1511,7 @@ impl CustomOperation for TradingProfileAddMarketOp {
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::AddMarket {
                 parent_class: instrument_class.clone(),
@@ -1641,7 +1523,7 @@ impl CustomOperation for TradingProfileAddMarketOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add market: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "instrument_class": instrument_class,
             "mic": mic,
@@ -1649,54 +1531,39 @@ impl CustomOperation for TradingProfileAddMarketOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Remove market from trading profile universe
-#[register_custom_op]
-pub struct TradingProfileRemoveMarketOp;
+pub struct TradingProfileRemoveMarket;
 
 #[async_trait]
-impl CustomOperation for TradingProfileRemoveMarketOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileRemoveMarket {
+    fn fqn(&self) -> &str {
+        "trading-profile.remove-market"
     }
-    fn verb(&self) -> &'static str {
-        "remove-market"
-    }
-    fn rationale(&self) -> &'static str {
-        "Modifies JSONB document to remove market"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::trading_profile::ast_db;
-        use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        let instrument_class = json_extract_string(args, "instrument-class")?;
 
-        let instrument_class = super::helpers::json_extract_string(args, "instrument-class")?;
-
-        let mic = super::helpers::json_extract_string(args, "mic")?;
+        let mic = json_extract_string(args, "mic")?;
 
         // Build node ID: _Trading Universe / {instrument_class} / {mic}
         let node_id = TradingMatrixNodeId::category(categories::UNIVERSE)
             .child(&instrument_class)
             .child(&mic);
 
-        let doc = ast_db::apply_and_save(pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
+        let doc = ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove market: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "instrument_class": instrument_class,
             "removed": mic,
@@ -1704,58 +1571,46 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Add standing instruction to trading profile
-#[register_custom_op]
-pub struct TradingProfileAddSsiOp;
+pub struct TradingProfileAddSsi;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddSsiOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddSsi {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-standing-instruction"
     }
-    fn verb(&self) -> &'static str {
-        "add-standing-instruction"
-    }
-    fn rationale(&self) -> &'static str {
-        "Modifies JSONB document to add SSI"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let ssi_type = super::helpers::json_extract_string(args, "ssi-type")?;
+        let ssi_type = json_extract_string(args, "ssi-type")?;
 
-        let ssi_name = super::helpers::json_extract_string(args, "ssi-name")?;
+        let ssi_name = json_extract_string(args, "ssi-name")?;
 
         // Generate ssi_id from type and name
         let ssi_id = format!("{}:{}", ssi_type, ssi_name);
 
-        let safekeeping_account = super::helpers::json_extract_string_opt(args, "safekeeping-account");
+        let safekeeping_account = json_extract_string_opt(args, "safekeeping-account");
 
-        let safekeeping_bic = super::helpers::json_extract_string_opt(args, "safekeeping-bic");
+        let safekeeping_bic = json_extract_string_opt(args, "safekeeping-bic");
 
-        let cash_account = super::helpers::json_extract_string_opt(args, "cash-account");
+        let cash_account = json_extract_string_opt(args, "cash-account");
 
-        let cash_bic = super::helpers::json_extract_string_opt(args, "cash-bic");
+        let cash_bic = json_extract_string_opt(args, "cash-bic");
 
-        let cash_currency = super::helpers::json_extract_string_opt(args, "cash-currency");
+        let cash_currency = json_extract_string_opt(args, "cash-currency");
 
-        let pset_bic = super::helpers::json_extract_string_opt(args, "pset-bic");
+        let pset_bic = json_extract_string_opt(args, "pset-bic");
 
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::AddSsi {
                 ssi_id: ssi_id.clone(),
@@ -1772,7 +1627,7 @@ impl CustomOperation for TradingProfileAddSsiOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add SSI: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "ssi_id": ssi_id,
             "ssi_name": ssi_name,
@@ -1780,108 +1635,81 @@ impl CustomOperation for TradingProfileAddSsiOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Remove standing instruction from trading profile
-#[register_custom_op]
-pub struct TradingProfileRemoveSsiOp;
+pub struct TradingProfileRemoveSsi;
 
 #[async_trait]
-impl CustomOperation for TradingProfileRemoveSsiOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileRemoveSsi {
+    fn fqn(&self) -> &str {
+        "trading-profile.remove-standing-instruction"
     }
-    fn verb(&self) -> &'static str {
-        "remove-standing-instruction"
-    }
-    fn rationale(&self) -> &'static str {
-        "Modifies JSONB document to remove SSI"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::trading_profile::ast_db;
-        use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
-
-        let ssi_name = super::helpers::json_extract_string(args, "ssi-name")?;
+        let ssi_name = json_extract_string(args, "ssi-name")?;
 
         // Build node ID: _Standing Settlement Instructions / {ssi_name}
         let node_id = TradingMatrixNodeId::category(categories::SSI).child(&ssi_name);
 
-        let doc = ast_db::apply_and_save(pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
+        let doc = ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove SSI: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "removed": ssi_name,
             "version": doc.version,
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Add booking rule to trading profile
-#[register_custom_op]
-pub struct TradingProfileAddBookingRuleOp;
+pub struct TradingProfileAddBookingRule;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddBookingRuleOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddBookingRule {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-booking-rule"
     }
-    fn verb(&self) -> &'static str {
-        "add-booking-rule"
-    }
-    fn rationale(&self) -> &'static str {
-        "Modifies JSONB document to add booking rule"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let rule_name = super::helpers::json_extract_string(args, "rule-name")?;
+        let rule_name = json_extract_string(args, "rule-name")?;
 
-        let priority = super::helpers::json_extract_int(args, "priority")? as i32;
+        let priority = json_extract_int(args, "priority")? as i32;
 
-        let ssi_ref = super::helpers::json_extract_string(args, "ssi-ref")?;
+        let ssi_ref = json_extract_string(args, "ssi-ref")?;
 
         // Generate rule_id from ssi_ref and rule_name
         let rule_id = format!("{}:{}", ssi_ref, rule_name);
 
         // Build match criteria
         let match_criteria = BookingMatchCriteria {
-            instrument_class: super::helpers::json_extract_string_opt(args, "match-instrument-class"),
-            security_type: super::helpers::json_extract_string_opt(args, "match-security-type"),
-            mic: super::helpers::json_extract_string_opt(args, "match-mic"),
-            currency: super::helpers::json_extract_string_opt(args, "match-currency"),
-            settlement_type: super::helpers::json_extract_string_opt(args, "match-settlement-type"),
-            counterparty_entity_id: super::helpers::json_extract_string_opt(args, "match-counterparty-id"),
+            instrument_class: json_extract_string_opt(args, "match-instrument-class"),
+            security_type: json_extract_string_opt(args, "match-security-type"),
+            mic: json_extract_string_opt(args, "match-mic"),
+            currency: json_extract_string_opt(args, "match-currency"),
+            settlement_type: json_extract_string_opt(args, "match-settlement-type"),
+            counterparty_entity_id: json_extract_string_opt(args, "match-counterparty-id"),
         };
 
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::AddBookingRule {
                 ssi_ref: ssi_ref.clone(),
@@ -1894,7 +1722,7 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add booking rule: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "rule_id": rule_id,
             "rule_name": rule_name,
@@ -1904,54 +1732,39 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Remove booking rule from trading profile
-#[register_custom_op]
-pub struct TradingProfileRemoveBookingRuleOp;
+pub struct TradingProfileRemoveBookingRule;
 
 #[async_trait]
-impl CustomOperation for TradingProfileRemoveBookingRuleOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileRemoveBookingRule {
+    fn fqn(&self) -> &str {
+        "trading-profile.remove-booking-rule"
     }
-    fn verb(&self) -> &'static str {
-        "remove-booking-rule"
-    }
-    fn rationale(&self) -> &'static str {
-        "Modifies JSONB document to remove booking rule"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        use crate::trading_profile::ast_db;
-        use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        let ssi_ref = json_extract_string(args, "ssi-ref")?;
 
-        let ssi_ref = super::helpers::json_extract_string(args, "ssi-ref")?;
-
-        let rule_id = super::helpers::json_extract_string(args, "rule-id")?;
+        let rule_id = json_extract_string(args, "rule-id")?;
 
         // Build node ID: _Standing Settlement Instructions / {ssi_ref} / {rule_id}
         let node_id = TradingMatrixNodeId::category(categories::SSI)
             .child(&ssi_ref)
             .child(&rule_id);
 
-        let doc = ast_db::apply_and_save(pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
+        let doc = ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove booking rule: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "ssi_ref": ssi_ref,
             "removed": rule_id,
@@ -1959,58 +1772,44 @@ impl CustomOperation for TradingProfileRemoveBookingRuleOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // =============================================================================
 // ISDA/CSA CONSTRUCTION OPERATIONS (Phase 2)
 // =============================================================================
 
 /// Add ISDA configuration to a trading profile document
-#[register_custom_op]
-pub struct TradingProfileAddIsdaConfigOp;
+pub struct TradingProfileAddIsdaConfig;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddIsdaConfigOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddIsdaConfig {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-isda-config"
     }
-
-    fn verb(&self) -> &'static str {
-        "add-isda-config"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Adds ISDA master agreement configuration to the document"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let counterparty_entity_id = super::helpers::json_extract_string(args, "counterparty-entity-id")?;
+        let counterparty_entity_id = json_extract_string(args, "counterparty-entity-id")?;
 
-        let counterparty_name = super::helpers::json_extract_string(args, "counterparty-name")?;
+        let counterparty_name = json_extract_string(args, "counterparty-name")?;
 
-        let counterparty_lei = super::helpers::json_extract_string_opt(args, "counterparty-lei");
+        let counterparty_lei = json_extract_string_opt(args, "counterparty-lei");
 
-        let governing_law = super::helpers::json_extract_string_opt(args, "governing-law");
+        let governing_law = json_extract_string_opt(args, "governing-law");
 
-        let agreement_date = super::helpers::json_extract_string_opt(args, "agreement-date");
+        let agreement_date = json_extract_string_opt(args, "agreement-date");
 
         // Generate isda_id from counterparty name
         let isda_id = counterparty_name.clone();
 
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::AddIsda {
                 isda_id: isda_id.clone(),
@@ -2024,7 +1823,7 @@ impl CustomOperation for TradingProfileAddIsdaConfigOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add ISDA config: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "isda_id": isda_id,
             "counterparty_name": counterparty_name,
@@ -2033,51 +1832,36 @@ impl CustomOperation for TradingProfileAddIsdaConfigOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Add product coverage to an ISDA agreement
-#[register_custom_op]
-pub struct TradingProfileAddIsdaCoverageOp;
+pub struct TradingProfileAddIsdaCoverage;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddIsdaCoverageOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddIsdaCoverage {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-isda-coverage"
     }
-
-    fn verb(&self) -> &'static str {
-        "add-isda-coverage"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Adds product coverage to an ISDA master agreement"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let isda_ref = super::helpers::json_extract_string(args, "isda-ref")?;
+        let isda_ref = json_extract_string(args, "isda-ref")?;
 
-        let asset_class = super::helpers::json_extract_string(args, "asset-class")?;
+        let asset_class = json_extract_string(args, "asset-class")?;
 
-        let base_products = super::helpers::json_extract_string_list_opt(args, "base-products")
-            .unwrap_or_default();
+        let base_products = json_extract_string_list_opt(args, "base-products").unwrap_or_default();
 
         // Generate coverage_id from isda_ref and asset_class
         let coverage_id = format!("{}:{}", isda_ref, asset_class);
 
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::AddProductCoverage {
                 isda_ref: isda_ref.clone(),
@@ -2089,7 +1873,7 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add ISDA coverage: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "isda_ref": isda_ref,
             "coverage_id": coverage_id,
@@ -2098,80 +1882,62 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Add CSA configuration to an ISDA agreement
-#[register_custom_op]
-pub struct TradingProfileAddCsaConfigOp;
+pub struct TradingProfileAddCsaConfig;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddCsaConfigOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddCsaConfig {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-csa-config"
     }
-
-    fn verb(&self) -> &'static str {
-        "add-csa-config"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Adds Credit Support Annex configuration to an ISDA agreement"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let isda_ref = super::helpers::json_extract_string(args, "isda-ref")?;
+        let isda_ref = json_extract_string(args, "isda-ref")?;
 
-        let csa_type = super::helpers::json_extract_string(args, "csa-type")?;
+        let csa_type = json_extract_string(args, "csa-type")?;
 
-        let threshold_currency = super::helpers::json_extract_string_opt(args, "threshold-currency");
+        let threshold_currency = json_extract_string_opt(args, "threshold-currency");
 
-        let threshold_amount = args
-            .get("threshold-amount")
-            .and_then(|v| {
-                if let Some(f) = v.as_f64() {
-                    Some(f)
-                } else if let Some(i) = v.as_i64() {
-                    Some(i as f64)
-                } else if let Some(s) = v.as_str() {
-                    s.parse::<f64>().ok()
-                } else {
-                    None
-                }
-            });
+        let threshold_amount = args.get("threshold-amount").and_then(|v| {
+            if let Some(f) = v.as_f64() {
+                Some(f)
+            } else if let Some(i) = v.as_i64() {
+                Some(i as f64)
+            } else if let Some(s) = v.as_str() {
+                s.parse::<f64>().ok()
+            } else {
+                None
+            }
+        });
 
-        let minimum_transfer_amount = args
-            .get("minimum-transfer-amount")
-            .and_then(|v| {
-                if let Some(f) = v.as_f64() {
-                    Some(f)
-                } else if let Some(i) = v.as_i64() {
-                    Some(i as f64)
-                } else if let Some(s) = v.as_str() {
-                    s.parse::<f64>().ok()
-                } else {
-                    None
-                }
-            });
+        let minimum_transfer_amount = args.get("minimum-transfer-amount").and_then(|v| {
+            if let Some(f) = v.as_f64() {
+                Some(f)
+            } else if let Some(i) = v.as_i64() {
+                Some(i as f64)
+            } else if let Some(s) = v.as_str() {
+                s.parse::<f64>().ok()
+            } else {
+                None
+            }
+        });
 
-        let collateral_ssi_ref = super::helpers::json_extract_string_opt(args, "collateral-ssi-ref");
+        let collateral_ssi_ref = json_extract_string_opt(args, "collateral-ssi-ref");
 
         // Generate csa_id from isda_ref and csa_type
         let csa_id = format!("{}:{}", isda_ref, csa_type);
 
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::AddCsa {
                 isda_ref: isda_ref.clone(),
@@ -2186,7 +1952,7 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add CSA config: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "isda_ref": isda_ref,
             "csa_id": csa_id,
@@ -2195,68 +1961,50 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Add eligible collateral to a CSA
-#[register_custom_op]
-pub struct TradingProfileAddCsaCollateralOp;
+pub struct TradingProfileAddCsaCollateral;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddCsaCollateralOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddCsaCollateral {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-csa-collateral"
     }
-
-    fn verb(&self) -> &'static str {
-        "add-csa-collateral"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Adds eligible collateral type to a Credit Support Annex"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let counterparty_ref = super::helpers::json_extract_string(args, "counterparty-ref")?;
+        let counterparty_ref = json_extract_string(args, "counterparty-ref")?;
 
-        let collateral_type = super::helpers::json_extract_string(args, "collateral-type")?;
+        let collateral_type = json_extract_string(args, "collateral-type")?;
 
-        let currencies: Option<Vec<String>> =
-            super::helpers::json_extract_string_list_opt(args, "currencies");
+        let currencies: Option<Vec<String>> = json_extract_string_list_opt(args, "currencies");
 
-        let _issuers: Option<Vec<String>> =
-            super::helpers::json_extract_string_list_opt(args, "issuers");
+        let _issuers: Option<Vec<String>> = json_extract_string_list_opt(args, "issuers");
 
-        let _min_rating = super::helpers::json_extract_string_opt(args, "min-rating");
+        let _min_rating = json_extract_string_opt(args, "min-rating");
 
-        let haircut_pct = args
-            .get("haircut-pct")
-            .and_then(|v| {
-                if let Some(f) = v.as_f64() {
-                    Some(f)
-                } else if let Some(i) = v.as_i64() {
-                    Some(i as f64)
-                } else if let Some(s) = v.as_str() {
-                    s.parse::<f64>().ok()
-                } else {
-                    None
-                }
-            });
+        let haircut_pct = args.get("haircut-pct").and_then(|v| {
+            if let Some(f) = v.as_f64() {
+                Some(f)
+            } else if let Some(i) = v.as_i64() {
+                Some(i as f64)
+            } else if let Some(s) = v.as_str() {
+                s.parse::<f64>().ok()
+            } else {
+                None
+            }
+        });
 
         // CSA type defaults to "VM" (Variation Margin) if not specified
-        let csa_type = super::helpers::json_extract_string_opt(args, "csa-type")
-            .unwrap_or_else(|| "VM".to_string());
+        let csa_type =
+            json_extract_string_opt(args, "csa-type").unwrap_or_else(|| "VM".to_string());
 
         // Generate a collateral ID from type and optional currency
         let collateral_id = if let Some(ref currs) = currencies {
@@ -2271,7 +2019,7 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::AddCsaEligibleCollateral {
                 isda_ref: counterparty_ref.clone(),
@@ -2286,7 +2034,7 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add CSA collateral: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "counterparty_ref": counterparty_ref,
             "csa_type": csa_type,
@@ -2294,50 +2042,36 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Link CSA to collateral SSI
-#[register_custom_op]
-pub struct TradingProfileLinkCsaSsiOp;
+pub struct TradingProfileLinkCsaSsi;
 
 #[async_trait]
-impl CustomOperation for TradingProfileLinkCsaSsiOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileLinkCsaSsi {
+    fn fqn(&self) -> &str {
+        "trading-profile.link-csa-ssi"
     }
-
-    fn verb(&self) -> &'static str {
-        "link-csa-ssi"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Links a CSA to a collateral SSI for margin transfers"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let counterparty_ref = super::helpers::json_extract_string(args, "counterparty-ref")?;
+        let counterparty_ref = json_extract_string(args, "counterparty-ref")?;
 
-        let ssi_name = super::helpers::json_extract_string(args, "ssi-name")?;
+        let ssi_name = json_extract_string(args, "ssi-name")?;
 
         // CSA type defaults to "VM" (Variation Margin) if not specified
-        let csa_type = super::helpers::json_extract_string_opt(args, "csa-type")
-            .unwrap_or_else(|| "VM".to_string());
+        let csa_type =
+            json_extract_string_opt(args, "csa-type").unwrap_or_else(|| "VM".to_string());
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::LinkCsaSsi {
                 isda_ref: counterparty_ref.clone(),
@@ -2348,7 +2082,7 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to link CSA SSI: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "counterparty_ref": counterparty_ref,
             "csa_type": csa_type,
@@ -2357,44 +2091,30 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Remove ISDA configuration from trading profile
-#[register_custom_op]
-pub struct TradingProfileRemoveIsdaConfigOp;
+pub struct TradingProfileRemoveIsdaConfig;
 
 #[async_trait]
-impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileRemoveIsdaConfig {
+    fn fqn(&self) -> &str {
+        "trading-profile.remove-isda-config"
     }
-
-    fn verb(&self) -> &'static str {
-        "remove-isda-config"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Removes ISDA master agreement and all children from the document"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let counterparty_ref = super::helpers::json_extract_string(args, "counterparty-ref")?;
+        let counterparty_ref = json_extract_string(args, "counterparty-ref")?;
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::RemoveIsda {
                 counterparty_ref: counterparty_ref.clone(),
@@ -2403,7 +2123,7 @@ impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove ISDA config: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "counterparty_ref": counterparty_ref,
             "removed": true,
@@ -2411,46 +2131,32 @@ impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Remove CSA configuration from trading profile
-#[register_custom_op]
-pub struct TradingProfileRemoveCsaConfigOp;
+pub struct TradingProfileRemoveCsaConfig;
 
 #[async_trait]
-impl CustomOperation for TradingProfileRemoveCsaConfigOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileRemoveCsaConfig {
+    fn fqn(&self) -> &str {
+        "trading-profile.remove-csa-config"
     }
-
-    fn verb(&self) -> &'static str {
-        "remove-csa-config"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Removes CSA from ISDA agreement in the document"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let counterparty_ref = super::helpers::json_extract_string(args, "counterparty-ref")?;
+        let counterparty_ref = json_extract_string(args, "counterparty-ref")?;
 
-        let csa_type = super::helpers::json_extract_string_opt(args, "csa-type");
+        let csa_type = json_extract_string_opt(args, "csa-type");
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::RemoveCsa {
                 counterparty_ref: counterparty_ref.clone(),
@@ -2460,7 +2166,7 @@ impl CustomOperation for TradingProfileRemoveCsaConfigOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove CSA config: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "counterparty_ref": counterparty_ref,
             "csa_type": csa_type,
@@ -2469,67 +2175,53 @@ impl CustomOperation for TradingProfileRemoveCsaConfigOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // =============================================================================
 // IM MANDATE OPERATIONS (Phase 3)
 // =============================================================================
 
 /// Add Investment Manager mandate to trading profile
-#[register_custom_op]
-pub struct TradingProfileAddImMandateOp;
+pub struct TradingProfileAddImMandate;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddImMandateOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddImMandate {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-im-mandate"
     }
-
-    fn verb(&self) -> &'static str {
-        "add-im-mandate"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Adds Investment Manager mandate configuration to the document"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let manager_ref = super::helpers::json_extract_string(args, "manager-ref")?;
+        let manager_ref = json_extract_string(args, "manager-ref")?;
 
-        let manager_ref_type = super::helpers::json_extract_string_opt(args, "manager-ref-type")
+        let manager_ref_type = json_extract_string_opt(args, "manager-ref-type")
             .unwrap_or_else(|| "NAME".to_string());
 
-        let priority = super::helpers::json_extract_int_opt(args, "priority")
+        let priority = json_extract_int_opt(args, "priority")
             .map(|i| i as i32)
             .unwrap_or(50);
 
-        let role = super::helpers::json_extract_string_opt(args, "role")
+        let role = json_extract_string_opt(args, "role")
             .unwrap_or_else(|| "INVESTMENT_MANAGER".to_string());
 
-        let _scope_all = super::helpers::json_extract_bool_opt(args, "scope-all").unwrap_or(true);
+        let _scope_all = json_extract_bool_opt(args, "scope-all").unwrap_or(true);
 
-        let scope_mics = super::helpers::json_extract_string_list_opt(args, "scope-mics");
+        let scope_mics = json_extract_string_list_opt(args, "scope-mics");
 
         let scope_instrument_classes =
-            super::helpers::json_extract_string_list_opt(args, "scope-instrument-classes");
+            json_extract_string_list_opt(args, "scope-instrument-classes");
 
-        let _instruction_method = super::helpers::json_extract_string_opt(args, "instruction-method");
+        let _instruction_method = json_extract_string_opt(args, "instruction-method");
 
-        let can_trade = super::helpers::json_extract_bool_opt(args, "can-trade").unwrap_or(true);
+        let can_trade = json_extract_bool_opt(args, "can-trade").unwrap_or(true);
 
-        let can_settle = super::helpers::json_extract_bool_opt(args, "can-settle").unwrap_or(true);
+        let can_settle = json_extract_bool_opt(args, "can-settle").unwrap_or(true);
 
         // Generate a unique mandate ID
         let mandate_id = Uuid::new_v4().to_string();
@@ -2552,7 +2244,7 @@ impl CustomOperation for TradingProfileAddImMandateOp {
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::AddImMandate {
                 manager_id: mandate_id,
@@ -2571,7 +2263,7 @@ impl CustomOperation for TradingProfileAddImMandateOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add IM mandate: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "manager_ref": manager_ref,
             "role": role,
@@ -2580,51 +2272,37 @@ impl CustomOperation for TradingProfileAddImMandateOp {
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Update Investment Manager scope
-#[register_custom_op]
-pub struct TradingProfileUpdateImScopeOp;
+pub struct TradingProfileUpdateImScope;
 
 #[async_trait]
-impl CustomOperation for TradingProfileUpdateImScopeOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileUpdateImScope {
+    fn fqn(&self) -> &str {
+        "trading-profile.update-im-scope"
     }
-
-    fn verb(&self) -> &'static str {
-        "update-im-scope"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Updates the scope of an existing Investment Manager mandate"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let manager_ref = super::helpers::json_extract_string(args, "manager-ref")?;
+        let manager_ref = json_extract_string(args, "manager-ref")?;
 
-        let _scope_all = super::helpers::json_extract_bool_opt(args, "scope-all");
+        let _scope_all = json_extract_bool_opt(args, "scope-all");
 
-        let scope_mics = super::helpers::json_extract_string_list_opt(args, "scope-mics");
+        let scope_mics = json_extract_string_list_opt(args, "scope-mics");
 
         let scope_instrument_classes =
-            super::helpers::json_extract_string_list_opt(args, "scope-instrument-classes");
+            json_extract_string_list_opt(args, "scope-instrument-classes");
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::UpdateImScope {
                 manager_ref: manager_ref.clone(),
@@ -2636,69 +2314,50 @@ impl CustomOperation for TradingProfileUpdateImScopeOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to update IM scope: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "manager_ref": manager_ref,
             "version": doc.version,
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Remove Investment Manager mandate
-#[register_custom_op]
-pub struct TradingProfileRemoveImMandateOp;
+pub struct TradingProfileRemoveImMandate;
 
 #[async_trait]
-impl CustomOperation for TradingProfileRemoveImMandateOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileRemoveImMandate {
+    fn fqn(&self) -> &str {
+        "trading-profile.remove-im-mandate"
     }
-
-    fn verb(&self) -> &'static str {
-        "remove-im-mandate"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Removes an Investment Manager mandate from the document"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let manager_ref = super::helpers::json_extract_string(args, "manager-ref")?;
+        let manager_ref = json_extract_string(args, "manager-ref")?;
 
         // Build node ID: _Managers / {manager_ref}
         let node_id = TradingMatrixNodeId::category(categories::MANAGERS).child(&manager_ref);
 
         // Apply operation to AST and save
-        let doc = ast_db::apply_and_save(pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
+        let doc = ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove IM mandate: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "removed": manager_ref,
             "version": doc.version,
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // =============================================================================
 // SETTLEMENT CONFIG OPERATIONS (Phase 3)
@@ -2706,36 +2365,27 @@ impl CustomOperation for TradingProfileRemoveImMandateOp {
 
 /// Set base currency for the trading profile
 /// Verb: trading-profile.set-base-currency
-#[register_custom_op]
-pub struct TradingProfileSetBaseCurrencyOp;
+pub struct TradingProfileSetBaseCurrency;
 
 #[async_trait]
-impl CustomOperation for TradingProfileSetBaseCurrencyOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileSetBaseCurrency {
+    fn fqn(&self) -> &str {
+        "trading-profile.set-base-currency"
     }
-
-    fn verb(&self) -> &'static str {
-        "set-base-currency"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Sets the base currency for the trading profile document"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let currency = super::helpers::json_extract_string(args, "currency")?;
+        let currency = json_extract_string(args, "currency")?;
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::SetBaseCurrency {
                 currency: currency.clone(),
@@ -2744,51 +2394,37 @@ impl CustomOperation for TradingProfileSetBaseCurrencyOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to set base currency: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "base_currency": currency,
             "version": doc.version,
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
 
-
 /// Add allowed currency to the trading profile.
-#[register_custom_op]
-pub struct TradingProfileAddAllowedCurrencyOp;
+pub struct TradingProfileAddAllowedCurrency;
 
 #[async_trait]
-impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileAddAllowedCurrency {
+    fn fqn(&self) -> &str {
+        "trading-profile.add-allowed-currency"
     }
-
-    fn verb(&self) -> &'static str {
-        "add-allowed-currency"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Adds an allowed currency to the trading profile document"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let currency = super::helpers::json_extract_string(args, "currency")?;
+        let currency = json_extract_string(args, "currency")?;
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(
-            pool,
+            &pool,
             profile_id,
             TradingMatrixOp::AddAllowedCurrency {
                 currency: currency.clone(),
@@ -2797,19 +2433,14 @@ impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add allowed currency: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "currency": currency,
             "version": doc.version,
             "status": format!("{:?}", doc.status),
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // =============================================================================
 // SYNC OPERATIONS (Phase 4)
@@ -2817,40 +2448,27 @@ impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
 
 /// Compare document with operational tables to show differences
 /// Verb: trading-profile.diff
-#[register_custom_op]
-pub struct TradingProfileDiffOp;
+pub struct TradingProfileDiff;
 
 #[async_trait]
-impl CustomOperation for TradingProfileDiffOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileDiff {
+    fn fqn(&self) -> &str {
+        "trading-profile.diff"
     }
-
-    fn verb(&self) -> &'static str {
-        "diff"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Compares document with operational tables to identify sync differences"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")?;
 
-        let result = document_ops::diff_document_vs_operational(pool, profile_id)
+        let result = document_ops::diff_document_vs_operational(&pool, profile_id)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to diff document: {}", e))?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
     }
 }
 
@@ -2859,76 +2477,52 @@ impl CustomOperation for TradingProfileDiffOp {
 // =============================================================================
 
 /// Validate that booking rules cover all universe combinations
-#[register_custom_op]
-pub struct TradingProfileValidateCoverageOp;
+pub struct TradingProfileValidateCoverage;
 
 #[async_trait]
-impl CustomOperation for TradingProfileValidateCoverageOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileValidateCoverage {
+    fn fqn(&self) -> &str {
+        "trading-profile.validate-universe-coverage"
     }
-    fn verb(&self) -> &'static str {
-        "validate-universe-coverage"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates that booking rules cover all market/instrument/currency combinations in the universe"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")
             .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
 
-        let result = document_ops::validate_coverage(pool, profile_id).await?;
+        let result = document_ops::validate_coverage(&pool, profile_id).await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
-
 
 /// Validate that a profile is ready for go-live
-#[register_custom_op]
-pub struct TradingProfileValidateGoLiveReadyOp;
+pub struct TradingProfileValidateGoLiveReady;
 
 #[async_trait]
-impl CustomOperation for TradingProfileValidateGoLiveReadyOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileValidateGoLiveReady {
+    fn fqn(&self) -> &str {
+        "trading-profile.validate-go-live-ready"
     }
-    fn verb(&self) -> &'static str {
-        "validate-go-live-ready"
-    }
-    fn rationale(&self) -> &'static str {
-        "Validates that a trading profile has all required components for production use"
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")
             .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
 
-        let result = document_ops::validate_go_live_ready(pool, profile_id).await?;
+        let result = document_ops::validate_go_live_ready(&pool, profile_id).await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
-
 
 // =============================================================================
 // PHASE 6: Document Lifecycle Operations
@@ -2936,84 +2530,60 @@ impl CustomOperation for TradingProfileValidateGoLiveReadyOp {
 
 /// Submit a draft profile for review
 /// Transitions: Draft → PendingReview
-#[register_custom_op]
-pub struct TradingProfileSubmitOp;
+pub struct TradingProfileSubmit;
 
 #[async_trait]
-impl CustomOperation for TradingProfileSubmitOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileSubmit {
+    fn fqn(&self) -> &str {
+        "trading-profile.submit"
     }
-
-    fn verb(&self) -> &'static str {
-        "submit"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Submits a draft trading profile for review. Validates the profile is ready before transitioning from Draft to PendingReview status."
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")
             .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
 
-        let submitted_by: Option<String> =
-            super::helpers::json_extract_string_opt(args, "submitted-by");
+        let submitted_by: Option<String> = json_extract_string_opt(args, "submitted-by");
 
-        let notes: Option<String> = super::helpers::json_extract_string_opt(args, "notes");
+        let notes: Option<String> = json_extract_string_opt(args, "notes");
 
-        let result = document_ops::submit_for_review(pool, profile_id, submitted_by, notes).await?;
+        let result =
+            document_ops::submit_for_review(&pool, profile_id, submitted_by, notes).await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
 
-
 /// Approve a profile pending review
 /// Transitions: PendingReview → Active
-#[register_custom_op]
-pub struct TradingProfileApproveOp;
+pub struct TradingProfileApprove;
 
 #[async_trait]
-impl CustomOperation for TradingProfileApproveOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileApprove {
+    fn fqn(&self) -> &str {
+        "trading-profile.approve"
     }
-
-    fn verb(&self) -> &'static str {
-        "approve"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Approves a trading profile pending review, transitioning it to Active status. Any previously active profile for the same CBU is superseded."
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")
             .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
 
-        let approved_by: Option<String> =
-            super::helpers::json_extract_string_opt(args, "approved-by");
+        let approved_by: Option<String> = json_extract_string_opt(args, "approved-by");
 
-        let notes: Option<String> = super::helpers::json_extract_string_opt(args, "notes");
+        let notes: Option<String> = json_extract_string_opt(args, "notes");
 
         // First, approve the profile (transitions PENDING_REVIEW -> ACTIVE)
         let approve_result =
-            document_ops::approve_profile(pool, profile_id, approved_by, notes).await?;
+            document_ops::approve_profile(&pool, profile_id, approved_by, notes).await?;
 
         // After approval, automatically materialize the document to operational tables
         // This ensures the Trading Matrix API can read the activated configuration
@@ -3021,7 +2591,7 @@ impl CustomOperation for TradingProfileApproveOp {
             r#"SELECT cbu_id, document FROM "ob-poc".cbu_trading_profiles WHERE profile_id = $1"#,
             profile_id
         )
-        .fetch_one(pool)
+        .fetch_one(&pool)
         .await?;
 
         let cbu_id = row
@@ -3057,7 +2627,7 @@ impl CustomOperation for TradingProfileApproveOp {
         if !document.isda_agreements.is_empty() {
             materialize_isda_agreements(
                 &mut tx,
-                pool,
+                &pool,
                 cbu_id,
                 &document.isda_agreements,
                 &refs.ssi_name_to_id,
@@ -3068,106 +2638,71 @@ impl CustomOperation for TradingProfileApproveOp {
         // Commit transaction
         tx.commit().await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(
             approve_result,
         )?))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 /// Reject a profile pending review
 /// Transitions: PendingReview → Draft
-#[register_custom_op]
-pub struct TradingProfileRejectOp;
+pub struct TradingProfileReject;
 
 #[async_trait]
-impl CustomOperation for TradingProfileRejectOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileReject {
+    fn fqn(&self) -> &str {
+        "trading-profile.reject"
     }
-
-    fn verb(&self) -> &'static str {
-        "reject"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Rejects a trading profile pending review, transitioning it back to Draft status with a rejection reason for remediation."
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")
             .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
 
-        let rejection_reason: String = super::helpers::json_extract_string_opt(args, "reason")
+        let rejection_reason: String = json_extract_string_opt(args, "reason")
             .ok_or_else(|| anyhow::anyhow!("reason is required"))?;
 
-        let rejected_by: Option<String> =
-            super::helpers::json_extract_string_opt(args, "rejected-by");
+        let rejected_by: Option<String> = json_extract_string_opt(args, "rejected-by");
 
         let result =
-            document_ops::reject_profile(pool, profile_id, rejection_reason, rejected_by).await?;
+            document_ops::reject_profile(&pool, profile_id, rejection_reason, rejected_by).await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
-
 
 /// Archive an active or superseded profile
 /// Transitions: Active|Superseded → Archived
-#[register_custom_op]
-pub struct TradingProfileArchiveOp;
+pub struct TradingProfileArchive;
 
 #[async_trait]
-impl CustomOperation for TradingProfileArchiveOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileArchive {
+    fn fqn(&self) -> &str {
+        "trading-profile.archive"
     }
-
-    fn verb(&self) -> &'static str {
-        "archive"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Archives an active or superseded trading profile, removing it from operational use while preserving the audit trail."
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")
             .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
 
-        let archived_by: Option<String> =
-            super::helpers::json_extract_string_opt(args, "archived-by");
+        let archived_by: Option<String> = json_extract_string_opt(args, "archived-by");
 
-        let notes: Option<String> = super::helpers::json_extract_string_opt(args, "notes");
+        let notes: Option<String> = json_extract_string_opt(args, "notes");
 
-        let result = document_ops::archive_profile(pool, profile_id, archived_by, notes).await?;
+        let result = document_ops::archive_profile(&pool, profile_id, archived_by, notes).await?;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
-
 
 // =============================================================================
 // CLONE OPERATION
@@ -3182,52 +2717,43 @@ impl CustomOperation for TradingProfileArchiveOp {
 /// - Migrating config during fund family restructuring
 ///
 /// DSL: (trading-profile.clone-to :profile-id @source :target-cbu-id @target-cbu)
-#[register_custom_op]
-pub struct TradingProfileCloneToOp;
+pub struct TradingProfileCloneTo;
 
 #[async_trait]
-impl CustomOperation for TradingProfileCloneToOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileCloneTo {
+    fn fqn(&self) -> &str {
+        "trading-profile.clone-to"
     }
-
-    fn verb(&self) -> &'static str {
-        "clone-to"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Clones a trading profile document to another CBU, creating a new DRAFT profile that can be customized before activation."
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
         // Source profile ID (required)
-        let source_profile_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "profile-id")
+        let source_profile_id: Uuid = json_extract_uuid(args, ctx, "profile-id")
             .map_err(|_| anyhow::anyhow!("profile-id is required"))?;
 
         // Target CBU ID (required)
-        let target_cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "target-cbu-id")
+        let target_cbu_id: Uuid = json_extract_uuid(args, ctx, "target-cbu-id")
             .map_err(|_| anyhow::anyhow!("target-cbu-id is required"))?;
 
         // Optional: notes
-        let notes: Option<String> = super::helpers::json_extract_string_opt(args, "notes");
+        let notes: Option<String> = json_extract_string_opt(args, "notes");
 
         // Use ast_db::clone_to_draft for new AST-based document format
         let (profile_id, doc) =
-            ast_db::clone_to_draft(pool, source_profile_id, target_cbu_id, notes)
+            ast_db::clone_to_draft(&pool, source_profile_id, target_cbu_id, notes)
                 .await
                 .map_err(|e| anyhow::anyhow!("Clone failed: {}", e))?;
 
         // Bind target profile ID if :as binding specified (transported via args "as" key)
-        if let Some(binding_name) = super::helpers::json_extract_string_opt(args, "as") {
+        if let Some(binding_name) = json_extract_string_opt(args, "as") {
             ctx.bind(&binding_name, profile_id);
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "cbu_id": target_cbu_id,
             "cbu_name": doc.cbu_name,
@@ -3235,12 +2761,7 @@ impl CustomOperation for TradingProfileCloneToOp {
             "version": doc.version
         })))
     }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // =============================================================================
 // CREATE NEW VERSION OPERATION
@@ -3248,48 +2769,34 @@ impl CustomOperation for TradingProfileCloneToOp {
 
 /// Create a new draft version from the current ACTIVE profile
 /// Used when modifications are needed to a live trading matrix
-#[register_custom_op]
-pub struct TradingProfileCreateNewVersionOp;
+pub struct TradingProfileCreateNewVersion;
 
 #[async_trait]
-impl CustomOperation for TradingProfileCreateNewVersionOp {
-    fn domain(&self) -> &'static str {
-        "trading-profile"
+impl SemOsVerbOp for TradingProfileCreateNewVersion {
+    fn fqn(&self) -> &str {
+        "trading-profile.create-new-version"
     }
-
-    fn verb(&self) -> &'static str {
-        "create-new-version"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Creates a new DRAFT version from the current ACTIVE profile. Enforces that only one working version exists at a time."
-    }
-#[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let cbu_id: Uuid = super::helpers::json_extract_uuid(args, ctx, "cbu-id")
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+        let cbu_id: Uuid = json_extract_uuid(args, ctx, "cbu-id")
             .map_err(|_| anyhow::anyhow!("cbu-id is required"))?;
 
-        let created_by: Option<String> = super::helpers::json_extract_string_opt(args, "created-by");
+        let created_by: Option<String> = json_extract_string_opt(args, "created-by");
 
-        let notes: Option<String> = super::helpers::json_extract_string_opt(args, "notes");
+        let notes: Option<String> = json_extract_string_opt(args, "notes");
 
-        let result = document_ops::create_new_version(pool, cbu_id, created_by, notes).await?;
+        let result = document_ops::create_new_version(&pool, cbu_id, created_by, notes).await?;
 
         // Bind new profile ID if :as binding specified (transported via args "as" key)
-        if let Some(binding_name) = super::helpers::json_extract_string_opt(args, "as") {
+        if let Some(binding_name) = json_extract_string_opt(args, "as") {
             ctx.bind(&binding_name, result.new_profile_id);
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
-

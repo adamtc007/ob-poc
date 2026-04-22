@@ -339,20 +339,18 @@ pub use template_ops::{
 };
 
 pub use trading_profile::{
-    TradingProfileActivateOp, TradingProfileAddAllowedCurrencyOp, TradingProfileAddBookingRuleOp,
-    TradingProfileAddComponentOp, TradingProfileAddCsaCollateralOp, TradingProfileAddCsaConfigOp,
-    TradingProfileAddImMandateOp, TradingProfileAddInstrumentClassOp,
-    TradingProfileAddIsdaConfigOp, TradingProfileAddIsdaCoverageOp, TradingProfileAddMarketOp,
-    TradingProfileAddSsiOp, TradingProfileApproveOp, TradingProfileArchiveOp,
-    TradingProfileCloneToOp, TradingProfileCreateDraftOp, TradingProfileCreateNewVersionOp,
-    TradingProfileDiffOp, TradingProfileGetActiveOp, TradingProfileImportOp,
-    TradingProfileLinkCsaSsiOp, TradingProfileMaterializeOp, TradingProfileRejectOp,
-    TradingProfileRemoveBookingRuleOp, TradingProfileRemoveComponentOp,
-    TradingProfileRemoveCsaConfigOp, TradingProfileRemoveImMandateOp,
-    TradingProfileRemoveInstrumentClassOp, TradingProfileRemoveIsdaConfigOp,
-    TradingProfileRemoveMarketOp, TradingProfileRemoveSsiOp, TradingProfileSetBaseCurrencyOp,
-    TradingProfileSubmitOp, TradingProfileUpdateImScopeOp, TradingProfileValidateCoverageOp,
-    TradingProfileValidateGoLiveReadyOp,
+    TradingProfileActivate, TradingProfileAddAllowedCurrency, TradingProfileAddBookingRule,
+    TradingProfileAddComponent, TradingProfileAddCsaCollateral, TradingProfileAddCsaConfig,
+    TradingProfileAddImMandate, TradingProfileAddInstrumentClass, TradingProfileAddIsdaConfig,
+    TradingProfileAddIsdaCoverage, TradingProfileAddMarket, TradingProfileAddSsi,
+    TradingProfileApprove, TradingProfileArchive, TradingProfileCloneTo,
+    TradingProfileCreateDraft, TradingProfileCreateNewVersion, TradingProfileDiff,
+    TradingProfileGetActive, TradingProfileImportVerb, TradingProfileLinkCsaSsi,
+    TradingProfileMaterialize, TradingProfileReject, TradingProfileRemoveBookingRule,
+    TradingProfileRemoveComponent, TradingProfileRemoveCsaConfig, TradingProfileRemoveImMandate,
+    TradingProfileRemoveInstrumentClass, TradingProfileRemoveIsdaConfig, TradingProfileRemoveMarket,
+    TradingProfileRemoveSsi, TradingProfileSetBaseCurrency, TradingProfileSubmit,
+    TradingProfileUpdateImScope, TradingProfileValidateCoverage, TradingProfileValidateGoLiveReady,
 };
 // Phase 5a composite-blocker #11 — trading_profile_ca_ops re-exports removed; see relocation comment above.
 // Phase 5e — ubo_analysis relocated. Types accessed via dsl_runtime::domain_ops::ubo_analysis.
@@ -696,6 +694,47 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(booking_principal_ops::RuleDisable));
     registry.register(Arc::new(booking_principal_ops::ContractPackCreate));
     registry.register(Arc::new(booking_principal_ops::ContractPackAddTemplate));
+
+    // Phase B Pattern B slice #79: trading-profile.* (36 verbs — full
+    // draft→submit→approve→activate→materialize→archive lifecycle,
+    // component CRUD dispatchers, ISDA/CSA/SSI/IM config, validation).
+    // Bridges to crate::trading_profile::{ast_db, document_ops}.
+    registry.register(Arc::new(trading_profile::TradingProfileImportVerb));
+    registry.register(Arc::new(trading_profile::TradingProfileGetActive));
+    registry.register(Arc::new(trading_profile::TradingProfileActivate));
+    registry.register(Arc::new(trading_profile::TradingProfileMaterialize));
+    registry.register(Arc::new(trading_profile::TradingProfileCreateDraft));
+    registry.register(Arc::new(trading_profile::TradingProfileAddComponent));
+    registry.register(Arc::new(trading_profile::TradingProfileRemoveComponent));
+    registry.register(Arc::new(trading_profile::TradingProfileAddInstrumentClass));
+    registry.register(Arc::new(trading_profile::TradingProfileRemoveInstrumentClass));
+    registry.register(Arc::new(trading_profile::TradingProfileAddMarket));
+    registry.register(Arc::new(trading_profile::TradingProfileRemoveMarket));
+    registry.register(Arc::new(trading_profile::TradingProfileAddSsi));
+    registry.register(Arc::new(trading_profile::TradingProfileRemoveSsi));
+    registry.register(Arc::new(trading_profile::TradingProfileAddBookingRule));
+    registry.register(Arc::new(trading_profile::TradingProfileRemoveBookingRule));
+    registry.register(Arc::new(trading_profile::TradingProfileAddIsdaConfig));
+    registry.register(Arc::new(trading_profile::TradingProfileAddIsdaCoverage));
+    registry.register(Arc::new(trading_profile::TradingProfileAddCsaConfig));
+    registry.register(Arc::new(trading_profile::TradingProfileAddCsaCollateral));
+    registry.register(Arc::new(trading_profile::TradingProfileLinkCsaSsi));
+    registry.register(Arc::new(trading_profile::TradingProfileRemoveIsdaConfig));
+    registry.register(Arc::new(trading_profile::TradingProfileRemoveCsaConfig));
+    registry.register(Arc::new(trading_profile::TradingProfileAddImMandate));
+    registry.register(Arc::new(trading_profile::TradingProfileUpdateImScope));
+    registry.register(Arc::new(trading_profile::TradingProfileRemoveImMandate));
+    registry.register(Arc::new(trading_profile::TradingProfileSetBaseCurrency));
+    registry.register(Arc::new(trading_profile::TradingProfileAddAllowedCurrency));
+    registry.register(Arc::new(trading_profile::TradingProfileDiff));
+    registry.register(Arc::new(trading_profile::TradingProfileValidateCoverage));
+    registry.register(Arc::new(trading_profile::TradingProfileValidateGoLiveReady));
+    registry.register(Arc::new(trading_profile::TradingProfileSubmit));
+    registry.register(Arc::new(trading_profile::TradingProfileApprove));
+    registry.register(Arc::new(trading_profile::TradingProfileReject));
+    registry.register(Arc::new(trading_profile::TradingProfileArchive));
+    registry.register(Arc::new(trading_profile::TradingProfileCloneTo));
+    registry.register(Arc::new(trading_profile::TradingProfileCreateNewVersion));
 }
 
 #[cfg(test)]
@@ -951,17 +990,19 @@ mod tests {
         assert!(!registry.has("control", "trace-chain"));
         assert!(!registry.has("control", "reconcile-ownership"));
         // Trading Profile document construction operations (Phase 1)
-        assert!(registry.has("trading-profile", "create-draft"));
-        assert!(registry.has("trading-profile", "add-instrument-class"));
-        assert!(registry.has("trading-profile", "remove-instrument-class"));
-        assert!(registry.has("trading-profile", "add-market"));
-        assert!(registry.has("trading-profile", "remove-market"));
-        assert!(registry.has("trading-profile", "add-standing-instruction"));
-        assert!(registry.has("trading-profile", "remove-standing-instruction"));
-        assert!(registry.has("trading-profile", "add-booking-rule"));
-        assert!(registry.has("trading-profile", "remove-booking-rule"));
+        // Phase 5c-migrate Phase B Pattern B slice #79: trading_profile moved to
+        // `sem_os_postgres::ops::trading_profile` via `extend_registry()`.
+        assert!(!registry.has("trading-profile", "create-draft"));
+        assert!(!registry.has("trading-profile", "add-instrument-class"));
+        assert!(!registry.has("trading-profile", "remove-instrument-class"));
+        assert!(!registry.has("trading-profile", "add-market"));
+        assert!(!registry.has("trading-profile", "remove-market"));
+        assert!(!registry.has("trading-profile", "add-standing-instruction"));
+        assert!(!registry.has("trading-profile", "remove-standing-instruction"));
+        assert!(!registry.has("trading-profile", "add-booking-rule"));
+        assert!(!registry.has("trading-profile", "remove-booking-rule"));
         // Versioned document lifecycle operations (Phase 7)
-        assert!(registry.has("trading-profile", "create-new-version"));
+        assert!(!registry.has("trading-profile", "create-new-version"));
         // Investor lifecycle operations (TA KYC-as-a-Service)
         // Phase 5c-migrate Phase B slice #46: investor lifecycle ops moved to
         // `sem_os_postgres::ops::investor::*`.
