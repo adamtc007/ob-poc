@@ -189,10 +189,11 @@ name = "dsl_mcp"
 path = "src/bin/dsl_mcp.rs"
 required-features = ["mcp"]
 
-[[bin]]
-name = "dsl_api"
-path = "src/bin/dsl_api.rs"
-required-features = ["server"]
+# Slice 4.1 (2026-04-22): `dsl_api` binary retired per user decision Q2(a).
+# `ob-poc-web` (`runbook-gate-vnext` ON) is now the sole authoritative
+# HTTP server for all production traffic. `Dockerfile.api` was deleted
+# alongside this binary — downstream deployments should build
+# `ob-poc-web` instead.
 
 [[bin]]
 name = "batch_test_harness"

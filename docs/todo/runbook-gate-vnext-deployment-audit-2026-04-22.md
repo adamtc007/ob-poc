@@ -5,10 +5,9 @@
 one, so Slice 4.1 (rip the `cfg(not(feature = "runbook-gate-vnext"))` branch) can proceed without
 silently breaking a deployment where the feature is OFF.
 
-**TL;DR:** two binaries exist with different feature sets. `ob-poc-web` has the feature ON;
-`dsl_api` (the Docker image) has it OFF. Slice 4.1 is blocked until one path is chosen: retire
-`dsl_api`, unify its feature set, or invert the peer review's conclusion and keep the legacy
-branch.
+**TL;DR (updated 2026-04-22 late-session):** user chose Path (a) — `ob-poc-web` is authoritative;
+`dsl_api` binary + `Dockerfile.api` retired. The Slice 4.1 blocker is resolved; the
+`cfg(not(feature = "runbook-gate-vnext"))` branch can now be deleted as a mechanical follow-up.
 
 ---
 
@@ -79,12 +78,25 @@ No `runbook-gate-vnext` relevance.
 
 ---
 
-## 3. Which binary runs production traffic?
+## 3. Which binary runs production traffic? — RESOLVED
 
-**[USER INPUT REQUIRED]**
+**User decision (2026-04-22 late-session): Path (a).**
 
-Current state on the main repo: two binaries can both build successfully; the feature split is not
-resolved by any automation in the tree. The answer determines Slice 4.1 scope.
+`ob-poc-web` is the sole authoritative HTTP server. `dsl_api` binary and
+`Dockerfile.api` have been retired in this session:
+
+- `rust/src/bin/dsl_api.rs` — **deleted**
+- `Dockerfile.api` — **deleted**
+- `rust/Cargo.toml` — `[[bin]] name = "dsl_api"` entry replaced with a
+  Slice 4.1 retirement note
+- `restart-services.sh` — rewritten to start `ob-poc-web` only
+  (previously started `dsl_api` on :3001 and `agentic_server` on :3000,
+  both of which are gone)
+
+Next follow-up (mechanical): delete the `#[cfg(not(feature =
+"runbook-gate-vnext"))]` branches in `rust/src/api/agent_service.rs` per
+the cfg-site inventory in §6. With no consumer building the feature OFF,
+those branches are dead code.
 
 Resolution paths:
 
