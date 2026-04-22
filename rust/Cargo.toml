@@ -27,10 +27,6 @@ sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
 sem_os_postgres = { path = "crates/sem_os_postgres" }
 governed_query_proc = { path = "crates/governed_query_proc" }
 dsl-runtime = { path = "crates/dsl-runtime" }
-dsl-runtime-macros = { path = "crates/dsl-runtime-macros" }
-
-# Auto-registration for custom operations
-inventory = "0.3"
 
 # Core libraries
 anyhow = "1.0"
@@ -253,7 +249,6 @@ members = [
 
     # Three-plane refactor — dsl-runtime (Phase 1 onwards)
     "crates/dsl-runtime",
-    "crates/dsl-runtime-macros",
 
     # Three-plane refactor harnesses (Phase 0e skeleton)
     "crates/determinism-harness",

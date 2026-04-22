@@ -19,7 +19,7 @@ BASELINE="$SCRIPT_DIR/write_path_baseline.txt"
 # They fall into three categories:
 #
 # 1. Verb execution layer (DSL verbs are the gate)
-#    - domain_ops/          Plugin verb handlers (#[register_custom_op])
+#    - domain_ops/          Plugin verb handlers (SemOsVerbOp impls)
 #    - dsl_v2/              CRUD verb executor (generic_executor, sheet_executor)
 #
 # 2. Canonical persistence engines (SemOS-governed)

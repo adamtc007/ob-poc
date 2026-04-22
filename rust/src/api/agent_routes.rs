@@ -2340,7 +2340,7 @@ async fn execute_session_dsl_raw(
             // View operations (view.universe, view.book, etc.) store ViewState in
             // ExecutionContext.pending_view_state. Propagate it to SessionContext
             // so the UI can access it. This fixes the "session state side door" where
-            // ViewState was previously discarded because CustomOperation only receives
+            // ViewState was previously discarded because verb ops only receive
             // ExecutionContext, not the full session.
             if let Some(view_state) = exec_ctx.take_pending_view_state() {
                 tracing::info!(

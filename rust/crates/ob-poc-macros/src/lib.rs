@@ -3,17 +3,12 @@
 //! This crate provides:
 //! - `#[derive(IdType)]` — UUID-backed ID newtype boilerplate.
 //!
-//! # Phase 2c note
+//! # Phase 5c-migrate slice #80 note
 //!
-//! `#[register_custom_op]` moved to `dsl-runtime-macros` per the three-plane
-//! architecture plan. Import sites updated in the same slice:
-//!
-//! ```text
-//! // before
-//! use ob_poc_macros::register_custom_op;
-//! // after
-//! use dsl_runtime_macros::register_custom_op;
-//! ```
+//! `#[register_custom_op]` was deleted altogether once every plugin op
+//! had migrated to `sem_os_postgres::ops::SemOsVerbOp`; the sibling
+//! `dsl-runtime-macros` crate that briefly owned it was removed in the
+//! same slice.
 
 use proc_macro::TokenStream;
 

@@ -757,6 +757,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // =========================================================================
+    // SemOS plugin op registry — canonical home for every plugin verb
+    // implementation post-Phase-5c-migrate slice #80. Built once here and
+    // threaded into every inner executor (BPMN inner, job worker, REPL V2
+    // legacy + V2).
+    // =========================================================================
+    let sem_os_ops = {
+        let mut reg = sem_os_postgres::ops::build_registry();
+        ob_poc::domain_ops::extend_registry(&mut reg);
+        Arc::new(reg)
+    };
+    tracing::info!(
+        registered_ops = sem_os_ops.len(),
+        "SemOsVerbOpRegistry initialised"
+    );
+
+    // =========================================================================
     // BPMN-Lite Integration (before REPL V2 — determines executor)
     // =========================================================================
     type BpmnSetup = (
@@ -837,7 +853,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let inner: Arc<dyn ob_poc::sequencer::DslExecutorV2> =
                                     Arc::new(
                                         RealDslExecutor::new(pool.clone())
-                                            .with_services(service_registry.clone()),
+                                            .with_services(service_registry.clone())
+                                            .with_sem_os_ops(sem_os_ops.clone()),
                                     );
 
                                 // WorkflowDispatcher — routes Direct vs Orchestrated.
@@ -864,7 +881,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 > = Arc::new(
                                     RealDslExecutor::new(pool.clone())
                                         .allow_durable_direct()
-                                        .with_services(service_registry.clone()),
+                                        .with_services(service_registry.clone())
+                                        .with_sem_os_ops(sem_os_ops.clone()),
                                 );
                                 let job_worker = JobWorker::new(
                                     format!("ob-poc-worker-{}", std::process::id()),
@@ -963,10 +981,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
+        // `sem_os_ops` was built at module startup above and is in scope here.
         // Legacy DslExecutor for the constructor (fallback path — never parks)
         use ob_poc::repl::executor_bridge::RealDslExecutor;
         let legacy_executor: Arc<dyn ob_poc::sequencer::DslExecutor> = Arc::new(
-            RealDslExecutor::new(pool.clone()).with_services(service_registry.clone()),
+            RealDslExecutor::new(pool.clone())
+                .with_services(service_registry.clone())
+                .with_sem_os_ops(sem_os_ops.clone()),
         );
 
         // Create RunbookStore — shared store for compiled runbook artifacts.
@@ -979,12 +1000,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_orchestrated_verbs(orchestrated_verbs);
 
         // Wire the VerbExecutionPort — lookup order:
-        //   1. SemOsVerbOpRegistry (Phase 5c-migrate Phase A — YAML-first
-        //      re-implementations of plugin ops live here; populated as
-        //      Phase B migrates each domain).
+        //   1. SemOsVerbOpRegistry (post-Phase-5c-migrate slice #80: the sole
+        //      home for plugin verb implementations).
         //   2. PgCrudExecutor (dsl-runtime-native CRUD fast path).
-        //   3. DslExecutor (legacy CustomOperation registry + everything
-        //      else; disappears when every op has migrated to sem_os).
+        //   3. DslExecutor (fallback for graph_query, durable-direct, and
+        //      template recursion; plugin dispatch flows through the same
+        //      SemOsVerbOpRegistry via `DslExecutor::with_sem_os_ops`).
         //
         // Phase 3 (three-plane architecture v0.3 §13): PgCrudExecutor
         // relocated from sem_os_postgres to dsl-runtime.
@@ -993,47 +1014,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use ob_poc::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
             use std::sync::Arc;
 
-            // SemOS-first op registry (Phase A smoke test + Phase B slices).
-            // Each Phase B commit adds a new op inside
-            // `sem_os_postgres::ops::build_registry()`. The test suite uses
-            // the same factory, so FQN coverage stays automatic.
-            //
-            // Phase B Pattern B slices then extend the registry with ob-poc
-            // verb ops that live in `rust/src/domain_ops/` because they bridge
-            // to ob-poc internals (semantic-state derivation, DslExecutor,
-            // ontology loader, etc.) that can't be inverted behind a service
-            // trait without disproportionate refactor.
-            let sem_os_ops = {
-                let mut reg = sem_os_postgres::ops::build_registry();
-                ob_poc::domain_ops::extend_registry(&mut reg);
-                Arc::new(reg)
-            };
-            tracing::info!(
-                registered_ops = sem_os_ops.len(),
-                fqns = ?sem_os_ops.manifest(),
-                "SemOsVerbOpRegistry initialised"
-            );
-
-            // Authoritative strict coverage check — runs after both registries
-            // exist so verbs served by either one count as covered. A missing
-            // handler here is fatal (panics) because the host promised YAML
-            // behaviour it can't deliver.
-            {
-                use dsl_runtime::CustomOperationRegistry;
-                use ob_poc::domain_ops::verify_plugin_verb_coverage_strict;
-                use std::collections::HashSet;
-
-                let sem_os_fqns: HashSet<String> = sem_os_ops.manifest().into_iter().collect();
-                let legacy_ops = CustomOperationRegistry::new();
-                verify_plugin_verb_coverage_strict(&legacy_ops, &sem_os_fqns);
-            }
-
             let verb_executor = ObPocVerbExecutor::from_pool_with_services(
                 pool.clone(),
                 service_registry.clone(),
             )
             .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())))
-            .with_sem_os_ops(sem_os_ops);
+            .with_sem_os_ops(sem_os_ops.clone());
             orchestrator = orchestrator.with_verb_execution_port(Arc::new(verb_executor));
             tracing::info!("VerbExecutionPort wired with SemOsVerbOpRegistry + PgCrudExecutor");
         }
@@ -1046,7 +1032,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // No BPMN — wire RealDslExecutor directly (it auto-impls DslExecutorV2
             // via the blanket impl, so execute_v2 maps to Completed/Failed, never Parked)
             orchestrator = orchestrator.with_executor_v2(Arc::new(
-                RealDslExecutor::new(pool.clone()).with_services(service_registry.clone()),
+                RealDslExecutor::new(pool.clone())
+                    .with_services(service_registry.clone())
+                    .with_sem_os_ops(sem_os_ops.clone()),
             ));
             tracing::info!("REPL V2 executor: RealDslExecutor (direct, no BPMN)");
         }

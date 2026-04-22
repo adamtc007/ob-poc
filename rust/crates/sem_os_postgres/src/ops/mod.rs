@@ -9,19 +9,17 @@
 //! upstream of the composition plane that sees all four — it already
 //! depends on `dsl-runtime`, which transitively depends on `sem_os_core`.
 //!
-//! # Rinse-and-repeat pattern
+//! # Migration history (Phase 5c-migrate)
 //!
 //! Phase A of the relocation (this file + the registry + the dispatcher
-//! branch in `ObPocVerbExecutor`) is pure plumbing. Phase B migrates op
+//! branch in `ObPocVerbExecutor`) was pure plumbing. Phase B migrated op
 //! bodies one domain at a time, YAML-first: read `config/verbs/<domain>.yaml`,
 //! write a fresh [`SemOsVerbOp`] impl in this module tree, register it at
 //! startup, delete the corresponding legacy `CustomOperation` impl from
-//! `dsl-runtime::domain_ops`. The legacy fallback in
-//! `dispatch_plugin_via_execute_json` absorbs every unmigrated verb until
-//! the migration closes out; the final cleanup slice strips the fallback,
-//! the `CustomOperation` trait, the `inventory` registry, and every file
-//! under `rust/crates/dsl-runtime/src/domain_ops/` and
-//! `rust/src/domain_ops/`.
+//! `dsl-runtime::domain_ops`. Slice #80 (final cleanup, 2026-04-21) stripped
+//! the remaining scaffold — the `CustomOperation` trait, the `inventory`
+//! registry, and the `dsl-runtime-macros` proc-macro crate — leaving
+//! [`SemOsVerbOp`] as the sole plugin-verb execution contract.
 
 use anyhow::Result;
 use async_trait::async_trait;

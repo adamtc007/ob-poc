@@ -28,6 +28,11 @@ pub struct RealDslExecutor {
     pool: PgPool,
     allow_durable_direct: bool,
     service_registry: std::sync::Arc<dsl_runtime::ServiceRegistry>,
+    /// Canonical [`sem_os_postgres::ops::SemOsVerbOpRegistry`] threaded onto
+    /// every inner `DslExecutor` this bridge constructs. Required for plugin
+    /// dispatch post-Phase-5c-migrate slice #80 — without it, plugin verbs
+    /// fail with an actionable "no SemOsVerbOp registered" error.
+    sem_os_ops: Option<std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>>,
 }
 
 impl RealDslExecutor {
@@ -36,6 +41,7 @@ impl RealDslExecutor {
             pool,
             allow_durable_direct: false,
             service_registry: std::sync::Arc::new(dsl_runtime::ServiceRegistry::empty()),
+            sem_os_ops: None,
         }
     }
 
@@ -51,6 +57,17 @@ impl RealDslExecutor {
         services: std::sync::Arc<dsl_runtime::ServiceRegistry>,
     ) -> Self {
         self.service_registry = services;
+        self
+    }
+
+    /// Install the canonical SemOS plugin op registry. Threaded into every
+    /// inner `DslExecutor` this bridge constructs so plugin verbs dispatch
+    /// correctly.
+    pub fn with_sem_os_ops(
+        mut self,
+        ops: std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>,
+    ) -> Self {
+        self.sem_os_ops = Some(ops);
         self
     }
 }
@@ -73,8 +90,11 @@ impl DslExecutor for RealDslExecutor {
         ctx.execution_id = Uuid::new_v4();
 
         // 4. Execute via the real dsl_v2 executor.
-        let executor = crate::dsl_v2::executor::DslExecutor::new(self.pool.clone())
+        let mut executor = crate::dsl_v2::executor::DslExecutor::new(self.pool.clone())
             .with_services(self.service_registry.clone());
+        if let Some(ref ops) = self.sem_os_ops {
+            executor = executor.with_sem_os_ops(ops.clone());
+        }
         let results = executor
             .execute_plan(&plan, &mut ctx)
             .await

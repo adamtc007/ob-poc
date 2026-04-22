@@ -15,7 +15,7 @@
 //!   declarative [`PendingStateAdvance`] that SemOS applies inside the same
 //!   transaction, and a vector of [`OutboxDraft`] rows for post-commit effects.
 //!   Named `GatedOutcome` to avoid collision with `dsl_runtime::VerbExecutionOutcome`
-//!   (the per-op outcome enum returned by CustomOperation impls).
+//!   (the per-op outcome enum returned by `SemOsVerbOp::execute` impls).
 //! - [`TransactionScopeId`] — correlation identifier for a Sequencer-owned
 //!   transaction scope. The scope *trait* (with executor access) lives in
 //!   `dsl-runtime::tx` — this crate carries the ID only so the boundary
@@ -419,7 +419,7 @@ pub enum OutcomeResult {
 /// Named `GatedOutcome` (not `VerbExecutionOutcome`) to avoid collision with
 /// [`dsl_runtime::VerbExecutionOutcome`] — the per-op outcome enum
 /// (`Uuid | Record | RecordSet | Affected | Void`) returned by every
-/// `CustomOperation` impl today. `GatedOutcome` is the Phase-5-target
+/// `SemOsVerbOp::execute` impl today. `GatedOutcome` is the Phase-5-target
 /// plane-boundary shape; the enum is the current per-statement return type.
 /// Phase 5+ migrates ops from enum to struct, but for now they coexist.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

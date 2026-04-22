@@ -10,7 +10,6 @@ use std::path::PathBuf;
 
 use dsl_core::config::types::{DurableConfig, SourceOfTruth, VerbBehavior, VerbScope, VerbTier};
 use dsl_core::config::ConfigLoader;
-use ob_poc::domain_ops::CustomOperationRegistry;
 use ob_poc::dsl_v2::execution::RuntimeVerbRegistry;
 use ob_poc::session::verb_contract::VerbDiagnostics;
 use ob_poc::session::verb_sync::VerbSyncService;
@@ -1069,14 +1068,15 @@ pub fn verbs_atlas(output_dir: Option<PathBuf>, lint_only: bool, verbose: bool) 
     let lexicon_verbs = load_verb_concepts(&config_dir)?;
     println!("  Found {} concept entries", lexicon_verbs.len());
 
-    // Build handler registry (inventory-based)
+    // Build handler registry from the canonical SemOS plugin op registry.
+    // Post-Phase-5c-migrate slice #80 every plugin op lives here (including
+    // the Pattern B ops appended by `ob_poc::domain_ops::extend_registry`).
     println!("Building handler registry...");
-    let custom_ops = CustomOperationRegistry::new();
-    let handler_list: HashSet<String> = custom_ops
-        .list()
-        .iter()
-        .map(|(domain, verb, _)| format!("{}.{}", domain, verb))
-        .collect();
+    let handler_list: HashSet<String> = {
+        let mut reg = sem_os_postgres::ops::build_registry();
+        ob_poc::domain_ops::extend_registry(&mut reg);
+        reg.manifest().into_iter().collect()
+    };
     println!("  Found {} registered handlers", handler_list.len());
 
     // Build pack membership indices
@@ -1413,7 +1413,7 @@ pub fn verbs_atlas(output_dir: Option<PathBuf>, lint_only: bool, verbose: bool) 
                 code: "NO_HANDLER".to_string(),
                 severity: Severity::Error,
                 verb_fqn: row.fqn.clone(),
-                message: "Plugin verb with no registered CustomOperation handler".to_string(),
+                message: "Plugin verb with no registered SemOsVerbOp handler".to_string(),
             });
         }
 

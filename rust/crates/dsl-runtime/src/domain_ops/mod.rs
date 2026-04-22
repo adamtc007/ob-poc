@@ -1,13 +1,16 @@
-//! Domain-plugin ops owned by the data plane.
+//! Domain-plugin ops helpers — historical home for the `CustomOperation`
+//! implementations that made up Phase 4 of the three-plane architecture
+//! refactor.
 //!
-//! Populated incrementally by Phase 4 of the three-plane architecture refactor.
-//! Each submodule contains a set of `CustomOperation` impls decorated with
-//! `#[register_custom_op]`. Registration flows through the `inventory`
-//! collection in [`crate::custom_op::CustomOperationRegistry::new`] — moving
-//! a file here changes nothing about how its ops are discovered at startup.
+//! Post-Phase-5c-migrate slice #80 every plugin op has been relocated to
+//! `sem_os_postgres::ops::*` (or kept inside `rust/src/domain_ops/` for the
+//! Pattern B ops that reach into ob-poc internals). The only artefacts left
+//! in this module are shared helpers used across those new homes:
 //!
-//! Ops in this module must not reach into `ob-poc` internals. Platform-coupled
-//! plugin ops stay in `ob-poc::domain_ops` behind service traits until Phase 5.
+//! - [`helpers`] — JSON argument extraction helpers consumed by
+//!   `SemOsVerbOp` impls.
+//! - [`affinity_graph_cache`] — in-process affinity graph cache still
+//!   consumed by sem_os_postgres affinity ops.
 
 pub mod helpers;
 

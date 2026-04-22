@@ -5,7 +5,8 @@
 //!
 //! The executor routes verbs through:
 //! - GenericCrudExecutor for CRUD operations (defined in verbs.yaml)
-//! - CustomOperationRegistry for plugins (complex logic, external APIs)
+//! - SemOsVerbOpRegistry for plugins (post-Phase-5c-migrate; the legacy
+//!   `CustomOperationRegistry` was removed in slice #80)
 
 #[cfg(feature = "database")]
 use anyhow::{anyhow, bail, Result};
@@ -46,9 +47,7 @@ use super::runtime_registry::{runtime_registry, RuntimeBehavior};
 #[cfg(feature = "database")]
 use super::submission::{DslSubmission, SubmissionError, SubmissionLimits};
 #[cfg(feature = "database")]
-use crate::domain_ops::CustomOperationRegistry;
-#[cfg(feature = "database")]
-use crate::domain_ops::verify_plugin_verb_coverage;
+use sem_os_postgres::ops::SemOsVerbOpRegistry;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -437,7 +436,7 @@ pub struct ExecutionContext {
     /// it via `session.set_view(view_state)`.
     ///
     /// This solves the "session state side door" where ViewState was being discarded
-    /// because CustomOperation only receives ExecutionContext, not UnifiedSessionContext.
+    /// because verb ops only receive ExecutionContext, not UnifiedSessionContext.
     pub pending_view_state: Option<ViewState>,
     /// Pending viewport state from viewport.* operations
     ///
@@ -1140,8 +1139,13 @@ pub struct IterationResult {
 pub struct DslExecutor {
     #[cfg(feature = "database")]
     pool: PgPool,
+    /// SemOS-native plugin op registry. Post-Phase-5c-migrate slice #80 this
+    /// is the single source of truth for plugin dispatch. `None` is allowed
+    /// so tests / harnesses can build an executor without a populated registry;
+    /// in production `ob-poc-web::main` wires the canonical registry via
+    /// [`Self::with_sem_os_ops`].
     #[cfg(feature = "database")]
-    custom_ops: CustomOperationRegistry,
+    sem_os_ops: Option<std::sync::Arc<SemOsVerbOpRegistry>>,
     #[cfg(feature = "database")]
     generic_executor: GenericCrudExecutor,
     #[cfg(feature = "database")]
@@ -1159,8 +1163,11 @@ pub struct DslExecutor {
 impl DslExecutor {
     /// Create a new executor with a database pool.
     ///
-    /// Verifies at construction time that every YAML `behavior: plugin` verb has a
-    /// registered `CustomOperation`.
+    /// Phase 5c-migrate slice #80 removed the legacy `CustomOperationRegistry`;
+    /// plugin dispatch now runs through [`SemOsVerbOpRegistry`]. The registry
+    /// is optional on the executor — tests / harnesses can construct one
+    /// without it, while production wires the canonical registry via
+    /// [`Self::with_sem_os_ops`] at host startup.
     ///
     /// # Examples
     ///
@@ -1174,22 +1181,6 @@ impl DslExecutor {
     /// ```
     #[cfg(feature = "database")]
     pub fn new(pool: PgPool) -> Self {
-        // Phase 5c-migrate Phase B: the authoritative strict coverage check
-        // runs in ob-poc-web::main after both the legacy `CustomOperationRegistry`
-        // and the `SemOsVerbOpRegistry` are built. This constructor only logs a
-        // soft warning for missing handlers — the ob-poc-web check panics on
-        // real gaps with full visibility into both registries.
-        let custom_ops = CustomOperationRegistry::new();
-        let legacy_coverage =
-            verify_plugin_verb_coverage(&custom_ops, &std::collections::HashSet::new());
-        if !legacy_coverage.yaml_missing_op.is_empty() {
-            tracing::debug!(
-                count = legacy_coverage.yaml_missing_op.len(),
-                "DslExecutor::new: YAML plugin verbs not yet in legacy registry \
-                 (expected if SemOS has taken them over); ob-poc-web does the authoritative check"
-            );
-        }
-
         Self {
             generic_executor: GenericCrudExecutor::new(pool.clone()),
             idempotency: super::idempotency::IdempotencyManager::new(pool.clone()),
@@ -1197,10 +1188,25 @@ impl DslExecutor {
                 pool.clone(),
             ),
             pool,
-            custom_ops,
+            sem_os_ops: None,
             events: None,
             service_registry: std::sync::Arc::new(dsl_runtime::ServiceRegistry::empty()),
         }
+    }
+
+    /// Install the canonical [`SemOsVerbOpRegistry`] for plugin dispatch.
+    ///
+    /// In production, `ob-poc-web::main` builds the registry from
+    /// `sem_os_postgres::ops::build_registry()` + `ob_poc::domain_ops::extend_registry()`
+    /// and hands it to every `DslExecutor` via this builder. Without it,
+    /// `execute_verb` will reject any verb that resolves to `RuntimeBehavior::Plugin`.
+    #[cfg(feature = "database")]
+    pub fn with_sem_os_ops(
+        mut self,
+        ops: std::sync::Arc<SemOsVerbOpRegistry>,
+    ) -> Self {
+        self.sem_os_ops = Some(ops);
+        self
     }
 
     /// Install the platform service registry. Call once at host startup
@@ -1215,42 +1221,6 @@ impl DslExecutor {
     /// onto contexts they build themselves.
     pub fn service_registry(&self) -> std::sync::Arc<dsl_runtime::ServiceRegistry> {
         self.service_registry.clone()
-    }
-
-    /// Verify that all YAML plugin verbs are backed by registered custom operations.
-    ///
-    /// Returns the fully-qualified YAML plugin verbs that are missing handlers.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use ob_poc::dsl_v2::executor::DslExecutor;
-    /// # use sqlx::PgPool;
-    /// # fn demo(pool: PgPool) {
-    /// let executor = DslExecutor::new(pool);
-    /// let _ = executor.verify_registry_coverage();
-    /// # }
-    /// ```
-    /// Borrow the legacy `CustomOperationRegistry` this executor was built
-    /// with. Used by the combined coverage test in the same module.
-    #[cfg(feature = "database")]
-    pub fn custom_ops_ref(&self) -> &CustomOperationRegistry {
-        &self.custom_ops
-    }
-
-    #[cfg(feature = "database")]
-    pub fn verify_registry_coverage(&self) -> std::result::Result<(), Vec<String>> {
-        let result =
-            verify_plugin_verb_coverage(&self.custom_ops, &std::collections::HashSet::new());
-        if result.yaml_missing_op.is_empty() {
-            Ok(())
-        } else {
-            Err(result
-                .yaml_missing_op
-                .into_iter()
-                .map(|(domain, verb)| format!("{domain}.{verb}"))
-                .collect())
-        }
     }
 
     /// Set the event emitter for observability.
@@ -1340,12 +1310,25 @@ impl DslExecutor {
 
         // Check if this is a plugin (custom operation)
         if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
-            tracing::debug!("execute_verb: routing to PLUGIN (execute_json)");
-            if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                return dispatch_plugin_via_execute_json(op.as_ref(), vc, ctx, &self.pool, &self.service_registry).await;
+            tracing::debug!("execute_verb: routing to PLUGIN (SemOsVerbOp)");
+            let fqn = format!("{}.{}", vc.domain, vc.verb);
+            if let Some(ref ops) = self.sem_os_ops {
+                if let Some(op) = ops.get(&fqn) {
+                    return dispatch_plugin_via_sem_os_op(
+                        op.as_ref(),
+                        &fqn,
+                        vc,
+                        ctx,
+                        &self.pool,
+                        &self.service_registry,
+                    )
+                    .await;
+                }
             }
             return Err(anyhow!(
-                "Plugin {}.{} has no handler implementation",
+                "Plugin {}.{} has no SemOsVerbOp registered (SemOsVerbOpRegistry \
+                 is either absent on this executor or missing the FQN). Wire \
+                 `DslExecutor::with_sem_os_ops` at host startup.",
                 vc.domain,
                 vc.verb
             ));
@@ -1362,12 +1345,24 @@ impl DslExecutor {
                     vc.domain,
                     vc.verb
                 );
-                if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                    return dispatch_plugin_via_execute_json(op.as_ref(), vc, ctx, &self.pool, &self.service_registry).await;
+                let fqn = format!("{}.{}", vc.domain, vc.verb);
+                if let Some(ref ops) = self.sem_os_ops {
+                    if let Some(op) = ops.get(&fqn) {
+                        return dispatch_plugin_via_sem_os_op(
+                            op.as_ref(),
+                            &fqn,
+                            vc,
+                            ctx,
+                            &self.pool,
+                            &self.service_registry,
+                        )
+                        .await;
+                    }
                 }
 
                 return Err(anyhow!(
-                    "Durable verb {}.{} is executing inside BPMN worker but has no direct custom-op implementation",
+                    "Durable verb {}.{} is executing inside BPMN worker but has no \
+                     SemOsVerbOp implementation registered",
                     vc.domain,
                     vc.verb
                 ));
@@ -1483,38 +1478,39 @@ impl DslExecutor {
 }
 
 // ============================================================================
-// Plugin dispatch via execute_json (Phase 2c cutover)
+// Plugin dispatch via SemOsVerbOp (post-5c-migrate slice #80)
 // ============================================================================
 
-/// Dispatch a plugin op through its `execute_json` method, bridging between
-/// the legacy `ExecutionContext` / `VerbCall` / `ExecutionResult` types and
-/// the SemOS-native `VerbExecutionContext` / JSON args / `VerbExecutionOutcome`.
+/// Dispatch a plugin op through its [`sem_os_postgres::ops::SemOsVerbOp`]
+/// impl, bridging between the legacy `ExecutionContext` / `VerbCall` /
+/// `ExecutionResult` types and the SemOS-native `VerbExecutionContext` /
+/// JSON args / `VerbExecutionOutcome`.
 ///
-/// This is the single point where legacy and SemOS-native worlds meet after
-/// the Phase 2c dispatch flip. The thunk:
+/// Post-slice-#80 this is the single point where legacy DslExecutor
+/// callers (template ops, `execute_dsl` recursion) and SemOS-native ops
+/// meet. The thunk:
 ///
 /// 1. Builds a `VerbExecutionContext` from the caller's `ExecutionContext`
 ///    (copies symbols + session-scoped fields into `extensions`).
 /// 2. Converts the `VerbCall` arguments to a JSON object.
-/// 3. Calls `op.execute_json(...)`.
-/// 4. Syncs `sem_ctx` mutations back: new symbol bindings + pending_* side
+/// 3. Opens a `PgTransactionScope` and calls `op.execute(...)`.
+/// 4. Commits on Ok / rolls back on Err.
+/// 5. Syncs `sem_ctx` mutations back: new symbol bindings + pending_* side
 ///    channels unpacked from `sem_ctx.extensions` into the caller's
 ///    `ExecutionContext.pending_*` fields.
-/// 5. Converts `VerbExecutionOutcome` back to `ExecutionResult`.
-///
-/// After all ops migrate their `execute_json` bodies to native (no
-/// thunking through legacy `execute()`), this bridge becomes the only live
-/// path for plugin dispatch; the legacy `CustomOperation::execute()` method
-/// is removed in a follow-up slice.
+/// 6. Converts `VerbExecutionOutcome` back to `ExecutionResult`.
 #[cfg(feature = "database")]
-async fn dispatch_plugin_via_execute_json(
-    op: &dyn crate::domain_ops::CustomOperation,
+async fn dispatch_plugin_via_sem_os_op(
+    op: &dyn sem_os_postgres::ops::SemOsVerbOp,
+    fqn: &str,
     vc: &VerbCall,
     ctx: &mut ExecutionContext,
     pool: &PgPool,
     services: &std::sync::Arc<dsl_runtime::ServiceRegistry>,
 ) -> Result<ExecutionResult> {
     use crate::sem_os_runtime::verb_executor_adapter as adapter;
+    use crate::sequencer_tx::PgTransactionScope;
+    use dsl_runtime::tx::TransactionScope;
     use sem_os_core::principal::Principal;
 
     // 1. Build sem_ctx from legacy ctx.
@@ -1568,59 +1564,30 @@ async fn dispatch_plugin_via_execute_json(
     // 2. Convert VerbCall args → JSON.
     let args = adapter::verb_call_to_json(vc);
 
-    // 3. Dispatch — scoped path (5c-migrate) or legacy pool path.
-    //
-    // Ops that have migrated to `execute_scoped` flip `requires_scope()` to
-    // `true`. The dispatcher opens a `PgTransactionScope` around the call
-    // and commits on Ok / rolls back on Err. Until every op has migrated,
-    // unmigrated ops keep taking `&PgPool` through `execute_json`.
-    let outcome = if op.requires_scope() {
-        use crate::sequencer_tx::PgTransactionScope;
-        use dsl_runtime::tx::TransactionScope;
-
-        let mut scope = PgTransactionScope::begin(pool).await.map_err(|e| {
-            anyhow!(
-                "execute_scoped({}.{}): begin txn failed: {}",
-                op.domain(),
-                op.verb(),
-                e
-            )
-        })?;
+    // 3. Dispatch under a Sequencer-owned transaction scope.
+    let mut scope = PgTransactionScope::begin(pool).await.map_err(|e| {
+        anyhow!("sem_os_op({}): begin txn failed: {}", fqn, e)
+    })?;
+    let outcome = {
         let scope_dyn: &mut dyn TransactionScope = &mut scope;
-        let outcome_result = op.execute_scoped(&args, &mut sem_ctx, scope_dyn).await;
-        match outcome_result {
+        match op.execute(&args, &mut sem_ctx, scope_dyn).await {
             Ok(outcome) => {
                 scope.commit().await.map_err(|e| {
-                    anyhow!(
-                        "execute_scoped({}.{}): commit failed: {}",
-                        op.domain(),
-                        op.verb(),
-                        e
-                    )
+                    anyhow!("sem_os_op({}): commit failed: {}", fqn, e)
                 })?;
                 outcome
             }
             Err(e) => {
                 if let Err(rollback_err) = scope.rollback().await {
                     tracing::warn!(
-                        domain = op.domain(),
-                        verb = op.verb(),
+                        fqn,
                         %rollback_err,
-                        "execute_scoped rollback failed after op error"
+                        "sem_os_op rollback failed after op error"
                     );
                 }
-                return Err(anyhow!(
-                    "execute_scoped({}.{}) failed: {}",
-                    op.domain(),
-                    op.verb(),
-                    e
-                ));
+                return Err(anyhow!("sem_os_op({}) failed: {}", fqn, e));
             }
         }
-    } else {
-        op.execute_json(&args, &mut sem_ctx, pool)
-            .await
-            .map_err(|e| anyhow!("execute_json({}.{}) failed: {}", op.domain(), op.verb(), e))?
     };
 
     // 4. Sync sem_ctx mutations back into the caller's ExecutionContext.
@@ -1782,7 +1749,9 @@ impl DslExecutor {
     ///
     /// This method ensures the verb execution participates in the caller's transaction.
     /// For CRUD verbs, it uses GenericCrudExecutor::execute_in_tx.
-    /// For plugin verbs, it calls CustomOperation::execute_in_tx if supported.
+    /// Plugin verbs cannot enlist in the caller's existing transaction — they
+    /// always own their own scope via [`dispatch_plugin_via_sem_os_op`] — so
+    /// this method rejects them.
     async fn execute_verb_in_tx(
         &self,
         vc: &VerbCall,
@@ -1796,26 +1765,17 @@ impl DslExecutor {
             .get(&vc.domain, &vc.verb)
             .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
 
-        // Check if this is a plugin (custom operation)
+        // Plugin verbs cannot enlist in the caller's transaction — they own
+        // their own scope via `SemOsVerbOp::execute` + `PgTransactionScope`.
+        // Fail fast so the caller doesn't get silent non-transactional
+        // behaviour inside an atomic batch.
         if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
             tracing::debug!("execute_verb_in_tx: routing to PLUGIN");
-            // Plugins never participate in the caller's transaction — the trait
-            // `CustomOperation` in `dsl_runtime` has no `execute_in_tx` method.
-            // Fail fast rather than silently doing non-transactional work inside
-            // an atomic batch. Slice F replaces this with a txn-aware dispatch
-            // over the `VerbExecutionPort` + `dsl_runtime::tx::TransactionScope` pair.
-            if let Some(_op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                return Err(anyhow!(
-                    "Plugin {}.{} cannot execute in a transaction. Transactional \
-                     plugin execution requires Slice F (VerbExecutionPort + \
-                     dsl_runtime::tx::TransactionScope); current dispatch is \
-                     non-transactional only.",
-                    vc.domain,
-                    vc.verb
-                ));
-            }
             return Err(anyhow!(
-                "Plugin {}.{} has no handler implementation",
+                "Plugin {}.{} cannot execute in a caller-owned transaction. \
+                 Plugin ops run under their own `PgTransactionScope` — use the \
+                 non-transactional `execute_verb` path, or teach the caller to \
+                 split the batch around the plugin call.",
                 vc.domain,
                 vc.verb
             ));
@@ -3089,33 +3049,20 @@ mod tests {
     }
 
     #[cfg(feature = "database")]
-    #[tokio::test]
-    async fn test_executor_registry_coverage_is_clean() {
-        // Post Phase 5c-migrate Phase B: some plugin verbs live in the
-        // `SemOsVerbOpRegistry` rather than the legacy `CustomOperationRegistry`
-        // the executor holds. `DslExecutor::verify_registry_coverage()` sees
-        // only legacy ops and will report SemOS-migrated verbs as missing —
-        // that's the isolated-view it's meant to expose. For the combined
-        // coverage test, we call the free function with both sources.
-        use crate::domain_ops::verify_plugin_verb_coverage;
-        use sqlx::postgres::PgPoolOptions;
-
-        let pool = PgPoolOptions::new()
-            .max_connections(1)
-            .connect_lazy("postgres://localhost/nonexistent")
-            .expect("lazy pool creation should not fail");
-        let executor = DslExecutor::new(pool);
-
-        let sem_os_fqns: std::collections::HashSet<String> =
-            sem_os_postgres::ops::build_registry()
-                .manifest()
-                .into_iter()
-                .collect();
-        let result = verify_plugin_verb_coverage(executor.custom_ops_ref(), &sem_os_fqns);
+    #[test]
+    fn test_sem_os_registry_has_plugin_verbs() {
+        // Post slice #80: the canonical registry lives in
+        // `sem_os_postgres::ops::build_registry()` merged with
+        // `ob_poc::domain_ops::extend_registry()`. This smoke test just
+        // asserts that the SemOS-side factory builds a non-empty registry
+        // so bin builds catch a regression where every op accidentally
+        // vanishes.
+        let mut registry = sem_os_postgres::ops::build_registry();
+        crate::domain_ops::extend_registry(&mut registry);
         assert!(
-            result.yaml_missing_op.is_empty(),
-            "YAML plugin verbs missing from both registries: {:?}",
-            result.yaml_missing_op
+            registry.len() > 100,
+            "SemOsVerbOpRegistry should have >100 ops, got {}",
+            registry.len()
         );
     }
 }

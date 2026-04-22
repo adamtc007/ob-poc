@@ -2,7 +2,7 @@
 //! the existing `DslExecutor` dispatch chain.
 //!
 //! This is the bridge between SemOS's execution contract and ob-poc's
-//! concrete verb execution infrastructure (CustomOperationRegistry +
+//! concrete verb execution infrastructure (`SemOsVerbOpRegistry` +
 //! GenericCrudExecutor). It translates:
 //!
 //! - `VerbExecutionContext` ↔ `dsl_v2::ExecutionContext` (30-field)
@@ -30,7 +30,8 @@ use dsl_core::ast::{Argument, AstNode, Literal, Span, VerbCall};
 /// - **SemOS-native** → `SemOsVerbOpRegistry` lookup (Phase 5c-migrate Phase A).
 ///   Takes precedence over all other paths once a verb is registered here.
 /// - **CRUD** → `CrudExecutionPort` when available, otherwise DslExecutor fallback.
-/// - **Plugin** → DslExecutor (`CustomOperationRegistry`, legacy).
+/// - **Plugin** → DslExecutor (plugin dispatch flows through its own
+///   `SemOsVerbOpRegistry` since slice #80).
 /// - **GraphQuery/Durable** → DslExecutor.
 pub struct ObPocVerbExecutor {
     executor: Arc<DslExecutor>,
@@ -57,10 +58,10 @@ impl ObPocVerbExecutor {
 
     /// Create an executor from a database pool.
     ///
-    /// Constructs the underlying `DslExecutor` (which auto-registers all
-    /// `CustomOperation` implementations and verifies plugin verb coverage).
-    /// The platform service registry defaults to empty — callers that need
-    /// service injection use [`Self::from_pool_with_services`].
+    /// Constructs the underlying `DslExecutor` without a plugin registry —
+    /// suitable for test harnesses. Production callers should use
+    /// [`Self::from_pool_with_services`] and then [`Self::with_sem_os_ops`]
+    /// so plugin dispatch resolves correctly.
     #[cfg(feature = "database")]
     pub fn from_pool(pool: sqlx::PgPool) -> Self {
         Self {
@@ -154,12 +155,12 @@ impl VerbExecutionPort for ObPocVerbExecutor {
             "VerbExecutionPort: routing verb"
         );
 
-        // 2.5. SemOS-native fast path — Phase A of the 5c-migrate plugin relocation.
+        // 2.5. SemOS-native fast path — canonical plugin dispatch post-slice-#80.
         //      If the verb FQN is registered in `SemOsVerbOpRegistry`, open a
         //      `PgTransactionScope`, invoke the op, commit on Ok / rollback on Err.
-        //      Unregistered FQNs fall through; legacy CustomOperation dispatch still
-        //      handles them. When every plugin op has migrated, the fallback branch
-        //      and the `CustomOperation` trait itself are deleted.
+        //      Unregistered FQNs fall through to the DslExecutor which has its
+        //      own plugin branch (also backed by the same registry) for recursive
+        //      DSL execution from template ops.
         if let Some(ref ops) = self.sem_os_ops {
             if let Some(op) = ops.get(verb_fqn) {
                 use crate::sequencer_tx::PgTransactionScope;
@@ -394,7 +395,7 @@ fn split_fqn(fqn: &str) -> dsl_runtime::Result<(String, String)> {
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
-/// Public wrapper for use by the compatibility shim in CustomOperation::execute_json.
+/// Public wrapper for use by the dsl_v2::executor compatibility shim.
 pub fn build_verb_call_pub(domain: &str, verb: &str, args: &serde_json::Value) -> VerbCall {
     build_verb_call(domain, verb, args)
 }

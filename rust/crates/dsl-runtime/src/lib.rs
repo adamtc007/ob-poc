@@ -4,10 +4,10 @@
 //! split between this crate, `sem_os_*` (control plane), and `ob-poc`
 //! (composition plane).
 //!
-//! # Phase 2 state
+//! # Current state
 //!
 //! Per `docs/todo/three-plane-architecture-implementation-plan-v0.1.md`
-//! §3 Phase 2, this crate now owns:
+//! §3 Phase 2, this crate owns:
 //!
 //! - `VerbExecutionPort` trait (moved from sem_os_core in Phase 1).
 //! - `VerbExecutionContext`, `VerbExecutionOutcome`, `VerbSideEffects`,
@@ -34,9 +34,13 @@
 //! into a shared lower crate or introducing a dsl-runtime-local error
 //! type. Phase 2 does not gate on inversion.
 //!
-//! Phase 2c will add `CustomOperation`, `CustomOperationRegistry`,
-//! `CustomOpFactory`, and `VerbRegistrar`, plus the `#[register_custom_op]`
-//! macro (relocating to a sibling `dsl-runtime-macros` crate).
+//! # Phase 5c-migrate slice #80 cleanup
+//!
+//! The former `CustomOperation` trait, `CustomOpFactory`,
+//! `CustomOperationRegistry`, and the scaffold `VerbRegistrar` trait were
+//! all deleted once every plugin op had migrated to
+//! `sem_os_postgres::ops::SemOsVerbOp`. The proc-macro crate
+//! `dsl-runtime-macros` was removed in the same slice.
 //!
 //! # Visibility policy
 //!
@@ -44,16 +48,9 @@
 //! surface is added here deliberately so the plane boundary is reviewable
 //! at a glance.
 
-// `#[register_custom_op]` in `dsl-runtime-macros` expands to absolute
-// `::dsl_runtime::CustomOperation` / `::dsl_runtime::CustomOpFactory`
-// paths. For plugin ops defined inside *this* crate, we alias self so
-// those absolute paths resolve during compilation.
-extern crate self as dsl_runtime;
-
 pub mod bods;
 pub mod cross_workspace;
 pub mod crud_executor;
-pub mod custom_op;
 pub mod document_bundles;
 pub mod document_requirements;
 pub mod domain_ops;
@@ -61,7 +58,6 @@ pub mod entity_kind;
 pub mod execution;
 pub mod placeholder;
 pub mod port;
-pub mod registrar;
 pub mod service_traits;
 pub mod services;
 pub mod state_reducer;
@@ -71,13 +67,11 @@ pub mod verification;
 
 // Explicit re-exports — do NOT add `pub use module::*`.
 pub use crud_executor::PgCrudExecutor;
-pub use custom_op::{CustomOpFactory, CustomOperation, CustomOperationRegistry};
 pub use execution::{
     Result, VerbExecutionContext, VerbExecutionOutcome, VerbExecutionResult, VerbSideEffects,
 };
 pub use port::{CrudExecutionPort, VerbExecutionPort};
 pub use services::{ServiceRegistry, ServiceRegistryBuilder};
-pub use registrar::VerbRegistrar;
 
 #[cfg(test)]
 pub use port::test_support;

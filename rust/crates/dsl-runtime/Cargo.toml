@@ -2,7 +2,7 @@
 name = "dsl-runtime"
 version = "0.1.0"
 edition = "2021"
-description = "DSL verb execution runtime — the data plane of the three-plane architecture. Owns VerbExecutionPort, CustomOperation, CustomOperationRegistry, and the metadata-CRUD interpreter."
+description = "DSL verb execution runtime — the data plane of the three-plane architecture. Owns VerbExecutionPort, VerbExecutionContext/Outcome, CrudExecutionPort, and the metadata-CRUD interpreter."
 
 # Phase 2 note — see docs/todo/three-plane-architecture-implementation-plan-v0.1.md §3:
 #   Phase 2 moved VerbExecutionContext/Outcome/SideEffects/Result and
@@ -13,6 +13,11 @@ description = "DSL verb execution runtime — the data plane of the three-plane 
 #   the dep direction by either moving Principal to a shared lower crate
 #   or introducing a dsl-runtime-local error type. Phase 2 does not gate
 #   on inversion — see the v0.3 Phase 2 gate.
+# Phase 5c-migrate slice #80 note: the former `CustomOperation` trait,
+# `CustomOperationRegistry`, and the `dsl-runtime-macros` crate were
+# deleted once every plugin op had migrated to
+# `sem_os_postgres::ops::SemOsVerbOp`. The `inventory` dep and the
+# `dsl-runtime-macros` path dep were removed in the same slice.
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
 # Phase 5a composite-blocker #23 — discovery_ops + stategraph use
@@ -26,18 +31,12 @@ tonic = "0.12"
 # and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately
 # until a later slice resolves the cycle cleanly.
 sem_os_core = { path = "../sem_os_core" }
-# Phase 4 Slice A — plugin ops moved from ob-poc::domain_ops use
-# #[register_custom_op], which expands to absolute ::dsl_runtime:: paths.
-# `extern crate self as dsl_runtime;` in lib.rs makes those paths resolve
-# when the macro is invoked inside this crate itself.
-dsl-runtime-macros = { path = "../dsl-runtime-macros" }
 # Composite-blocker #1 (agent_ops) uses `#[governed_query]` on a live
 # execute_json method; keeping the attribute requires the proc-macro
 # crate in dsl-runtime's graph. Zero transitive ob-poc pull.
 governed_query_proc = { path = "../governed_query_proc" }
 async-trait = "0.1"
 anyhow = "1.0"
-inventory = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Phase 3 — PgCrudExecutor lives here now; needs chrono/json/uuid/rust_decimal
