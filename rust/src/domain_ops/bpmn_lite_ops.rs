@@ -62,12 +62,17 @@ impl SemOsVerbOp for BpmnCompile {
     fn fqn(&self) -> &str {
         "bpmn.compile"
     }
-    async fn execute(
+
+    /// Phase F.1b (Pattern B §3.1, 2026-04-22): gRPC compile moves to
+    /// pre_fetch. Compilation is idempotent (bytecode is a hash of the
+    /// XML) so re-compilation on scope rollback + retry is safe — the
+    /// bpmn-server returns the same bytecode every time.
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let bpmn_xml = json_extract_string(args, "bpmn-xml")?;
         let client = get_bpmn_client()?;
         let result = client.compile(&bpmn_xml).await?;
@@ -85,7 +90,24 @@ impl SemOsVerbOp for BpmnCompile {
                 })
                 .collect(),
         };
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(typed)?))
+        Ok(Some(serde_json::json!({
+            "_bpmn_compile_result": serde_json::to_value(typed)?
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_bpmn_compile_result").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "bpmn.compile: pre_fetch result missing \
+                 (`_bpmn_compile_result` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
