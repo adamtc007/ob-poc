@@ -1231,12 +1231,13 @@ impl SemOsVerbOp for GleifResolveSuccessor {
     fn fqn(&self) -> &str {
         "gleif.resolve-successor"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let lei = json_extract_string_opt(args, "lei")
             .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
@@ -1248,7 +1249,6 @@ impl SemOsVerbOp for GleifResolveSuccessor {
 
         loop {
             let record = client.get_lei_record(&current_lei).await?;
-
             let status = record
                 .attributes
                 .entity
@@ -1258,10 +1258,8 @@ impl SemOsVerbOp for GleifResolveSuccessor {
             if status == "ACTIVE" {
                 break;
             }
-
             was_merged = true;
 
-            // Check for successor
             if let Some(successor) = record.attributes.entity.successor_entities.first() {
                 chain.push(successor.lei.clone());
                 current_lei = successor.lei.clone();
@@ -1284,7 +1282,24 @@ impl SemOsVerbOp for GleifResolveSuccessor {
             was_merged,
         };
 
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
+        Ok(Some(serde_json::json!({
+            "_gleif_successor": serde_json::to_value(&result)?
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_successor").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.resolve-successor: pre_fetch result missing \
+                 (`_gleif_successor` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 

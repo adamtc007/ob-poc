@@ -189,7 +189,7 @@ HTTP through pre_fetch and DB writes through execute.
 | `GleifImportTree` | **OPEN** | Needs same fetch/persist split of `import_corporate_tree` |
 | `GleifRefresh` | **CLOSED 2026-04-22** | Reuses `fetch_all_for_enrich` + `persist_enrichment` from GleifEnrich split. pre_fetch resolves refresh targets (single entity or bulk-stale-discovery DB query), then fetches an `EnrichmentFetch` bundle per target. Execute loops through bundles and calls `persist_enrichment`; per-target HTTP errors counted separately from persist errors (both surface in the `errors` response field). |
 | `GleifImportManagedFunds` | **OPEN** | Needs fetch-bundle for manager + all fund records + persistence loop |
-| `GleifResolveSuccessor` | **OPEN** | Inspect + split as needed |
+| `GleifResolveSuccessor` | **CLOSED 2026-04-22** | Misclassified in original ledger — on inspection is pure HTTP (chase successor chain via `get_lei_record` loop, no DB writes). Straight pre_fetch migration; result under `_gleif_successor`. |
 | `GleifImportToClientGroup` | **OPEN** | Heavy DB writes for group + relationships |
 
 **EnrichmentFetch struct** (rust/src/gleif/enrichment.rs): serde-
@@ -204,7 +204,7 @@ service methods (`import_corporate_tree`, `refresh_entity`,
 `import_managed_funds`, etc.). Each method follows the same
 mechanical refactor — ~200-400 lines per method.
 
-**Status:** 13/17 ops CLOSED (§3.3a 11 + §3.3b 2); 4/17 OPEN (§3.3b remaining 4). **PARTIAL.**
+**Status:** 14/17 ops CLOSED (§3.3a 11 + §3.3b 3); 3/17 OPEN (§3.3b remaining 3). **PARTIAL.**
 
 ### 3.4 File: `request_ops.rs` — helper-indirect gRPC (CLOSED 2026-04-22, F.1c)
 
