@@ -111,16 +111,39 @@ pub fn json_extract_cbu_id(
 // Phase C.3 helpers (F7 follow-on, 2026-04-22)
 // ---------------------------------------------------------------------------
 
-/// Emit a `PendingStateAdvance` via the `ctx.extensions["_pending_state_advance"]`
-/// side channel. Read by the dispatcher post-execute and shadow-logged; Phase C.2
-/// applies the advance via SemOS inside the Sequencer's outer scope.
+/// Emit a `PendingStateAdvance`-shaped JSON payload via the
+/// `ctx.extensions["_pending_state_advance"]` side channel. Read by the
+/// dispatcher post-execute and shadow-logged; Phase C.2-main applies the
+/// advance via SemOS inside the Sequencer's outer scope.
 ///
 /// Use from plugin ops that mutate state, AFTER the DB write has committed
 /// (or is guaranteed by the ambient txn). Only emit on a genuine state
 /// transition — idempotent returns that found an existing row should NOT
 /// emit, because no state advance occurred.
 ///
-/// Arguments:
+/// # Shape contract (important — deliberately DIVERGES from `PendingStateAdvance`)
+///
+/// The JSON this helper writes is **pre-resolution**. Specifically:
+/// - `to_node` is a taxonomy **string token** (e.g. `"cbu:onboarded"`)
+///   while [`ob_poc_types::PendingStateAdvance`] types `to_node` as
+///   [`ob_poc_types::DagNodeId(Uuid)`]. Direct `serde_json::from_value`
+///   into `PendingStateAdvance` will therefore fail at the first state
+///   transition.
+/// - `slot_path` is a logical path string with no structural typing yet.
+/// - `constellation_marks[].entity_id` is a UUID string, fine as-is.
+///
+/// Phase C.2-main is responsible for:
+/// 1. Resolving each `to_node` token against the state-machine catalogue
+///    to produce a `DagNodeId`.
+/// 2. Constructing a real `PendingStateAdvance` from the resolved parts.
+/// 3. Applying it via SemOS inside the outer transaction.
+///
+/// Until Phase C.2-main lands, the payload is observed-and-logged only
+/// (see `dispatch_plugin_via_sem_os_op_in_scope` for the peek site). The
+/// shape-contract test `emit_shape_pins_pre_resolution_payload` pins the
+/// current JSON so drift is caught immediately.
+///
+/// # Arguments
 /// - `ctx`: verb execution context — `ctx.extensions` will be promoted to
 ///   an object if it isn't one already
 /// - `entity_id`: the entity whose DAG node transitioned
@@ -399,6 +422,79 @@ mod tests {
         let mut ctx = VerbExecutionContext::default();
         emit_pending_state_advance_batch(&mut ctx, &[]);
         assert!(peek_pending_state_advance(&ctx).is_none());
+    }
+
+    #[test]
+    fn emit_shape_pins_pre_resolution_payload() {
+        // Shape-contract test: pins the exact JSON the emitter writes so
+        // any future drift (e.g. accidentally switching `to_node` to an
+        // already-resolved UUID, or renaming `slot_path`) is caught
+        // before it lands unseen in 70+ plugin verb call sites.
+        //
+        // This test DELIBERATELY does NOT deserialize into
+        // `ob_poc_types::PendingStateAdvance` — see the doc-comment on
+        // `emit_pending_state_advance` for the pre-resolution rationale.
+        let mut ctx = VerbExecutionContext::default();
+        let entity_id = Uuid::parse_str("11111111-2222-3333-4444-555555555555").unwrap();
+
+        emit_pending_state_advance(
+            &mut ctx,
+            entity_id,
+            "cbu:onboarded",
+            "cbu/trading-profile",
+            "shape-contract-test",
+        );
+
+        let peeked = peek_pending_state_advance(&ctx).expect("must be present");
+
+        // state_transitions: exactly one, with a STRING to_node (not DagNodeId).
+        assert_eq!(peeked["state_transitions"].as_array().unwrap().len(), 1);
+        let t0 = &peeked["state_transitions"][0];
+        assert_eq!(t0["entity_id"], "11111111-2222-3333-4444-555555555555");
+        assert!(t0["from_node"].is_null());
+        assert_eq!(t0["to_node"], "cbu:onboarded"); // String, not UUID.
+        assert_eq!(t0["reason"], "shape-contract-test");
+
+        // constellation_marks: exactly one, slot path is a plain string.
+        assert_eq!(peeked["constellation_marks"].as_array().unwrap().len(), 1);
+        let m0 = &peeked["constellation_marks"][0];
+        assert_eq!(m0["slot_path"], "cbu/trading-profile");
+        assert_eq!(m0["entity_id"], "11111111-2222-3333-4444-555555555555");
+
+        assert_eq!(peeked["writes_since_push_delta"], 1);
+        assert_eq!(peeked["catalogue_effects"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn emit_shape_is_not_directly_deserializable_into_typed_advance() {
+        // Documents the type GAP between the emitter's pre-resolution
+        // payload and `ob_poc_types::PendingStateAdvance`. Phase C.2-main
+        // is responsible for the token -> DagNodeId resolution step; if
+        // someone deletes that step, this test breaks and surfaces the
+        // gap again.
+        //
+        // The typed struct expects `to_node: DagNodeId(Uuid)`. The
+        // emitter writes `to_node: <taxonomy_token_string>`. Direct
+        // from_value MUST fail.
+        use ob_poc_types::PendingStateAdvance;
+
+        let mut ctx = VerbExecutionContext::default();
+        emit_pending_state_advance(
+            &mut ctx,
+            Uuid::new_v4(),
+            "cbu:onboarded",
+            "cbu/trading-profile",
+            "test",
+        );
+
+        let raw = peek_pending_state_advance(&ctx).unwrap().clone();
+        let result: Result<PendingStateAdvance, _> = serde_json::from_value(raw);
+        assert!(
+            result.is_err(),
+            "emitter payload MUST NOT round-trip into typed PendingStateAdvance \
+             directly — Phase C.2-main resolves tokens to UUIDs first. If this \
+             test starts passing, the resolver step was removed."
+        );
     }
 
     #[test]
