@@ -290,6 +290,134 @@ mod cross_step_tests {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // Test 4: Cross-step atomicity WORKS when the runbook runs under a
+    // caller-owned scope via execute_runbook_in_scope (Phase B.2b-ε).
+    //
+    // This is the positive B.2b-ε proof: same 2-step shape as test 1
+    // (step 2 fails after step 1 succeeds), but the test drives the
+    // scope-aware runbook path directly. Caller rolls back the scope
+    // when the final status is Failed → step 1's write is gone.
+    // ─────────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    #[ignore] // Requires database
+    async fn test_in_scope_rollback_delivers_cross_step_atomicity() -> Result<()> {
+        use ob_poc::runbook::{execute_runbook_in_scope, CompiledRunbookStatus};
+        use ob_poc::sequencer_tx::PgTransactionScope;
+
+        let db = TestDb::new().await?;
+        let cbu_name = db.name("fund_in_scope");
+
+        let step1_dsl = format!(r#"(cbu.ensure :name "{}" :jurisdiction "LU")"#, cbu_name);
+        let step2_dsl = format!(
+            r#"(cbu.ensure :name "{}" :as @fund)
+               (cbu.assign-role :cbu-id @fund :entity-id "00000000-0000-0000-0000-000000000000" :role "BAD_ROLE_IN_SCOPE")"#,
+            cbu_name
+        );
+
+        let store = RunbookStore::new();
+        let steps = vec![
+            make_step(&step1_dsl, "cbu.ensure"),
+            make_step(&step2_dsl, "cbu.assign-role"),
+        ];
+        let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
+        let id = rb.id;
+        store.insert(&rb).await?;
+
+        let dsl_exec = Arc::new(RealDslExecutor::new(db.pool.clone()));
+        let step_exec = DslStepExecutor::new(dsl_exec);
+
+        // Open outer scope. Run runbook. Caller (this test) owns commit/rollback.
+        let mut scope = PgTransactionScope::begin(&db.pool).await?;
+        let result = {
+            let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+            execute_runbook_in_scope(&store, id, None, &step_exec, scope_dyn).await?
+        };
+
+        // Final status: Failed (step 2 bombed).
+        assert!(
+            matches!(result.final_status, CompiledRunbookStatus::Failed { .. }),
+            "expected Failed final status, got {:?}",
+            result.final_status
+        );
+
+        // ROLL BACK the scope — simulates the Sequencer's B.2b-ζ behavior
+        // when a runbook fails.
+        scope.rollback().await?;
+
+        // Step 1's CBU write was inside the outer scope, so rollback
+        // undoes it. Cross-step atomicity delivered.
+        let cbu_found = db.cbu_exists(&cbu_name).await?;
+        assert!(
+            !cbu_found,
+            "CBU '{}' MUST NOT exist after scope rollback — \
+             cross-step atomicity via execute_runbook_in_scope is the \
+             B.2b-ε contract.",
+            cbu_name
+        );
+
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Test 5: in-scope happy path — all steps succeed, caller commits,
+    // all writes visible post-commit.
+    // ─────────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    #[ignore] // Requires database
+    async fn test_in_scope_commit_persists_writes() -> Result<()> {
+        use ob_poc::runbook::{execute_runbook_in_scope, CompiledRunbookStatus};
+        use ob_poc::sequencer_tx::PgTransactionScope;
+
+        let db = TestDb::new().await?;
+        let cbu_a = db.name("scope_happy_a");
+        let cbu_b = db.name("scope_happy_b");
+
+        let step1_dsl = format!(r#"(cbu.ensure :name "{}" :jurisdiction "LU")"#, cbu_a);
+        let step2_dsl = format!(r#"(cbu.ensure :name "{}" :jurisdiction "IE")"#, cbu_b);
+
+        let store = RunbookStore::new();
+        let steps = vec![
+            make_step(&step1_dsl, "cbu.ensure"),
+            make_step(&step2_dsl, "cbu.ensure"),
+        ];
+        let rb = CompiledRunbook::new(Uuid::new_v4(), 1, steps, ReplayEnvelope::empty());
+        let id = rb.id;
+        store.insert(&rb).await?;
+
+        let dsl_exec = Arc::new(RealDslExecutor::new(db.pool.clone()));
+        let step_exec = DslStepExecutor::new(dsl_exec);
+
+        let mut scope = PgTransactionScope::begin(&db.pool).await?;
+        let result = {
+            let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+            execute_runbook_in_scope(&store, id, None, &step_exec, scope_dyn).await?
+        };
+
+        assert!(
+            matches!(result.final_status, CompiledRunbookStatus::Completed { .. }),
+            "expected Completed, got {:?}",
+            result.final_status
+        );
+
+        scope.commit().await?;
+
+        assert!(
+            db.cbu_exists(&cbu_a).await?,
+            "CBU A must exist after scope commit"
+        );
+        assert!(
+            db.cbu_exists(&cbu_b).await?,
+            "CBU B must exist after scope commit"
+        );
+
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // Sentinel: a compile-time reminder that these tests have a flip
     // contract. When B.2b migration lands, flip the assertions in
     // tests 1 and 2; test 3 is the positive control and does NOT flip.
