@@ -65,6 +65,13 @@ pub mod agentic;
 // (F6) is the slice that makes the envelope the primary dispatch contract.
 pub mod envelope_builder;
 
+// Phase D.3 — TOCTOU recheck scaffold (2026-04-22). Verifies the
+// state_gate_hash computed at gate time still matches the current DB
+// state after the Sequencer has acquired row locks inside its outer
+// transaction. Pure scaffolding until D.2 migration is applied
+// AND real envelopes are constructed at stage 6.
+pub mod toctou_recheck;
+
 // Graph visualization module
 #[cfg(feature = "database")]
 pub mod graph;
