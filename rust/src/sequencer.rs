@@ -83,9 +83,37 @@ use sem_os_client::SemOsClient;
 // ---------------------------------------------------------------------------
 
 /// Trait for DSL execution — allows stub execution in Phase 0.
+///
+/// Phase B.2b-γ (2026-04-22): extended with `execute_in_scope` so the
+/// step executor bridge can thread a caller-owned `TransactionScope`
+/// from the Sequencer into the DSL executor — enabling cross-step
+/// atomicity (B.2b-ζ). The default impl of `execute_in_scope` falls
+/// back to `execute()`, which opens its own per-verb transactions;
+/// implementors that can honor the outer scope (RealDslExecutor)
+/// override it.
 #[async_trait::async_trait]
 pub trait DslExecutor: Send + Sync {
     async fn execute(&self, dsl: &str) -> Result<serde_json::Value, String>;
+
+    /// Execute a DSL string against a caller-owned transaction scope.
+    ///
+    /// The default implementation ignores the scope and delegates to
+    /// `execute()`. This is safe for test stubs that don't touch the
+    /// DB. Production implementations (RealDslExecutor) override this
+    /// to route verb dispatch through
+    /// `DslExecutor::execute_plan_atomic_in_scope`, so a multi-step
+    /// runbook sharing one scope commits atomically or rolls back
+    /// together.
+    ///
+    /// The caller owns scope lifetime: this method does NOT begin,
+    /// commit, or roll back the scope.
+    async fn execute_in_scope(
+        &self,
+        dsl: &str,
+        _scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    ) -> Result<serde_json::Value, String> {
+        self.execute(dsl).await
+    }
 }
 
 /// Stub executor that returns success for all DSL.

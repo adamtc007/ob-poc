@@ -72,16 +72,13 @@ impl RealDslExecutor {
     }
 }
 
-#[async_trait::async_trait]
-impl DslExecutor for RealDslExecutor {
-    async fn execute(&self, dsl: &str) -> Result<serde_json::Value, String> {
-        // 1. Parse DSL string → Program AST.
-        let program = parse_program(dsl).map_err(|e| format!("Parse error: {}", e))?;
-
-        // 2. Compile → ExecutionPlan (topological sort, injections).
-        let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;
-
-        // 3. Build execution context.
+impl RealDslExecutor {
+    /// Shared parse → compile → build context path used by both the
+    /// self-scoped (`execute`) and in-scope (`execute_in_scope`) entry
+    /// points.
+    fn build_executor_and_ctx(
+        &self,
+    ) -> (crate::dsl_v2::executor::DslExecutor, ExecutionContext) {
         let mut ctx = if self.allow_durable_direct {
             ExecutionContext::new().allow_durable_direct()
         } else {
@@ -89,18 +86,19 @@ impl DslExecutor for RealDslExecutor {
         };
         ctx.execution_id = Uuid::new_v4();
 
-        // 4. Execute via the real dsl_v2 executor.
         let mut executor = crate::dsl_v2::executor::DslExecutor::new(self.pool.clone())
             .with_services(self.service_registry.clone());
         if let Some(ref ops) = self.sem_os_ops {
             executor = executor.with_sem_os_ops(ops.clone());
         }
-        let results = executor
-            .execute_plan(&plan, &mut ctx)
-            .await
-            .map_err(|e| format!("Execution error: {}", e))?;
 
-        // 5. Convert results to JSON.
+        (executor, ctx)
+    }
+
+    fn build_response(
+        results: &[ExecutionResult],
+        ctx: &ExecutionContext,
+    ) -> serde_json::Value {
         let step_results: Vec<serde_json::Value> =
             results.iter().map(execution_result_to_json).collect();
 
@@ -110,12 +108,64 @@ impl DslExecutor for RealDslExecutor {
             .map(|(k, v)| (k.clone(), json!(v.to_string())))
             .collect();
 
-        Ok(json!({
+        json!({
             "success": true,
             "steps_executed": step_results.len(),
             "results": step_results,
             "bindings": bindings,
-        }))
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl DslExecutor for RealDslExecutor {
+    async fn execute(&self, dsl: &str) -> Result<serde_json::Value, String> {
+        // 1. Parse DSL string → Program AST.
+        let program = parse_program(dsl).map_err(|e| format!("Parse error: {}", e))?;
+
+        // 2. Compile → ExecutionPlan (topological sort, injections).
+        let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;
+
+        // 3. Build executor + context (shared with execute_in_scope).
+        let (executor, mut ctx) = self.build_executor_and_ctx();
+
+        // 4. Execute via execute_plan (per-verb txns — each verb commits).
+        //    This preserves legacy non-atomic semantics for callers that
+        //    don't have an outer scope to pass in.
+        let results = executor
+            .execute_plan(&plan, &mut ctx)
+            .await
+            .map_err(|e| format!("Execution error: {}", e))?;
+
+        Ok(Self::build_response(&results, &ctx))
+    }
+
+    /// Phase B.2b-γ (2026-04-22): scope-aware entry point for the
+    /// Sequencer's step executor bridge. Parses + compiles the DSL,
+    /// then runs the plan through
+    /// [`DslExecutor::execute_plan_atomic_in_scope`] so every verb
+    /// dispatches through the CALLER'S scope — no per-verb txns.
+    ///
+    /// Caller (step executor bridge → runbook executor → Sequencer)
+    /// owns commit/rollback. When the Sequencer opens one scope per
+    /// runbook (B.2b-ζ), multiple steps share one transaction and
+    /// commit atomically or roll back together.
+    async fn execute_in_scope(
+        &self,
+        dsl: &str,
+        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    ) -> Result<serde_json::Value, String> {
+        let program = parse_program(dsl).map_err(|e| format!("Parse error: {}", e))?;
+        let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;
+
+        let (executor, mut ctx) = self.build_executor_and_ctx();
+
+        let results = executor
+            .execute_plan_atomic_in_scope(&plan, &mut ctx, scope)
+            .await
+            .map_err(|e| format!("Execution error: {}", e))?;
+
+        Ok(Self::build_response(&results, &ctx))
     }
 }
 
