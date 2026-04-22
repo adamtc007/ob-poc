@@ -656,6 +656,46 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(gleif_ops::GleifLookupByIsin));
     registry.register(Arc::new(gleif_ops::GleifImportToClientGroup));
     registry.register(Arc::new(gleif_ops::GleifLookup));
+
+    // Phase B Pattern B slice #78: booking_principal_ops (32 verbs —
+    // legal-entity / rule-field / booking-location / booking-principal
+    // / client-principal-relationship / service-availability / ruleset
+    // / rule / contract-pack). Bridges to
+    // crate::database::booking_principal_repository +
+    // crate::domain_ops::rule_evaluator; ob-poc API DTOs in
+    // crate::api::booking_principal_types stay in ob-poc.
+    registry.register(Arc::new(booking_principal_ops::LegalEntityCreate));
+    registry.register(Arc::new(booking_principal_ops::LegalEntityUpdate));
+    registry.register(Arc::new(booking_principal_ops::LegalEntityList));
+    registry.register(Arc::new(booking_principal_ops::RuleFieldRegister));
+    registry.register(Arc::new(booking_principal_ops::RuleFieldList));
+    registry.register(Arc::new(booking_principal_ops::BookingLocationCreate));
+    registry.register(Arc::new(booking_principal_ops::BookingLocationUpdate));
+    registry.register(Arc::new(booking_principal_ops::BookingLocationList));
+    registry.register(Arc::new(booking_principal_ops::BookingPrincipalCreate));
+    registry.register(Arc::new(booking_principal_ops::BookingPrincipalUpdate));
+    registry.register(Arc::new(booking_principal_ops::BookingPrincipalRetire));
+    registry.register(Arc::new(booking_principal_ops::BookingPrincipalEvaluate));
+    registry.register(Arc::new(booking_principal_ops::BookingPrincipalSelect));
+    registry.register(Arc::new(booking_principal_ops::BookingPrincipalExplain));
+    registry.register(Arc::new(booking_principal_ops::BookingPrincipalCoverageMatrix));
+    registry.register(Arc::new(booking_principal_ops::BookingPrincipalGapReport));
+    registry.register(Arc::new(booking_principal_ops::BookingPrincipalImpactAnalysis));
+    registry.register(Arc::new(booking_principal_ops::ClientPrincipalRelationshipRecord));
+    registry.register(Arc::new(booking_principal_ops::ClientPrincipalRelationshipTerminate));
+    registry.register(Arc::new(booking_principal_ops::ClientPrincipalRelationshipList));
+    registry.register(Arc::new(booking_principal_ops::ClientPrincipalRelationshipCrossSellCheck));
+    registry.register(Arc::new(booking_principal_ops::ServiceAvailabilitySet));
+    registry.register(Arc::new(booking_principal_ops::ServiceAvailabilityList));
+    registry.register(Arc::new(booking_principal_ops::ServiceAvailabilityListByPrincipal));
+    registry.register(Arc::new(booking_principal_ops::RulesetCreate));
+    registry.register(Arc::new(booking_principal_ops::RulesetPublish));
+    registry.register(Arc::new(booking_principal_ops::RulesetRetire));
+    registry.register(Arc::new(booking_principal_ops::RuleAdd));
+    registry.register(Arc::new(booking_principal_ops::RuleUpdate));
+    registry.register(Arc::new(booking_principal_ops::RuleDisable));
+    registry.register(Arc::new(booking_principal_ops::ContractPackCreate));
+    registry.register(Arc::new(booking_principal_ops::ContractPackAddTemplate));
 }
 
 #[cfg(test)]
@@ -1082,36 +1122,37 @@ mod tests {
         // legacy registry.
         assert!(!registry.has("pack", "select"));
         assert!(!registry.has("pack", "answer"));
-        // Booking principal operations
-        assert!(registry.has("legal-entity", "create"));
-        assert!(registry.has("legal-entity", "update"));
-        assert!(registry.has("legal-entity", "list"));
-        assert!(registry.has("booking-location", "create"));
-        assert!(registry.has("booking-location", "update"));
-        assert!(registry.has("booking-location", "list"));
-        assert!(registry.has("booking-principal", "create"));
-        assert!(registry.has("booking-principal", "update"));
-        assert!(registry.has("booking-principal", "retire"));
-        assert!(registry.has("booking-principal", "evaluate"));
-        assert!(registry.has("booking-principal", "select"));
-        assert!(registry.has("booking-principal", "explain"));
-        assert!(registry.has("booking-principal", "coverage-matrix"));
-        assert!(registry.has("booking-principal", "gap-report"));
-        assert!(registry.has("booking-principal", "impact-analysis"));
-        assert!(registry.has("client-principal-relationship", "record"));
-        assert!(registry.has("client-principal-relationship", "terminate"));
-        assert!(registry.has("client-principal-relationship", "list"));
-        assert!(registry.has("client-principal-relationship", "cross-sell-check"));
-        assert!(registry.has("service-availability", "set"));
-        assert!(registry.has("service-availability", "list"));
-        assert!(registry.has("service-availability", "list-by-principal"));
-        assert!(registry.has("ruleset", "create"));
-        assert!(registry.has("ruleset", "publish"));
-        assert!(registry.has("ruleset", "retire"));
-        assert!(registry.has("rule", "add"));
-        assert!(registry.has("rule", "update"));
-        assert!(registry.has("rule", "disable"));
-        assert!(registry.has("contract-pack", "create"));
-        assert!(registry.has("contract-pack", "add-template"));
+        // Phase 5c-migrate Phase B Pattern B slice #78: booking_principal_ops
+        // moved to `sem_os_postgres::ops::booking_principal` via `extend_registry()`.
+        assert!(!registry.has("legal-entity", "create"));
+        assert!(!registry.has("legal-entity", "update"));
+        assert!(!registry.has("legal-entity", "list"));
+        assert!(!registry.has("booking-location", "create"));
+        assert!(!registry.has("booking-location", "update"));
+        assert!(!registry.has("booking-location", "list"));
+        assert!(!registry.has("booking-principal", "create"));
+        assert!(!registry.has("booking-principal", "update"));
+        assert!(!registry.has("booking-principal", "retire"));
+        assert!(!registry.has("booking-principal", "evaluate"));
+        assert!(!registry.has("booking-principal", "select"));
+        assert!(!registry.has("booking-principal", "explain"));
+        assert!(!registry.has("booking-principal", "coverage-matrix"));
+        assert!(!registry.has("booking-principal", "gap-report"));
+        assert!(!registry.has("booking-principal", "impact-analysis"));
+        assert!(!registry.has("client-principal-relationship", "record"));
+        assert!(!registry.has("client-principal-relationship", "terminate"));
+        assert!(!registry.has("client-principal-relationship", "list"));
+        assert!(!registry.has("client-principal-relationship", "cross-sell-check"));
+        assert!(!registry.has("service-availability", "set"));
+        assert!(!registry.has("service-availability", "list"));
+        assert!(!registry.has("service-availability", "list-by-principal"));
+        assert!(!registry.has("ruleset", "create"));
+        assert!(!registry.has("ruleset", "publish"));
+        assert!(!registry.has("ruleset", "retire"));
+        assert!(!registry.has("rule", "add"));
+        assert!(!registry.has("rule", "update"));
+        assert!(!registry.has("rule", "disable"));
+        assert!(!registry.has("contract-pack", "create"));
+        assert!(!registry.has("contract-pack", "add-template"));
     }
 }
