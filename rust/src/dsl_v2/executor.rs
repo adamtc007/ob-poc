@@ -1573,6 +1573,23 @@ async fn dispatch_plugin_via_sem_os_op_in_scope(
     let outcome = op.execute(&args, &mut sem_ctx, scope).await
         .map_err(|e| anyhow!("sem_os_op({}) failed: {}", fqn, e))?;
 
+    // Phase C.1 (F7 follow-on, 2026-04-22): shadow-observe any
+    // `PendingStateAdvance` the op emitted via its `ctx.extensions`
+    // side channel. Today `cbu.create` is the only pilot emitter;
+    // the rollout pattern is "emit side-channel from op, shadow-log
+    // from dispatcher, apply-in-txn from Sequencer (Phase C.2)".
+    if let Some(advance) = sem_ctx
+        .extensions
+        .as_object()
+        .and_then(|m| m.get("_pending_state_advance"))
+    {
+        tracing::debug!(
+            fqn,
+            advance = %advance,
+            "Stage 9a shadow — PendingStateAdvance emitted by pilot verb"
+        );
+    }
+
     // 4. Sync sem_ctx mutations back into the caller's ExecutionContext.
     for (name, uuid) in &sem_ctx.symbols {
         ctx.symbols.insert(name.clone(), *uuid);
