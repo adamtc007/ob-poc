@@ -194,6 +194,79 @@ pub fn peek_pending_state_advance(
     ctx.extensions.as_object()?.get("_pending_state_advance")
 }
 
+/// A single declarative state transition — the input shape for
+/// [`emit_pending_state_advance_batch`]. Collected by verbs that mutate
+/// multiple entities in one call (e.g. `cbu.create-from-client-group`
+/// creates N CBUs; `capital.split` touches the share class + every
+/// holder; remediation sweeps mark K entities at once).
+#[derive(Debug, Clone)]
+pub struct StateTransitionInput<'a> {
+    pub entity_id: Uuid,
+    pub to_node: &'a str,
+    pub slot_path: &'a str,
+    pub reason: &'a str,
+}
+
+/// Emit a single `PendingStateAdvance` carrying N state transitions +
+/// N constellation marks, one per input. `writes_since_push_delta` is
+/// the batch size (each entity is one logical write from the session's
+/// perspective).
+///
+/// Use this when a single verb causes multiple entity-level state
+/// advances that must apply atomically. Single-transition emitters
+/// should continue to use [`emit_pending_state_advance`] — this
+/// variant is strictly for the fan-out case.
+///
+/// Like the single-transition emitter, last-writer-wins within a plan
+/// step: a second call in the same step OVERWRITES the previous
+/// advance (enforced by the shared `_pending_state_advance` key).
+pub fn emit_pending_state_advance_batch(
+    ctx: &mut VerbExecutionContext,
+    transitions: &[StateTransitionInput<'_>],
+) {
+    if transitions.is_empty() {
+        return;
+    }
+
+    if !ctx.extensions.is_object() {
+        ctx.extensions = serde_json::Value::Object(serde_json::Map::new());
+    }
+
+    let state_transitions: Vec<serde_json::Value> = transitions
+        .iter()
+        .map(|t| {
+            serde_json::json!({
+                "entity_id": t.entity_id.to_string(),
+                "from_node": null,
+                "to_node": t.to_node,
+                "reason": t.reason,
+            })
+        })
+        .collect();
+
+    let constellation_marks: Vec<serde_json::Value> = transitions
+        .iter()
+        .map(|t| {
+            serde_json::json!({
+                "slot_path": t.slot_path,
+                "entity_id": t.entity_id.to_string(),
+            })
+        })
+        .collect();
+
+    if let Some(ext_obj) = ctx.extensions.as_object_mut() {
+        ext_obj.insert(
+            "_pending_state_advance".to_string(),
+            serde_json::json!({
+                "state_transitions": state_transitions,
+                "constellation_marks": constellation_marks,
+                "writes_since_push_delta": transitions.len() as u64,
+                "catalogue_effects": [],
+            }),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,5 +353,94 @@ mod tests {
     fn take_pending_state_advance_returns_none_when_never_emitted() {
         let mut ctx = VerbExecutionContext::default();
         assert!(take_pending_state_advance(&mut ctx).is_none());
+    }
+
+    #[test]
+    fn emit_pending_state_advance_batch_fan_out() {
+        let mut ctx = VerbExecutionContext::default();
+        let e1 = Uuid::new_v4();
+        let e2 = Uuid::new_v4();
+        let e3 = Uuid::new_v4();
+
+        emit_pending_state_advance_batch(
+            &mut ctx,
+            &[
+                StateTransitionInput {
+                    entity_id: e1,
+                    to_node: "cbu:onboarded",
+                    slot_path: "cbu/trading-profile",
+                    reason: "batch-1",
+                },
+                StateTransitionInput {
+                    entity_id: e2,
+                    to_node: "cbu:onboarded",
+                    slot_path: "cbu/trading-profile",
+                    reason: "batch-2",
+                },
+                StateTransitionInput {
+                    entity_id: e3,
+                    to_node: "cbu:onboarded",
+                    slot_path: "cbu/trading-profile",
+                    reason: "batch-3",
+                },
+            ],
+        );
+
+        let peeked = peek_pending_state_advance(&ctx).expect("must be present");
+        assert_eq!(peeked["state_transitions"].as_array().unwrap().len(), 3);
+        assert_eq!(peeked["constellation_marks"].as_array().unwrap().len(), 3);
+        assert_eq!(peeked["writes_since_push_delta"], 3);
+        assert_eq!(peeked["state_transitions"][0]["entity_id"], e1.to_string());
+        assert_eq!(peeked["state_transitions"][2]["entity_id"], e3.to_string());
+    }
+
+    #[test]
+    fn emit_pending_state_advance_batch_empty_is_noop() {
+        let mut ctx = VerbExecutionContext::default();
+        emit_pending_state_advance_batch(&mut ctx, &[]);
+        assert!(peek_pending_state_advance(&ctx).is_none());
+    }
+
+    #[test]
+    fn emit_pending_state_advance_batch_overwrites_single() {
+        let mut ctx = VerbExecutionContext::default();
+        let e1 = Uuid::new_v4();
+        let e2 = Uuid::new_v4();
+
+        // Single emit first.
+        emit_pending_state_advance(
+            &mut ctx,
+            e1,
+            "cbu:onboarded",
+            "cbu/trading-profile",
+            "single",
+        );
+        assert_eq!(
+            peek_pending_state_advance(&ctx).unwrap()["writes_since_push_delta"],
+            1
+        );
+
+        // Batch emit overwrites (last-writer-wins).
+        emit_pending_state_advance_batch(
+            &mut ctx,
+            &[
+                StateTransitionInput {
+                    entity_id: e1,
+                    to_node: "cbu:active",
+                    slot_path: "cbu/lifecycle",
+                    reason: "batch-overwrite-1",
+                },
+                StateTransitionInput {
+                    entity_id: e2,
+                    to_node: "cbu:active",
+                    slot_path: "cbu/lifecycle",
+                    reason: "batch-overwrite-2",
+                },
+            ],
+        );
+
+        let peeked = peek_pending_state_advance(&ctx).unwrap();
+        assert_eq!(peeked["writes_since_push_delta"], 2);
+        assert_eq!(peeked["state_transitions"][0]["to_node"], "cbu:active");
     }
 }
