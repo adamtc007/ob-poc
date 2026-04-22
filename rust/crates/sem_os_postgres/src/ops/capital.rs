@@ -32,7 +32,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use dsl_runtime::domain_ops::helpers::{
-    json_extract_int, json_extract_string, json_extract_string_opt, json_extract_uuid,
+    self, json_extract_int, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt, json_get_required_uuid,
 };
 use dsl_runtime::tx::TransactionScope;
@@ -81,7 +81,7 @@ impl SemOsVerbOp for Transfer {
     async fn execute(
         &self,
         args: &Value,
-        _ctx: &mut VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let share_class_id = json_get_required_uuid(args, "share-class-id")?;
@@ -199,6 +199,24 @@ impl SemOsVerbOp for Transfer {
         .bind(&reference)
         .fetch_one(scope.executor())
         .await?;
+
+        helpers::emit_pending_state_advance_batch(
+            ctx,
+            &[
+                helpers::StateTransitionInput {
+                    entity_id: from_entity_id,
+                    to_node: "capital:transferred_out",
+                    slot_path: "capital/holdings",
+                    reason: "capital.transfer (source)",
+                },
+                helpers::StateTransitionInput {
+                    entity_id: to_entity_id,
+                    to_node: "capital:transferred_in",
+                    slot_path: "capital/holdings",
+                    reason: "capital.transfer (target)",
+                },
+            ],
+        );
 
         Ok(VerbExecutionOutcome::Uuid(transfer_out_id.0))
     }
@@ -421,7 +439,7 @@ impl SemOsVerbOp for IssueShares {
     async fn execute(
         &self,
         args: &Value,
-        _ctx: &mut VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let share_class_id = json_get_required_uuid(args, "share-class-id")?;
@@ -460,6 +478,14 @@ impl SemOsVerbOp for IssueShares {
         .execute(scope.executor())
         .await?;
 
+        helpers::emit_pending_state_advance(
+            ctx,
+            share_class_id,
+            "capital:issued",
+            "capital/share-class",
+            "capital.issue-shares",
+        );
+
         Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
 }
@@ -479,7 +505,7 @@ impl SemOsVerbOp for CancelShares {
     async fn execute(
         &self,
         args: &Value,
-        _ctx: &mut VerbExecutionContext,
+        ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let share_class_id = json_get_required_uuid(args, "share-class-id")?;
@@ -528,6 +554,14 @@ impl SemOsVerbOp for CancelShares {
         .bind(share_class_id)
         .execute(scope.executor())
         .await?;
+
+        helpers::emit_pending_state_advance(
+            ctx,
+            share_class_id,
+            "capital:cancelled",
+            "capital/share-class",
+            "capital.cancel-shares",
+        );
 
         Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
     }
@@ -628,6 +662,14 @@ impl SemOsVerbOp for ShareClassCreate {
         .bind(authorized_units)
         .execute(scope.executor())
         .await?;
+
+        helpers::emit_pending_state_advance(
+            ctx,
+            issuer_entity_id,
+            "capital:share_class_created",
+            "capital/share-class",
+            "capital.share-class.create",
+        );
 
         Ok(VerbExecutionOutcome::Uuid(share_class_id))
     }
@@ -773,6 +815,14 @@ impl SemOsVerbOp for IssueInitial {
             .execute(scope.executor())
             .await?;
 
+        helpers::emit_pending_state_advance(
+            ctx,
+            issuer_entity_id,
+            "capital:issue_initial",
+            "capital/issuance",
+            "capital.issue.initial",
+        );
+
         Ok(VerbExecutionOutcome::Uuid(event_id))
     }
 }
@@ -862,6 +912,14 @@ impl SemOsVerbOp for IssueNew {
         .bind(event_id)
         .execute(scope.executor())
         .await?;
+
+        helpers::emit_pending_state_advance(
+            ctx,
+            issuer_entity_id,
+            "capital:issue_new",
+            "capital/issuance",
+            "capital.issue.new",
+        );
 
         Ok(VerbExecutionOutcome::Uuid(event_id))
     }
@@ -1031,6 +1089,14 @@ impl SemOsVerbOp for Split {
         .execute(scope.executor())
         .await?;
 
+        helpers::emit_pending_state_advance(
+            ctx,
+            issuer_entity_id,
+            "capital:split_executed",
+            "capital/issuance",
+            "capital.split",
+        );
+
         Ok(VerbExecutionOutcome::Uuid(event_id))
     }
 }
@@ -1109,6 +1175,14 @@ impl SemOsVerbOp for Buyback {
         .execute(scope.executor())
         .await?;
 
+        helpers::emit_pending_state_advance(
+            ctx,
+            issuer_entity_id,
+            "capital:treasury_acquired",
+            "capital/issuance",
+            "capital.buyback",
+        );
+
         Ok(VerbExecutionOutcome::Uuid(event_id))
     }
 }
@@ -1181,6 +1255,14 @@ impl SemOsVerbOp for Cancel {
         .bind(event_id)
         .execute(scope.executor())
         .await?;
+
+        helpers::emit_pending_state_advance(
+            ctx,
+            issuer_entity_id,
+            "capital:issued_cancelled",
+            "capital/issuance",
+            "capital.cancel",
+        );
 
         Ok(VerbExecutionOutcome::Uuid(event_id))
     }
