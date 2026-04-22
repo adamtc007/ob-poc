@@ -1289,121 +1289,66 @@ impl DslExecutor {
         result
     }
 
-    /// Inner verb execution logic (no event emission)
+    /// Inner verb execution logic (no event emission).
+    ///
+    /// Phase B.2b-α (2026-04-22): this is now a thin wrapper that opens a
+    /// per-verb `PgTransactionScope` and delegates to
+    /// [`Self::execute_verb_in_scope`] — the single in-scope dispatch
+    /// entry point. All three behavior variants (Plugin, Durable-direct,
+    /// Generic CRUD) are handled uniformly there. The Sequencer migration
+    /// (B.2b-ζ) replaces this per-verb scope with an outer scope threaded
+    /// from the runbook step loop, giving true cross-step atomicity.
     #[cfg(feature = "database")]
-    #[allow(clippy::too_many_arguments)]
     async fn execute_verb_inner(
         &self,
         vc: &VerbCall,
         ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
+        use crate::sequencer_tx::PgTransactionScope;
+
         tracing::debug!("execute_verb: ENTER {}.{}", vc.domain, vc.verb);
 
-        // Look up verb in runtime registry (loaded from YAML)
-        let runtime_verb = runtime_registry()
-            .get(&vc.domain, &vc.verb)
-            .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
-        tracing::debug!(
-            "execute_verb: found verb, behavior={:?}",
-            runtime_verb.behavior
-        );
-
-        // Check if this is a plugin (custom operation)
-        if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
-            tracing::debug!("execute_verb: routing to PLUGIN (SemOsVerbOp)");
-            let fqn = format!("{}.{}", vc.domain, vc.verb);
-            if let Some(ref ops) = self.sem_os_ops {
-                if let Some(op) = ops.get(&fqn) {
-                    return dispatch_plugin_via_sem_os_op(
-                        op.as_ref(),
-                        &fqn,
-                        vc,
-                        ctx,
-                        &self.pool,
-                        &self.service_registry,
-                    )
-                    .await;
-                }
-            }
-            return Err(anyhow!(
-                "Plugin {}.{} has no SemOsVerbOp registered (SemOsVerbOpRegistry \
-                 is either absent on this executor or missing the FQN). Wire \
-                 `DslExecutor::with_sem_os_ops` at host startup.",
-                vc.domain,
-                vc.verb
-            ));
-        }
-
-        // Durable verbs normally require the V2 REPL / WorkflowDispatcher
-        // infrastructure. Inside a BPMN worker, however, we may need to invoke
-        // the direct implementation of a durable verb as an internal service
-        // task without starting a nested orchestration.
-        if let RuntimeBehavior::Durable(d) = &runtime_verb.behavior {
-            if ctx.allow_durable_direct {
-                tracing::debug!(
-                    "execute_verb: allowing direct execution of durable verb {}.{} inside BPMN worker",
-                    vc.domain,
-                    vc.verb
-                );
-                let fqn = format!("{}.{}", vc.domain, vc.verb);
-                if let Some(ref ops) = self.sem_os_ops {
-                    if let Some(op) = ops.get(&fqn) {
-                        return dispatch_plugin_via_sem_os_op(
-                            op.as_ref(),
-                            &fqn,
-                            vc,
-                            ctx,
-                            &self.pool,
-                            &self.service_registry,
-                        )
-                        .await;
-                    }
-                }
-
-                return Err(anyhow!(
-                    "Durable verb {}.{} is executing inside BPMN worker but has no \
-                     SemOsVerbOp implementation registered",
-                    vc.domain,
-                    vc.verb
-                ));
-            }
-
-            return Err(anyhow!(
-                "Durable verb {}.{} (process_key={}) requires V2 REPL with WorkflowDispatcher. \
-                 Use /api/repl/v2/ endpoints instead.",
+        // Legacy per-verb scope. Phase B.2b-ζ replaces this with an outer
+        // Sequencer-owned scope threaded into `execute_verb_in_scope`.
+        let mut scope = PgTransactionScope::begin(&self.pool).await.map_err(|e| {
+            anyhow!(
+                "execute_verb({}.{}): begin txn failed: {}",
                 vc.domain,
                 vc.verb,
-                d.process_key
-            ));
-        }
+                e
+            )
+        })?;
 
-        tracing::debug!("execute_verb: routing to GENERIC executor");
+        let outcome = {
+            let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+            self.execute_verb_in_scope(vc, ctx, scope_dyn).await
+        };
 
-        // Convert VerbCall arguments to JSON for generic executor
-        let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
-        tracing::debug!(
-            "execute_verb: json_args keys={:?}",
-            json_args.keys().collect::<Vec<_>>()
-        );
-
-        // Execute via generic executor
-        let result = self
-            .generic_executor
-            .execute(runtime_verb, &json_args)
-            .await?;
-        tracing::debug!("execute_verb: generic executor returned {:?}", result);
-
-        // Handle symbol capture
-        if runtime_verb.returns.capture {
-            if let GenericExecutionResult::Uuid(uuid) = &result {
-                if let Some(name) = &runtime_verb.returns.name {
-                    ctx.bind(name, *uuid);
+        match outcome {
+            Ok(result) => {
+                scope.commit().await.map_err(|e| {
+                    anyhow!(
+                        "execute_verb({}.{}): commit failed: {}",
+                        vc.domain,
+                        vc.verb,
+                        e
+                    )
+                })?;
+                tracing::debug!("execute_verb: EXIT success {}.{}", vc.domain, vc.verb);
+                Ok(result)
+            }
+            Err(e) => {
+                if let Err(rollback_err) = scope.rollback().await {
+                    tracing::warn!(
+                        domain = %vc.domain,
+                        verb = %vc.verb,
+                        %rollback_err,
+                        "execute_verb rollback failed after op error"
+                    );
                 }
+                Err(e)
             }
         }
-
-        tracing::debug!("execute_verb: EXIT success");
-        Ok(result.to_legacy())
     }
 
     /// Convert VerbCall arguments to JSON HashMap for generic executor
@@ -1603,65 +1548,11 @@ async fn dispatch_plugin_via_sem_os_op_in_scope(
     Ok(adapter::from_verb_outcome(outcome))
 }
 
-/// Legacy wrapper that opens + commits its own `PgTransactionScope` per
-/// verb. Still the single-dispatch-site today (Phase B.2 moves all
-/// callers to [`dispatch_plugin_via_sem_os_op_in_scope`] with a
-/// Sequencer-owned outer scope).
-///
-/// Bridges between the legacy `ExecutionContext` / `VerbCall` /
-/// `ExecutionResult` types and the SemOS-native `VerbExecutionContext` /
-/// JSON args / `VerbExecutionOutcome`.
-///
-/// This wrapper:
-/// 1. Opens a `PgTransactionScope`.
-/// 2. Delegates to `dispatch_plugin_via_sem_os_op_in_scope`.
-/// 3. Commits on `Ok`.
-/// 4. Rolls back on `Err`.
-#[cfg(feature = "database")]
-async fn dispatch_plugin_via_sem_os_op(
-    op: &dyn sem_os_postgres::ops::SemOsVerbOp,
-    fqn: &str,
-    vc: &VerbCall,
-    ctx: &mut ExecutionContext,
-    pool: &PgPool,
-    services: &std::sync::Arc<dsl_runtime::ServiceRegistry>,
-) -> Result<ExecutionResult> {
-    use crate::sequencer_tx::PgTransactionScope;
-
-    // 1. Open a Sequencer-owned per-verb transaction scope. Phase B.2
-    //    replaces this with an outer scope threaded from the Sequencer's
-    //    stage-8 loop so multi-step runbooks commit atomically.
-    let mut scope = PgTransactionScope::begin(pool).await.map_err(|e| {
-        anyhow!("sem_os_op({}): begin txn failed: {}", fqn, e)
-    })?;
-
-    // 2. Dispatch against the scope.
-    let outcome = {
-        let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
-        dispatch_plugin_via_sem_os_op_in_scope(op, fqn, vc, ctx, services, scope_dyn).await
-    };
-
-    // 3/4. Commit on Ok, rollback on Err. Caller never sees the per-verb
-    //      scope; the outcome is the aggregated result.
-    match outcome {
-        Ok(result) => {
-            scope.commit().await.map_err(|e| {
-                anyhow!("sem_os_op({}): commit failed: {}", fqn, e)
-            })?;
-            Ok(result)
-        }
-        Err(e) => {
-            if let Err(rollback_err) = scope.rollback().await {
-                tracing::warn!(
-                    fqn,
-                    %rollback_err,
-                    "sem_os_op rollback failed after op error"
-                );
-            }
-            Err(e)
-        }
-    }
-}
+// Phase B.2b-α (2026-04-22): the legacy `dispatch_plugin_via_sem_os_op`
+// self-scoping wrapper was removed. Plugin dispatch now always flows
+// through `DslExecutor::execute_verb_in_scope` with a caller-owned scope;
+// the per-verb scope is opened by `execute_verb_inner` until the
+// Sequencer migration (B.2b-ζ) lands an outer scope.
 
 // ============================================================================
 // Submission Execution
@@ -1877,23 +1768,24 @@ impl DslExecutor {
         Ok(result.to_legacy())
     }
 
-    /// Phase B.2 (F6 follow-on, 2026-04-22): scope-aware variant of
-    /// `execute_verb_in_tx`. Unlike `execute_verb_in_tx`, this method:
+    /// Phase B.2 (F6 follow-on, 2026-04-22): scope-aware verb dispatch.
+    /// All three runtime behaviors route through this single entry point;
+    /// the caller owns the transaction boundary.
     ///
-    /// 1. Accepts `&mut dyn TransactionScope` — the Sequencer-owned
-    ///    scope threaded from stage 8, not a caller-owned `sqlx::Transaction`.
-    /// 2. **Dispatches plugin verbs through the scope** via
-    ///    [`dispatch_plugin_via_sem_os_op_in_scope`] (Phase B.1 primitive).
-    ///    The legacy `execute_verb_in_tx` refused plugin verbs because
-    ///    they needed their own per-verb scope; B.2 reverses that — the
-    ///    outer scope is the one the plugin uses.
-    /// 3. Runs generic verbs via `generic_executor.execute_in_tx` using
+    /// 1. **Plugin** (`RuntimeBehavior::Plugin`) → dispatches through
+    ///    [`dispatch_plugin_via_sem_os_op_in_scope`] using the ambient scope.
+    /// 2. **Durable + `ctx.allow_durable_direct`** → dispatches through the
+    ///    same in-scope plugin primitive (invoked inside BPMN workers as
+    ///    internal service tasks that must share the worker's txn).
+    /// 3. **Durable + default** → rejected; durable verbs require
+    ///    WorkflowDispatcher, not direct execution.
+    /// 4. **Generic CRUD** → runs via `generic_executor.execute_in_tx` using
     ///    `scope.transaction()` as the `&mut Transaction` handle.
     ///
-    /// Durable verbs are still rejected — they route through the BPMN
-    /// dispatcher, not the plan executor.
-    #[allow(dead_code)] // Phase B.2a: method exists; callers migrate in B.2b.
-    async fn execute_verb_in_scope(
+    /// Post B.2b-α (2026-04-22): `execute_verb_inner` delegates here by
+    /// opening a per-verb scope; the Sequencer migration (B.2b-ζ) replaces
+    /// that per-verb scope with an outer scope threaded from stage 8.
+    pub(crate) async fn execute_verb_in_scope(
         &self,
         vc: &VerbCall,
         ctx: &mut ExecutionContext,
@@ -1905,23 +1797,28 @@ impl DslExecutor {
             .get(&vc.domain, &vc.verb)
             .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
 
-        // Durable verbs cannot participate in a caller-owned scope —
-        // they route through WorkflowDispatcher instead.
+        // Durable verbs: normally routed through WorkflowDispatcher. The
+        // BPMN worker path sets `ctx.allow_durable_direct` so internal
+        // service tasks can invoke durable verb implementations directly —
+        // those share the worker's ambient scope.
+        let is_durable_direct = matches!(&runtime_verb.behavior, RuntimeBehavior::Durable(_))
+            && ctx.allow_durable_direct;
         if let RuntimeBehavior::Durable(d) = &runtime_verb.behavior {
-            return Err(anyhow!(
-                "Durable verb {}.{} (process_key={}) cannot execute inside a \
-                 Sequencer-owned TransactionScope. Durable verbs require the V2 \
-                 REPL with WorkflowDispatcher.",
-                vc.domain,
-                vc.verb,
-                d.process_key
-            ));
+            if !ctx.allow_durable_direct {
+                return Err(anyhow!(
+                    "Durable verb {}.{} (process_key={}) cannot execute inside a \
+                     Sequencer-owned TransactionScope. Durable verbs require the V2 \
+                     REPL with WorkflowDispatcher.",
+                    vc.domain,
+                    vc.verb,
+                    d.process_key
+                ));
+            }
         }
 
-        // Plugin verbs: dispatch through the in-scope primitive. This is the
-        // Phase B.2 contract — the ambient scope already exists; the plugin
-        // op runs inside it and the outer caller owns commit/rollback.
-        if let RuntimeBehavior::Plugin(_) = &runtime_verb.behavior {
+        // Plugin verbs (or durable-direct treated as plugin): dispatch
+        // through the in-scope primitive.
+        if matches!(&runtime_verb.behavior, RuntimeBehavior::Plugin(_)) || is_durable_direct {
             let fqn = format!("{}.{}", vc.domain, vc.verb);
             let sem_os_ops = self.sem_os_ops.as_ref().ok_or_else(|| {
                 anyhow!(
