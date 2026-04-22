@@ -113,15 +113,14 @@ use crate::dsl_v2::ref_resolver::ResolveResult;
 use crate::dsl_v2::syntax::parse_program;
 use crate::dsl_v2::validation::RefType;
 use crate::dsl_v2::{enrich_program, Statement};
-#[cfg(not(feature = "runbook-gate-vnext"))]
-use crate::graph::GraphScope;
+// Slice 4.1-c (2026-04-22): cfg(not(runbook-gate-vnext)) imports removed —
+// runbook-gate-vnext is now in default features so `(not ...)` paths are
+// dead code. See agent_service.rs legacy sites deleted in the same slice.
 use crate::mcp::macro_index::MacroIndex;
 use crate::mcp::scenario_index::ScenarioIndex;
 // VerbSearchResult/VerbSearchSource: removed with process_chat
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 use crate::sage::SageEngine;
-#[cfg(not(feature = "runbook-gate-vnext"))]
-use crate::session::SessionScope;
 use crate::session::{SessionEvent, SessionState, UnifiedSession, UnresolvedRefInfo};
 // Phase2Service: removed with process_chat (TOCTOU recheck in REPL orchestrator)
 use serde::{Deserialize, Serialize};
@@ -1198,148 +1197,16 @@ impl AgentService {
             .await
     }
 
-    /// Legacy execution path — bypasses runbook compilation gate.
-    ///
-    /// Retained under `#[cfg(not(feature = "runbook-gate-vnext"))]` as fallback.
-    /// When `runbook-gate-vnext` is enabled, this is dead code and `execute_via_runbook_gate`
-    /// is used instead.
-    #[cfg(not(feature = "runbook-gate-vnext"))]
-    async fn execute_resolved_dsl(
-        &self,
-        session: &mut UnifiedSession,
-        resolved_dsl: String,
-        program: crate::dsl_v2::ast::Program,
-    ) -> Result<AgentChatResponse, String> {
-        use crate::dsl_v2::execution::ExecutionContext;
-
-        let executor = self.build_dsl_executor();
-        let mut exec_ctx = ExecutionContext::new();
-        match executor.execute_dsl(&resolved_dsl, &mut exec_ctx).await {
-            Ok(results) => {
-                // Check if any result is a macro that returned combined_dsl to stage
-                for result in &results {
-                    if let crate::dsl_v2::execution::ExecutionResult::Record(json) = result {
-                        if let Some(combined_dsl) =
-                            json.get("combined_dsl").and_then(|v| v.as_str())
-                        {
-                            if !combined_dsl.is_empty() {
-                                session.run_sheet.entries.clear();
-
-                                let ast = parse_program(combined_dsl)
-                                    .map(|p| p.statements)
-                                    .unwrap_or_default();
-                                session.set_pending_dsl(combined_dsl.to_string(), ast, None, false);
-
-                                let entities_found = json
-                                    .get("entities_found")
-                                    .and_then(|v| v.as_i64())
-                                    .unwrap_or(0);
-                                let msg = json
-                                    .get("message")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("DSL batch generated");
-
-                                let response_msg = format!(
-                                    "{}\n\nStaged {} cbu.create statements. Say 'run' to execute.",
-                                    msg, entities_found
-                                );
-                                session.add_agent_message(
-                                    response_msg.clone(),
-                                    None,
-                                    Some(combined_dsl.to_string()),
-                                );
-
-                                return Ok(AgentChatResponse {
-                                    message: response_msg,
-                                    dsl_source: Some(combined_dsl.to_string()),
-                                    can_execute: true,
-                                    session_state: SessionState::ReadyToExecute,
-
-                                    ast: None,
-                                    disambiguation: None,
-                                    commands: None,
-                                    unresolved_refs: None,
-                                    current_ref_index: None,
-                                    dsl_hash: None,
-                                    verb_disambiguation: None,
-                                    intent_tier: None,
-                                    decision: None,
-                                    sage_explain: None,
-                                    coder_proposal: None,
-                                    discovery_bootstrap: None,
-                                    parked_entries: None,
-                                    onboarding_state: None,
-                                });
-                            }
-                        }
-                    }
-                }
-
-                // Normal execution - mark as executed
-                session.run_sheet.mark_all_executed();
-                self.sync_scope_from_exec_ctx(session, &mut exec_ctx);
-
-                // Record positive learning signal (non-vnext path)
-                if !results.is_empty() {
-                    let original_utterance = session
-                        .messages
-                        .iter()
-                        .rev()
-                        .find(|m| m.role == crate::session::unified::MessageRole::User)
-                        .map(|m| m.content.clone());
-
-                    if let Some(utterance) = original_utterance {
-                        let executed_verbs: Vec<String> = program
-                            .statements
-                            .iter()
-                            .filter_map(|stmt| {
-                                if let crate::dsl_v2::ast::Statement::VerbCall(vc) = stmt {
-                                    Some(vc.full_name())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-
-                        // Verb selection signal recording removed — learning routes deleted
-                        let _ = (&executed_verbs, &utterance);
-                    }
-                }
-
-                let msg = Self::narrate_execution(
-                    &session.run_sheet,
-                    results.len(),
-                    session.context.cbu_ids.len(),
-                );
-                session.add_agent_message(msg.clone(), None, None);
-                Ok(AgentChatResponse {
-                    message: msg,
-                    dsl_source: Some(resolved_dsl),
-                    can_execute: false,
-                    session_state: SessionState::Executed,
-
-                    ast: None,
-                    disambiguation: None,
-                    commands: None,
-                    unresolved_refs: None,
-                    current_ref_index: None,
-                    dsl_hash: None,
-                    verb_disambiguation: None,
-                    intent_tier: None,
-                    decision: None,
-                    sage_explain: None,
-                    coder_proposal: None,
-                    discovery_bootstrap: None,
-                    parked_entries: None,
-                    onboarding_state: None,
-                })
-            }
-            Err(e) => {
-                let msg = format!("Execution failed: {}", e);
-                Ok(self.fail(&msg, session))
-            }
-        }
-    }
+    // Slice 4.1-c (2026-04-22): legacy `execute_resolved_dsl`
+    // (the `#[cfg(not(feature = "runbook-gate-vnext"))]` path) has been
+    // deleted. Under runbook-gate-vnext (now always on via default
+    // features, Slice 4.1), all Chat API execution compiles into a
+    // CompiledRunbook and dispatches through execute_runbook() via
+    // `execute_via_runbook_gate`. The legacy DslExecutor::execute_dsl
+    // direct path is no longer reachable; its function body (~130
+    // lines covering macro-staged combined_dsl, mark_all_executed,
+    // legacy narration, and sync_scope_from_exec_ctx) was removed
+    // in commit 43eb3fed's follow-up.
 
     /// Runbook-gated execution path (INV-1, INV-11).
     ///
@@ -1651,47 +1518,10 @@ impl AgentService {
         })
     }
 
-    /// Sync scope from execution context into session (legacy path only).
-    #[cfg(not(feature = "runbook-gate-vnext"))]
-    fn sync_scope_from_exec_ctx(
-        &self,
-        session: &mut UnifiedSession,
-        exec_ctx: &mut crate::dsl_v2::execution::ExecutionContext,
-    ) {
-        if let Some(unified_session) = exec_ctx.take_pending_session() {
-            let loaded = unified_session.cbu_ids_vec();
-            let cbu_count = loaded.len();
-
-            for cbu_id in &loaded {
-                if !session.context.cbu_ids.contains(cbu_id) {
-                    session.context.cbu_ids.push(*cbu_id);
-                }
-            }
-
-            let scope_def = if cbu_count == 1 {
-                GraphScope::SingleCbu {
-                    cbu_id: loaded[0],
-                    cbu_name: unified_session.name.clone().unwrap_or_default(),
-                }
-            } else if cbu_count > 1 {
-                GraphScope::Custom {
-                    description: unified_session
-                        .name
-                        .clone()
-                        .unwrap_or_else(|| format!("{} CBUs", cbu_count)),
-                }
-            } else {
-                GraphScope::Empty
-            };
-
-            session.context.scope = Some(SessionScope::from_graph_scope(scope_def));
-            tracing::info!(
-                "[EXEC] Set context.scope with {} CBUs, scope_type={:?}",
-                cbu_count,
-                session.context.scope.as_ref().map(|s| &s.definition)
-            );
-        }
-    }
+    // Slice 4.1-c (2026-04-22): `sync_scope_from_exec_ctx` deleted.
+    // It was called only from the legacy `execute_resolved_dsl` path
+    // (now removed) and threaded `GraphScope` / `SessionScope` types
+    // whose imports were already stripped in the cfg(not) cleanup.
 
     /// Recursively resolve EntityRefs in an AST node
     async fn resolve_ast_node(&self, node: &mut AstNode) {
