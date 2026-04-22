@@ -118,12 +118,12 @@ impl SemOsVerbOp for SourcesSearch {
     fn fqn(&self) -> &str {
         "research.sources.search"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
         let query = json_extract_string_opt(args, "query")
@@ -165,6 +165,25 @@ impl SemOsVerbOp for SourcesSearch {
             })
             .collect();
 
+        Ok(Some(serde_json::json!({ "_sources_search_results": results })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_sources_search_results")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sources.search: pre_fetch result missing \
+                     (`_sources_search_results` absent from args)"
+                )
+            })?;
         Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
@@ -177,19 +196,18 @@ impl SemOsVerbOp for SourcesFetch {
     fn fqn(&self) -> &str {
         "research.sources.fetch"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
         let key = json_extract_string_opt(args, "key")
             .ok_or_else(|| anyhow::anyhow!(":key required"))?;
         let include_raw = json_extract_bool_opt(args, "include-raw").unwrap_or(false);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
-        let pool = scope.pool().clone();
 
         let registry = build_source_registry();
 
@@ -197,7 +215,6 @@ impl SemOsVerbOp for SourcesFetch {
             .get(&source_id)
             .ok_or_else(|| anyhow::anyhow!("Source not found: {}", source_id))?;
 
-        // Validate key format
         if !source.validate_key(&key) {
             return Err(anyhow::anyhow!(
                 "Invalid key format for {}: {}",
@@ -215,11 +232,30 @@ impl SemOsVerbOp for SourcesFetch {
         }
 
         let entity = source.fetch_entity(&key, Some(options)).await?;
-
         let result = normalized_entity_to_json(&entity);
 
-        // Log research action if decision-id provided
+        Ok(Some(serde_json::json!({ "_sources_fetched_entity": result })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_sources_fetched_entity").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "sources.fetch: pre_fetch result missing \
+                 (`_sources_fetched_entity` absent from args)"
+            )
+        })?;
+
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         if let Some(dec_id) = decision_id {
+            // `source_id` is needed for the log tag; re-read from args.
+            let source_id = json_extract_string_opt(args, "source-id")
+                .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
+            let pool = scope.pool().clone();
             log_research_action(&pool, dec_id, &format!("{}:fetch", source_id), &result, 0, 0)
                 .await?;
         }
@@ -289,12 +325,15 @@ impl SemOsVerbOp for CompaniesHouseSearch {
     fn fqn(&self) -> &str {
         "research.companies-house.search"
     }
-    async fn execute(
+
+    /// Phase F.2 (ledger §3.2, 2026-04-22): HTTP call moved to pre_fetch.
+    /// Executes outside the transaction scope; result is serialized into
+    /// args under `_search_results` for `execute` to hand back.
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let query = json_extract_string_opt(args, "query")
             .ok_or_else(|| anyhow::anyhow!(":query required"))?;
         let limit = json_extract_int_opt(args, "limit").map(|l| l as usize);
@@ -325,6 +364,25 @@ impl SemOsVerbOp for CompaniesHouseSearch {
             })
             .collect();
 
+        Ok(Some(serde_json::json!({ "_search_results": results })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_search_results")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "companies-house.search: pre_fetch result missing \
+                     (`_search_results` absent from args)"
+                )
+            })?;
         Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
@@ -337,16 +395,18 @@ impl SemOsVerbOp for CompaniesHouseFetchCompany {
     fn fqn(&self) -> &str {
         "research.companies-house.fetch-company"
     }
-    async fn execute(
+
+    /// Phase F.2 (2026-04-22): HTTP fetch moves to pre_fetch; the DB log
+    /// (log_research_action) stays in execute so it shares the inner
+    /// transaction scope.
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
-        let pool = scope.pool().clone();
 
         let loader = CompaniesHouseLoader::from_env()?;
 
@@ -358,8 +418,25 @@ impl SemOsVerbOp for CompaniesHouseFetchCompany {
         let entity = loader.fetch_entity(&company_number, Some(options)).await?;
         let result = normalized_entity_to_json(&entity);
 
-        // Log research action if decision-id provided
+        Ok(Some(serde_json::json!({ "_fetched_entity": result })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_fetched_entity").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "companies-house.fetch-company: pre_fetch result missing \
+                 (`_fetched_entity` absent from args)"
+            )
+        })?;
+
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         if let Some(dec_id) = decision_id {
+            let pool = scope.pool().clone();
             log_research_action(&pool, dec_id, "companies-house:fetch-company", &result, 0, 0)
                 .await?;
         }
@@ -376,17 +453,16 @@ impl SemOsVerbOp for CompaniesHouseFetchPsc {
     fn fqn(&self) -> &str {
         "research.companies-house.fetch-psc"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
         let include_ceased = json_extract_bool_opt(args, "include-ceased").unwrap_or(false);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
-        let pool = scope.pool().clone();
 
         let loader = CompaniesHouseLoader::from_env()?;
 
@@ -420,8 +496,29 @@ impl SemOsVerbOp for CompaniesHouseFetchPsc {
             })
             .collect();
 
-        // Log research action if decision-id provided
+        Ok(Some(serde_json::json!({ "_psc_holders": results })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_psc_holders")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "companies-house.fetch-psc: pre_fetch result missing \
+                     (`_psc_holders` absent from args)"
+                )
+            })?;
+
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         if let Some(dec_id) = decision_id {
+            let pool = scope.pool().clone();
             log_research_action(
                 &pool,
                 dec_id,
@@ -445,12 +542,12 @@ impl SemOsVerbOp for CompaniesHouseFetchOfficers {
     fn fqn(&self) -> &str {
         "research.companies-house.fetch-officers"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
         let include_resigned = json_extract_bool_opt(args, "include-resigned").unwrap_or(false);
@@ -481,6 +578,25 @@ impl SemOsVerbOp for CompaniesHouseFetchOfficers {
             })
             .collect();
 
+        Ok(Some(serde_json::json!({ "_officers": results })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_officers")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "companies-house.fetch-officers: pre_fetch result missing \
+                     (`_officers` absent from args)"
+                )
+            })?;
         Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
@@ -493,6 +609,55 @@ impl SemOsVerbOp for CompaniesHouseImportCompany {
     fn fqn(&self) -> &str {
         "research.companies-house.import-company"
     }
+
+    /// Phase F.2: ALL external HTTP (entity + optional PSC + optional
+    /// officers) runs in pre_fetch. DB writes (create_entity,
+    /// log_research_action) stay in execute where they share the inner
+    /// transaction scope.
+    async fn pre_fetch(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+    ) -> Result<Option<serde_json::Value>> {
+        let company_number = json_extract_string_opt(args, "company-number")
+            .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
+        let include_psc = json_extract_bool_opt(args, "include-psc").unwrap_or(true);
+        let include_officers = json_extract_bool_opt(args, "include-officers").unwrap_or(false);
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+
+        let loader = CompaniesHouseLoader::from_env()?;
+
+        let mut options = FetchOptions::new();
+        if let Some(dec_id) = decision_id {
+            options = options.with_decision_id(dec_id);
+        }
+        let entity = loader.fetch_entity(&company_number, Some(options)).await?;
+
+        let mut psc_count = 0;
+        if include_psc {
+            let psc_options = FetchControlHoldersOptions::new();
+            let holders = loader
+                .fetch_control_holders(&company_number, Some(psc_options))
+                .await?;
+            psc_count = holders.len();
+        }
+
+        let mut officer_count = 0;
+        if include_officers {
+            let officer_options = FetchOfficersOptions::new();
+            let officers = loader
+                .fetch_officers(&company_number, Some(officer_options))
+                .await?;
+            officer_count = officers.len();
+        }
+
+        Ok(Some(serde_json::json!({
+            "_ch_import_entity": serde_json::to_value(&entity)?,
+            "_ch_import_psc_count": psc_count,
+            "_ch_import_officer_count": officer_count,
+        })))
+    }
+
     async fn execute(
         &self,
         args: &serde_json::Value,
@@ -501,45 +666,29 @@ impl SemOsVerbOp for CompaniesHouseImportCompany {
     ) -> Result<VerbExecutionOutcome> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
-        let include_psc = json_extract_bool_opt(args, "include-psc").unwrap_or(true);
-        let include_officers = json_extract_bool_opt(args, "include-officers").unwrap_or(false);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         let pool = scope.pool().clone();
 
-        let loader = CompaniesHouseLoader::from_env()?;
+        let entity: crate::research::sources::normalized::NormalizedEntity = args
+            .get("_ch_import_entity")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "companies-house.import-company: pre_fetch result missing \
+                     (`_ch_import_entity` absent from args)"
+                )
+            })??;
+        let psc_count = args
+            .get("_ch_import_psc_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
+        let officer_count = args
+            .get("_ch_import_officer_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
 
-        // Fetch company
-        let mut options = FetchOptions::new();
-        if let Some(dec_id) = decision_id {
-            options = options.with_decision_id(dec_id);
-        }
-        let entity = loader.fetch_entity(&company_number, Some(options)).await?;
-
-        // Create entity in database
         let entity_id = create_entity_from_normalized(&pool, &entity).await?;
-
-        let mut psc_count = 0;
-        let mut officer_count = 0;
-
-        // Optionally import PSC
-        if include_psc {
-            let psc_options = FetchControlHoldersOptions::new();
-            let holders = loader
-                .fetch_control_holders(&company_number, Some(psc_options))
-                .await?;
-            psc_count = holders.len();
-            // TODO: Create PSC relationships in database
-        }
-
-        // Optionally import officers
-        if include_officers {
-            let officer_options = FetchOfficersOptions::new();
-            let officers = loader
-                .fetch_officers(&company_number, Some(officer_options))
-                .await?;
-            officer_count = officers.len();
-            // TODO: Create officer relationships in database
-        }
 
         let result = serde_json::json!({
             "entity_id": entity_id,
@@ -578,12 +727,12 @@ impl SemOsVerbOp for SecEdgarSearch {
     fn fqn(&self) -> &str {
         "research.sec-edgar.search"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let query = json_extract_string_opt(args, "query")
             .ok_or_else(|| anyhow::anyhow!(":query required"))?;
         let limit = json_extract_int_opt(args, "limit").map(|l| l as usize);
@@ -609,6 +758,25 @@ impl SemOsVerbOp for SecEdgarSearch {
             })
             .collect();
 
+        Ok(Some(serde_json::json!({ "_sec_search_results": results })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_sec_search_results")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sec-edgar.search: pre_fetch result missing \
+                     (`_sec_search_results` absent from args)"
+                )
+            })?;
         Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
@@ -621,16 +789,15 @@ impl SemOsVerbOp for SecEdgarFetchCompany {
     fn fqn(&self) -> &str {
         "research.sec-edgar.fetch-company"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
-        let pool = scope.pool().clone();
 
         let loader = SecEdgarLoader::new()?;
 
@@ -642,8 +809,25 @@ impl SemOsVerbOp for SecEdgarFetchCompany {
         let entity = loader.fetch_entity(&cik, Some(options)).await?;
         let result = normalized_entity_to_json(&entity);
 
-        // Log research action if decision-id provided
+        Ok(Some(serde_json::json!({ "_sec_fetched_entity": result })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_sec_fetched_entity").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "sec-edgar.fetch-company: pre_fetch result missing \
+                 (`_sec_fetched_entity` absent from args)"
+            )
+        })?;
+
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         if let Some(dec_id) = decision_id {
+            let pool = scope.pool().clone();
             log_research_action(&pool, dec_id, "sec-edgar:fetch-company", &result, 0, 0).await?;
         }
 
@@ -659,18 +843,17 @@ impl SemOsVerbOp for SecEdgarFetchBeneficialOwners {
     fn fqn(&self) -> &str {
         "research.sec-edgar.fetch-beneficial-owners"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let _include_13d = json_extract_bool_opt(args, "include-13d").unwrap_or(true);
         let _include_13g = json_extract_bool_opt(args, "include-13g").unwrap_or(true);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
-        let pool = scope.pool().clone();
 
         let loader = SecEdgarLoader::new()?;
 
@@ -695,8 +878,29 @@ impl SemOsVerbOp for SecEdgarFetchBeneficialOwners {
             })
             .collect();
 
-        // Log research action if decision-id provided
+        Ok(Some(serde_json::json!({ "_sec_beneficial_owners": results })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_sec_beneficial_owners")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sec-edgar.fetch-beneficial-owners: pre_fetch result missing \
+                     (`_sec_beneficial_owners` absent from args)"
+                )
+            })?;
+
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         if let Some(dec_id) = decision_id {
+            let pool = scope.pool().clone();
             log_research_action(
                 &pool,
                 dec_id,
@@ -720,17 +924,16 @@ impl SemOsVerbOp for SecEdgarFetchFilings {
     fn fqn(&self) -> &str {
         "research.sec-edgar.fetch-filings"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let _limit = json_extract_int_opt(args, "limit").unwrap_or(50);
 
-        // For now, fetch entity and return filing summary from raw_response
         let loader = SecEdgarLoader::new()?;
 
         let options = FetchOptions::new().with_raw();
@@ -744,6 +947,21 @@ impl SemOsVerbOp for SecEdgarFetchFilings {
             .cloned()
             .unwrap_or_else(|| serde_json::json!([]));
 
+        Ok(Some(serde_json::json!({ "_sec_filings": filings })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let filings = args.get("_sec_filings").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "sec-edgar.fetch-filings: pre_fetch result missing \
+                 (`_sec_filings` absent from args)"
+            )
+        })?;
         Ok(VerbExecutionOutcome::Record(
             serde_json::json!({ "filings": filings }),
         ))
@@ -758,6 +976,41 @@ impl SemOsVerbOp for SecEdgarImportCompany {
     fn fqn(&self) -> &str {
         "research.sec-edgar.import-company"
     }
+
+    /// Phase F.2: HTTP fetches (entity + optional BO) in pre_fetch; DB
+    /// writes (create_entity, log_research_action) in execute.
+    async fn pre_fetch(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+    ) -> Result<Option<serde_json::Value>> {
+        let cik = json_extract_string_opt(args, "cik")
+            .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+        let include_beneficial_owners =
+            json_extract_bool_opt(args, "include-beneficial-owners").unwrap_or(true);
+        let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+
+        let loader = SecEdgarLoader::new()?;
+
+        let mut options = FetchOptions::new();
+        if let Some(dec_id) = decision_id {
+            options = options.with_decision_id(dec_id);
+        }
+        let entity = loader.fetch_entity(&cik, Some(options)).await?;
+
+        let mut bo_count = 0;
+        if include_beneficial_owners {
+            let bo_options = FetchControlHoldersOptions::new();
+            let holders = loader.fetch_control_holders(&cik, Some(bo_options)).await?;
+            bo_count = holders.len();
+        }
+
+        Ok(Some(serde_json::json!({
+            "_sec_import_entity": serde_json::to_value(&entity)?,
+            "_sec_import_bo_count": bo_count,
+        })))
+    }
+
     async fn execute(
         &self,
         args: &serde_json::Value,
@@ -766,32 +1019,25 @@ impl SemOsVerbOp for SecEdgarImportCompany {
     ) -> Result<VerbExecutionOutcome> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
-        let include_beneficial_owners =
-            json_extract_bool_opt(args, "include-beneficial-owners").unwrap_or(true);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         let pool = scope.pool().clone();
 
-        let loader = SecEdgarLoader::new()?;
+        let entity: crate::research::sources::normalized::NormalizedEntity = args
+            .get("_sec_import_entity")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sec-edgar.import-company: pre_fetch result missing \
+                     (`_sec_import_entity` absent from args)"
+                )
+            })??;
+        let bo_count = args
+            .get("_sec_import_bo_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
 
-        // Fetch company
-        let mut options = FetchOptions::new();
-        if let Some(dec_id) = decision_id {
-            options = options.with_decision_id(dec_id);
-        }
-        let entity = loader.fetch_entity(&cik, Some(options)).await?;
-
-        // Create entity in database
         let entity_id = create_entity_from_normalized(&pool, &entity).await?;
-
-        let mut bo_count = 0;
-
-        // Optionally import beneficial owners
-        if include_beneficial_owners {
-            let bo_options = FetchControlHoldersOptions::new();
-            let holders = loader.fetch_control_holders(&cik, Some(bo_options)).await?;
-            bo_count = holders.len();
-            // TODO: Create BO relationships in database
-        }
 
         let result = serde_json::json!({
             "entity_id": entity_id,
@@ -800,7 +1046,6 @@ impl SemOsVerbOp for SecEdgarImportCompany {
             "beneficial_owners_imported": bo_count,
         });
 
-        // Log research action if decision-id provided
         if let Some(dec_id) = decision_id {
             log_research_action(&pool, dec_id, "sec-edgar:import-company", &result, 1, 0).await?;
         }

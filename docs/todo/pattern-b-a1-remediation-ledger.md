@@ -105,24 +105,43 @@ Per **Decision D11 (2026-04-18, Option III)**, these are grandfathered into the 
 - [ ] Integration test: BPMN compile → instance_id returned via callback; signal/cancel round-trip; inspect returns fresh data.
 - [ ] Row above moves to **CLOSED**.
 
-### 3.2 File: `source_loader_ops.rs` — 16 ops
+### 3.2 File: `source_loader_ops.rs` — 15 ops (3 pure-config + 12 HTTP)
 
-All 16 instantiate external HTTP loaders (`CompaniesHouseLoader`, `GleifLoader`, `SecEdgarLoader`) and call `.search()` / `.fetch_entity()` / `.fetch_control_holders()` inside `execute_json`.
+Originally listed as 16 ops; the actual count is 15 — 3 pure-config ops
+(`SourcesList`, `SourcesInfo`, `SourcesFindForJurisdiction`) have no I/O
+and need no remediation.
 
-| sub-group | ops | resolution |
-|---|---|---|
-| Search ops (return candidate lists) | 4 ops (CH search, SEC search, …) | **Pre-fetch at stage 5.** Fetch happens during intent resolution; results passed into verb envelope args. No txn wraps the HTTP call. |
-| Fetch-entity ops (retrieve + persist) | 8 ops | **Split fetch-then-persist.** Each op restructures: (a) HTTP fetch phase (no txn), (b) txn opens, (c) DB persist phase. Cleaner than outbox for these because persist is the domain interest and must be synchronous with the user flow. |
-| Fetch-control-holders ops (retrieve + derive graph) | 4 ops | Same split-phase treatment. |
+All 12 I/O ops remediated via pre_fetch (2026-04-22, Phase F.2):
 
-**Completion criteria for source_loader_ops.rs:**
+| op | HTTP call | pre_fetch result key | status |
+|---|---|---|---|
+| `SourcesSearch` | `source.search(...)` | `_sources_search_results` | **CLOSED** |
+| `SourcesFetch` | `source.fetch_entity(...)` | `_sources_fetched_entity` | **CLOSED** |
+| `CompaniesHouseSearch` | `loader.search(...)` | `_search_results` | **CLOSED** |
+| `CompaniesHouseFetchCompany` | `loader.fetch_entity(...)` | `_fetched_entity` | **CLOSED** |
+| `CompaniesHouseFetchPsc` | `loader.fetch_control_holders(...)` | `_psc_holders` | **CLOSED** |
+| `CompaniesHouseFetchOfficers` | `loader.fetch_officers(...)` | `_officers` | **CLOSED** |
+| `CompaniesHouseImportCompany` | entity + PSC + officers | `_ch_import_entity/_psc_count/_officer_count` | **CLOSED** |
+| `SecEdgarSearch` | `loader.search(...)` | `_sec_search_results` | **CLOSED** |
+| `SecEdgarFetchCompany` | `loader.fetch_entity(...)` | `_sec_fetched_entity` | **CLOSED** |
+| `SecEdgarFetchBeneficialOwners` | `loader.fetch_control_holders(...)` | `_sec_beneficial_owners` | **CLOSED** |
+| `SecEdgarFetchFilings` | `loader.fetch_entity(... raw)` | `_sec_filings` | **CLOSED** |
+| `SecEdgarImportCompany` | entity + BO | `_sec_import_entity/_bo_count` | **CLOSED** |
 
-- [ ] Every op either: (a) routes HTTP fetch through pre-txn stage 5 pre-fetch, or (b) splits its body into pre-txn fetch + in-txn persist, with the HTTP call demonstrably outside the Sequencer-opened transaction.
-- [ ] HTTP calls inside execute_json bodies: **zero** (lint L4).
-- [ ] Integration tests for each op: state before/after identical to current behaviour; timing shows HTTP happens before `BEGIN`.
-- [ ] Row above moves to **CLOSED**.
+**Pattern used:** the `SemOsVerbOp::pre_fetch` hook added in Phase F.1.
+`pre_fetch` performs the HTTP call and stores the formatted result under
+a file-unique key in the returned JSON object; the dispatcher merges it
+into `args` before opening the transaction scope. `execute` reads the
+pre-fetched data from args (zero I/O), does any DB work (create entity,
+log research action), and returns.
 
-**Status:** 0/16 ops remediated. **OPEN.**
+For Import ops the pattern is richer: HTTP fetch + optional dependent
+HTTP fetches (PSC, officers, beneficial owners) all run in pre_fetch
+under a single outer HTTP phase. DB writes (`create_entity_from_normalized`
+and `log_research_action`) stay in execute, sharing the inner txn scope.
+
+**Status:** 12/12 I/O ops remediated (3 pure-config ops trivially CLOSED).
+Row moves to **CLOSED 2026-04-22**.
 
 ### 3.3 File: `gleif_ops.rs` — 17 ops
 
