@@ -1106,6 +1106,27 @@ pub async fn execute_runbook_with_pool(
 /// to `DslExecutorV2`. In tests, a stub implementation can be used.
 #[async_trait::async_trait]
 pub trait StepExecutor: Send + Sync {
+    /// Scope-aware step execution (Phase B.2b-δ, 2026-04-22).
+    ///
+    /// Routes dispatch through a caller-owned `TransactionScope` —
+    /// the Sequencer (B.2b-ζ) opens one scope per runbook and passes
+    /// it into every step, so the whole runbook commits atomically
+    /// or rolls back together.
+    ///
+    /// The default implementation ignores the scope and delegates to
+    /// `execute_step`. Stubs that don't touch the DB (SuccessExecutor,
+    /// FailureExecutor, ParkOnVerb) don't need to override. Production
+    /// bridges (DslStepExecutor) override it.
+    ///
+    /// Caller owns scope lifetime: this method does NOT begin, commit,
+    /// or roll back the scope.
+    async fn execute_step_in_scope(
+        &self,
+        step: &CompiledStep,
+        _scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    ) -> StepOutcome {
+        self.execute_step(step).await
+    }
     /// Execute a single compiled step and return the outcome.
     async fn execute_step(&self, step: &CompiledStep) -> StepOutcome;
 }

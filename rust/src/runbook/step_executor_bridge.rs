@@ -45,6 +45,20 @@ impl super::executor::StepExecutor for DslStepExecutor {
             Err(error) => StepOutcome::Failed { error },
         }
     }
+
+    /// Phase B.2b-δ (2026-04-22): routes step execution through the
+    /// caller-owned scope so the runbook executor's outer scope (B.2b-ε)
+    /// is shared across every step.
+    async fn execute_step_in_scope(
+        &self,
+        step: &CompiledStep,
+        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    ) -> StepOutcome {
+        match self.executor.execute_in_scope(&step.dsl, scope).await {
+            Ok(result) => StepOutcome::Completed { result },
+            Err(error) => StepOutcome::Failed { error },
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
