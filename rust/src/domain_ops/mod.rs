@@ -583,6 +583,14 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // crate::database::derive_semantic_state + crate::ontology::SemanticStageRegistry
     // + crate::dsl_v2::executor::DslExecutor).
     registry.register(Arc::new(onboarding::OnboardingAutoComplete));
+
+    // Phase B Pattern B slice #73: bpmn.* gRPC pass-through verbs
+    // (bridges to crate::bpmn_integration::client).
+    registry.register(Arc::new(bpmn_lite_ops::BpmnCompile));
+    registry.register(Arc::new(bpmn_lite_ops::BpmnStart));
+    registry.register(Arc::new(bpmn_lite_ops::BpmnSignal));
+    registry.register(Arc::new(bpmn_lite_ops::BpmnCancel));
+    registry.register(Arc::new(bpmn_lite_ops::BpmnInspect));
 }
 
 #[cfg(test)]
