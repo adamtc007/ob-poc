@@ -1355,8 +1355,11 @@ fn infer_pk_column(table: &str) -> &str {
 }
 
 /// Resolve entity type code from CRUD config or args.
+///
+/// Slice 8.1 (2026-04-22): `crud` parameter prefixed with `_` — reserved
+/// for future `type_code` support from YAML mapping; not yet consumed.
 fn resolve_entity_type_code(
-    crud: &VerbCrudMapping,
+    _crud: &VerbCrudMapping,
     args: &serde_json::Map<String, serde_json::Value>,
 ) -> crate::Result<String> {
     // 1. Explicit type_code in config (not currently in VerbCrudMapping — future)

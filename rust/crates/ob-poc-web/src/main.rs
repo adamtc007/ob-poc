@@ -772,6 +772,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "SemOsVerbOpRegistry initialised"
     );
 
+    // F3 fix (Slice 2.2): drift-check the registry against every YAML plugin
+    // verb BEFORE serving traffic. Missing registrations → panic. This is
+    // the same computation `test_plugin_verb_coverage` runs in CI, so
+    // startup and tests can never diverge on what "covered" means.
+    {
+        let missing = ob_poc::domain_ops::find_missing_plugin_ops(&sem_os_ops);
+        if !missing.is_empty() {
+            panic!(
+                "FATAL: {} YAML plugin verb(s) have no SemOsVerbOp registered. \
+                 Plugin dispatch for these verbs will hard-fail at runtime. \
+                 Wire them in `sem_os_postgres::ops::build_registry()` or \
+                 `ob_poc::domain_ops::extend_registry()`. Missing FQNs: {:?}",
+                missing.len(),
+                missing
+            );
+        }
+        tracing::info!("SemOsVerbOpRegistry coverage check passed — every YAML plugin verb has a handler");
+    }
+
     // =========================================================================
     // BPMN-Lite Integration (before REPL V2 — determines executor)
     // =========================================================================
@@ -1311,6 +1330,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sessions.clone(),
         sem_os_client.clone(),
         Some(repl_v2_orchestrator),
+        // F1 fix (Slice 2.1b): thread the canonical SemOS plugin op registry
+        // and platform service registry so the agent chat / legacy DSL paths
+        // dispatch plugin verbs correctly (post-Phase-5c-migrate slice #80).
+        Some(sem_os_ops.clone()),
+        Some(service_registry.clone()),
     )
     .await;
 

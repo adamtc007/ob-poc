@@ -10,7 +10,8 @@
 //!   DATABASE_URL=postgresql:///data_designer \
 //!   cargo test --features database --test bpmn_integration_test -- --ignored --nocapture
 //! ```
-#![cfg(all(feature = "database", feature = "vnext-repl"))]
+// Slice 4.2 (2026-04-22): `vnext-repl` feature removed; gate simplified to `database`.
+#![cfg(feature = "database")]
 
 use std::collections::HashMap;
 use std::sync::Arc;

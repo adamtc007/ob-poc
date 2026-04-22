@@ -21,6 +21,33 @@ async fn main() -> Result<()> {
     let candle = CandleEmbedder::new()?;
     let embedder: Arc<dyn Embedder> = Arc::new(CachedEmbedder::new(Arc::new(candle)));
 
-    let server = McpServer::new(pool, embedder);
+    // F1 fix (Slice 2.1): build the canonical SemOS plugin op registry and
+    // thread it into the server so `dsl_execute` / `dsl_execute_submission`
+    // can dispatch plugin verbs post-Phase-5c-migrate slice #80.
+    let sem_os_ops = {
+        let mut reg = sem_os_postgres::ops::build_registry();
+        ob_poc::domain_ops::extend_registry(&mut reg);
+        Arc::new(reg)
+    };
+    eprintln!(
+        "[dsl_mcp] SemOsVerbOpRegistry initialised with {} plugin ops",
+        sem_os_ops.len()
+    );
+
+    // F3 fix (Slice 2.2): drift-check the registry against every YAML plugin
+    // verb BEFORE serving MCP traffic. Missing registrations → panic.
+    {
+        let missing = ob_poc::domain_ops::find_missing_plugin_ops(&sem_os_ops);
+        if !missing.is_empty() {
+            panic!(
+                "FATAL: {} YAML plugin verb(s) have no SemOsVerbOp registered. \
+                 Missing FQNs: {:?}",
+                missing.len(),
+                missing
+            );
+        }
+    }
+
+    let server = McpServer::new(pool, embedder).with_sem_os_ops(sem_os_ops);
     server.run().await
 }

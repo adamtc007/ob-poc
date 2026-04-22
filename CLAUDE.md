@@ -491,7 +491,8 @@ SEM_OS_DATABASE_URL="postgresql:///..."      # For standalone sem_os_server
 SEM_OS_JWT_SECRET=dev-secret                 # JWT for sem_os_server
 OBPOC_STRICT_SINGLE_PIPELINE=true            # PolicyGate (default: true)
 OBPOC_STRICT_SEMREG=true                     # SemReg fail-closed (default: true)
-OBPOC_ALLOW_RAW_EXECUTE=false                # Allow /execute with raw DSL
+# OBPOC_ALLOW_RAW_EXECUTE removed 2026-04-22 (Slice 3.1) — raw DSL in request
+# bodies is now always rejected; no flag can reopen the bypass.
 SAGE_FAST_PATH=1                             # Read+structure fast path
 BRAVE_SEARCH_API_KEY="..."                   # Research macros
 ```

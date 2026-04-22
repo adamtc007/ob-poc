@@ -23,8 +23,7 @@ use crate::database::generation_log_repository::{
 };
 use crate::database::VisualizationRepository;
 use crate::dsl_v2::execution::{
-    runtime_registry, AtomicExecutionResult, BestEffortExecutionResult, DslExecutor,
-    ExecutionContext,
+    runtime_registry, AtomicExecutionResult, BestEffortExecutionResult, ExecutionContext,
 };
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::dsl_v2::planning::compile;
@@ -83,7 +82,10 @@ macro_rules! tool_name_enum {
 tool_name_enum! {
     DslValidate             => "dsl_validate",
     DslExecute              => "dsl_execute",
-    DslExecuteSubmission    => "dsl_execute_submission",
+    // F19 fix (Slice 5.1, 2026-04-22): `dsl_execute_submission` removed.
+    // It was a second MCP tool that executed DSL without a session context,
+    // making its SemOS envelope computation permissive (`None` session).
+    // Callers now use `dsl_execute` with an explicit session binding.
     DslBind                 => "dsl_bind",
     DslPlan                 => "dsl_plan",
     VerbSearch              => "verb_search",
@@ -227,6 +229,12 @@ pub struct ToolHandlers {
     pub(super) sem_os_service: Option<Arc<dyn sem_os_core::service::CoreService>>,
     /// Authoring pipeline mode (Research vs Governed) — controls db_introspect surface.
     pub(super) agent_mode: sem_os_core::authoring::agent_mode::AgentMode,
+    /// Canonical SemOS plugin op registry threaded into every inner
+    /// `DslExecutor` constructed by these handlers. Required for plugin
+    /// dispatch post-Phase-5c-migrate slice #80 — without it, plugin verbs
+    /// inside `dsl_execute` / `dsl_execute_submission` fail with the
+    /// actionable "no SemOsVerbOp registered" error.
+    pub(super) sem_os_ops: Option<Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>>,
 }
 
 impl ToolHandlers {
@@ -251,6 +259,7 @@ impl ToolHandlers {
             sem_os_client: None,
             sem_os_service: None,
             agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
+            sem_os_ops: None,
         }
     }
 
@@ -297,6 +306,29 @@ impl ToolHandlers {
     ) -> Self {
         self.sem_os_service = Some(service);
         self
+    }
+
+    /// Install the canonical SemOS plugin op registry. Threaded into every
+    /// inner `DslExecutor` these handlers construct so plugin verbs dispatch
+    /// correctly (post-Phase-5c-migrate slice #80).
+    pub fn with_sem_os_ops(
+        mut self,
+        ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>,
+    ) -> Self {
+        self.sem_os_ops = Some(ops);
+        self
+    }
+
+    /// Build an inner `DslExecutor` with the canonical SemOS plugin op
+    /// registry pre-installed. All handler-local executor construction MUST
+    /// flow through this helper — raw `DslExecutor::new(self.pool.clone())`
+    /// at a tool handler would hard-fail on plugin dispatch.
+    pub(super) fn build_dsl_executor(&self) -> crate::dsl_v2::execution::DslExecutor {
+        let mut executor = crate::dsl_v2::execution::DslExecutor::new(self.pool.clone());
+        if let Some(ref ops) = self.sem_os_ops {
+            executor = executor.with_sem_os_ops(ops.clone());
+        }
+        executor
     }
 
     /// Get the session store, or error if not configured
@@ -422,7 +454,7 @@ impl ToolHandlers {
         match tool {
             ToolName::DslValidate => self.dsl_validate(args).await,
             ToolName::DslExecute => self.dsl_execute(args).await,
-            ToolName::DslExecuteSubmission => self.dsl_execute_submission(args).await,
+            // F19 fix (Slice 5.1, 2026-04-22): DslExecuteSubmission removed.
             ToolName::DslBind => self.dsl_bind(args).await,
             ToolName::DslPlan => self.dsl_plan(args).await,
             ToolName::VerbSearch => self.verb_search(args).await,
@@ -998,7 +1030,7 @@ impl ToolHandlers {
         // =====================================================================
         // EXECUTE - Route based on batch policy
         // =====================================================================
-        let executor = DslExecutor::new(self.pool.clone());
+        let executor = self.build_dsl_executor();
         let mut ctx = ExecutionContext::new();
 
         // Execute based on batch policy
@@ -1258,160 +1290,10 @@ impl ToolHandlers {
         }
     }
 
-    /// Execute DSL using the unified submission model
-    ///
-    /// Supports:
-    /// - Singleton execution (one UUID per symbol)
-    /// - Batch execution (multiple UUIDs for one symbol)
-    /// - Draft state (unresolved symbols, can bind later)
-    async fn dsl_execute_submission(&self, args: Value) -> Result<Value> {
-        use crate::dsl_v2::{DomainContext, DslSubmission, SubmissionLimits, SubmissionState};
-
-        let source = args["source"]
-            .as_str()
-            .ok_or_else(|| anyhow!("source required"))?;
-
-        // Parse bindings from JSON
-        let bindings_json = args["bindings"].as_object();
-        let confirmed = args["confirmed"].as_bool().unwrap_or(false);
-
-        // Parse DSL
-        let program = parse_program(source).map_err(|e| anyhow!("Parse error: {:?}", e))?;
-
-        // SemReg verb validation: check all verb FQNs in parsed AST are allowed
-        if let Some(ref client) = self.sem_os_client {
-            use dsl_core::Statement;
-            let actor = crate::policy::ActorResolver::from_env();
-            let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
-                client.as_ref(),
-                &actor,
-                None, // dsl_execute_submission has no session context
-            )
-            .await;
-            let phase2 =
-                crate::traceability::Phase2Service::evaluate_from_envelope(envelope.clone());
-            match phase2.halt_reason_code {
-                Some("sem_os_unavailable") => {
-                    let policy_gate = crate::policy::PolicyGate::from_env();
-                    if policy_gate.semreg_fail_closed() {
-                        tracing::warn!(
-                            "dsl_execute_submission: SemReg unavailable in strict mode — blocking"
-                        );
-                        return Err(anyhow!(
-                            "SemReg unavailable — execution blocked in strict mode"
-                        ));
-                    }
-                    tracing::warn!(
-                        "dsl_execute_submission: SemReg unavailable — proceeding with governance warning"
-                    );
-                }
-                Some("no_allowed_verbs") => {
-                    tracing::warn!("dsl_execute_submission: SemReg DenyAll — blocking execution");
-                    return Err(anyhow!("SemReg denied execution: no verbs are allowed"));
-                }
-                _ => {
-                    let denied_verbs = crate::traceability::Phase2Service::collect_denied_verbs(
-                        &phase2.artifacts,
-                        program.statements.iter().filter_map(|stmt| {
-                            if let Statement::VerbCall(vc) = stmt {
-                                Some(format!("{}.{}", vc.domain, vc.verb))
-                            } else {
-                                None
-                            }
-                        }),
-                    );
-                    if !denied_verbs.is_empty() {
-                        tracing::warn!(
-                            denied = ?denied_verbs,
-                            "dsl_execute_submission: SemReg denied verbs in DSL"
-                        );
-                        return Err(anyhow!(
-                            "SemReg denied execution: verbs not in allowed set: {}",
-                            denied_verbs.join(", ")
-                        ));
-                    }
-                }
-            }
-        }
-
-        // Build submission
-        let mut submission = DslSubmission::new(program.statements);
-
-        // Parse and add bindings
-        if let Some(bindings_obj) = bindings_json {
-            for (symbol, value) in bindings_obj {
-                let binding = Self::parse_binding_value(value)?;
-                submission.set_binding(symbol, binding);
-            }
-        }
-
-        let limits = SubmissionLimits::default();
-        let state = submission.state(&limits);
-
-        // Return state info for draft or warning states
-        match &state {
-            SubmissionState::Draft { unresolved } => {
-                return Ok(json!({
-                    "state": "draft",
-                    "unresolved": unresolved,
-                    "message": "Resolve symbols before executing"
-                }));
-            }
-            SubmissionState::TooLarge {
-                message,
-                suggestion,
-            } => {
-                return Ok(json!({
-                    "state": "too_large",
-                    "message": message,
-                    "suggestion": suggestion
-                }));
-            }
-            SubmissionState::ReadyWithWarning {
-                message,
-                iterations,
-                total_ops,
-            } if !confirmed => {
-                return Ok(json!({
-                    "state": "warning",
-                    "message": message,
-                    "iterations": iterations,
-                    "total_ops": total_ops,
-                    "hint": "Set confirmed=true to proceed"
-                }));
-            }
-            _ => {} // Ready or confirmed warning - proceed to execution
-        }
-
-        // Execute
-        let executor = DslExecutor::new(self.pool.clone());
-        let mut domain_ctx = DomainContext::new();
-
-        match executor
-            .execute_submission(&submission, &mut domain_ctx, &limits)
-            .await
-        {
-            Ok(result) => Ok(json!({
-                "success": true,
-                "state": "executed",
-                "is_batch": result.is_batch,
-                "total_executed": result.total_executed,
-                "iterations": result.iterations.iter().map(|i| json!({
-                    "index": i.index,
-                    "success": i.success,
-                    "bindings": i.bindings.iter()
-                        .map(|(k, v)| (k.clone(), json!(v.to_string())))
-                        .collect::<serde_json::Map<_, _>>(),
-                    "error": i.error
-                })).collect::<Vec<_>>()
-            })),
-            Err(e) => Ok(json!({
-                "success": false,
-                "state": "error",
-                "error": e.to_string()
-            })),
-        }
-    }
+    // F19 fix (Slice 5.1, 2026-04-22): `dsl_execute_submission` removed —
+    // was a second MCP DSL-execution entrypoint with no session context,
+    // so its SemOS envelope was permissive. All callers now route through
+    // `dsl_execute` with an explicit session binding.
 
     /// Bind symbols to UUIDs for a pending submission
     ///

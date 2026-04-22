@@ -207,7 +207,9 @@ database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector"] 
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP/intent pipeline for semantic verb search
-vnext-repl = ["database"]  # DEPRECATED: REPL V2 always enabled. Kept for downstream Cargo.toml compat.
+# Slice 4.2 (2026-04-22): `vnext-repl` feature removed. REPL V2 is always enabled.
+# The feature existed as an alias for `database` during the V1→V2 migration and
+# was deprecated on 2026-03-22; no remaining cfg-gate depended on it post-cleanup.
 write-set-contract = []  # Enables contract-driven write_set derivation from verb YAML metadata (INV-8)
 runbook-gate-vnext = ["database"]  # All execution paths through compile_invocation() + execute_runbook() (INV-1, INV-11)
 

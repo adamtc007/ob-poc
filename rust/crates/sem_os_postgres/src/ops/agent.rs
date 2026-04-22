@@ -887,16 +887,17 @@ impl SemOsVerbOp for ReadPolicy {
     ) -> Result<VerbExecutionOutcome> {
         let strict_pipeline =
             std::env::var("OBPOC_STRICT_SINGLE_PIPELINE").unwrap_or_else(|_| "true".to_string());
-        let allow_raw_execute =
-            std::env::var("OBPOC_ALLOW_RAW_EXECUTE").unwrap_or_else(|_| "false".to_string());
         let strict_semreg =
             std::env::var("OBPOC_STRICT_SEMREG").unwrap_or_else(|_| "true".to_string());
         let allow_legacy_generate =
             std::env::var("OBPOC_ALLOW_LEGACY_GENERATE").unwrap_or_else(|_| "false".to_string());
 
+        // F16 fix (Slice 3.1, 2026-04-22): `allow_raw_execute` removed — raw
+        // DSL bypass no longer exists. Always report false for API
+        // backwards-compat in consumers that haven't migrated yet.
         Ok(VerbExecutionOutcome::Record(json!({
             "strict_single_pipeline": strict_pipeline == "true",
-            "allow_raw_execute": allow_raw_execute == "true",
+            "allow_raw_execute": false,
             "strict_semreg": strict_semreg == "true",
             "allow_legacy_generate": allow_legacy_generate == "true",
             "message": "Current PolicyGate configuration"

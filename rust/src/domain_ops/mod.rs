@@ -200,7 +200,10 @@ pub mod rule_evaluator;
 // `dsl-runtime::domain_ops::*` consuming `dyn StewardshipDispatch` via
 // the ServiceRegistry. `ObPocStewardshipDispatch` in ob-poc bridges
 // to `sem_reg::stewardship::dispatch_phase{0,1}_tool` + general MCP.
-pub(crate) mod sem_os_helpers;
+// Slice 4.2 (2026-04-22): `sem_os_helpers` module deleted — it carried
+// CustomOps-era delegation helpers that became orphaned when slice #80
+// deleted the `CustomOperation` trait. All callers routed through
+// `dispatch_plugin_via_sem_os_op` or direct service traits afterwards.
 // Phase 5a composite-blocker #17 — sem_os_maintenance_ops relocated to
 // `dsl-runtime::domain_ops::sem_os_maintenance_ops`. Pure clean lift —
 // the spec's "ob-poc-adapter destination" matrix tag turned out wrong
@@ -595,6 +598,39 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(trading_profile::TradingProfileCreateNewVersion));
 }
 
+/// Return the sorted list of plugin-verb FQNs declared in YAML (via
+/// `runtime_registry()`) that do NOT have a `SemOsVerbOp` registered in the
+/// supplied registry. An empty list means the registry covers every plugin
+/// verb; a non-empty list means plugin dispatch will hard-fail at runtime
+/// when any missing FQN is invoked.
+///
+/// Used by:
+/// - `test_plugin_verb_coverage` (crate-internal CI invariant)
+/// - Slice 2.2 (F3) startup fail-fast check in `ob-poc-web::main`
+///
+/// Exactly the same computation in both paths — no drift possible.
+pub fn find_missing_plugin_ops(
+    registry: &sem_os_postgres::ops::SemOsVerbOpRegistry,
+) -> Vec<String> {
+    use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
+    use std::collections::HashSet;
+
+    let sem_os_fqns: HashSet<String> = registry.manifest().into_iter().collect();
+
+    let mut missing: Vec<String> = Vec::new();
+    let runtime_reg = runtime_registry();
+    for verb in runtime_reg.all_verbs() {
+        if let RuntimeBehavior::Plugin(_handler) = &verb.behavior {
+            let fqn = format!("{}.{}", verb.domain, verb.verb);
+            if !sem_os_fqns.contains(&fqn) {
+                missing.push(fqn);
+            }
+        }
+    }
+    missing.sort();
+    missing
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -605,30 +641,33 @@ mod tests {
         // canonical `SemOsVerbOpRegistry` (either from
         // `sem_os_postgres::ops::build_registry()` or appended by
         // [`extend_registry`] for Pattern B ops that stay in `ob-poc`).
-        use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
-        use std::collections::HashSet;
-
         let mut sem_os_registry = sem_os_postgres::ops::build_registry();
         extend_registry(&mut sem_os_registry);
-        let sem_os_fqns: HashSet<String> = sem_os_registry.manifest().into_iter().collect();
 
-        let mut missing: Vec<String> = Vec::new();
-        let runtime_reg = runtime_registry();
-        for verb in runtime_reg.all_verbs() {
-            if let RuntimeBehavior::Plugin(_handler) = &verb.behavior {
-                let fqn = format!("{}.{}", verb.domain, verb.verb);
-                if !sem_os_fqns.contains(&fqn) {
-                    missing.push(fqn);
-                }
-            }
-        }
-        missing.sort();
+        let missing = find_missing_plugin_ops(&sem_os_registry);
 
         assert!(
             missing.is_empty(),
             "YAML plugin verbs missing a SemOsVerbOp registration: {:?}",
             missing
         );
+    }
+
+    #[test]
+    fn test_find_missing_plugin_ops_detects_empty_registry() {
+        // Slice 2.2: prove the fail-fast helper actually detects drift.
+        // An empty registry must report EVERY plugin verb as missing.
+        let empty = sem_os_postgres::ops::SemOsVerbOpRegistry::empty();
+        let missing = find_missing_plugin_ops(&empty);
+        assert!(
+            !missing.is_empty(),
+            "Empty registry should report at least one missing plugin FQN; \
+             got 0 — the check is broken and the startup panic would be silenced."
+        );
+        // Sanity: the list is sorted (important for stable error messages).
+        let mut sorted = missing.clone();
+        sorted.sort();
+        assert_eq!(missing, sorted, "find_missing_plugin_ops output must be sorted");
     }
 
     #[test]

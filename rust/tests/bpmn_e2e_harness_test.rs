@@ -11,9 +11,10 @@
 //! Run with:
 //! ```bash
 //! DATABASE_URL=postgresql:///data_designer \
-//!   cargo test --features "database,vnext-repl" --test bpmn_e2e_harness_test -- --ignored --nocapture
+//!   cargo test --features database --test bpmn_e2e_harness_test -- --ignored --nocapture
 //! ```
-#![cfg(all(feature = "database", feature = "vnext-repl"))]
+// Slice 4.2 (2026-04-22): `vnext-repl` feature removed; gate simplified to `database`.
+#![cfg(feature = "database")]
 
 use std::net::SocketAddr;
 use std::sync::Arc;

@@ -1,14 +1,15 @@
 //! Typed compilation error model (INV-7).
 //!
 //! Every compilation failure maps to exactly one `CompilationErrorKind` variant.
-//! The 8 variants correspond to the 7 phases in §6.2 of the paper plus a
-//! catch-all for unexpected internal errors:
+//! The 9 variants correspond to the 7 phases in §6.2 of the paper plus
+//! `EnvelopeUnavailable` (Slice 3.2 / F17 fail-closed) and a catch-all for
+//! unexpected internal errors:
 //!
 //! ```text
 //! Step 1: expand    → ExpansionFailed | CycleDetected | LimitsExceeded
 //! Step 2: DAG       → DagError
 //! Step 3: pack gate → PackConstraint
-//! Step 4: SemReg    → SemRegDenied
+//! Step 4: SemReg    → SemRegDenied | EnvelopeUnavailable
 //! Step 5: write_set → (infallible — empty set on failure)
 //! Step 6: store     → StoreFailed
 //! Step 7: envelope  → (infallible — always succeeds)
@@ -87,6 +88,14 @@ pub enum CompilationErrorKind {
     #[error("SemReg denied verb: {verb} — {reason}")]
     SemRegDenied { verb: String, reason: String },
 
+    /// Slice 3.2 / F17: SemReg envelope (allowed_verbs set) is unavailable.
+    /// The runbook compiler fails closed rather than executing ungoverned.
+    /// This fires when SemReg is down, unconfigured, or returned
+    /// `SemOsContextEnvelope::unavailable()`. Previously the compiler skipped
+    /// the CCIR filter — that was a bypass; this variant closes it.
+    #[error("SemReg envelope unavailable — cannot authorise runbook execution")]
+    EnvelopeUnavailable,
+
     /// Storage operation failed (e.g., Postgres insert error).
     #[error("Storage failed: {reason}")]
     StoreFailed { reason: String },
@@ -105,9 +114,10 @@ pub enum CompilationErrorKind {
 mod tests {
     use super::*;
 
-    /// INV-7: All 8 CompilationErrorKind variants must be constructible.
+    /// INV-7: All 9 CompilationErrorKind variants must be constructible.
+    /// (Was 8 pre-Slice-3.2; `EnvelopeUnavailable` added for F17 fail-closed.)
     #[test]
-    fn test_all_8_error_kinds_constructible() {
+    fn test_all_error_kinds_constructible() {
         let variants: Vec<CompilationErrorKind> = vec![
             CompilationErrorKind::ExpansionFailed {
                 reason: "missing field".into(),
@@ -129,6 +139,7 @@ mod tests {
                 verb: "entity.delete".into(),
                 reason: "denied by policy rule".into(),
             },
+            CompilationErrorKind::EnvelopeUnavailable,
             CompilationErrorKind::StoreFailed {
                 reason: "connection refused".into(),
             },
@@ -137,7 +148,7 @@ mod tests {
             },
         ];
 
-        assert_eq!(variants.len(), 8, "Must have exactly 8 variants (INV-7)");
+        assert_eq!(variants.len(), 9, "Must have exactly 9 variants (INV-7)");
 
         // Each variant produces a non-empty Display string
         for v in &variants {

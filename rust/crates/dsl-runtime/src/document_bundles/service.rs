@@ -252,11 +252,8 @@ impl DocsBundleService {
     }
 }
 
-#[cfg(all(test, feature = "database"))]
-mod tests {
-    #[allow(unused_imports)]
-    use super::*;
-
-    // Integration tests would go here
-    // Requires test database setup
-}
+// Slice 8.1 (2026-04-22): removed invalid `#[cfg(all(test, feature = "database"))]`
+// tests module. The `database` feature does not exist on this crate
+// (dsl-runtime has no feature flags), so the cfg evaluated to false and
+// the stub module never compiled. Integration tests for the docs-bundle
+// service live at the workspace integration-test level.

@@ -81,6 +81,23 @@ impl AgentState {
         sessions: SessionStore,
         sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
     ) -> Self {
+        Self::with_semantic_and_plugin_registry(pool, sessions, sem_os_client, None, None).await
+    }
+
+    /// Variant of [`Self::with_semantic`] that accepts the canonical SemOS
+    /// plugin op registry and platform service registry. Required for
+    /// production — without the registry, plugin verbs in the agent legacy
+    /// and runbook-gate paths hard-fail post-Phase-5c-migrate slice #80.
+    ///
+    /// The shorter [`Self::with_semantic`] preserves the legacy signature
+    /// for tests that don't exercise plugin dispatch.
+    pub async fn with_semantic_and_plugin_registry(
+        pool: PgPool,
+        sessions: SessionStore,
+        sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
+        sem_os_ops: Option<Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>>,
+        service_registry: Option<Arc<dsl_runtime::ServiceRegistry>>,
+    ) -> Self {
         use crate::agent::learning::embedder::CandleEmbedder;
 
         let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
@@ -237,7 +254,7 @@ impl AgentState {
         let policy_gate = Arc::new(PolicyGate::from_env());
         tracing::info!(
             strict = policy_gate.strict_single_pipeline,
-            allow_raw_execute = policy_gate.allow_raw_execute,
+            strict_semreg = policy_gate.strict_semreg,
             "PolicyGate loaded from environment"
         );
 
@@ -323,6 +340,22 @@ impl AgentState {
             agent_service = agent_service.with_scenario_index(si);
         }
 
+        // F1 fix (Slice 2.1b): thread the canonical SemOS plugin op registry
+        // and platform service registry so agent-side `DslExecutor` /
+        // `RealDslExecutor` construction inside `AgentService` reaches plugin
+        // verbs without the "no SemOsVerbOp registered" hard-fail.
+        if let Some(ref ops) = sem_os_ops {
+            agent_service = agent_service.with_sem_os_ops(ops.clone());
+            tracing::info!(
+                registered_ops = ops.len(),
+                "AgentService wired with SemOsVerbOpRegistry"
+            );
+        }
+        if let Some(ref services) = service_registry {
+            agent_service = agent_service.with_service_registry(services.clone());
+            tracing::info!("AgentService wired with platform ServiceRegistry");
+        }
+
         // Wire SemOsClient if provided (env-driven in main.rs)
         if let Some(ref client) = sem_os_client {
             agent_service = agent_service.with_sem_os_client(client.clone());
@@ -369,13 +402,23 @@ pub async fn create_agent_router_with_semantic(
 }
 
 /// Create agent router with semantic verb search and an optional REPL V2 adapter.
+#[allow(clippy::too_many_arguments)]
 pub async fn create_agent_router_with_semantic_and_repl(
     pool: PgPool,
     sessions: SessionStore,
     sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
     repl_v2_orchestrator: Option<Arc<crate::sequencer::ReplOrchestratorV2>>,
+    sem_os_ops: Option<Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>>,
+    service_registry: Option<Arc<dsl_runtime::ServiceRegistry>>,
 ) -> Router {
-    let mut state = AgentState::with_semantic(pool, sessions, sem_os_client).await;
+    let mut state = AgentState::with_semantic_and_plugin_registry(
+        pool,
+        sessions,
+        sem_os_client,
+        sem_os_ops,
+        service_registry,
+    )
+    .await;
     state.repl_v2_orchestrator = repl_v2_orchestrator.clone();
     let router = crate::api::agent_routes::create_agent_router_with_state(state);
     if let Some(orchestrator) = repl_v2_orchestrator {

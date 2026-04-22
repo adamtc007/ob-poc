@@ -7,10 +7,14 @@ use crate::sem_reg::abac::ActorContext;
 use serde::Serialize;
 
 /// Server-side policy configuration. Loaded once at startup.
+///
+/// F16 fix (Slice 3.1, 2026-04-22): the `allow_raw_execute` flag and its
+/// environment variable `OBPOC_ALLOW_RAW_EXECUTE` were removed. Raw DSL in
+/// request bodies is now always rejected by the handler — no flag can
+/// reopen the bypass. The `can_execute_raw_dsl` method was removed with it.
 #[derive(Debug, Clone, Serialize)]
 pub struct PolicyGate {
     pub strict_single_pipeline: bool,
-    pub allow_raw_execute: bool,
     pub strict_semreg: bool,
     pub allow_legacy_generate: bool,
 }
@@ -19,7 +23,6 @@ impl PolicyGate {
     pub fn from_env() -> Self {
         Self {
             strict_single_pipeline: env_bool("OBPOC_STRICT_SINGLE_PIPELINE", true),
-            allow_raw_execute: env_bool("OBPOC_ALLOW_RAW_EXECUTE", false),
             strict_semreg: env_bool("OBPOC_STRICT_SEMREG", true),
             allow_legacy_generate: env_bool("OBPOC_ALLOW_LEGACY_GENERATE", false),
         }
@@ -28,7 +31,6 @@ impl PolicyGate {
     pub fn permissive() -> Self {
         Self {
             strict_single_pipeline: false,
-            allow_raw_execute: true,
             strict_semreg: false,
             allow_legacy_generate: true,
         }
@@ -37,14 +39,9 @@ impl PolicyGate {
     pub fn strict() -> Self {
         Self {
             strict_single_pipeline: true,
-            allow_raw_execute: false,
             strict_semreg: true,
             allow_legacy_generate: false,
         }
-    }
-
-    pub fn can_execute_raw_dsl(&self, actor: &ActorContext) -> bool {
-        self.allow_raw_execute && actor.roles.iter().any(|r| r == "operator" || r == "admin")
     }
 
     pub fn can_use_legacy_generate(&self, actor: &ActorContext) -> bool {
@@ -63,7 +60,6 @@ impl PolicyGate {
     pub fn snapshot(&self) -> PolicySnapshot {
         PolicySnapshot {
             strict_single_pipeline: self.strict_single_pipeline,
-            allow_raw_execute: self.allow_raw_execute,
             strict_semreg: self.strict_semreg,
             allow_legacy_generate: self.allow_legacy_generate,
         }
@@ -73,7 +69,6 @@ impl PolicyGate {
 #[derive(Debug, Clone, Serialize)]
 pub struct PolicySnapshot {
     pub strict_single_pipeline: bool,
-    pub allow_raw_execute: bool,
     pub strict_semreg: bool,
     pub allow_legacy_generate: bool,
 }
@@ -208,20 +203,18 @@ mod tests {
     #[test]
     fn test_strict_denies_all() {
         let g = PolicyGate::strict();
-        assert!(!g.can_execute_raw_dsl(&operator()));
         assert!(!g.can_use_legacy_generate(&operator()));
         assert!(g.semreg_fail_closed());
     }
+    // F16 fix (Slice 3.1, 2026-04-22): `can_execute_raw_dsl` removed — raw
+    // DSL in request bodies is now always rejected by the handler. The
+    // `test_permissive_allows_operator` and `test_admin_same_as_operator`
+    // tests were deleted along with the method.
     #[test]
-    fn test_permissive_allows_operator() {
-        let g = PolicyGate::permissive();
-        assert!(!g.can_execute_raw_dsl(&viewer()));
-        assert!(g.can_execute_raw_dsl(&operator()));
-    }
-    #[test]
-    fn test_admin_same_as_operator() {
-        let g = PolicyGate::permissive();
-        assert!(g.can_execute_raw_dsl(&admin()));
+    fn test_admin_has_roles() {
+        // Sanity — harness still distinguishes admin from viewer.
+        let admin = admin();
+        assert!(admin.roles.iter().any(|r| r == "admin"));
     }
     #[test]
     fn test_strict_with_legacy_flag() {

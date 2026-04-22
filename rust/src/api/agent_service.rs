@@ -390,6 +390,14 @@ pub struct AgentService {
     macro_registry: Option<Arc<MacroRegistry>>,
     /// Optional Sage engine for Stage 1.5 shadow classification.
     sage_engine: Option<Arc<dyn SageEngine>>,
+    /// Canonical SemOS plugin op registry. Threaded into every inner
+    /// `DslExecutor` / `RealDslExecutor` constructed by this service so
+    /// plugin verbs dispatch correctly post-Phase-5c-migrate slice #80.
+    sem_os_ops: Option<Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>>,
+    /// Platform service registry. Threaded into every inner executor this
+    /// service constructs so ops that consume platform traits via
+    /// `VerbExecutionContext::service::<dyn T>()` resolve correctly.
+    service_registry: Option<Arc<dsl_runtime::ServiceRegistry>>,
 }
 
 #[allow(dead_code)] // Remaining helpers pending further decomposition
@@ -479,6 +487,8 @@ impl AgentService {
             scenario_index: None,
             macro_registry: None,
             sage_engine: None,
+            sem_os_ops: None,
+            service_registry: None,
         }
     }
 
@@ -527,6 +537,58 @@ impl AgentService {
     pub fn with_sage_engine(mut self, sage_engine: Arc<dyn SageEngine>) -> Self {
         self.sage_engine = Some(sage_engine);
         self
+    }
+
+    /// Install the canonical SemOS plugin op registry. Threaded into every
+    /// inner `DslExecutor` / `RealDslExecutor` this service constructs so
+    /// plugin verbs dispatch correctly (post-Phase-5c-migrate slice #80).
+    pub fn with_sem_os_ops(
+        mut self,
+        ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>,
+    ) -> Self {
+        self.sem_os_ops = Some(ops);
+        self
+    }
+
+    /// Install the platform service registry. Threaded into every inner
+    /// executor this service constructs so ops that consume platform traits
+    /// via `VerbExecutionContext::service::<dyn T>()` resolve correctly.
+    pub fn with_service_registry(
+        mut self,
+        services: Arc<dsl_runtime::ServiceRegistry>,
+    ) -> Self {
+        self.service_registry = Some(services);
+        self
+    }
+
+    /// Build an inner `DslExecutor` with the canonical registry + services
+    /// chained in. All agent-side legacy-path `DslExecutor` construction
+    /// MUST flow through this helper.
+    fn build_dsl_executor(&self) -> crate::dsl_v2::execution::DslExecutor {
+        let mut executor = crate::dsl_v2::execution::DslExecutor::new(self.pool.clone());
+        if let Some(ref services) = self.service_registry {
+            executor = executor.with_services(services.clone());
+        }
+        if let Some(ref ops) = self.sem_os_ops {
+            executor = executor.with_sem_os_ops(ops.clone());
+        }
+        executor
+    }
+
+    /// Build an inner `RealDslExecutor` with the canonical registry + services
+    /// chained in. All agent-side runbook-gate-vnext `RealDslExecutor`
+    /// construction MUST flow through this helper.
+    #[cfg(feature = "runbook-gate-vnext")]
+    fn build_real_dsl_executor(&self) -> crate::repl::executor_bridge::RealDslExecutor {
+        let mut executor =
+            crate::repl::executor_bridge::RealDslExecutor::new(self.pool.clone());
+        if let Some(ref services) = self.service_registry {
+            executor = executor.with_services(services.clone());
+        }
+        if let Some(ref ops) = self.sem_os_ops {
+            executor = executor.with_sem_os_ops(ops.clone());
+        }
+        executor
     }
 
     /// Extract entity mentions from utterance and build debug info
@@ -1148,9 +1210,9 @@ impl AgentService {
         resolved_dsl: String,
         program: crate::dsl_v2::ast::Program,
     ) -> Result<AgentChatResponse, String> {
-        use crate::dsl_v2::execution::{DslExecutor, ExecutionContext};
+        use crate::dsl_v2::execution::ExecutionContext;
 
-        let executor = DslExecutor::new(self.pool.clone());
+        let executor = self.build_dsl_executor();
         let mut exec_ctx = ExecutionContext::new();
         match executor.execute_dsl(&resolved_dsl, &mut exec_ctx).await {
             Ok(results) => {
@@ -1293,7 +1355,6 @@ impl AgentService {
         resolved_dsl: String,
         program: crate::dsl_v2::ast::Program,
     ) -> Result<AgentChatResponse, String> {
-        use crate::repl::executor_bridge::RealDslExecutor;
         use crate::runbook::executor::RunbookStoreBackend;
         use crate::runbook::step_executor_bridge::DslStepExecutor;
         use crate::runbook::{
@@ -1395,7 +1456,7 @@ impl AgentService {
                 }
 
                 // Execute through the gate (INV-1)
-                let real_executor = RealDslExecutor::new(self.pool.clone());
+                let real_executor = self.build_real_dsl_executor();
                 let step_executor = DslStepExecutor::new(std::sync::Arc::new(real_executor));
                 match execute_runbook(store, runbook_id, None, &step_executor).await {
                     Ok(result) => {

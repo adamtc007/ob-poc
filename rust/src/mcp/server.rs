@@ -56,6 +56,17 @@ impl McpServer {
         self
     }
 
+    /// Install the canonical SemOS plugin op registry. Threaded into the
+    /// handler's inner `DslExecutor` construction so plugin verbs dispatch
+    /// correctly (post-Phase-5c-migrate slice #80).
+    pub fn with_sem_os_ops(
+        mut self,
+        ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>,
+    ) -> Self {
+        self.handlers = self.handlers.with_sem_os_ops(ops);
+        self
+    }
+
     /// Run the server, reading from stdin and writing to stdout
     pub async fn run(&self) -> anyhow::Result<()> {
         let stdin = std::io::stdin();

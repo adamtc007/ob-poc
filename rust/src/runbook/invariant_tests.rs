@@ -147,6 +147,10 @@ fn test_dag_assembly_in_compiler() {
 
 #[test]
 fn test_all_compilation_error_variants() {
+    // Slice 3.2 (F17): added `EnvelopeUnavailable` (count: 7 → 9, including
+    // `InternalError`). The exact variant count surfaces in the `errors`
+    // module's own INV-7 test; this one asserts at least the pre-3.2 set
+    // constructs.
     let variants: Vec<CompilationErrorKind> = vec![
         CompilationErrorKind::ExpansionFailed {
             reason: "test".into(),
@@ -168,14 +172,15 @@ fn test_all_compilation_error_variants() {
             verb: "test".into(),
             reason: "test".into(),
         },
+        CompilationErrorKind::EnvelopeUnavailable,
         CompilationErrorKind::StoreFailed {
             reason: "test".into(),
         },
     ];
     assert_eq!(
         variants.len(),
-        7,
-        "INV-7: Must have exactly 7 error variants"
+        8,
+        "Must include pre-3.2 seven variants plus EnvelopeUnavailable"
     );
     for v in &variants {
         assert!(
