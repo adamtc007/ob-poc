@@ -242,18 +242,60 @@ impl SemOsVerbOp for BpmnCancel {
     fn fqn(&self) -> &str {
         "bpmn.cancel"
     }
+
+    /// Phase F.1 (2026-04-22): same outbox-deferral pattern as
+    /// `BpmnSignal`. Fire-and-forget cancel — no return value, caller
+    /// doesn't wait on the BPMN service to acknowledge.
+    /// Idempotency key: `bpmn_cancel:<instance_id>:<reason-hash-16>`.
     async fn execute(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let instance_id = json_get_required_uuid(args, "instance-id")?;
         let reason = json_extract_string_opt(args, "reason")
             .unwrap_or_else(|| "Cancelled by operator".to_string());
 
-        let client = get_bpmn_client()?;
-        client.cancel(instance_id, &reason).await?;
+        let outbox_id = uuid::Uuid::new_v4();
+        let trace_id = uuid::Uuid::new_v4();
+
+        let reason_hash = blake3::hash(reason.as_bytes()).to_hex().to_string();
+        let idempotency_key = format!(
+            "bpmn_cancel:{}:{}",
+            instance_id,
+            &reason_hash[..16]
+        );
+
+        let outbox_payload = serde_json::json!({
+            "instance_id": instance_id,
+            "reason": reason,
+        });
+
+        sqlx::query(
+            r#"
+            INSERT INTO public.outbox
+                (id, trace_id, envelope_version, effect_kind, payload, idempotency_key, status)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, 'pending')
+            ON CONFLICT (idempotency_key, effect_kind) DO NOTHING
+            "#,
+        )
+        .bind(outbox_id)
+        .bind(trace_id)
+        .bind(1i16)
+        .bind("bpmn_cancel")
+        .bind(&outbox_payload)
+        .bind(&idempotency_key)
+        .execute(scope.executor())
+        .await?;
+
+        tracing::info!(
+            %instance_id,
+            reason = %reason,
+            %idempotency_key,
+            "bpmn.cancel queued to public.outbox (Phase F.1 outbox deferral)"
+        );
 
         Ok(VerbExecutionOutcome::Void)
     }
