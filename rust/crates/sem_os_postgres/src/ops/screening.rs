@@ -80,6 +80,24 @@ async fn enqueue_workstream_screening(
     .execute(scope.executor())
     .await?;
 
+    // Phase C.3 rollout (F7 follow-on, 2026-04-22): new screening
+    // enters PENDING. Shared across screening.pep / .sanctions /
+    // future .adverse-media because all of them enqueue through this
+    // helper. The idempotent early-return at line 68 bypasses this
+    // emission — existing PENDING screenings are NOT a state advance.
+    let reason = format!(
+        "screening.{} — new PENDING screening for workstream {}",
+        screening_type.to_lowercase(),
+        workstream_id
+    );
+    dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+        ctx,
+        screening_id,
+        &format!("screening:{}:pending", screening_type.to_lowercase()),
+        "screening/workstream",
+        &reason,
+    );
+
     ctx.bind("screening", screening_id);
     Ok(screening_id)
 }

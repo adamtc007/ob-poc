@@ -189,6 +189,25 @@ impl SemOsVerbOp for EntityAdd {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
+
+        // Phase C.3 rollout: client-group membership mutation. The
+        // state-advance node identifies the entity's membership status
+        // inside this group. Using `entity_id` (not `id`) as the
+        // advancing subject because the membership row is a join — the
+        // entity is the thing that moved.
+        let to_node = format!("client-group-membership:{}", membership_type);
+        let reason = format!(
+            "client-group.entity-add — entity {} now '{}' in group {}",
+            entity_id, membership_type, group_id
+        );
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            entity_id,
+            &to_node,
+            "client-group/membership",
+            &reason,
+        );
+
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -236,6 +255,35 @@ impl SemOsVerbOp for EntityRemove {
             .await?
             .rows_affected()
         };
+        // Phase C.3 rollout: entity-remove emits iff a row actually
+        // moved. No-op call that hit zero rows is not a state advance.
+        if affected > 0 {
+            let (to_node, reason) = if mark_historical {
+                (
+                    "client-group-membership:historical".to_string(),
+                    format!(
+                        "client-group.entity-remove — entity {} marked HISTORICAL in group {}",
+                        entity_id, group_id
+                    ),
+                )
+            } else {
+                (
+                    "client-group-membership:removed".to_string(),
+                    format!(
+                        "client-group.entity-remove — entity {} REMOVED from group {}",
+                        entity_id, group_id
+                    ),
+                )
+            };
+            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+                ctx,
+                entity_id,
+                &to_node,
+                "client-group/membership",
+                &reason,
+            );
+        }
+
         Ok(VerbExecutionOutcome::Record(json!({
             "removed": affected > 0,
             "mark_historical": mark_historical
