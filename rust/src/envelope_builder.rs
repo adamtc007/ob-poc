@@ -61,11 +61,12 @@ use ob_poc_types::{
     LogicalClock,
     ResolvedEntities,
     SessionScopeRef,
-    StateGateHash,
     TraceId,
     VerbArgs,
     VerbRef,
+    WorkspaceSnapshotId,
 };
+use ob_poc_types::gated_envelope::state_gate_hash;
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
@@ -134,15 +135,38 @@ pub fn build_shadow_envelope(inputs: &EnvelopeInputs<'_>) -> GatedVerbEnvelope {
     entity_list.sort_by_key(|e| e.entity_id);
     let resolved_entities = ResolvedEntities(entity_list);
 
-    // <phase_d_todo> StateGateHash: BLAKE3 over the §10.5 canonical
-    // encoding. Requires row-versioning first. Placeholder = zero hash.
-    let state_gate_hash = StateGateHash([0u8; 32]);
-
     // <phase_a_todo> DagNodeId / DagNodeVersion: today no per-entity DAG
     // cursor exists on the session. Placeholder = session_id as node id,
     // version 0.
     let dag_position = DagNodeId(inputs.session_id);
     let dag_node_version = DagNodeVersion(0);
+
+    // Phase A.4 (Phase D.3 partial, 2026-04-22): compute the real BLAKE3
+    // StateGateHash over the spec §10.5 canonical encoding. The hash is
+    // deterministic given the same (entities, dag position, scope,
+    // workspace snapshot, catalogue snapshot) — when row_version columns
+    // populate from Phase D.2 backfill, the hash becomes a genuine
+    // TOCTOU fingerprint. Pre-Phase-D.2, row_version fields are still 0
+    // (placeholder in ResolvedEntity above), so the hash is still
+    // determined by (entity_ids, ids, scope) — but it's no longer the
+    // zero sentinel. Slice D.3 wires the runtime-side recheck that
+    // compares this hash against a post-lock recomputation.
+    //
+    // WorkspaceSnapshotId: <phase_a_todo> today the session has no
+    // workspace-level snapshot cursor. Placeholder: session_id as the
+    // workspace snapshot id so the hash is still deterministic per
+    // session. Phase D.2 backfills real workspace snapshot ids from
+    // constellation rehydration events.
+    let workspace_snapshot_id = WorkspaceSnapshotId(inputs.session_id);
+    let state_gate_hash = state_gate_hash::hash(
+        EnvelopeVersion::CURRENT,
+        &resolved_entities,
+        dag_position,
+        dag_node_version,
+        session_scope,
+        workspace_snapshot_id,
+        catalogue_snapshot_id,
+    );
 
     let authorisation = AuthorisationProof {
         issued_at: LogicalClock(inputs.logical_clock),
@@ -211,9 +235,52 @@ mod tests {
         assert_eq!(env.closed_loop_marker.writes_since_push_at_gate, 7);
         // Catalogue snapshot id should be non-zero when a fingerprint is supplied.
         assert_ne!(env.catalogue_snapshot_id.0, 0);
-        // Placeholder state-gate hash — asserts the <phase_d_todo> zero
-        // sentinel so a future refactor surfaces here when real data lands.
-        assert_eq!(env.authorisation.state_gate_hash.0, [0u8; 32]);
+        // Phase A.4: StateGateHash is now the real BLAKE3 hash, not the
+        // zero sentinel. Any non-zero hash value is acceptable — Phase
+        // D.3's recheck asserts equality against a post-lock
+        // recomputation, not a specific byte pattern.
+        assert_ne!(env.authorisation.state_gate_hash.0, [0u8; 32]);
+    }
+
+    #[test]
+    fn shadow_envelope_state_gate_hash_is_deterministic() {
+        // Phase A.4 regression: the same inputs produce the same
+        // StateGateHash across runs. This is the canonical-encoding
+        // determinism obligation (spec §9.1 + §10.5).
+        let session_id = Uuid::from_u128(0xdead_beef_cafe_babe_0000_0000_0000_0001);
+        let cbus = [
+            Uuid::from_u128(0x0000_0000_0000_0000_0000_0000_0000_0001),
+            Uuid::from_u128(0x0000_0000_0000_0000_0000_0000_0000_0002),
+        ];
+        let mk = || EnvelopeInputs {
+            session_id,
+            verb_fqn: "cbu.create",
+            args: serde_json::json!({"name": "Deterministic"}),
+            writes_since_push_at_gate: 0,
+            scope_cbu_ids: &cbus,
+            semreg_fingerprint_proxy: Some("v1:0011223344556677"),
+            logical_clock: 1,
+            trace_id: Some(Uuid::nil()),
+        };
+        let h1 = build_shadow_envelope(&mk()).authorisation.state_gate_hash;
+        let h2 = build_shadow_envelope(&mk()).authorisation.state_gate_hash;
+        assert_eq!(
+            h1, h2,
+            "StateGateHash must be deterministic over identical inputs"
+        );
+
+        // Any input change produces a different hash.
+        let different_session = Uuid::from_u128(0xdead_beef_cafe_babe_0000_0000_0000_0002);
+        let h3 = build_shadow_envelope(&EnvelopeInputs {
+            session_id: different_session,
+            ..mk()
+        })
+        .authorisation
+        .state_gate_hash;
+        assert_ne!(
+            h1, h3,
+            "Different session_id must produce a different StateGateHash"
+        );
     }
 
     #[test]

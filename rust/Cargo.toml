@@ -88,6 +88,10 @@ jsonschema = "0.29"
 base64 = "0.22"
 sha2 = "0.10"
 hex = "0.4"
+# Phase F.1 (2026-04-22): BLAKE3 used for outbox idempotency-key hashing
+# in the bpmn_lite_ops refactor. Already a transitive dep via
+# ob-poc-types; direct listing here keeps the usage site explicit.
+blake3 = "1"
 
 # CLI dependencies
 clap = { version = "4.5", features = ["derive", "env"], optional = true }

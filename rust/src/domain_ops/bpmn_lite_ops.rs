@@ -144,24 +144,88 @@ impl SemOsVerbOp for BpmnSignal {
     fn fqn(&self) -> &str {
         "bpmn.signal"
     }
+
+    /// Phase F.1 (Pattern B A1 remediation, 2026-04-22): bpmn.signal was a
+    /// "fire-and-forget" gRPC call inside the verb body — a direct A1
+    /// violation per three-plane v0.3 §11.2. This impl now defers the
+    /// gRPC call to the outbox: the verb writes a `bpmn_signal` row into
+    /// `public.outbox` inside the ambient transaction scope and returns
+    /// `Void` synchronously. The drainer consumer (to be registered in
+    /// `ob-poc-web::main` alongside `MaintenanceSpawnConsumer`) performs
+    /// the actual `client.signal(...)` post-commit.
+    ///
+    /// Why outbox rather than two-phase:
+    ///  - `bpmn.signal` has no return value — callers don't wait on the
+    ///    signal to reach the BPMN service. Outbox deferral preserves
+    ///    the synchronous contract while moving the external call out
+    ///    of the verb body.
+    ///  - Outbox deferral also preserves atomicity: if the enclosing
+    ///    transaction rolls back, the outbox row is gone too — the
+    ///    BPMN signal is never sent. A two-phase approach (fire gRPC
+    ///    now, rollback later) would leak the signal to the BPMN
+    ///    service even on outer-txn failure.
+    ///
+    /// Idempotency key:
+    ///   `bpmn_signal:<instance_id>:<message_name>:<payload_hash>`
+    /// Two identical signals within the same transaction collapse to
+    /// one outbox row (the unique index on `(idempotency_key,
+    /// effect_kind)` dedupes silently via `ON CONFLICT DO NOTHING`).
     async fn execute(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let instance_id = json_get_required_uuid(args, "instance-id")?;
         let message_name = json_extract_string(args, "message-name")?;
         let payload = json_extract_string_opt(args, "payload");
 
-        let client = get_bpmn_client()?;
-        client
-            .signal(
-                instance_id,
-                &message_name,
-                payload.as_ref().map(|p| p.as_bytes()),
-            )
-            .await?;
+        let outbox_id = uuid::Uuid::new_v4();
+        let trace_id = uuid::Uuid::new_v4();
+
+        // Idempotency: BLAKE3 of (message_name || payload_bytes) keeps the
+        // key bounded regardless of payload size.
+        let payload_bytes = payload.as_deref().unwrap_or("").as_bytes();
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(message_name.as_bytes());
+        hasher.update(b"\x00"); // separator
+        hasher.update(payload_bytes);
+        let payload_hash = hasher.finalize().to_hex().to_string();
+        let idempotency_key = format!(
+            "bpmn_signal:{}:{}:{}",
+            instance_id, message_name, &payload_hash[..16]
+        );
+
+        let outbox_payload = serde_json::json!({
+            "instance_id": instance_id,
+            "message_name": message_name,
+            "payload": payload,
+        });
+
+        sqlx::query(
+            r#"
+            INSERT INTO public.outbox
+                (id, trace_id, envelope_version, effect_kind, payload, idempotency_key, status)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, 'pending')
+            ON CONFLICT (idempotency_key, effect_kind) DO NOTHING
+            "#,
+        )
+        .bind(outbox_id)
+        .bind(trace_id)
+        .bind(1i16) // EnvelopeVersion::CURRENT
+        .bind("bpmn_signal")
+        .bind(&outbox_payload)
+        .bind(&idempotency_key)
+        .execute(scope.executor())
+        .await?;
+
+        tracing::info!(
+            %instance_id,
+            %message_name,
+            %idempotency_key,
+            "bpmn.signal queued to public.outbox (Phase F.1 outbox deferral)"
+        );
 
         Ok(VerbExecutionOutcome::Void)
     }
