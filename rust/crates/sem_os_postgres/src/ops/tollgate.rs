@@ -473,6 +473,22 @@ impl SemOsVerbOp for Override {
         .fetch_one(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: tollgate override is a governance-level
+        // state advance — a failing evaluation is being explicitly
+        // overridden by an approver with stated authority. The
+        // evaluation itself is the advancing subject (the override
+        // row is the evidence).
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            evaluation_id,
+            "tollgate-evaluation:overridden",
+            "tollgate/decision",
+            &format!(
+                "tollgate.override — evaluation {} overridden by {} ({}): {}",
+                evaluation_id, approved_by, approval_authority, override_reason
+            ),
+        );
+
         Ok(VerbExecutionOutcome::Uuid(override_id))
     }
 }

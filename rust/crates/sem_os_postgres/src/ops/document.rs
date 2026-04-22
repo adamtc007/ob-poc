@@ -433,7 +433,7 @@ impl SemOsVerbOp for Solicit {
             request_id: task_id,
             requirement_id,
             document_type_id,
-            document_type_code: doc_type,
+            document_type_code: doc_type.clone(),
             document_id: None,
             blob_ref: None,
             status: "requested".to_string(),
@@ -442,6 +442,21 @@ impl SemOsVerbOp for Solicit {
         if workflow_instance_id.is_some() {
             ctx.bind("task", result.request_id);
         }
+        // Phase C.3 rollout: new document requirement in REQUESTED state.
+        // ON CONFLICT DO UPDATE means this can be an idempotent touch
+        // (same requirement already exists), but the status transition
+        // to 'requested' is genuine on either path — the emit captures
+        // the "solicitation issued" event rather than "new row".
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            requirement_id,
+            "requirement:requested",
+            "document/requirement",
+            &format!(
+                "document.solicit — {} for entity {}",
+                doc_type, subject_entity_id
+            ),
+        );
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }
 }
@@ -719,6 +734,14 @@ impl SemOsVerbOp for Verify {
         if result.rows_affected() == 0 {
             return Err(anyhow!("Version not found or not in verifiable state"));
         }
+        // Phase C.3 rollout: document version → verified.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            version_id,
+            "document-version:verified",
+            "document/verification",
+            &format!("document.verify — version {} verified by {}", version_id, verified_by),
+        );
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -777,6 +800,17 @@ impl SemOsVerbOp for Reject {
         if result.rows_affected() == 0 {
             return Err(anyhow!("Version not found or not in rejectable state"));
         }
+        // Phase C.3 rollout: document version → rejected.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            version_id,
+            "document-version:rejected",
+            "document/verification",
+            &format!(
+                "document.reject — version {} rejected ({}) by {}",
+                version_id, rejection_code, verified_by
+            ),
+        );
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }

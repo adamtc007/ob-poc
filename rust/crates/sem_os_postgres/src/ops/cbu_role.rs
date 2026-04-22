@@ -113,6 +113,18 @@ impl SemOsVerbOp for AssignOwnership {
         .await?;
 
         ctx.bind("cbu_entity_role", role_result);
+        // Phase C.3 rollout: ownership edge recorded. Subject is the
+        // CBU whose structure changed.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            cbu_id,
+            "cbu-role:ownership-assigned",
+            "cbu/role-graph",
+            &format!(
+                "cbu.assign-ownership — {} owns {}% of {} (under CBU {})",
+                owner_entity_id, percentage_display, owned_entity_id, cbu_id
+            ),
+        );
         Ok(VerbExecutionOutcome::Record(json!({
             "role_id": role_result,
             "relationship_id": rel_result,
