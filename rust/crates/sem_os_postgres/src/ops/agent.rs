@@ -761,6 +761,32 @@ impl SemOsVerbOp for ActivateTeaching {
     fn fqn(&self) -> &str {
         "agent.activate-teaching"
     }
+
+    /// F guardrail closure (ledger §2.2, 2026-04-22): the pre-refactor
+    /// body spawned `cargo run --release ... populate_embeddings` via
+    /// `tokio::process::Command::new("cargo")` directly inside the verb
+    /// body — an A1 violation that regressed from the Phase 0g
+    /// `MaintenanceReindexEmbeddingsOp` fix during the Slice-#80
+    /// CustomOperation relocation.
+    ///
+    /// Now uses the same outbox-deferral pattern as Phase 0g:
+    ///   1. Count pending patterns (read-only; safe inside the verb).
+    ///   2. If zero, return early — no effect needed.
+    ///   3. Otherwise, insert a `maintenance_spawn` row into
+    ///      `public.outbox` carrying the same subprocess spec. The
+    ///      existing `MaintenanceSpawnConsumer` (registered in
+    ///      `ob-poc-web::main`) drains the row post-commit and spawns
+    ///      the subprocess. Reuses the Phase 0g infrastructure —
+    ///      `OutboxEffectKind::MaintenanceSpawn`, same spawn payload
+    ///      schema, same drainer handler.
+    ///   4. Return a `queued` response instead of a `success` one.
+    ///      Callers that wait for the actual subprocess to complete
+    ///      (admin tools, CI scripts) retain the direct path:
+    ///      `cargo run --release -p ob-semantic-matcher --bin populate_embeddings`
+    ///
+    /// Idempotency key is timestamped per day so concurrent activations
+    /// within the same day collapse to one subprocess run — matching
+    /// the Phase 0g pattern.
     async fn execute(
         &self,
         _args: &Value,
@@ -784,56 +810,67 @@ impl SemOsVerbOp for ActivateTeaching {
             return Ok(VerbExecutionOutcome::Record(json!({
                 "success": true,
                 "message": "No pending patterns to embed",
-                "embedded_count": 0
+                "embedded_count": 0,
+                "status": "noop"
             })));
         }
 
-        tracing::info!(
-            "Running populate_embeddings for {} pending patterns...",
-            pending_before
-        );
+        let outbox_id = uuid::Uuid::new_v4();
+        let trace_id = uuid::Uuid::new_v4();
+        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let idempotency_key = format!("activate_teaching:{}:{}", trace_id, today);
 
-        let output = tokio::process::Command::new("cargo")
-            .args([
+        let payload = serde_json::json!({
+            "command": "cargo",
+            "args": [
                 "run",
                 "--release",
                 "-p",
                 "ob-semantic-matcher",
                 "--bin",
                 "populate_embeddings",
-            ])
-            .output()
-            .await
-            .map_err(|e| anyhow!("Failed to run populate_embeddings: {}", e))?;
+            ],
+            "force": false,
+            "source": "agent.activate-teaching",
+            "pending_before": pending_before,
+        });
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Ok(VerbExecutionOutcome::Record(json!({
-                "success": false,
-                "error": format!("populate_embeddings failed: {}", stderr)
-            })));
-        }
-
-        let (pending_after,): (i64,) = sqlx::query_as(
+        sqlx::query(
             r#"
-            SELECT COUNT(*) FROM "ob-poc".v_recently_taught rt
-            WHERE NOT EXISTS (
-                SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
-                WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb
-            )
+            INSERT INTO public.outbox
+                (id, trace_id, envelope_version, effect_kind, payload, idempotency_key, status)
+            VALUES
+                ($1, $2, $3, $4, $5, $6, 'pending')
+            ON CONFLICT (idempotency_key, effect_kind) DO NOTHING
             "#,
         )
-        .fetch_one(scope.executor())
+        .bind(outbox_id)
+        .bind(trace_id)
+        .bind(1i16) // EnvelopeVersion::CURRENT
+        .bind("maintenance_spawn")
+        .bind(&payload)
+        .bind(&idempotency_key)
+        .execute(scope.executor())
         .await
-        .map_err(|e| anyhow!("Failed to count remaining patterns: {}", e))?;
+        .map_err(|e| anyhow!("Failed to enqueue activate-teaching outbox row: {}", e))?;
 
-        let embedded_count = pending_before - pending_after;
+        tracing::info!(
+            pending_before,
+            %idempotency_key,
+            "agent.activate-teaching queued to public.outbox (Phase F guardrail §2.2 closure)"
+        );
+
         Ok(VerbExecutionOutcome::Record(json!({
             "success": true,
-            "message": format!("Activated {} new patterns for semantic search", embedded_count),
-            "embedded_count": embedded_count,
+            "status": "queued",
+            "message": format!(
+                "Queued populate_embeddings for {} pending patterns; \
+                 drainer (MaintenanceSpawnConsumer) will run it post-commit.",
+                pending_before
+            ),
             "pending_before": pending_before,
-            "pending_after": pending_after
+            "idempotency_key": idempotency_key,
+            "outbox_row_id": outbox_id,
         })))
     }
 }

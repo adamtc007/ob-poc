@@ -51,18 +51,19 @@ Per **Decision D11 (2026-04-18, Option III)**, these are grandfathered into the 
 |---|---|---|---|---|
 | `MaintenanceReindexEmbeddingsOp` | 391–560 (Phase 0g rewrite) | ~~`tokio::process::Command::new("cargo")` spawns `cargo run --release -- populate_embeddings` subprocess~~ — REMOVED | **Outbox deferral complete.** `execute` and `execute_json` now insert a `maintenance_spawn` row into `public.outbox` (migration 131) and return `{"status": "queued", ...}`. No subprocess in verb body. Phase 5e drainer will consume the row and spawn the subprocess post-commit. | **CLOSED 2026-04-18** |
 
-### 2.2 File: `sem_os_postgres/src/ops/agent.rs` (added 2026-04-22)
+### 2.2 File: `sem_os_postgres/src/ops/agent.rs` (added + CLOSED 2026-04-22)
 
 | op | lines | external effect | resolution path | status |
 |---|---|---|---|---|
-| `ActivateTeaching` | ~796 | `tokio::process::Command::new("cargo")` spawns `cargo run --release -p ob-semantic-matcher --bin populate_embeddings` subprocess inside the verb body. Same shape as the Phase-0g-remediated `MaintenanceReindexEmbeddingsOp` but in a different file — likely introduced during the Slice-#80 relocation of CustomOperation impls. Caught 2026-04-22 by the new `lint_external_effects_in_verbs.sh` (L4 script). | **Outbox deferral, same pattern as 2.1.** Reuse `OutboxEffectKind::MaintenanceSpawn` + the existing `MaintenanceSpawnConsumer`. Rewrite `execute` to insert an outbox row instead of spawning directly. Admin synchronous path preserved via the same `cargo run` command. | **OPEN** |
+| `ActivateTeaching` | ~757-870 | ~~`tokio::process::Command::new("cargo")` spawns `populate_embeddings` subprocess directly inside verb body~~ — REMOVED | **Outbox deferral complete (2026-04-22).** Verb now inserts a `maintenance_spawn` row into `public.outbox` (reusing the Phase 0g-built `OutboxEffectKind::MaintenanceSpawn` + `MaintenanceSpawnConsumer` infrastructure wholesale). Idempotency key `activate_teaching:<trace_id>:<YYYY-MM-DD>` collapses concurrent same-day activations to one subprocess run. Admin synchronous path preserved via direct `cargo run -p ob-semantic-matcher --bin populate_embeddings`. Behaviour change noted: response now `{"status": "queued", ...}` instead of `{"success": true, "embedded_count": N}` — callers that need post-embedding counts must poll the outbox or the embeddings table directly. | **CLOSED 2026-04-22** |
 
-**Completion criteria for 2.2:**
+**Completion criteria for 2.2 (all met):**
 
-- [x] Lint L4 catches the violation — `scripts/lint_external_effects_in_verbs.sh` grandfathers this file explicitly as of 2026-04-22 (no new violations permitted while the ledger row is open).
-- [ ] `ActivateTeaching::execute` rewritten to `INSERT INTO public.outbox ... effect_kind='maintenance_spawn'` with idempotency key `activate_teaching:<trace_id>:<date>`.
-- [ ] Lint L4 passes against `sem_os_postgres/src/ops/agent.rs` — remove from `GRANDFATHERED` in the lint script.
-- [ ] Row above moves to **CLOSED**.
+- [x] Lint L4 caught the violation — `scripts/lint_external_effects_in_verbs.sh` grandfathered the file on 2026-04-22.
+- [x] `ActivateTeaching::execute` rewritten to `INSERT INTO public.outbox ... effect_kind='maintenance_spawn'` with idempotency key `activate_teaching:<trace_id>:<date>`.
+- [x] Lint L4 passes against `sem_os_postgres/src/ops/agent.rs` — removed from `GRANDFATHERED` in the lint script.
+- [x] Lint now reports `Grandfathered hits: 0 (scheduled for Phase F.1-F.3)`.
+- [x] Row above moves to **CLOSED**.
 
 **Completion criteria for 0g (all met):**
 

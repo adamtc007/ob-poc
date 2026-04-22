@@ -60,12 +60,10 @@ GRANDFATHERED=(
     "src/domain_ops/source_loader_ops.rs"
     "src/domain_ops/gleif_ops.rs"
     "src/domain_ops/request_ops.rs"
-    # Slice #80 relocation regression: `ActivateTeaching` op spawns
-    # `populate_embeddings` via `tokio::process::Command::new("cargo")`
-    # at line 796. Same pattern as the original Phase 0g-remediated
-    # `MaintenanceReindexEmbeddingsOp` but in a different file. Added
-    # to the ledger §2 on 2026-04-22 for Phase F follow-on remediation.
-    "crates/sem_os_postgres/src/ops/agent.rs"
+    # 2026-04-22: `crates/sem_os_postgres/src/ops/agent.rs` removed from
+    # grandfathered list — the `ActivateTeaching` subprocess spawn was
+    # closed by outbox deferral (same pattern as Phase 0g
+    # `MaintenanceReindexEmbeddingsOp`). Ledger §2.2 moved to CLOSED.
 )
 
 # ── External-I/O patterns ──────────────────────────────────────────────
@@ -95,7 +93,12 @@ VIOLATIONS=()
 GRANDFATHERED_HITS=()
 
 for file in $PLUGIN_FILES; do
-    hits=$(cd "$ROOT" && grep -En "$EXTERNAL_IO_REGEX" "$file" 2>/dev/null || true)
+    # Skip comment lines (///, //!, //) before checking — these appear in
+    # docstrings that reference the pattern we're linting. A comment
+    # quoting `tokio::process::Command::new` as historical context is
+    # NOT an A1 violation.
+    hits=$(cd "$ROOT" && grep -En "$EXTERNAL_IO_REGEX" "$file" 2>/dev/null \
+        | grep -vE '^\s*[0-9]+:\s*(//|\s*\*)' || true)
     if [[ -z "$hits" ]]; then
         continue
     fi
