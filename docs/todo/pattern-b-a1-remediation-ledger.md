@@ -176,29 +176,35 @@ sub-op result JSON flows through the outer dispatcher into its
 `execute`, which delegates to the same sub-op's `execute`. Both legs
 of the delegation preserve the pre_fetch contract.
 
-#### §3.3b — 6 DB-write-interleaved ops (OPEN; Phase F.3b)
+#### §3.3b — 6 DB-write-interleaved ops (PARTIAL; 1 CLOSED 2026-04-22)
 
-These interleave HTTP with DB WRITES, not just reads. Moving HTTP to
-pre_fetch requires architectural refactor of `GleifEnrichmentService`
-which currently does DB writes inside HTTP fetch loops:
+These interleave HTTP with DB WRITES, not just reads. The path
+forward (started 2026-04-22 late-session) is to split the service
+into fetch-only + persist-only method pairs, letting each op route
+HTTP through pre_fetch and DB writes through execute.
 
-| op | blocker |
-|---|---|
-| `GleifEnrich` | `GleifEnrichmentService::enrich_entity` writes to multiple tables inside HTTP fetch loop |
-| `GleifImportTree` | Service-level tree import with DB writes per fetched node |
-| `GleifRefresh` | Stale-entity discovery → refresh via service (writes) |
-| `GleifImportManagedFunds` | Full CBU structure import (many DB writes) |
-| `GleifResolveSuccessor` | Likely similar service-mediated write pattern (needs inspection) |
-| `GleifImportToClientGroup` | Heavy DB writes for group + relationships |
+| op | status | notes |
+|---|---|---|
+| `GleifEnrich` | **CLOSED 2026-04-22** | `GleifEnrichmentService::fetch_all_for_enrich` (HTTP-only, bundles 9 GLEIF calls into `EnrichmentFetch`) + `persist_enrichment` (DB-only). GleifEnrich op wires pre_fetch → execute. Legacy `enrich_entity` kept as wrapper for non-op callers. |
+| `GleifImportTree` | **OPEN** | Needs same fetch/persist split of `import_corporate_tree` |
+| `GleifRefresh` | **OPEN** | Needs fetch/persist split of `refresh_entity` + stale-discovery |
+| `GleifImportManagedFunds` | **OPEN** | Needs fetch-bundle for manager + all fund records + persistence loop |
+| `GleifResolveSuccessor` | **OPEN** | Inspect + split as needed |
+| `GleifImportToClientGroup` | **OPEN** | Heavy DB writes for group + relationships |
 
-**Phase F.3b path forward:** split `GleifEnrichmentService` into a
-read-only `GleifFetcher` (HTTP only; returns structured data) + a write
-component that consumes the fetched data. Then these 6 ops can put
-`GleifFetcher` calls in pre_fetch and the write component in execute.
-Tracked as a separate slice; ~3-4 days mechanical work once the service
-split is designed.
+**EnrichmentFetch struct** (rust/src/gleif/enrichment.rs): serde-
+round-trippable bundle of `LeiRecord`, `BicMapping`s, direct-parent
+`(lei, name)`, ultimate-parent `(lei, name)`, fund-manager, umbrella,
+master — all optional where the corresponding GLEIF relationship
+may be absent. Pre_fetch produces it, execute deserializes from
+args and hands it to persist_enrichment.
 
-**Status:** 11/17 ops CLOSED (§3.3a); 6/17 OPEN (§3.3b). **PARTIAL.**
+**Remaining work path:** apply the same split pattern to the other 5
+service methods (`import_corporate_tree`, `refresh_entity`,
+`import_managed_funds`, etc.). Each method follows the same
+mechanical refactor — ~200-400 lines per method.
+
+**Status:** 12/17 ops CLOSED (§3.3a 11 + §3.3b 1); 5/17 OPEN (§3.3b remaining 5). **PARTIAL.**
 
 ### 3.4 File: `request_ops.rs` — helper-indirect gRPC (CLOSED 2026-04-22, F.1c)
 

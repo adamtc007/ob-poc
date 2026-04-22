@@ -1,9 +1,17 @@
 //! GLEIF Enrichment Service
 //!
 //! Orchestrates the enrichment of entities with GLEIF data.
+//!
+//! Phase F.3b (2026-04-22): split into `fetch_all_for_enrich` (HTTP
+//! only, pure reads) + `persist_enrichment` (DB writes, consumes the
+//! fetched struct). The legacy `enrich_entity` is a thin wrapper that
+//! calls both. This lets the `GleifEnrich` plugin op run the HTTP
+//! phase in pre_fetch (outside the txn) and the DB phase in execute
+//! (inside the caller's scope) — A1 invariant satisfied.
 
 use super::{client::GleifClient, repository::GleifRepository, types::*};
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -11,6 +19,24 @@ use uuid::Uuid;
 pub struct GleifEnrichmentService {
     client: GleifClient,
     repository: GleifRepository,
+}
+
+/// All HTTP results needed to run the `enrich_entity` persist pass.
+///
+/// Phase F.3b: produced by `fetch_all_for_enrich`, consumed by
+/// `persist_enrichment`. JSON-round-trippable so the `GleifEnrich` op
+/// can pass it through the pre_fetch → args → execute pipeline.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnrichmentFetch {
+    pub record: LeiRecord,
+    pub bics: Vec<BicMapping>,
+    /// (parent_lei, parent_name) — None if no direct parent reported
+    pub direct_parent: Option<(String, Option<String>)>,
+    pub ultimate_parent: Option<(String, Option<String>)>,
+    /// (manager_lei, manager_name) — None if not a fund or no manager
+    pub fund_manager: Option<(String, String)>,
+    pub umbrella: Option<(String, String)>,
+    pub master: Option<(String, String)>,
 }
 
 impl GleifEnrichmentService {
@@ -21,9 +47,117 @@ impl GleifEnrichmentService {
         })
     }
 
-    /// Enrich an existing entity with GLEIF data by LEI
+    /// Phase F.3b (2026-04-22): HTTP-only fetch phase. Called by
+    /// `GleifEnrich::pre_fetch` outside the transaction scope.
+    /// Returns a self-contained struct; the caller (execute) does
+    /// the DB writes via `persist_enrichment`.
+    ///
+    /// Pure reads against GLEIF — no DB writes, no side effects.
+    pub async fn fetch_all_for_enrich(&self, lei: &str) -> Result<EnrichmentFetch> {
+        let record = self
+            .client
+            .get_lei_record(lei)
+            .await
+            .context("Failed to fetch LEI record from GLEIF")?;
+
+        let bics = self.client.get_bic_mappings(lei).await.unwrap_or_default();
+
+        let direct_parent = match self.client.get_direct_parent(lei).await {
+            Ok(Some(rel)) => {
+                let parent_lei = rel.attributes.relationship.end_node.id.clone();
+                let parent_name = self
+                    .client
+                    .get_lei_record(&parent_lei)
+                    .await
+                    .ok()
+                    .map(|r| r.attributes.entity.legal_name.name.clone());
+                Some((parent_lei, parent_name))
+            }
+            _ => None,
+        };
+
+        let ultimate_parent = match self.client.get_ultimate_parent(lei).await {
+            Ok(Some(rel)) => {
+                let parent_lei = rel.attributes.relationship.end_node.id.clone();
+                let parent_name = self
+                    .client
+                    .get_lei_record(&parent_lei)
+                    .await
+                    .ok()
+                    .map(|r| r.attributes.entity.legal_name.name.clone());
+                Some((parent_lei, parent_name))
+            }
+            _ => None,
+        };
+
+        let fund_manager = match self.client.get_fund_manager(lei).await {
+            Ok(Some(manager)) => manager.attributes.lei.clone().map(|manager_lei| {
+                (
+                    manager_lei,
+                    manager.attributes.entity.legal_name.name.clone(),
+                )
+            }),
+            _ => None,
+        };
+
+        let umbrella = match self.client.get_umbrella_fund(lei).await {
+            Ok(Some(u)) => u.attributes.lei.clone().map(|umbrella_lei| {
+                (umbrella_lei, u.attributes.entity.legal_name.name.clone())
+            }),
+            _ => None,
+        };
+
+        let master = match self.client.get_master_fund(lei).await {
+            Ok(Some(m)) => m
+                .attributes
+                .lei
+                .clone()
+                .map(|master_lei| (master_lei, m.attributes.entity.legal_name.name.clone())),
+            _ => None,
+        };
+
+        Ok(EnrichmentFetch {
+            record,
+            bics,
+            direct_parent,
+            ultimate_parent,
+            fund_manager,
+            umbrella,
+            master,
+        })
+    }
+
+    /// Legacy method — kept for backwards compat. Calls fetch + persist
+    /// internally. Callers can migrate to the split methods as needed;
+    /// under the new `GleifEnrich::pre_fetch` / `execute` flow the
+    /// split is explicit.
     pub async fn enrich_entity(&self, entity_id: Uuid, lei: &str) -> Result<EnrichmentResult> {
-        // Log sync start
+        let fetched = self.fetch_all_for_enrich(lei).await?;
+        self.persist_enrichment(entity_id, lei, fetched).await
+    }
+
+    /// Phase F.3b: DB-only persist phase. Called by
+    /// `GleifEnrich::execute` inside the caller's transaction scope.
+    /// All writes; no HTTP.
+    #[allow(clippy::too_many_lines)]
+    pub async fn persist_enrichment(
+        &self,
+        entity_id: Uuid,
+        lei: &str,
+        fetched: EnrichmentFetch,
+    ) -> Result<EnrichmentResult> {
+        // Unpack the pre-fetched HTTP results.
+        let EnrichmentFetch {
+            record,
+            bics,
+            direct_parent,
+            ultimate_parent,
+            fund_manager,
+            umbrella,
+            master,
+        } = fetched;
+
+        // Log sync start.
         let _sync_id = self
             .repository
             .log_sync(
@@ -38,76 +172,56 @@ impl GleifEnrichmentService {
             )
             .await?;
 
-        // Fetch LEI record from GLEIF API
-        let record = self
-            .client
-            .get_lei_record(lei)
-            .await
-            .context("Failed to fetch LEI record from GLEIF")?;
-
-        // Fetch BIC mappings
-        let bics = self.client.get_bic_mappings(lei).await.unwrap_or_default();
-
-        // Update entity with GLEIF data
+        // Update entity with GLEIF data.
         self.repository
             .update_entity_from_gleif(entity_id, &record)
             .await?;
 
-        // Insert names
+        // Insert names.
         let names_added = self
             .repository
             .insert_entity_names(entity_id, &record)
             .await?;
 
-        // Insert addresses
+        // Insert addresses.
         let addresses_added = self
             .repository
             .insert_entity_addresses(entity_id, &record)
             .await?;
 
-        // Insert identifiers
+        // Insert identifiers.
         let identifiers_added = self
             .repository
             .insert_entity_identifiers(entity_id, &record, &bics)
             .await?;
 
-        // Insert lifecycle events
+        // Insert lifecycle events.
         let events_added = self
             .repository
             .insert_lifecycle_events(entity_id, &record)
             .await?;
 
-        // Fetch and insert parent relationships
+        // Parent relationships.
         let mut parent_relationships_added = 0;
         let direct_exception: Option<ReportingException> = None;
         let mut ultimate_exception: Option<ReportingException> = None;
 
-        // Fetch direct parent
-        if let Ok(Some(direct_parent)) = self.client.get_direct_parent(lei).await {
-            let parent_lei = &direct_parent.attributes.relationship.end_node.id;
-            let parent_record = self.client.get_lei_record(parent_lei).await.ok();
-            let parent_name = parent_record
-                .as_ref()
-                .map(|r| r.attributes.entity.legal_name.name.as_str());
-
+        if let Some((parent_lei, parent_name_opt)) = direct_parent.as_ref() {
             self.repository
                 .insert_parent_relationship(
                     entity_id,
                     parent_lei,
-                    parent_name,
+                    parent_name_opt.as_deref(),
                     "DIRECT_PARENT",
                     None,
                 )
                 .await?;
             parent_relationships_added += 1;
 
-            // Update the entity with direct parent LEI
             sqlx::query(
-                r#"
-                UPDATE "ob-poc".entity_limited_companies
-                SET direct_parent_lei = $2
-                WHERE entity_id = $1
-            "#,
+                r#"UPDATE "ob-poc".entity_limited_companies
+                   SET direct_parent_lei = $2
+                   WHERE entity_id = $1"#,
             )
             .bind(entity_id)
             .bind(parent_lei)
@@ -115,32 +229,22 @@ impl GleifEnrichmentService {
             .await?;
         }
 
-        // Fetch ultimate parent
-        if let Ok(Some(ultimate_parent)) = self.client.get_ultimate_parent(lei).await {
-            let parent_lei = &ultimate_parent.attributes.relationship.end_node.id;
-            let parent_record = self.client.get_lei_record(parent_lei).await.ok();
-            let parent_name = parent_record
-                .as_ref()
-                .map(|r| r.attributes.entity.legal_name.name.as_str());
-
+        if let Some((parent_lei, parent_name_opt)) = ultimate_parent.as_ref() {
             self.repository
                 .insert_parent_relationship(
                     entity_id,
                     parent_lei,
-                    parent_name,
+                    parent_name_opt.as_deref(),
                     "ULTIMATE_PARENT",
                     None,
                 )
                 .await?;
             parent_relationships_added += 1;
 
-            // Update the entity with ultimate parent LEI
             sqlx::query(
-                r#"
-                UPDATE "ob-poc".entity_limited_companies
-                SET ultimate_parent_lei = $2
-                WHERE entity_id = $1
-            "#,
+                r#"UPDATE "ob-poc".entity_limited_companies
+                   SET ultimate_parent_lei = $2
+                   WHERE entity_id = $1"#,
             )
             .bind(entity_id)
             .bind(parent_lei)
@@ -148,84 +252,67 @@ impl GleifEnrichmentService {
             .await?;
         }
 
-        // Fetch and insert fund relationships (for fund entities)
-        // These are trading-relevant: fund manager, umbrella fund, master fund
+        // Fund relationships.
         let mut fund_relationships_added = 0;
 
-        // Fund manager (IS_FUND-MANAGED_BY) -> INVESTMENT_MANAGER role
-        if let Ok(Some(fund_manager)) = self.client.get_fund_manager(lei).await {
-            if let Some(ref manager_lei) = fund_manager.attributes.lei {
-                let manager_name = fund_manager.attributes.entity.legal_name.name.as_str();
-
-                self.repository
-                    .insert_parent_relationship(
-                        entity_id,
-                        manager_lei,
-                        Some(manager_name),
-                        "FUND_MANAGER",
-                        None,
-                    )
-                    .await?;
-                fund_relationships_added += 1;
-                tracing::info!(
-                    entity_id = %entity_id,
-                    manager_lei = %manager_lei,
-                    manager_name = %manager_name,
-                    "Added fund manager relationship from GLEIF"
-                );
-            }
+        if let Some((manager_lei, manager_name)) = fund_manager.as_ref() {
+            self.repository
+                .insert_parent_relationship(
+                    entity_id,
+                    manager_lei,
+                    Some(manager_name.as_str()),
+                    "FUND_MANAGER",
+                    None,
+                )
+                .await?;
+            fund_relationships_added += 1;
+            tracing::info!(
+                entity_id = %entity_id,
+                %manager_lei,
+                %manager_name,
+                "Added fund manager relationship from GLEIF"
+            );
         }
 
-        // Umbrella fund (IS_SUBFUND_OF) -> fund structure
-        if let Ok(Some(umbrella)) = self.client.get_umbrella_fund(lei).await {
-            if let Some(ref umbrella_lei) = umbrella.attributes.lei {
-                let umbrella_name = umbrella.attributes.entity.legal_name.name.as_str();
-
-                self.repository
-                    .insert_parent_relationship(
-                        entity_id,
-                        umbrella_lei,
-                        Some(umbrella_name),
-                        "UMBRELLA_FUND",
-                        None,
-                    )
-                    .await?;
-                fund_relationships_added += 1;
-                tracing::info!(
-                    entity_id = %entity_id,
-                    umbrella_lei = %umbrella_lei,
-                    umbrella_name = %umbrella_name,
-                    "Added umbrella fund relationship from GLEIF"
-                );
-            }
+        if let Some((umbrella_lei, umbrella_name)) = umbrella.as_ref() {
+            self.repository
+                .insert_parent_relationship(
+                    entity_id,
+                    umbrella_lei,
+                    Some(umbrella_name.as_str()),
+                    "UMBRELLA_FUND",
+                    None,
+                )
+                .await?;
+            fund_relationships_added += 1;
+            tracing::info!(
+                entity_id = %entity_id,
+                %umbrella_lei,
+                %umbrella_name,
+                "Added umbrella fund relationship from GLEIF"
+            );
         }
 
-        // Master fund (IS_FEEDER_TO) -> master-feeder structure
-        if let Ok(Some(master)) = self.client.get_master_fund(lei).await {
-            if let Some(ref master_lei) = master.attributes.lei {
-                let master_name = master.attributes.entity.legal_name.name.as_str();
-
-                self.repository
-                    .insert_parent_relationship(
-                        entity_id,
-                        master_lei,
-                        Some(master_name),
-                        "MASTER_FUND",
-                        None,
-                    )
-                    .await?;
-                fund_relationships_added += 1;
-                tracing::info!(
-                    entity_id = %entity_id,
-                    master_lei = %master_lei,
-                    master_name = %master_name,
-                    "Added master fund relationship from GLEIF"
-                );
-            }
+        if let Some((master_lei, master_name)) = master.as_ref() {
+            self.repository
+                .insert_parent_relationship(
+                    entity_id,
+                    master_lei,
+                    Some(master_name.as_str()),
+                    "MASTER_FUND",
+                    None,
+                )
+                .await?;
+            fund_relationships_added += 1;
+            tracing::info!(
+                entity_id = %entity_id,
+                %master_lei,
+                %master_name,
+                "Added master fund relationship from GLEIF"
+            );
         }
 
-        // Check for reporting exceptions (when no parent is found)
-        // This is simplified - in reality we'd need to check the exception endpoint
+        // Reporting exceptions based on the primary record.
         if let Some(ref rels) = record.relationships {
             if rels.direct_parent.is_none() && rels.ultimate_parent.is_none() {
                 // Check entity category for public float indicators

@@ -50,6 +50,50 @@ impl SemOsVerbOp for GleifEnrich {
     fn fqn(&self) -> &str {
         "gleif.enrich"
     }
+
+    /// Phase F.3b (2026-04-22): HTTP-only phase. Resolves the effective
+    /// LEI (from args or from entity-id via DB lookup), then calls
+    /// `GleifEnrichmentService::fetch_all_for_enrich` which bundles
+    /// all 9 GLEIF HTTP calls (primary record, BICs, direct/ultimate
+    /// parents, fund manager, umbrella, master) into one struct.
+    /// Zero DB writes in this phase.
+    async fn pre_fetch(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let lei_arg = json_extract_string_opt(args, "lei");
+        let entity_id_arg = json_extract_uuid_opt(args, ctx, "entity-id");
+
+        // Determine effective LEI.
+        let lei: String = match (lei_arg, entity_id_arg) {
+            (Some(l), _) => l,
+            (None, Some(eid)) => {
+                let lei: Option<String> = sqlx::query_scalar(
+                    r#"SELECT lei FROM "ob-poc".entity_limited_companies WHERE entity_id = $1"#,
+                )
+                .bind(eid)
+                .fetch_optional(pool)
+                .await?
+                .flatten();
+                lei.ok_or_else(|| anyhow::anyhow!("Entity {} has no LEI", eid))?
+            }
+            (None, None) => {
+                return Err(anyhow::anyhow!("Either :lei or :entity-id required"));
+            }
+        };
+
+        // Fetch the full enrichment bundle (all HTTP, no DB writes).
+        let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
+        let fetched = service.fetch_all_for_enrich(&lei).await?;
+
+        Ok(Some(serde_json::json!({
+            "_gleif_enrich_fetched": serde_json::to_value(fetched)?,
+            "_gleif_enrich_effective_lei": lei,
+        })))
+    }
+
     async fn execute(
         &self,
         args: &serde_json::Value,
@@ -58,80 +102,74 @@ impl SemOsVerbOp for GleifEnrich {
     ) -> Result<VerbExecutionOutcome> {
         let pool = scope.pool().clone();
 
-        // Get LEI or entity-id
-        let lei = json_extract_string_opt(args, "lei");
-        let entity_id_arg = json_extract_uuid_opt(args, ctx, "entity-id");
+        let lei = args
+            .get("_gleif_enrich_effective_lei")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.enrich: pre_fetch result missing \
+                     (`_gleif_enrich_effective_lei` absent from args)"
+                )
+            })?
+            .to_string();
 
-        let (lei, entity_id): (String, Uuid) = match (lei, entity_id_arg) {
-            (Some(l), _) => {
-                // Look up or create entity by LEI
+        let fetched: crate::gleif::enrichment::EnrichmentFetch = args
+            .get("_gleif_enrich_fetched")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.enrich: pre_fetch result missing \
+                     (`_gleif_enrich_fetched` absent from args)"
+                )
+            })??;
+
+        // Resolve entity_id: lookup by LEI, or create-by-name using the
+        // pre-fetched record's legal_name (no new HTTP here).
+        let entity_id_arg = json_extract_uuid_opt(args, ctx, "entity-id");
+        let entity_id: Uuid = match entity_id_arg {
+            Some(eid) => eid,
+            None => {
                 let existing: Option<Uuid> = sqlx::query_scalar(
                     r#"SELECT entity_id FROM "ob-poc".entity_limited_companies WHERE lei = $1"#,
                 )
-                .bind(&l)
+                .bind(&lei)
                 .fetch_optional(&pool)
                 .await?;
 
                 match existing {
-                    Some(id) => (l, id),
+                    Some(id) => id,
                     None => {
-                        // Create new entity from GLEIF using DSL (ensures deduplication by name)
-                        let client = GleifClient::new()?;
-
-                        // Fetch LEI record first to get entity name
-                        let record = client.get_lei_record(&l).await?;
-                        let name = &record.attributes.entity.legal_name.name;
-                        let jurisdiction = record
+                        // Use the pre-fetched record to build the ensure DSL.
+                        let name = &fetched.record.attributes.entity.legal_name.name;
+                        let jurisdiction = fetched
+                            .record
                             .attributes
                             .entity
                             .jurisdiction
                             .as_deref()
                             .unwrap_or("XX");
-
-                        // Use DSL to create entity (idempotent by name - prevents duplicates)
                         let dsl = format!(
                             r#"(entity.ensure :entity-type "limited-company" :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
                             escape_dsl_string(name),
                             jurisdiction,
-                            l
+                            lei
                         );
 
                         let executor = DslExecutor::new(pool.clone());
                         let mut dsl_ctx = ExecutionContext::new();
                         executor.execute_dsl(&dsl, &mut dsl_ctx).await?;
-
-                        // Get the created/existing entity ID from context
-                        let entity_id = dsl_ctx
+                        dsl_ctx
                             .resolve("entity")
-                            .ok_or_else(|| anyhow::anyhow!("DSL did not bind @entity"))?;
-
-                        (l, entity_id)
+                            .ok_or_else(|| anyhow::anyhow!("DSL did not bind @entity"))?
                     }
                 }
             }
-            (None, Some(eid)) => {
-                // Get LEI from existing entity
-                let lei: Option<String> = sqlx::query_scalar(
-                    r#"SELECT lei FROM "ob-poc".entity_limited_companies WHERE entity_id = $1"#,
-                )
-                .bind(eid)
-                .fetch_optional(&pool)
-                .await?
-                .flatten();
-
-                match lei {
-                    Some(l) => (l, eid),
-                    None => return Err(anyhow::anyhow!("Entity {} has no LEI", eid)),
-                }
-            }
-            (None, None) => {
-                return Err(anyhow::anyhow!("Either :lei or :entity-id required"));
-            }
         };
 
-        // Enrich entity with GLEIF data
+        // Persist the pre-fetched enrichment (all DB writes).
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
-        let result = service.enrich_entity(entity_id, &lei).await?;
+        let result = service.persist_enrichment(entity_id, &lei, fetched).await?;
 
         let result_json = serde_json::json!({
             "entity_id": entity_id,
@@ -142,7 +180,6 @@ impl SemOsVerbOp for GleifEnrich {
             "parent_relationships_added": result.parent_relationships_added,
         });
 
-        // Log research action if decision-id provided (links Phase 2 execution to Phase 1 selection)
         if let Some(decision_id) = json_extract_uuid_opt(args, ctx, "decision-id") {
             let entities_updated = if result.names_added > 0 || result.addresses_added > 0 {
                 1
