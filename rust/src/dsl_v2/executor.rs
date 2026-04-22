@@ -206,13 +206,13 @@ pub enum ExecutionResult {
     /// No result (void operation)
     Void,
     /// Entity query result for batch iteration (entity.query verb)
-    EntityQuery(dsl_runtime::domain_ops::entity_query::EntityQueryResult),
+    EntityQuery(ob_poc_types::entity_query::EntityQueryResult),
     /// Template invocation result (template.invoke verb)
     TemplateInvoked(crate::domain_ops::template_ops::TemplateInvokeResult),
     /// Template batch execution result (template.batch verb)
     TemplateBatch(crate::domain_ops::template_ops::TemplateBatchResult),
     /// Batch control operation result (batch.pause, batch.resume, etc.)
-    BatchControl(dsl_runtime::domain_ops::batch_control_ops::BatchControlResult),
+    BatchControl(ob_poc_types::batch_control::BatchControlResult),
 }
 
 // ============================================================================

@@ -15,7 +15,8 @@ pub mod helpers;
 // Phase 5c-migrate Phase B slice #64: agent_ops → `sem_os_postgres::ops::agent`.
 // Phase 5c-migrate Phase B slice #5 (2026-04-21): attribute_ops relocated
 // to `sem_os_postgres::ops::attribute::*`.
-pub mod batch_control_ops;
+// Phase 5c-migrate Phase B slice #71: batch_control_ops → `sem_os_postgres::ops::batch_control`.
+// BatchControlResult relocated to `ob-poc-types::batch_control`.
 pub mod affinity_graph_cache;
 // Phase 5c-migrate Phase B slice #9: affinity_ops → `sem_os_postgres::ops::affinity`.
 // Phase 5c-migrate Phase B slice #60: billing_ops → `sem_os_postgres::ops::billing`.
@@ -40,7 +41,8 @@ pub mod affinity_graph_cache;
 // Phase 5c-migrate Phase B slice #29: economic_exposure_ops → `sem_os_postgres::ops::economic_exposure`.
 // Phase 5c-migrate Phase B slice #30: edge_ops → `sem_os_postgres::ops::edge`.
 // Phase 5c-migrate Phase B slice #25: entity_ops → `sem_os_postgres::ops::entity`.
-pub mod entity_query;
+// Phase 5c-migrate Phase B slice #70: entity_query → `sem_os_postgres::ops::entity_query`.
+// EntityQueryResult relocated to `ob-poc-types::entity_query`.
 // Phase 5c-migrate Phase B slice #40: evidence_ops → `sem_os_postgres::ops::evidence`.
 // Phase 5c-migrate Phase B slice #54: graph_validate_ops → `sem_os_postgres::ops::graph_validate`.
 // Phase 5c-migrate Phase B slice #23: import_run_ops → `sem_os_postgres::ops::import_run`.

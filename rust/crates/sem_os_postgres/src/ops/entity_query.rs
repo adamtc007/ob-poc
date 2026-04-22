@@ -1,56 +1,36 @@
-//! Entity Query Custom Operation
+//! `entity.query` verb — YAML-first re-implementation of the legacy
+//! `entity_query_ops` plugin op.
 //!
-//! Provides `entity.query` verb that returns a list of entity refs suitable
-//! for batch template execution. Unlike `entity.list` which returns records,
-//! this returns a binding that can be consumed by `template.batch :source @binding`.
+//! Returns a list of entity refs suitable for batch template
+//! iteration via `template.batch :source @binding`. Unlike
+//! `entity.list` (which returns JSON records), this op surfaces a
+//! structured `EntityQueryResult` through the
+//! `ExecutionResult::EntityQuery` variant. The `SemOsVerbOp` contract
+//! only returns `VerbExecutionOutcome` variants, so the op itself
+//! projects a lightweight `{_type, total_count, entity_type}` JSON
+//! summary — the full `EntityQueryResult` projection is carried via
+//! `ExecutionResult::EntityQuery` in the legacy executor path. Phase
+//! 5c-migrate pairs this port with the relocation of
+//! `EntityQueryResult` into `ob-poc-types::entity_query`.
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
-use sqlx::PgPool;
+use ob_poc_types::entity_query::EntityQueryResult;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::custom_op::CustomOperation;
-use crate::execution::{VerbExecutionContext, VerbExecutionOutcome};
+use dsl_runtime::domain_ops::helpers::{json_extract_int_opt, json_extract_string_opt};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-/// Entity query result - a list of (entity_id, name) tuples for batch iteration
-#[derive(Debug, Clone, Default)]
-pub struct EntityQueryResult {
-    /// Entity items: (entity_id, display_name)
-    pub items: Vec<(Uuid, String)>,
-    /// Entity type queried
-    pub entity_type: Option<String>,
-    /// Total count (may differ from items.len() if limited)
-    pub total_count: usize,
-}
-
-impl EntityQueryResult {
-    /// Get entity IDs only
-    pub fn entity_ids(&self) -> Vec<Uuid> {
-        self.items.iter().map(|(id, _)| *id).collect()
-    }
-}
-
-/// `entity.query` - Query entities for batch processing
-///
-/// Rationale: Returns a list of entity refs suitable for `template.batch :source @binding`.
-/// Unlike `entity.list` which returns JSON records, this returns a structured result
-/// that can be iterated by batch execution.
-///
-/// Example DSL:
-/// ```clojure
-/// (entity.query :type "fund" :name-like "Allianz%" :jurisdiction "LU" :limit 100 :as @funds)
-/// (template.batch :id "onboard-fund-cbu" :source @funds ...)
-/// ```
-#[register_custom_op]
-pub struct EntityQueryOp;
+use super::SemOsVerbOp;
 
 async fn entity_query_impl(
+    scope: &mut dyn TransactionScope,
     entity_type: Option<String>,
     name_like: Option<String>,
     jurisdiction: Option<String>,
     limit: i64,
-    pool: &PgPool,
 ) -> Result<EntityQueryResult> {
     let entity_type_ref = entity_type.as_deref();
     let name_like_ref = name_like.as_deref();
@@ -64,7 +44,7 @@ async fn entity_query_impl(
         Some("partnership") => ("entity_partnerships", "partnership_name"),
         Some("trust") => ("entity_trusts", "trust_name"),
         _ => {
-            return execute_unified_entity_query(name_like_ref, jurisdiction_ref, limit, pool)
+            return execute_unified_entity_query(scope, name_like_ref, jurisdiction_ref, limit)
                 .await;
         }
     };
@@ -102,7 +82,7 @@ async fn entity_query_impl(
             sqlx::query_as(&query)
                 .bind(pattern)
                 .bind(jur)
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
         }
         (Some(name), None) => {
@@ -113,11 +93,11 @@ async fn entity_query_impl(
             };
             sqlx::query_as(&query)
                 .bind(sql_pattern)
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
         }
-        (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(pool).await?,
-        (None, None) => sqlx::query_as(&query).fetch_all(pool).await?,
+        (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(scope.executor()).await?,
+        (None, None) => sqlx::query_as(&query).fetch_all(scope.executor()).await?,
     };
 
     Ok(EntityQueryResult {
@@ -128,10 +108,10 @@ async fn entity_query_impl(
 }
 
 async fn execute_unified_entity_query(
+    scope: &mut dyn TransactionScope,
     name_like: Option<&str>,
     jurisdiction: Option<&str>,
     limit: i64,
-    pool: &PgPool,
 ) -> Result<EntityQueryResult> {
     let base_query = r#"
         SELECT entity_id, company_name as name, jurisdiction FROM "ob-poc".entity_limited_companies
@@ -145,11 +125,9 @@ async fn execute_unified_entity_query(
     "#;
 
     let mut conditions = Vec::new();
-
     if name_like.is_some() {
         conditions.push("name ILIKE $1".to_string());
     }
-
     if jurisdiction.is_some() {
         let idx = if name_like.is_some() { 2 } else { 1 };
         conditions.push(format!("jurisdiction = ${}", idx));
@@ -176,7 +154,7 @@ async fn execute_unified_entity_query(
             sqlx::query_as(&query)
                 .bind(pattern)
                 .bind(jur)
-                .fetch_all(pool)
+                .fetch_all(scope.executor())
                 .await?
         }
         (Some(name), None) => {
@@ -185,10 +163,13 @@ async fn execute_unified_entity_query(
             } else {
                 format!("%{}%", name)
             };
-            sqlx::query_as(&query).bind(pattern).fetch_all(pool).await?
+            sqlx::query_as(&query)
+                .bind(pattern)
+                .fetch_all(scope.executor())
+                .await?
         }
-        (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(pool).await?,
-        (None, None) => sqlx::query_as(&query).fetch_all(pool).await?,
+        (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(scope.executor()).await?,
+        (None, None) => sqlx::query_as(&query).fetch_all(scope.executor()).await?,
     };
 
     Ok(EntityQueryResult {
@@ -198,63 +179,32 @@ async fn execute_unified_entity_query(
     })
 }
 
+pub struct Query;
+
 #[async_trait]
-impl CustomOperation for EntityQueryOp {
-    fn domain(&self) -> &'static str {
-        "entity"
+impl SemOsVerbOp for Query {
+    fn fqn(&self) -> &str {
+        "entity.query"
     }
-
-    fn verb(&self) -> &'static str {
-        "query"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Returns entity list for batch template iteration, not JSON records"
-    }
-
-    async fn execute_json(
+    async fn execute(
         &self,
-        args: &serde_json::Value,
+        args: &Value,
         _ctx: &mut VerbExecutionContext,
-        pool: &PgPool,
+        scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use crate::domain_ops::helpers::{json_extract_int_opt, json_extract_string_opt};
-
         let entity_type = json_extract_string_opt(args, "type");
         let name_like = json_extract_string_opt(args, "name-like");
         let jurisdiction = json_extract_string_opt(args, "jurisdiction");
         let limit = json_extract_int_opt(args, "limit").unwrap_or(1000);
-        let result = entity_query_impl(entity_type, name_like, jurisdiction, limit, pool).await?;
-
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({
-                "_type": "entity_query",
-                "_debug": format!("{result:?}")
-            }),
-        ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_entity_query_result_entity_ids() {
-        let result = EntityQueryResult {
-            items: vec![
-                (Uuid::new_v4(), "Test 1".to_string()),
-                (Uuid::new_v4(), "Test 2".to_string()),
-            ],
-            entity_type: Some("fund".to_string()),
-            total_count: 2,
-        };
-
-        let ids = result.entity_ids();
-        assert_eq!(ids.len(), 2);
+        let result = entity_query_impl(scope, entity_type, name_like, jurisdiction, limit).await?;
+        Ok(VerbExecutionOutcome::Record(json!({
+            "_type": "entity_query",
+            "items": result.items.iter().map(|(id, name)| json!({
+                "id": id.to_string(),
+                "name": name,
+            })).collect::<Vec<_>>(),
+            "entity_type": result.entity_type,
+            "total_count": result.total_count,
+        })))
     }
 }

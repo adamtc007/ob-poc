@@ -34,6 +34,7 @@ pub mod affinity;
 pub mod agent;
 pub mod attribute;
 pub mod audit;
+pub mod batch_control;
 pub mod billing;
 pub mod board;
 pub mod capital;
@@ -55,6 +56,7 @@ pub mod document;
 pub mod economic_exposure;
 pub mod edge;
 pub mod entity;
+pub mod entity_query;
 pub mod evidence;
 pub mod focus;
 pub mod governance;
@@ -641,6 +643,23 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #51: tollgate.check-gate — decision gate evaluation
     // (SKELETON_READY / EVIDENCE_COMPLETE / REVIEW_COMPLETE).
     registry.register(Arc::new(tollgate_evaluate::CheckGate));
+
+    // Phase B slice #70: entity.query (1 plugin verb — returns
+    // EntityQueryResult projection for template.batch iteration).
+    // EntityQueryResult moved to `ob-poc-types::entity_query`.
+    registry.register(Arc::new(entity_query::Query));
+
+    // Phase B slice #71: batch.* (7 plugin verbs — pause/resume/
+    // continue/skip/abort/status are session-state signals; add-products
+    // does bulk cbu_products INSERTs). BatchControlResult moved to
+    // `ob-poc-types::batch_control`.
+    registry.register(Arc::new(batch_control::Pause));
+    registry.register(Arc::new(batch_control::Resume));
+    registry.register(Arc::new(batch_control::Continue));
+    registry.register(Arc::new(batch_control::Skip));
+    registry.register(Arc::new(batch_control::Abort));
+    registry.register(Arc::new(batch_control::Status));
+    registry.register(Arc::new(batch_control::AddProducts));
 
     // Phase B slice #69: discovery.* (10 plugin verbs — read-only graph
     // / entity / context / relationship exploration + verb metadata

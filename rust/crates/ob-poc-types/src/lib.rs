@@ -17,11 +17,13 @@
 //! 2. Tagged enums only: `#[serde(tag = "type")]`
 //! 3. UUIDs as strings for JSON compatibility
 
+pub mod batch_control;
 pub mod chat;
 pub mod commands;
 pub mod control;
 pub mod decision;
 pub mod disambiguation;
+pub mod entity_query;
 pub mod galaxy;
 pub mod gated_envelope;
 pub mod graph_scene;
