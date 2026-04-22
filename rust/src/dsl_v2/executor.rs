@@ -1524,7 +1524,8 @@ async fn dispatch_plugin_via_sem_os_op_in_scope(
     //     path sees the pre-fetched data with no external I/O of
     //     its own. Default `Ok(None)` makes this a no-op for ops
     //     that don't need it.
-    if let Some(pre_fetched) = op.pre_fetch(&args, &mut sem_ctx).await
+    let pre_fetch_pool = scope.pool().clone();
+    if let Some(pre_fetched) = op.pre_fetch(&args, &mut sem_ctx, &pre_fetch_pool).await
         .map_err(|e| anyhow!("sem_os_op({}) pre_fetch failed: {}", fqn, e))?
     {
         if let (Some(existing_obj), serde_json::Value::Object(pf_obj)) =

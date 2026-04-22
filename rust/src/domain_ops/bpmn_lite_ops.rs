@@ -326,6 +326,7 @@ impl SemOsVerbOp for BpmnInspect {
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let instance_id = json_get_required_uuid(args, "instance-id")?;
 

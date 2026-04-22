@@ -143,20 +143,62 @@ and `log_research_action`) stay in execute, sharing the inner txn scope.
 **Status:** 12/12 I/O ops remediated (3 pure-config ops trivially CLOSED).
 Row moves to **CLOSED 2026-04-22**.
 
-### 3.3 File: `gleif_ops.rs` — 17 ops
+### 3.3 File: `gleif_ops.rs` — 17 ops (10 pure-lookup + 1 dispatcher + 6 DB-write-interleaved)
 
-Same pattern as `source_loader_ops.rs`. 17 ops instantiate `GleifClient` or `GleifEnrichmentService` and make HTTP calls inside `execute_json`.
+**Phase F.3 status (2026-04-22): partial — 11/17 closed (§3.3a); 6 remain OPEN (§3.3b).**
 
-Apply the same split-phase / pre-fetch treatment. Most ops are fetch-then-persist (LEI lookup → DB write of entity).
+#### §3.3a — 10 pure-HTTP + HTTP-with-DB-lookup ops + 1 dispatcher (CLOSED 2026-04-22)
 
-**Completion criteria for gleif_ops.rs:**
+| op | pre_fetch result key | uses pool for DB lookup? | status |
+|---|---|---|---|
+| `GleifSearch` | `_gleif_search_candidates` | — | **CLOSED** |
+| `GleifGetRecord` | `_gleif_record` | — | **CLOSED** |
+| `GleifGetParent` | `_gleif_parent` | — | **CLOSED** |
+| `GleifGetChildren` | `_gleif_children` | — | **CLOSED** |
+| `GleifGetUmbrella` | `_gleif_umbrella` | yes (entity-id → LEI) | **CLOSED** |
+| `GleifGetManager` | `_gleif_manager` | yes (entity-id → LEI) | **CLOSED** |
+| `GleifGetMasterFund` | `_gleif_master_fund` | yes (entity-id → LEI) | **CLOSED** |
+| `GleifGetManagedFunds` | `_gleif_managed_funds` | — | **CLOSED** |
+| `GleifTraceOwnership` | `_gleif_trace_ownership` | yes (entity-id → LEI) | **CLOSED** |
+| `GleifLookupByIsin` | `_gleif_isin_lookup` | — | **CLOSED** |
+| `GleifLookup` (dispatcher) | delegates to sub-op | delegates | **CLOSED** |
 
-- [ ] Each of 17 ops: HTTP fetch moves out of `execute_json` body, into stage 5 pre-fetch or an explicit pre-txn phase.
-- [ ] HTTP calls inside execute_json bodies: **zero** (lint L4).
-- [ ] Integration tests green.
-- [ ] Row above moves to **CLOSED**.
+**Trait extension in F.3:** `SemOsVerbOp::pre_fetch` signature gained a
+`&sqlx::PgPool` parameter (Phase F.1/F.2 previously had just args+ctx).
+Ops that look up `entity_id → LEI` before calling GLEIF can now do that
+DB read in pre_fetch outside the txn. Pool access is for READ-ONLY
+auto-commit queries only; writes still happen in `execute` under the
+caller's scope.
 
-**Status:** 0/17 ops remediated. **OPEN.**
+**Dispatcher delegation:** `GleifLookup::pre_fetch` matches on
+`target-type` and delegates to the selected sub-op's `pre_fetch`;
+sub-op result JSON flows through the outer dispatcher into its
+`execute`, which delegates to the same sub-op's `execute`. Both legs
+of the delegation preserve the pre_fetch contract.
+
+#### §3.3b — 6 DB-write-interleaved ops (OPEN; Phase F.3b)
+
+These interleave HTTP with DB WRITES, not just reads. Moving HTTP to
+pre_fetch requires architectural refactor of `GleifEnrichmentService`
+which currently does DB writes inside HTTP fetch loops:
+
+| op | blocker |
+|---|---|
+| `GleifEnrich` | `GleifEnrichmentService::enrich_entity` writes to multiple tables inside HTTP fetch loop |
+| `GleifImportTree` | Service-level tree import with DB writes per fetched node |
+| `GleifRefresh` | Stale-entity discovery → refresh via service (writes) |
+| `GleifImportManagedFunds` | Full CBU structure import (many DB writes) |
+| `GleifResolveSuccessor` | Likely similar service-mediated write pattern (needs inspection) |
+| `GleifImportToClientGroup` | Heavy DB writes for group + relationships |
+
+**Phase F.3b path forward:** split `GleifEnrichmentService` into a
+read-only `GleifFetcher` (HTTP only; returns structured data) + a write
+component that consumes the fetched data. Then these 6 ops can put
+`GleifFetcher` calls in pre_fetch and the write component in execute.
+Tracked as a separate slice; ~3-4 days mechanical work once the service
+split is designed.
+
+**Status:** 11/17 ops CLOSED (§3.3a); 6/17 OPEN (§3.3b). **PARTIAL.**
 
 ### 3.4 Phase 5f completion criteria
 

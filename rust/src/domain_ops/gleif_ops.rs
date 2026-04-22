@@ -176,21 +176,19 @@ impl SemOsVerbOp for GleifSearch {
     fn fqn(&self) -> &str {
         "gleif.search"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let name = json_extract_string_opt(args, "name");
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let name = json_extract_string_opt(args, "name")
+            .ok_or_else(|| anyhow::anyhow!(":name required for search"))?;
         let limit = json_extract_int_opt(args, "limit").unwrap_or(20) as usize;
 
         let client = GleifClient::new()?;
-
-        let results = match name {
-            Some(ref n) => client.search_by_name(n, limit).await?,
-            None => return Err(anyhow::anyhow!(":name required for search")),
-        };
+        let results = client.search_by_name(&name, limit).await?;
 
         let candidates: Vec<serde_json::Value> = results
             .iter()
@@ -205,6 +203,25 @@ impl SemOsVerbOp for GleifSearch {
             })
             .collect();
 
+        Ok(Some(serde_json::json!({ "_gleif_search_candidates": candidates })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let candidates = args
+            .get("_gleif_search_candidates")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.search: pre_fetch result missing \
+                     (`_gleif_search_candidates` absent from args)"
+                )
+            })?;
         Ok(VerbExecutionOutcome::RecordSet(candidates))
     }
 }
@@ -349,28 +366,45 @@ impl SemOsVerbOp for GleifGetRecord {
     fn fqn(&self) -> &str {
         "gleif.get-record"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let lei = json_extract_string_opt(args, "lei")
             .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let record = client.get_lei_record(&lei).await?;
 
-        Ok(VerbExecutionOutcome::Record(serde_json::json!({
-            "lei": record.lei(),
-            "name": record.attributes.entity.legal_name.name,
-            "jurisdiction": record.attributes.entity.jurisdiction,
-            "category": record.attributes.entity.category,
-            "sub_category": record.attributes.entity.sub_category,
-            "status": record.attributes.entity.status,
-            "legal_form": record.attributes.entity.legal_form,
-            "registration": record.attributes.registration,
+        Ok(Some(serde_json::json!({
+            "_gleif_record": {
+                "lei": record.lei(),
+                "name": record.attributes.entity.legal_name.name,
+                "jurisdiction": record.attributes.entity.jurisdiction,
+                "category": record.attributes.entity.category,
+                "sub_category": record.attributes.entity.sub_category,
+                "status": record.attributes.entity.status,
+                "legal_form": record.attributes.entity.legal_form,
+                "registration": record.attributes.registration,
+            }
         })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let record = args.get("_gleif_record").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-record: pre_fetch result missing (`_gleif_record` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(record))
     }
 }
 
@@ -386,29 +420,46 @@ impl SemOsVerbOp for GleifGetParent {
     fn fqn(&self) -> &str {
         "gleif.get-parent"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let lei = json_extract_string_opt(args, "lei")
             .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let parent = client.get_direct_parent(&lei).await?;
 
-        match parent {
-            Some(rel) => Ok(VerbExecutionOutcome::Record(serde_json::json!({
+        let payload = match parent {
+            Some(rel) => serde_json::json!({
                 "parent_lei": rel.attributes.relationship.end_node.id,
                 "relationship_type": rel.attributes.relationship.relationship_type,
                 "relationship_status": rel.attributes.relationship.status,
-            }))),
-            None => Ok(VerbExecutionOutcome::Record(serde_json::json!({
+            }),
+            None => serde_json::json!({
                 "parent_lei": null,
                 "message": "No direct parent found"
-            }))),
-        }
+            }),
+        };
+
+        Ok(Some(serde_json::json!({ "_gleif_parent": payload })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let parent = args.get("_gleif_parent").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-parent: pre_fetch result missing (`_gleif_parent` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(parent))
     }
 }
 
@@ -794,12 +845,13 @@ impl SemOsVerbOp for GleifGetChildren {
     fn fqn(&self) -> &str {
         "gleif.get-children"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let lei = json_extract_string_opt(args, "lei")
             .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
@@ -817,6 +869,25 @@ impl SemOsVerbOp for GleifGetChildren {
             })
             .collect();
 
+        Ok(Some(serde_json::json!({ "_gleif_children": results })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let results = args
+            .get("_gleif_children")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.get-children: pre_fetch result missing \
+                     (`_gleif_children` absent from args)"
+                )
+            })?;
         Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
@@ -833,22 +904,19 @@ impl SemOsVerbOp for GleifTraceOwnership {
     fn fqn(&self) -> &str {
         "gleif.trace-ownership"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let pool = scope.pool().clone();
-
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
             None => {
-                // Try to get LEI from entity-id
                 let entity_id = json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
-
-                get_lei_for_entity(&pool, entity_id)
+                get_lei_for_entity(pool, entity_id)
                     .await?
                     .ok_or_else(|| anyhow::anyhow!("Entity {} has no LEI", entity_id))?
             }
@@ -856,11 +924,9 @@ impl SemOsVerbOp for GleifTraceOwnership {
 
         let client = GleifClient::new()?;
 
-        // Get starting entity info
         let start_record = client.get_lei_record(&lei).await?;
         let start_name = start_record.attributes.entity.legal_name.name.clone();
 
-        // Trace parent chain
         let mut chain = Vec::new();
         let mut current_lei = lei.clone();
         let mut terminus = UboStatus::Unknown;
@@ -882,8 +948,6 @@ impl SemOsVerbOp for GleifTraceOwnership {
                     current_lei = parent_lei;
                 }
                 None => {
-                    // No parent - check for reporting exception
-                    // For now, assume public float if no parent
                     terminus = UboStatus::PublicFloat;
                     break;
                 }
@@ -898,7 +962,24 @@ impl SemOsVerbOp for GleifTraceOwnership {
             total_depth: chain.len(),
         };
 
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
+        Ok(Some(serde_json::json!({
+            "_gleif_trace_ownership": serde_json::to_value(&result)?
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_trace_ownership").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.trace-ownership: pre_fetch result missing \
+                 (`_gleif_trace_ownership` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
@@ -914,12 +995,12 @@ impl SemOsVerbOp for GleifGetManagedFunds {
     fn fqn(&self) -> &str {
         "gleif.get-managed-funds"
     }
-    async fn execute(
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let manager_lei = json_extract_string_opt(args, "manager-lei")
             .ok_or_else(|| anyhow::anyhow!(":manager-lei required"))?;
         let resolve_umbrellas =
@@ -928,13 +1009,10 @@ impl SemOsVerbOp for GleifGetManagedFunds {
 
         let client = GleifClient::new()?;
 
-        // Get manager name
         let manager_record = client.get_lei_record(&manager_lei).await?;
         let manager_name = manager_record.attributes.entity.legal_name.name.clone();
 
-        // Fetch managed funds
         let mut all_funds = client.get_managed_funds(&manager_lei).await?;
-
         if let Some(lim) = limit {
             all_funds.truncate(lim as usize);
         }
@@ -944,7 +1022,6 @@ impl SemOsVerbOp for GleifGetManagedFunds {
             .map(DiscoveredEntity::from_lei_record)
             .collect();
 
-        // Resolve umbrellas
         let mut fund_umbrellas: HashMap<String, DiscoveredEntity> = HashMap::new();
         if resolve_umbrellas {
             for fund in &funds {
@@ -965,7 +1042,24 @@ impl SemOsVerbOp for GleifGetManagedFunds {
             total_count: funds.len(),
         };
 
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
+        Ok(Some(serde_json::json!({
+            "_gleif_managed_funds": serde_json::to_value(&result)?
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_managed_funds").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-managed-funds: pre_fetch result missing \
+                 (`_gleif_managed_funds` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
@@ -1057,15 +1151,14 @@ impl SemOsVerbOp for GleifGetUmbrella {
     fn fqn(&self) -> &str {
         "gleif.get-umbrella"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         use crate::gleif::{UmbrellaEntity, UmbrellaResult};
-
-        let pool = scope.pool().clone();
 
         let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
@@ -1073,7 +1166,7 @@ impl SemOsVerbOp for GleifGetUmbrella {
                 let entity_id = json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
 
-                get_lei_for_entity(&pool, entity_id)
+                get_lei_for_entity(pool, entity_id)
                     .await?
                     .ok_or_else(|| anyhow::anyhow!("Entity {} has no LEI", entity_id))?
             }
@@ -1081,11 +1174,8 @@ impl SemOsVerbOp for GleifGetUmbrella {
 
         let client = GleifClient::new()?;
 
-        // Get the sub-fund record for its name
         let subfund = client.get_lei_record(&lei).await?;
         let subfund_name = subfund.attributes.entity.legal_name.name.clone();
-
-        // Look up umbrella fund
         let umbrella = client.get_umbrella_fund(&lei).await?;
 
         let result = UmbrellaResult {
@@ -1098,7 +1188,24 @@ impl SemOsVerbOp for GleifGetUmbrella {
             }),
         };
 
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
+        Ok(Some(serde_json::json!({
+            "_gleif_umbrella": serde_json::to_value(&result)?
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_umbrella").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-umbrella: pre_fetch result missing \
+                 (`_gleif_umbrella` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
@@ -1117,15 +1224,14 @@ impl SemOsVerbOp for GleifGetManager {
     fn fqn(&self) -> &str {
         "gleif.get-manager"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         use crate::gleif::{ManagerEntity, ManagerResult};
-
-        let pool = scope.pool().clone();
 
         let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
@@ -1133,7 +1239,7 @@ impl SemOsVerbOp for GleifGetManager {
                 let entity_id = json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
 
-                get_lei_for_entity(&pool, entity_id)
+                get_lei_for_entity(pool, entity_id)
                     .await?
                     .ok_or_else(|| anyhow::anyhow!("Entity {} has no LEI", entity_id))?
             }
@@ -1141,11 +1247,8 @@ impl SemOsVerbOp for GleifGetManager {
 
         let client = GleifClient::new()?;
 
-        // Get the fund record for its name
         let fund = client.get_lei_record(&lei).await?;
         let fund_name = fund.attributes.entity.legal_name.name.clone();
-
-        // Look up fund manager
         let manager = client.get_fund_manager(&lei).await?;
 
         let result = ManagerResult {
@@ -1159,7 +1262,24 @@ impl SemOsVerbOp for GleifGetManager {
             }),
         };
 
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
+        Ok(Some(serde_json::json!({
+            "_gleif_manager": serde_json::to_value(&result)?
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_manager").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-manager: pre_fetch result missing \
+                 (`_gleif_manager` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
@@ -1177,15 +1297,14 @@ impl SemOsVerbOp for GleifGetMasterFund {
     fn fqn(&self) -> &str {
         "gleif.get-master-fund"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         use crate::gleif::{MasterEntity, MasterFundResult};
-
-        let pool = scope.pool().clone();
 
         let lei = match json_extract_string_opt(args, "lei") {
             Some(l) => l,
@@ -1193,7 +1312,7 @@ impl SemOsVerbOp for GleifGetMasterFund {
                 let entity_id = json_extract_uuid_opt(args, ctx, "entity-id")
                     .ok_or_else(|| anyhow::anyhow!(":lei or :entity-id required"))?;
 
-                get_lei_for_entity(&pool, entity_id)
+                get_lei_for_entity(pool, entity_id)
                     .await?
                     .ok_or_else(|| anyhow::anyhow!("Entity {} has no LEI", entity_id))?
             }
@@ -1201,11 +1320,8 @@ impl SemOsVerbOp for GleifGetMasterFund {
 
         let client = GleifClient::new()?;
 
-        // Get the feeder fund record for its name
         let feeder = client.get_lei_record(&lei).await?;
         let feeder_name = feeder.attributes.entity.legal_name.name.clone();
-
-        // Look up master fund
         let master = client.get_master_fund(&lei).await?;
 
         let result = MasterFundResult {
@@ -1218,7 +1334,24 @@ impl SemOsVerbOp for GleifGetMasterFund {
             }),
         };
 
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(&result)?))
+        Ok(Some(serde_json::json!({
+            "_gleif_master_fund": serde_json::to_value(&result)?
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_master_fund").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.get-master-fund: pre_fetch result missing \
+                 (`_gleif_master_fund` absent from args)"
+            )
+        })?;
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
@@ -1236,12 +1369,13 @@ impl SemOsVerbOp for GleifLookupByIsin {
     fn fqn(&self) -> &str {
         "gleif.lookup-by-isin"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         use crate::gleif::IsinLookupResult;
 
         let isin = json_extract_string_opt(args, "isin")
@@ -1266,6 +1400,21 @@ impl SemOsVerbOp for GleifLookupByIsin {
             }),
         };
 
+        Ok(Some(serde_json::json!({ "_gleif_isin_lookup": result })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let result = args.get("_gleif_isin_lookup").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
+                "gleif.lookup-by-isin: pre_fetch result missing \
+                 (`_gleif_isin_lookup` absent from args)"
+            )
+        })?;
         Ok(VerbExecutionOutcome::Record(result))
     }
 }
@@ -1787,6 +1936,35 @@ impl SemOsVerbOp for GleifLookup {
     fn fqn(&self) -> &str {
         "gleif.lookup"
     }
+
+    /// Phase F.2: dispatcher delegates pre_fetch to the selected sub-op
+    /// so the sub-op's HTTP call (and any optional DB lookup for LEI)
+    /// runs outside the txn scope. Execute then delegates to the same
+    /// sub-op's execute, which reads the pre-fetched key from args.
+    async fn pre_fetch(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let target_type = json_extract_string_opt(args, "target-type")
+            .ok_or_else(|| anyhow::anyhow!(":target-type required (record|parent|children|manager|managed-funds|master-fund|umbrella|isin)"))?;
+        match target_type.as_str() {
+            "record" => GleifGetRecord.pre_fetch(args, ctx, pool).await,
+            "parent" => GleifGetParent.pre_fetch(args, ctx, pool).await,
+            "children" => GleifGetChildren.pre_fetch(args, ctx, pool).await,
+            "manager" => GleifGetManager.pre_fetch(args, ctx, pool).await,
+            "managed-funds" => GleifGetManagedFunds.pre_fetch(args, ctx, pool).await,
+            "master-fund" => GleifGetMasterFund.pre_fetch(args, ctx, pool).await,
+            "umbrella" => GleifGetUmbrella.pre_fetch(args, ctx, pool).await,
+            "isin" => GleifLookupByIsin.pre_fetch(args, ctx, pool).await,
+            other => Err(anyhow::anyhow!(
+                "Unknown GLEIF lookup target-type '{}'. Valid: record, parent, children, manager, managed-funds, master-fund, umbrella, isin",
+                other
+            )),
+        }
+    }
+
     async fn execute(
         &self,
         args: &serde_json::Value,

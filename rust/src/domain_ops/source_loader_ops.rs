@@ -123,6 +123,7 @@ impl SemOsVerbOp for SourcesSearch {
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
@@ -201,6 +202,7 @@ impl SemOsVerbOp for SourcesFetch {
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
@@ -333,6 +335,7 @@ impl SemOsVerbOp for CompaniesHouseSearch {
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let query = json_extract_string_opt(args, "query")
             .ok_or_else(|| anyhow::anyhow!(":query required"))?;
@@ -403,6 +406,7 @@ impl SemOsVerbOp for CompaniesHouseFetchCompany {
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
@@ -458,6 +462,7 @@ impl SemOsVerbOp for CompaniesHouseFetchPsc {
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
@@ -547,6 +552,7 @@ impl SemOsVerbOp for CompaniesHouseFetchOfficers {
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
@@ -618,6 +624,7 @@ impl SemOsVerbOp for CompaniesHouseImportCompany {
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
@@ -732,6 +739,7 @@ impl SemOsVerbOp for SecEdgarSearch {
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let query = json_extract_string_opt(args, "query")
             .ok_or_else(|| anyhow::anyhow!(":query required"))?;
@@ -794,6 +802,7 @@ impl SemOsVerbOp for SecEdgarFetchCompany {
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
@@ -848,6 +857,7 @@ impl SemOsVerbOp for SecEdgarFetchBeneficialOwners {
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
@@ -929,6 +939,7 @@ impl SemOsVerbOp for SecEdgarFetchFilings {
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
@@ -983,6 +994,7 @@ impl SemOsVerbOp for SecEdgarImportCompany {
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;

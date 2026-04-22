@@ -975,9 +975,16 @@ pub trait SemOsVerbOp: Send + Sync {
     /// from its normal args parameter — with no external I/O inside
     /// the inner txn (A1 invariant satisfied).
     ///
+    /// The `pool` argument is the same connection pool the dispatcher
+    /// will use to open the execute scope. Pre_fetch may use it for
+    /// READ-ONLY auto-commit queries (looking up an entity's LEI
+    /// before the HTTP call, for example). **Writes via the pool**
+    /// in pre_fetch bypass the execute-scope's transaction and are
+    /// not A1-compliant; do HTTP in pre_fetch, DB writes in execute.
+    ///
     /// Default: no pre-fetch. Override on read-only ops that must
     /// reach external services to build their response (e.g.
-    /// `bpmn.inspect`).
+    /// `bpmn.inspect`, `gleif.*` lookups).
     ///
     /// Returning `Err` here short-circuits the verb — the op never
     /// enters `execute()` and the dispatcher surfaces the error to
@@ -986,6 +993,7 @@ pub trait SemOsVerbOp: Send + Sync {
         &self,
         _args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
         Ok(None)
     }
