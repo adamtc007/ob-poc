@@ -31,6 +31,7 @@ pub(crate) mod parked_tokens;
 pub(crate) mod pending_dispatch_worker;
 pub(crate) mod pending_dispatches;
 pub(crate) mod request_state;
+pub(crate) mod saga_reaper;
 pub(crate) mod signal_relay;
 pub(crate) mod types;
 pub(crate) mod worker;
