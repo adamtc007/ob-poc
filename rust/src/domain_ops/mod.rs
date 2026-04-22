@@ -406,10 +406,10 @@ pub use trading_profile::{
 
 // GLEIF operations (LEI data enrichment)
 pub use gleif_ops::{
-    GleifEnrichOp, GleifGetChildrenOp, GleifGetManagedFundsOp, GleifGetManagerOp,
-    GleifGetMasterFundOp, GleifGetParentOp, GleifGetRecordOp, GleifGetUmbrellaOp,
-    GleifImportManagedFundsOp, GleifImportTreeOp, GleifLookupByIsinOp, GleifRefreshOp,
-    GleifResolveSuccessorOp, GleifSearchOp, GleifTraceOwnershipOp,
+    GleifEnrich, GleifGetChildren, GleifGetManagedFunds, GleifGetManager, GleifGetMasterFund,
+    GleifGetParent, GleifGetRecord, GleifGetUmbrella, GleifImportManagedFunds,
+    GleifImportToClientGroup, GleifImportTree, GleifLookup, GleifLookupByIsin, GleifRefresh,
+    GleifResolveSuccessor, GleifSearch, GleifTraceOwnership,
 };
 
 // Re-export the CustomOperation trait + registry from `dsl-runtime`.
@@ -633,6 +633,29 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(request_ops::DocumentRequest));
     registry.register(Arc::new(request_ops::DocumentUpload));
     registry.register(Arc::new(request_ops::DocumentWaive));
+
+    // Phase B Pattern B slice #77: gleif.* (17 verbs — LEI lookup,
+    // hierarchy import, ownership trace, successor resolution,
+    // client-group import; bridges to crate::gleif::{client, service}
+    // and crate::dsl_v2::{execution::DslExecutor, executor::ExecutionContext}
+    // for recursive idempotent entity/CBU/role creation).
+    registry.register(Arc::new(gleif_ops::GleifEnrich));
+    registry.register(Arc::new(gleif_ops::GleifSearch));
+    registry.register(Arc::new(gleif_ops::GleifImportTree));
+    registry.register(Arc::new(gleif_ops::GleifRefresh));
+    registry.register(Arc::new(gleif_ops::GleifGetRecord));
+    registry.register(Arc::new(gleif_ops::GleifGetParent));
+    registry.register(Arc::new(gleif_ops::GleifImportManagedFunds));
+    registry.register(Arc::new(gleif_ops::GleifGetChildren));
+    registry.register(Arc::new(gleif_ops::GleifTraceOwnership));
+    registry.register(Arc::new(gleif_ops::GleifGetManagedFunds));
+    registry.register(Arc::new(gleif_ops::GleifResolveSuccessor));
+    registry.register(Arc::new(gleif_ops::GleifGetUmbrella));
+    registry.register(Arc::new(gleif_ops::GleifGetManager));
+    registry.register(Arc::new(gleif_ops::GleifGetMasterFund));
+    registry.register(Arc::new(gleif_ops::GleifLookupByIsin));
+    registry.register(Arc::new(gleif_ops::GleifImportToClientGroup));
+    registry.register(Arc::new(gleif_ops::GleifLookup));
 }
 
 #[cfg(test)]
@@ -785,16 +808,18 @@ mod tests {
         assert!(!registry.has("temporal", "entity-history"));
         assert!(!registry.has("temporal", "compare-ownership"));
         // GLEIF operations (LEI data enrichment)
-        assert!(registry.has("gleif", "enrich"));
-        assert!(registry.has("gleif", "search"));
-        assert!(registry.has("gleif", "import-tree"));
-        assert!(registry.has("gleif", "refresh"));
-        assert!(registry.has("gleif", "get-record"));
-        assert!(registry.has("gleif", "get-parent"));
-        assert!(registry.has("gleif", "get-children"));
-        assert!(registry.has("gleif", "trace-ownership"));
-        assert!(registry.has("gleif", "get-managed-funds"));
-        assert!(registry.has("gleif", "resolve-successor"));
+        // Phase 5c-migrate Phase B Pattern B slice #77: gleif_ops moved to
+        // `sem_os_postgres::ops::gleif` via `extend_registry()`.
+        assert!(!registry.has("gleif", "enrich"));
+        assert!(!registry.has("gleif", "search"));
+        assert!(!registry.has("gleif", "import-tree"));
+        assert!(!registry.has("gleif", "refresh"));
+        assert!(!registry.has("gleif", "get-record"));
+        assert!(!registry.has("gleif", "get-parent"));
+        assert!(!registry.has("gleif", "get-children"));
+        assert!(!registry.has("gleif", "trace-ownership"));
+        assert!(!registry.has("gleif", "get-managed-funds"));
+        assert!(!registry.has("gleif", "resolve-successor"));
         // Phase 5c-migrate Phase B slice #37: BODS ops moved to
         // `sem_os_postgres::ops::bods::*`.
         assert!(!registry.has("bods", "discover-ubos"));
