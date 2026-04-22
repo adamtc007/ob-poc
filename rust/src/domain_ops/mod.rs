@@ -335,7 +335,7 @@ pub use request_ops::{
 // Phase 5a — semantic_ops relocated to dsl-runtime. Inventory registration
 // automatic; external ob-poc code does not import these types directly.
 pub use template_ops::{
-    TemplateBatchOp, TemplateBatchResult, TemplateInvokeOp, TemplateInvokeResult,
+    TemplateBatch, TemplateBatchResult, TemplateInvoke, TemplateInvokeResult,
 };
 
 pub use trading_profile::{
@@ -591,6 +591,13 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(bpmn_lite_ops::BpmnSignal));
     registry.register(Arc::new(bpmn_lite_ops::BpmnCancel));
     registry.register(Arc::new(bpmn_lite_ops::BpmnInspect));
+
+    // Phase B Pattern B slice #74: template.* (template invocation +
+    // batch execution; bridges to crate::templates::TemplateExpander,
+    // crate::dsl_v2::{parser, execution_plan, execution::DslExecutor,
+    // batch_executor::BatchExecutor, runtime_registry}).
+    registry.register(Arc::new(template_ops::TemplateInvoke));
+    registry.register(Arc::new(template_ops::TemplateBatch));
 }
 
 #[cfg(test)]
