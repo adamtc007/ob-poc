@@ -160,6 +160,40 @@ pub fn emit_pending_state_advance(
     }
 }
 
+/// Phase C.2 accessor (2026-04-22): typed read of the
+/// `_pending_state_advance` side channel after a verb executes. Returns
+/// the raw JSON the emitter placed — callers typically deserialise to
+/// `ob_poc_types::PendingStateAdvance`. When the verb did not emit
+/// (idempotent, validation failure, or simply doesn't participate in
+/// state-advance yet), returns `None`.
+///
+/// This is the read half of the contract that `emit_pending_state_advance`
+/// writes. Phase B.2b's Sequencer reads this after each step in the
+/// dispatch loop, aggregates across steps, then applies the union via
+/// SemOS inside the outer transaction before stage-9a commit.
+///
+/// The accessor also **removes** the key from `ctx.extensions` so
+/// subsequent verbs in the same plan don't see stale advance data from
+/// an earlier step. This matches the single-write, single-read
+/// contract the C.1/C.3 emitters assume.
+pub fn take_pending_state_advance(
+    ctx: &mut VerbExecutionContext,
+) -> Option<serde_json::Value> {
+    let obj = ctx.extensions.as_object_mut()?;
+    obj.remove("_pending_state_advance")
+}
+
+/// Non-destructive peek — for logging / observability paths that want
+/// to see the emitted advance without consuming it. Phase C.2 apply
+/// path uses `take_pending_state_advance` so the advance is applied
+/// exactly once; shadow logging uses `peek_pending_state_advance` so
+/// dispatch-level observability + stage-9a apply can coexist.
+pub fn peek_pending_state_advance(
+    ctx: &VerbExecutionContext,
+) -> Option<&serde_json::Value> {
+    ctx.extensions.as_object()?.get("_pending_state_advance")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,5 +226,59 @@ mod tests {
         ctx.symbols.insert("entity1".to_string(), id);
         let args = serde_json::json!({"entity": "@entity1"});
         assert_eq!(json_extract_uuid_opt(&args, &ctx, "entity").unwrap(), id);
+    }
+
+    #[test]
+    fn emit_and_peek_pending_state_advance_roundtrip() {
+        let mut ctx = VerbExecutionContext::default();
+        let entity_id = Uuid::new_v4();
+
+        // Nothing emitted yet.
+        assert!(peek_pending_state_advance(&ctx).is_none());
+
+        // Emit once.
+        emit_pending_state_advance(
+            &mut ctx,
+            entity_id,
+            "cbu:onboarded",
+            "cbu/trading-profile",
+            "test",
+        );
+
+        // Peek must return the shape the emitter wrote.
+        let peeked = peek_pending_state_advance(&ctx).expect("must be present");
+        assert_eq!(peeked["state_transitions"][0]["to_node"], "cbu:onboarded");
+        assert_eq!(peeked["constellation_marks"][0]["slot_path"], "cbu/trading-profile");
+        assert_eq!(peeked["writes_since_push_delta"], 1);
+
+        // Peek does NOT consume.
+        assert!(peek_pending_state_advance(&ctx).is_some());
+    }
+
+    #[test]
+    fn take_pending_state_advance_consumes_once() {
+        let mut ctx = VerbExecutionContext::default();
+        let entity_id = Uuid::new_v4();
+
+        emit_pending_state_advance(
+            &mut ctx,
+            entity_id,
+            "entity:ghost",
+            "entity/identity",
+            "test-consume",
+        );
+
+        let taken = take_pending_state_advance(&mut ctx).expect("must be present");
+        assert_eq!(taken["state_transitions"][0]["to_node"], "entity:ghost");
+
+        // Second take yields None — the key was removed.
+        assert!(take_pending_state_advance(&mut ctx).is_none());
+        assert!(peek_pending_state_advance(&ctx).is_none());
+    }
+
+    #[test]
+    fn take_pending_state_advance_returns_none_when_never_emitted() {
+        let mut ctx = VerbExecutionContext::default();
+        assert!(take_pending_state_advance(&mut ctx).is_none());
     }
 }
