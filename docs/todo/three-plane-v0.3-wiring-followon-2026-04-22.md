@@ -4,7 +4,20 @@
 **Source review:** `docs/todo/three-plane-implementation-peer-review-2026-04-22.md` findings F5-F10.
 **Spec:** `docs/todo/three-plane-architecture-v0.3.md` §§8.4, 10.3, 10.5, 10.7, 17.
 
-**Scope.** This plan wires the v0.3 destination-state invariants that are out-of-scope for the main
+## Phase-by-phase status (updated 2026-04-22 end-of-session)
+
+| Phase | v0.3 mapping | State at end of session | Commits this session |
+|-------|--------------|-------------------------|---------------------|
+| **A** — envelope wiring (F5) | 5c-wire | **COMPLETE** (A.1-A.4). Shadow envelope + trace_id threading + real BLAKE3 StateGateHash all shipped. Placeholder fields tagged `<phase_a_todo>` for future concretization (DagNodeId, WorkspaceSnapshotId) but hash is deterministic and cross-run byte-identical. | 44585376, 9a1f76c6, 0b60d9df, d57a91be |
+| **B** — single-dispatch (F6) | 5c-migrate final | **PRIMITIVES COMPLETE** (B.1, B.2a). `dispatch_plugin_via_sem_os_op_in_scope`, `execute_verb_in_scope`, `execute_plan_atomic_in_scope` all exist, tested, `#[allow(dead_code)]`-gated until B.2b migrates the Sequencer. **B.2b remaining: 1-2 weeks dedicated** to hoist Sequencer outer scope. | 00033390, bf49dd2b, c3942912 |
+| **C** — PendingStateAdvance (F7) | 5c-migrate state-advance | **PATTERN COMPLETE + 27/~50 verbs emitting.** Shared `emit_pending_state_advance` helper + `peek/take_pending_state_advance` accessors ready. Every verb family with clean state machine has at least one emitter; investor family has full 11-verb lifecycle coverage. Remaining ~23 verbs = mechanical 5-line calls. **Apply-in-txn (C.2 main) needs B.2b first.** | 12cc4dc1, e632270a, 2d174449, 607a3b80, 0fdeab11, ea612b31, 4ed2dd65 |
+| **D** — TOCTOU + row-version (F8, F9) | 5d | **MIGRATION STAGED** (D.1). SQL ready at `rust/migrations/20260422_row_version_entity_tables.sql`; NOT yet applied (needs operator approval). D.2 backfill + D.3 recheck require D.1 applied first. | 91aea971 |
+| **E** — dual-schema YAML (F10) | Phase 6 | **NOT STARTED.** 4-8 week effort per original plan: new `round-trip-harness` crate + YAML schema extensions + per-verb effect-equivalence proofs. | — |
+| **F** — Pattern B A1 (F11) | 5f | **GUARDRAIL + 3 LEDGER ROWS CLOSED.** L4 lint enforces no new A1 violations; current grandfathered-hits = **zero**. Closed: §2.1 MaintenanceReindexEmbeddings, §2.2 ActivateTeaching, §3.1 BpmnSignal, §3.1 BpmnCancel (verb + consumer + drainer registration). Open: §3.1 compile/start/inspect; §3.2-§3.4 source_loader/gleif/request (helper-indirect, needs Phase F.4 call-graph lint). | 66b6398b, d57a91be, 0cc4c834, 3760c60f, 94fc11b6 |
+
+## Scope
+
+This plan wires the v0.3 destination-state invariants that are out-of-scope for the main
 correction plan. Each phase here corresponds to a named v0.3 phase:
 
 - Phase A (F5) → v0.3 Phase 5c-wire (envelope construction)
@@ -19,6 +32,20 @@ order within a phase.
 
 **Cadence:** medium slices. Where a phase has heavy fan-out (B, D) it extends to R-sweep per-op or
 per-table.
+
+## What genuinely blocks v0.3 §17 Definition-of-Done
+
+After the 2026-04-22 session, three distinct work items remain and none can honestly land in a day:
+
+1. **Phase B.2b — Sequencer outer-scope migration.** Touches `execute_runbook_from`, `execute_runbook_with_pool`, the runbook executor's per-step txn management, and the downstream WorkflowDispatcher. ~1-2 week dedicated work. Blocks C.2 main (apply-in-txn) and D.3 (TOCTOU recheck inside txn).
+
+2. **Phase D.2 + D.3 — row-version backfill under live traffic + StateGateHash recheck.** Migration 20260422_row_version_entity_tables.sql ready; application + zero-downtime backfill for the 5 entity tables (cbu, entities, kyc_cases, deals, client_groups) takes 2-3 weeks. Blocks the real TOCTOU guarantee.
+
+3. **Phase E — dual-schema YAML + round-trip harness.** New crate (`round-trip-harness/`) + YAML schema extensions + per-verb effect-equivalence proofs (N ≥ 50 fixtures per dissolved CRUD verb). Blocks CRUD dissolution, which is 50-60% of the 625-op surface. 4-8 weeks.
+
+These three are the genuine remaining work. Everything else in the plan is either mechanical rollout (C.3 remainder, F.1 inspect/compile/start) or documented-and-tracked (F.2-F.4 Pattern B remediation for source_loader/gleif/request).
+
+---
 
 ---
 
