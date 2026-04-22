@@ -57,9 +57,9 @@ pub use errors::{CompilationError, CompilationErrorKind};
 #[cfg(feature = "database")]
 pub use executor::PostgresRunbookStore;
 pub use executor::{
-    compute_write_set, execute_runbook, execute_runbook_in_scope, ExecutionError, LockStats,
-    RunbookEvent, RunbookExecutionResult, RunbookStore, RunbookStoreBackend, StepExecutionResult,
-    StepExecutor, StepOutcome,
+    acquire_advisory_locks_on_scope, compute_write_set, execute_runbook, execute_runbook_in_scope,
+    ExecutionError, LockStats, RunbookEvent, RunbookExecutionResult, RunbookStore,
+    RunbookStoreBackend, StepExecutionResult, StepExecutor, StepOutcome,
 };
 pub use response::{
     ClarificationContext, ClarificationRequest, CompiledRunbookSummary, ConstraintViolationDetail,

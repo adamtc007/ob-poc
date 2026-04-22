@@ -1096,6 +1096,83 @@ pub async fn execute_runbook_with_pool(
 }
 
 // ---------------------------------------------------------------------------
+// acquire_advisory_locks_on_scope — Phase B.2b-ζ (2026-04-22)
+// ---------------------------------------------------------------------------
+
+/// Acquire advisory locks on an **existing** `TransactionScope` rather than
+/// opening a fresh pool transaction. Data mutations and locks share the
+/// same txn — when the scope commits, locks release atomically with the
+/// data; when it rolls back, locks release with the rollback.
+///
+/// This is the Phase B.2b-ζ companion to [`acquire_advisory_locks`]. Use
+/// from the Sequencer when a single outer scope spans multiple runbook
+/// entries: acquire locks once on scope open, hold them across the whole
+/// batch, release with scope commit/rollback at the end.
+///
+/// # Arguments
+/// - `scope`: the caller-owned transaction scope. This function takes
+///   `scope.transaction()` and issues `pg_advisory_xact_lock` calls on it.
+/// - `write_set`: UUIDs to lock, typically aggregated from `CompiledStep.write_set`.
+/// - `store`: used for holder-lookup on contention (same as the
+///   pool-based variant).
+///
+/// # Returns
+/// - `Ok(LockStats)` when all locks acquired. Caller keeps executing;
+///   locks auto-release when the scope commits or rolls back.
+/// - `Err(ExecutionError::LockTimeout)` on contention. Caller is
+///   responsible for rolling back the scope. Other concurrent sessions
+///   holding the locks are identified via the store when possible.
+pub async fn acquire_advisory_locks_on_scope(
+    scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    write_set: &BTreeSet<Uuid>,
+    store: &dyn RunbookStoreBackend,
+) -> Result<LockStats, ExecutionError> {
+    use crate::database::locks::{acquire_locks, LockError, LockKey, LockMode};
+
+    const LOCK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+    if write_set.is_empty() {
+        return Ok(LockStats::default());
+    }
+
+    let lock_keys: Vec<LockKey> = write_set
+        .iter()
+        .map(|id| LockKey::write("entity", id.to_string()))
+        .collect();
+
+    let lock_start = std::time::Instant::now();
+
+    match acquire_locks(scope.transaction(), &lock_keys, LockMode::Timeout(LOCK_TIMEOUT)).await {
+        Ok(result) => Ok(LockStats {
+            locks_acquired: result.acquired.len(),
+            lock_wait_ms: lock_start.elapsed().as_millis() as u64,
+        }),
+        Err(LockError::Contention {
+            entity_type,
+            entity_id,
+            holder_runbook_id,
+            ..
+        }) => {
+            let holder = if holder_runbook_id.is_some() {
+                holder_runbook_id.map(CompiledRunbookId)
+            } else {
+                store
+                    .lookup_lock_holder(&entity_type, &entity_id)
+                    .await
+                    .map(CompiledRunbookId)
+            };
+            let entity_uuid = Uuid::parse_str(&entity_id).unwrap_or(Uuid::nil());
+            Err(ExecutionError::LockTimeout {
+                entity_ids: vec![entity_uuid],
+                write_set: write_set.clone(),
+                holder_runbook_id: holder,
+            })
+        }
+        Err(LockError::Database(e)) => Err(ExecutionError::Database(e.to_string())),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // execute_runbook_in_scope — Phase B.2b-ε (2026-04-22)
 // ---------------------------------------------------------------------------
 
