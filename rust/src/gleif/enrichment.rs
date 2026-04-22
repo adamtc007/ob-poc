@@ -378,6 +378,130 @@ impl GleifEnrichmentService {
         })
     }
 
+    /// Phase F.3b-4 (2026-04-22): HTTP-only fetch for the corporate
+    /// tree. Produces a `CorporateTreeResult` that `persist_corporate_tree`
+    /// consumes. Exposed so `GleifImportTree::pre_fetch` can call it
+    /// outside the txn.
+    pub async fn fetch_corporate_tree_only(
+        &self,
+        root_lei: &str,
+        max_depth: usize,
+    ) -> Result<super::client::CorporateTreeResult> {
+        self.client.fetch_corporate_tree(root_lei, max_depth).await
+    }
+
+    /// Phase F.3b-4: DB-only persist phase. Takes the pre-fetched
+    /// `CorporateTreeResult` and writes all entities + relationships.
+    /// No HTTP.
+    #[allow(clippy::too_many_lines)]
+    pub async fn persist_corporate_tree(
+        &self,
+        root_lei: &str,
+        tree_result: super::client::CorporateTreeResult,
+    ) -> Result<TreeImportResult> {
+        let mut entities_created = 0;
+        let mut entities_updated = 0;
+        let mut relationships_created = 0;
+        let mut terminal_entities = Vec::new();
+
+        let records = &tree_result.records;
+        let discovered_relationships = &tree_result.relationships;
+
+        for record in records {
+            let lei = record.lei();
+
+            let existing_id = self.repository.find_entity_by_lei(lei).await?;
+
+            let entity_id = match existing_id {
+                Some(id) => {
+                    self.repository.update_entity_from_gleif(id, record).await?;
+                    entities_updated += 1;
+                    id
+                }
+                None => {
+                    let id = self.repository.create_entity_from_gleif(record).await?;
+                    entities_created += 1;
+                    id
+                }
+            };
+
+            self.repository
+                .insert_entity_names(entity_id, record)
+                .await?;
+            self.repository
+                .insert_entity_addresses(entity_id, record)
+                .await?;
+            self.repository
+                .insert_entity_identifiers(entity_id, record, &[])
+                .await?;
+
+            if record.relationships.is_none()
+                || (record
+                    .relationships
+                    .as_ref()
+                    .map(|r| r.direct_parent.is_none() && r.ultimate_parent.is_none())
+                    .unwrap_or(true))
+            {
+                if !record.is_fund() {
+                    terminal_entities.push(TerminalEntity {
+                        lei: lei.to_string(),
+                        name: record.attributes.entity.legal_name.name.clone(),
+                        exception: None,
+                    });
+                }
+            }
+        }
+
+        for rel in discovered_relationships {
+            let child_id = self.repository.find_entity_by_lei(&rel.child_lei).await?;
+
+            if let Some(child_entity_id) = child_id {
+                let parent_record = records.iter().find(|r| r.lei() == rel.parent_lei);
+                let parent_name =
+                    parent_record.map(|r| r.attributes.entity.legal_name.name.as_str());
+
+                let db_rel_type = match rel.relationship_type.as_str() {
+                    "DIRECT_PARENT" => "DIRECT_PARENT",
+                    "IS_FUND-MANAGED_BY" => "FUND_MANAGER",
+                    "IS_SUBFUND_OF" => "UMBRELLA_FUND",
+                    "IS_FEEDER_TO" => "MASTER_FUND",
+                    other => other,
+                };
+
+                self.repository
+                    .insert_parent_relationship(
+                        child_entity_id,
+                        &rel.parent_lei,
+                        parent_name,
+                        db_rel_type,
+                        None,
+                    )
+                    .await?;
+                relationships_created += 1;
+            }
+        }
+
+        let imported_leis: Vec<String> = records.iter().map(|r| r.lei().to_string()).collect();
+
+        tracing::info!(
+            root_lei = %root_lei,
+            entities_created = entities_created,
+            entities_updated = entities_updated,
+            relationships_created = relationships_created,
+            total_leis = imported_leis.len(),
+            "Corporate tree persisted from pre-fetched bundle"
+        );
+
+        Ok(TreeImportResult {
+            root_lei: root_lei.to_string(),
+            entities_created,
+            entities_updated,
+            relationships_created,
+            terminal_entities,
+            imported_leis,
+        })
+    }
+
     /// Import a corporate tree starting from a root LEI
     pub async fn import_corporate_tree(
         &self,

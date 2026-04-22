@@ -186,7 +186,7 @@ HTTP through pre_fetch and DB writes through execute.
 | op | status | notes |
 |---|---|---|
 | `GleifEnrich` | **CLOSED 2026-04-22** | `GleifEnrichmentService::fetch_all_for_enrich` (HTTP-only, bundles 9 GLEIF calls into `EnrichmentFetch`) + `persist_enrichment` (DB-only). GleifEnrich op wires pre_fetch → execute. Legacy `enrich_entity` kept as wrapper for non-op callers. |
-| `GleifImportTree` | **OPEN** | Needs same fetch/persist split of `import_corporate_tree` |
+| `GleifImportTree` | **CLOSED 2026-04-22** | New `fetch_corporate_tree_only` + `persist_corporate_tree` methods on GleifEnrichmentService. The HTTP is a single `client.fetch_corporate_tree(root, depth)` BFS that returns a `CorporateTreeResult` (records + discovered relationships); all DB writes happen in persist. Added `Serialize+Deserialize` derives on `CorporateTreeResult` and `DiscoveredRelationship` for the args round-trip. |
 | `GleifRefresh` | **CLOSED 2026-04-22** | Reuses `fetch_all_for_enrich` + `persist_enrichment` from GleifEnrich split. pre_fetch resolves refresh targets (single entity or bulk-stale-discovery DB query), then fetches an `EnrichmentFetch` bundle per target. Execute loops through bundles and calls `persist_enrichment`; per-target HTTP errors counted separately from persist errors (both surface in the `errors` response field). |
 | `GleifImportManagedFunds` | **OPEN** | Needs fetch-bundle for manager + all fund records + persistence loop |
 | `GleifResolveSuccessor` | **CLOSED 2026-04-22** | Misclassified in original ledger — on inspection is pure HTTP (chase successor chain via `get_lei_record` loop, no DB writes). Straight pre_fetch migration; result under `_gleif_successor`. |
@@ -204,7 +204,7 @@ service methods (`import_corporate_tree`, `refresh_entity`,
 `import_managed_funds`, etc.). Each method follows the same
 mechanical refactor — ~200-400 lines per method.
 
-**Status:** 14/17 ops CLOSED (§3.3a 11 + §3.3b 3); 3/17 OPEN (§3.3b remaining 3). **PARTIAL.**
+**Status:** 15/17 ops CLOSED (§3.3a 11 + §3.3b 4); 2/17 OPEN (§3.3b remaining 2). **PARTIAL.**
 
 ### 3.4 File: `request_ops.rs` — helper-indirect gRPC (CLOSED 2026-04-22, F.1c)
 

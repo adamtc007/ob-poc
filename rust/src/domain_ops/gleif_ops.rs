@@ -275,6 +275,31 @@ impl SemOsVerbOp for GleifImportTree {
     fn fqn(&self) -> &str {
         "gleif.import-tree"
     }
+
+    /// Phase F.3b (2026-04-22): HTTP-only fetch of the corporate tree
+    /// (BFS from root LEI up to `:max-depth`). Execute handles all DB
+    /// writes using the pre-fetched `CorporateTreeResult`.
+    async fn pre_fetch(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let root_lei = json_extract_string_opt(args, "root-lei")
+            .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
+        let max_depth = json_extract_int_opt(args, "max-depth").unwrap_or(3) as usize;
+
+        let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
+        let tree = service
+            .fetch_corporate_tree_only(&root_lei, max_depth)
+            .await?;
+
+        Ok(Some(serde_json::json!({
+            "_gleif_tree_fetched": serde_json::to_value(tree)?,
+            "_gleif_tree_root_lei": root_lei,
+        })))
+    }
+
     async fn execute(
         &self,
         args: &serde_json::Value,
@@ -283,13 +308,30 @@ impl SemOsVerbOp for GleifImportTree {
     ) -> Result<VerbExecutionOutcome> {
         let pool = scope.pool().clone();
 
-        let root_lei = json_extract_string_opt(args, "root-lei")
-            .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
+        let root_lei = args
+            .get("_gleif_tree_root_lei")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-tree: pre_fetch result missing \
+                     (`_gleif_tree_root_lei` absent from args)"
+                )
+            })?
+            .to_string();
 
-        let max_depth = json_extract_int_opt(args, "max-depth").unwrap_or(3) as usize;
+        let tree: crate::gleif::client::CorporateTreeResult = args
+            .get("_gleif_tree_fetched")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-tree: pre_fetch result missing \
+                     (`_gleif_tree_fetched` absent from args)"
+                )
+            })??;
 
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
-        let result = service.import_corporate_tree(&root_lei, max_depth).await?;
+        let result = service.persist_corporate_tree(&root_lei, tree).await?;
 
         let result_json = serde_json::json!({
             "root_lei": result.root_lei,
@@ -299,7 +341,6 @@ impl SemOsVerbOp for GleifImportTree {
             "terminal_entities": result.terminal_entities.len(),
         });
 
-        // Log research action if decision-id provided
         if let Some(decision_id) = json_extract_uuid_opt(args, ctx, "decision-id") {
             log_research_action(
                 &pool,
