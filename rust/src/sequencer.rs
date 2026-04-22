@@ -63,6 +63,7 @@ use crate::runbook::envelope::ReplayEnvelope;
 #[cfg(feature = "database")]
 use crate::runbook::executor::PostgresRunbookStore;
 use crate::runbook::executor::{execute_runbook_with_pool, RunbookStoreBackend, StepOutcome};
+use crate::runbook::CompiledRunbookId;
 use crate::runbook::step_executor_bridge::{
     DslExecutorV2StepExecutor, DslStepExecutor, VerbExecutionPortStepExecutor,
 };
@@ -5937,6 +5938,38 @@ impl ReplOrchestratorV2 {
         fallback_version: u64,
         session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
     ) -> StepOutcome {
+        self.execute_entry_via_gate_impl(
+            entry,
+            session_id,
+            is_durable,
+            runbook_id,
+            fallback_version,
+            session_stack,
+            None,
+        )
+        .await
+    }
+
+    /// Phase B.2b-ζ (2026-04-22): scope-aware variant of
+    /// [`Self::execute_entry_via_gate`]. When `scope` is `Some`, routes
+    /// the step through `execute_runbook_in_scope` against the caller-
+    /// owned transaction. When `None`, preserves the legacy per-verb
+    /// transaction semantics via `execute_runbook_with_pool`.
+    ///
+    /// Only `execute_runbook_from` currently passes `Some(scope)`; the
+    /// other call sites (park-resume, direct single-entry execute)
+    /// keep `None` — they don't run in a multi-entry batch and so
+    /// can't benefit from a shared outer scope.
+    async fn execute_entry_via_gate_impl(
+        &self,
+        entry: &RunbookEntry,
+        session_id: Uuid,
+        is_durable: bool,
+        runbook_id: Uuid,
+        fallback_version: u64,
+        session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
+        scope: Option<&mut dyn dsl_runtime::tx::TransactionScope>,
+    ) -> StepOutcome {
         // Construct the store backend: Postgres when pool available, in-memory fallback.
         // This ensures lock events, status events, and holder lookups fire in production
         // (Phase D: RunbookStoreBackend trait wiring).
@@ -6000,13 +6033,30 @@ impl ReplOrchestratorV2 {
                 })
         };
 
+        // Dispatch helper: picks between in-scope and with-pool paths.
+        async fn run_through_gate(
+            store: &dyn RunbookStoreBackend,
+            compiled_id: CompiledRunbookId,
+            bridge: &dyn crate::runbook::StepExecutor,
+            scope: Option<&mut dyn dsl_runtime::tx::TransactionScope>,
+            pool: Option<&sqlx::PgPool>,
+        ) -> Result<crate::runbook::executor::RunbookExecutionResult, crate::runbook::ExecutionError> {
+            match scope {
+                Some(s) => {
+                    crate::runbook::execute_runbook_in_scope(store, compiled_id, None, bridge, s)
+                        .await
+                }
+                None => {
+                    execute_runbook_with_pool(store, compiled_id, None, bridge, pool).await
+                }
+            }
+        }
+
         if is_durable {
             if let Some(ref exec) = self.executor_v2 {
                 let bridge =
                     DslExecutorV2StepExecutor::new(exec.clone(), runbook_id, session_stack);
-                match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool())
-                    .await
-                {
+                match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
                     Ok(result) => extract_first_outcome(result),
                     Err(e) => StepOutcome::Failed {
                         error: format!("Execution gate error: {}", e),
@@ -6015,9 +6065,7 @@ impl ReplOrchestratorV2 {
             } else {
                 // No V2 executor — fall back to sync bridge (never parks).
                 let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-                match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool())
-                    .await
-                {
+                match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
                     Ok(result) => extract_first_outcome(result),
                     Err(e) => StepOutcome::Failed {
                         error: format!("Execution gate error: {}", e),
@@ -6031,7 +6079,7 @@ impl ReplOrchestratorV2 {
                 sem_os_core::principal::Principal::system(),
                 Some(session_id),
             );
-            match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool()).await {
+            match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
                 Ok(result) => extract_first_outcome(result),
                 Err(e) => StepOutcome::Failed {
                     error: format!("Execution gate error: {}", e),
@@ -6039,7 +6087,7 @@ impl ReplOrchestratorV2 {
             }
         } else {
             let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-            match execute_runbook_with_pool(store, compiled_id, None, &bridge, self.pool()).await {
+            match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
                 Ok(result) => extract_first_outcome(result),
                 Err(e) => StepOutcome::Failed {
                     error: format!("Execution gate error: {}", e),
