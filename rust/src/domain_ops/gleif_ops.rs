@@ -672,6 +672,139 @@ impl SemOsVerbOp for GleifImportManagedFunds {
     fn fqn(&self) -> &str {
         "gleif.import-managed-funds"
     }
+
+    /// Phase F.3b-5 (2026-04-22): all HTTP runs in pre_fetch. The
+    /// previously conditional HTTP inside `get_or_create_entity_by_lei`
+    /// is eliminated by pre-checking DB existence for every LEI we
+    /// MIGHT need to create, then HTTP-fetching only the records for
+    /// LEIs NOT already in the DB. Execute uses the pre-fetched
+    /// records via `get_or_create_entity_by_lei_from_prefetched`.
+    async fn pre_fetch(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let manager_lei = json_extract_string_opt(args, "manager-lei");
+        let name_pattern = json_extract_string_opt(args, "name-pattern");
+
+        if manager_lei.is_none() && name_pattern.is_none() {
+            return Err(anyhow::anyhow!(":manager-lei or :name-pattern required"));
+        }
+
+        let ultimate_client_lei = json_extract_string_opt(args, "ultimate-client-lei");
+        let limit = json_extract_int_opt(args, "limit")
+            .map(|l| l as usize)
+            .unwrap_or(1000);
+
+        let client = GleifClient::new()?;
+
+        // --- HTTP Phase 1: fetch funds list + optional manager record.
+        let mut funds = Vec::new();
+        let mut search_method = "relationship";
+
+        if let Some(ref lei) = manager_lei {
+            funds = client.get_managed_funds(lei).await?;
+
+            if funds.is_empty() {
+                if let Some(ref pattern) = name_pattern {
+                    funds = client.search_funds_by_name(pattern, limit).await?;
+                    search_method = "name_search";
+                } else {
+                    let manager_record = client.get_lei_record(lei).await?;
+                    let manager_name = &manager_record.attributes.entity.legal_name.name;
+                    let search_prefix = manager_name
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or(manager_name);
+                    funds = client.search_funds_by_name(search_prefix, limit).await?;
+                    search_method = "name_search_auto";
+                }
+            }
+        } else if let Some(ref pattern) = name_pattern {
+            funds = client.search_funds_by_name(pattern, limit).await?;
+            search_method = "name_search";
+        }
+
+        funds.truncate(limit);
+
+        // --- Collect LEIs that might need entity creation.
+        let mut dep_leis: Vec<String> = Vec::new();
+        if let Some(ref lei) = manager_lei {
+            dep_leis.push(lei.clone());
+        }
+        if let Some(ref lei) = ultimate_client_lei {
+            dep_leis.push(lei.clone());
+        }
+        for fund in &funds {
+            dep_leis.push(fund.lei().to_string());
+            if let Some(ref rels) = fund.relationships {
+                if let Some(ref umbrella) = rels.umbrella_fund {
+                    if let Some(ref url) = umbrella.links.related {
+                        if let Some(umbrella_lei) = url.split('/').next_back() {
+                            dep_leis.push(umbrella_lei.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        dep_leis.sort();
+        dep_leis.dedup();
+
+        // --- Pre-fetched records map (seeded with what we already have).
+        let mut prefetched: HashMap<String, LeiRecord> = HashMap::new();
+        for fund in &funds {
+            prefetched.insert(fund.lei().to_string(), fund.clone());
+        }
+
+        // --- HTTP Phase 2: for each dep LEI that's NOT in DB AND NOT
+        //     already in prefetched (i.e. not a fund), fetch its record.
+        for lei in &dep_leis {
+            if prefetched.contains_key(lei) {
+                continue;
+            }
+            // DB existence check — if the entity already exists, we
+            // won't need the record to create it.
+            let in_funds: Option<Uuid> =
+                sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entity_funds WHERE lei = $1"#)
+                    .bind(lei)
+                    .fetch_optional(pool)
+                    .await?;
+            if in_funds.is_some() {
+                continue;
+            }
+            let in_lcs: Option<Uuid> = sqlx::query_scalar(
+                r#"SELECT entity_id FROM "ob-poc".entity_limited_companies WHERE lei = $1"#,
+            )
+            .bind(lei)
+            .fetch_optional(pool)
+            .await?;
+            if in_lcs.is_some() {
+                continue;
+            }
+            // Not in DB and not already fetched → HTTP fetch.
+            match client.get_lei_record(lei).await {
+                Ok(record) => {
+                    prefetched.insert(lei.clone(), record);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        lei = %lei,
+                        error = %e,
+                        "gleif.import-managed-funds pre_fetch: failed to fetch LEI record; \
+                         execute will error if this LEI turns out to need creation"
+                    );
+                }
+            }
+        }
+
+        Ok(Some(serde_json::json!({
+            "_gleif_import_mf_funds": serde_json::to_value(&funds)?,
+            "_gleif_import_mf_prefetched": serde_json::to_value(&prefetched)?,
+            "_gleif_import_mf_search_method": search_method,
+        })))
+    }
+
     async fn execute(
         &self,
         args: &serde_json::Value,
@@ -682,70 +815,38 @@ impl SemOsVerbOp for GleifImportManagedFunds {
 
         let manager_lei = json_extract_string_opt(args, "manager-lei");
         let name_pattern = json_extract_string_opt(args, "name-pattern");
-
-        // Either manager-lei or name-pattern is required
-        if manager_lei.is_none() && name_pattern.is_none() {
-            return Err(anyhow::anyhow!(":manager-lei or :name-pattern required"));
-        }
-
         let ultimate_client_lei = json_extract_string_opt(args, "ultimate-client-lei");
-
         let create_cbus = json_extract_bool_opt(args, "create-cbus").unwrap_or(true);
-
-        let limit = json_extract_int_opt(args, "limit")
-            .map(|l| l as usize)
-            .unwrap_or(1000); // Default limit to prevent runaway imports
-
         let dry_run = json_extract_bool_opt(args, "dry-run").unwrap_or(false);
 
-        let client = GleifClient::new()?;
-
-        // Fetch funds - try relationship endpoint first, then fall back to name search
-        let mut funds = Vec::new();
-        let mut search_method = "relationship";
-
-        if let Some(ref lei) = manager_lei {
-            tracing::info!("Fetching managed funds for manager LEI: {}", lei);
-            funds = client.get_managed_funds(lei).await?;
-
-            // If relationship endpoint returns nothing, try name-based search
-            if funds.is_empty() {
-                if let Some(ref pattern) = name_pattern {
-                    tracing::info!(
-                        "Relationship endpoint empty, falling back to name search: {}",
-                        pattern
-                    );
-                    funds = client.search_funds_by_name(pattern, limit).await?;
-                    search_method = "name_search";
-                } else {
-                    // Try to get manager name for fallback search
-                    let manager_record = client.get_lei_record(lei).await?;
-                    let manager_name = &manager_record.attributes.entity.legal_name.name;
-
-                    // Extract a searchable prefix (e.g., "Allianz" from "Allianz Global Investors GmbH")
-                    let search_prefix = manager_name
-                        .split_whitespace()
-                        .next()
-                        .unwrap_or(manager_name);
-                    tracing::info!(
-                        "Relationship endpoint empty, falling back to name search with prefix: {}",
-                        search_prefix
-                    );
-                    funds = client.search_funds_by_name(search_prefix, limit).await?;
-                    search_method = "name_search_auto";
-                }
-            }
-        } else if let Some(ref pattern) = name_pattern {
-            tracing::info!("Searching funds by name pattern: {}", pattern);
-            funds = client.search_funds_by_name(pattern, limit).await?;
-            search_method = "name_search";
-        }
-
-        // Apply limit
-        funds.truncate(limit);
+        let funds: Vec<LeiRecord> = args
+            .get("_gleif_import_mf_funds")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-managed-funds: pre_fetch result missing \
+                     (`_gleif_import_mf_funds` absent from args)"
+                )
+            })??;
+        let prefetched: HashMap<String, LeiRecord> = args
+            .get("_gleif_import_mf_prefetched")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-managed-funds: pre_fetch result missing \
+                     (`_gleif_import_mf_prefetched` absent from args)"
+                )
+            })??;
+        let search_method = args
+            .get("_gleif_import_mf_search_method")
+            .and_then(|v| v.as_str())
+            .unwrap_or("relationship")
+            .to_string();
 
         tracing::info!(
-            "Found {} funds to import via {}",
+            "gleif.import-managed-funds: {} funds (via {})",
             funds.len(),
             search_method
         );
@@ -762,7 +863,6 @@ impl SemOsVerbOp for GleifImportManagedFunds {
                     })
                 })
                 .collect();
-
             return Ok(VerbExecutionOutcome::Record(serde_json::json!({
                 "dry_run": true,
                 "manager_lei": manager_lei,
@@ -773,16 +873,14 @@ impl SemOsVerbOp for GleifImportManagedFunds {
             })));
         }
 
-        // Get or create manager entity (only if manager_lei provided)
         let manager_entity_id = if let Some(ref lei) = manager_lei {
-            Some(get_or_create_entity_by_lei(&pool, &client, lei).await?)
+            Some(get_or_create_entity_by_lei_from_prefetched(&pool, lei, &prefetched).await?)
         } else {
             None
         };
 
-        // Get or create ultimate client entity (if provided)
         let ultimate_client_entity_id = if let Some(ref uc_lei) = ultimate_client_lei {
-            Some(get_or_create_entity_by_lei(&pool, &client, uc_lei).await?)
+            Some(get_or_create_entity_by_lei_from_prefetched(&pool, uc_lei, &prefetched).await?)
         } else {
             None
         };
@@ -792,7 +890,7 @@ impl SemOsVerbOp for GleifImportManagedFunds {
         let mut roles_assigned = 0;
 
         for fund in &funds {
-            let fund_lei = &fund.lei();
+            let fund_lei = fund.lei();
             let fund_name = &fund.attributes.entity.legal_name.name;
             let jurisdiction = fund
                 .attributes
@@ -801,45 +899,39 @@ impl SemOsVerbOp for GleifImportManagedFunds {
                 .as_deref()
                 .unwrap_or("LU");
 
-            // Get or create fund entity
             let fund_entity_id = get_or_create_entity_from_record(&pool, fund).await?;
             entities_created += 1;
 
             if create_cbus {
-                // Create CBU for the fund
                 let cbu_id = create_fund_cbu(&pool, fund_name, jurisdiction).await?;
                 cbus_created += 1;
 
-                // Assign ASSET_OWNER role (fund owns itself)
                 assign_role(&pool, cbu_id, fund_entity_id, "ASSET_OWNER").await?;
                 roles_assigned += 1;
 
-                // Assign INVESTMENT_MANAGER and MANAGEMENT_COMPANY roles if manager known
                 if let Some(mgr_id) = manager_entity_id {
                     assign_role(&pool, cbu_id, mgr_id, "INVESTMENT_MANAGER").await?;
                     roles_assigned += 1;
-
-                    // Assign MANAGEMENT_COMPANY role (same as IM for self-managed)
                     assign_role(&pool, cbu_id, mgr_id, "MANAGEMENT_COMPANY").await?;
                     roles_assigned += 1;
                 }
 
-                // Assign ULTIMATE_CLIENT role if provided
                 if let Some(uc_id) = ultimate_client_entity_id {
                     assign_role(&pool, cbu_id, uc_id, "ULTIMATE_CLIENT").await?;
                     roles_assigned += 1;
                 }
 
-                // Check for umbrella fund relationship
                 if let Some(ref rels) = fund.relationships {
                     if let Some(ref umbrella) = rels.umbrella_fund {
                         if let Some(ref url) = umbrella.links.related {
                             if let Some(umbrella_lei) = url.split('/').next_back() {
-                                // Get or create umbrella entity
                                 let umbrella_entity_id =
-                                    get_or_create_entity_by_lei(&pool, &client, umbrella_lei)
-                                        .await?;
-                                // Assign SICAV role (umbrella is the SICAV)
+                                    get_or_create_entity_by_lei_from_prefetched(
+                                        &pool,
+                                        umbrella_lei,
+                                        &prefetched,
+                                    )
+                                    .await?;
                                 assign_role(&pool, cbu_id, umbrella_entity_id, "SICAV").await?;
                                 roles_assigned += 1;
                             }
@@ -861,7 +953,6 @@ impl SemOsVerbOp for GleifImportManagedFunds {
             "roles_assigned": roles_assigned,
         });
 
-        // Log research action if decision-id provided
         if let Some(decision_id) = json_extract_uuid_opt(args, ctx, "decision-id") {
             log_research_action(
                 &pool,
@@ -879,39 +970,55 @@ impl SemOsVerbOp for GleifImportManagedFunds {
 }
 
 // Helper functions for GleifImportManagedFunds
+
+/// Phase F.3b-5 (2026-04-22): DB-only variant of
+/// `get_or_create_entity_by_lei`. Uses a pre-fetched records map
+/// instead of calling HTTP when the entity needs to be created.
+/// The caller (pre_fetch in `GleifImportManagedFunds`) is
+/// responsible for populating `prefetched_records` with every LEI
+/// that might need creation.
 #[cfg(feature = "database")]
-async fn get_or_create_entity_by_lei(
+async fn get_or_create_entity_by_lei_from_prefetched(
     pool: &PgPool,
-    client: &GleifClient,
     lei: &str,
+    prefetched_records: &HashMap<String, LeiRecord>,
 ) -> Result<Uuid> {
-    // Check if entity exists in entity_funds first (for FUND category)
+    // Same DB checks as get_or_create_entity_by_lei.
     let existing: Option<Uuid> =
         sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entity_funds WHERE lei = $1"#)
             .bind(lei)
             .fetch_optional(pool)
             .await?;
-
     if let Some(id) = existing {
         return Ok(id);
     }
 
-    // Also check entity_limited_companies (for non-fund entities like ManCos)
     let existing: Option<Uuid> = sqlx::query_scalar(
         r#"SELECT entity_id FROM "ob-poc".entity_limited_companies WHERE lei = $1"#,
     )
     .bind(lei)
     .fetch_optional(pool)
     .await?;
-
     if let Some(id) = existing {
         return Ok(id);
     }
 
-    // Fetch from GLEIF and create
-    let record = client.get_lei_record(lei).await?;
-    get_or_create_entity_from_record(pool, &record).await
+    // NOT in DB — use the pre-fetched record instead of calling HTTP.
+    let record = prefetched_records.get(lei).ok_or_else(|| {
+        anyhow::anyhow!(
+            "LEI {} was not pre-fetched. Pre_fetch must include all \
+             LEIs that could need entity creation.",
+            lei
+        )
+    })?;
+    get_or_create_entity_from_record(pool, record).await
 }
+
+// Phase F.3b-5 (2026-04-22): `get_or_create_entity_by_lei` (the HTTP-
+// on-miss variant) was removed — all callers migrated to
+// `get_or_create_entity_by_lei_from_prefetched` which takes a
+// pre-fetched records map instead of calling HTTP. This closes the
+// last A1 violation path in gleif_ops.rs.
 
 #[cfg(feature = "database")]
 async fn get_or_create_entity_from_record(pool: &PgPool, record: &LeiRecord) -> Result<Uuid> {
@@ -1703,6 +1810,50 @@ impl SemOsVerbOp for GleifImportToClientGroup {
     fn fqn(&self) -> &str {
         "gleif.import-to-client-group"
     }
+
+    /// Phase F.3b-6 (2026-04-22): tree fetch runs in pre_fetch (all
+    /// HTTP outside txn). Execute does `persist_corporate_tree` + the
+    /// client-group-specific DB work (discovery status update,
+    /// entity-group membership, role assignments, relationship
+    /// creation).
+    async fn pre_fetch(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let root_lei = json_extract_string_opt(args, "root-lei")
+            .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
+        let max_depth = json_extract_int_opt(args, "max-depth").unwrap_or(3) as usize;
+        let include_funds = json_extract_bool_opt(args, "include-funds").unwrap_or(false);
+        let max_funds_per_manco =
+            json_extract_int_opt(args, "max-funds-per-manco").map(|v| v as usize);
+
+        let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
+
+        let tree = if include_funds {
+            let options = TreeFetchOptions {
+                max_depth,
+                include_managed_funds: true,
+                include_fund_structures: true,
+                include_master_feeder: true,
+                fund_type_filter: vec![],
+                fund_jurisdiction_filter: vec![],
+                max_funds_per_manco: max_funds_per_manco.or(Some(500)),
+            };
+            service
+                .fetch_corporate_tree_with_options_only(&root_lei, options)
+                .await?
+        } else {
+            service.fetch_corporate_tree_only(&root_lei, max_depth).await?
+        };
+
+        Ok(Some(serde_json::json!({
+            "_gleif_icg_tree": serde_json::to_value(tree)?,
+            "_gleif_icg_root_lei": root_lei,
+        })))
+    }
+
     async fn execute(
         &self,
         args: &serde_json::Value,
@@ -1712,14 +1863,27 @@ impl SemOsVerbOp for GleifImportToClientGroup {
         let pool = scope.pool().clone();
 
         let group_id = json_get_required_uuid(args, "group-id")?;
-        let root_lei = json_extract_string_opt(args, "root-lei")
-            .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
-        let max_depth = json_extract_int_opt(args, "max-depth").unwrap_or(3) as usize;
+        let root_lei = args
+            .get("_gleif_icg_root_lei")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-to-client-group: pre_fetch result missing \
+                     (`_gleif_icg_root_lei` absent from args)"
+                )
+            })?
+            .to_string();
 
-        // New: fund inclusion options
-        let include_funds = json_extract_bool_opt(args, "include-funds").unwrap_or(false);
-        let max_funds_per_manco =
-            json_extract_int_opt(args, "max-funds-per-manco").map(|v| v as usize);
+        let tree: crate::gleif::client::CorporateTreeResult = args
+            .get("_gleif_icg_tree")
+            .cloned()
+            .map(serde_json::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.import-to-client-group: pre_fetch result missing \
+                     (`_gleif_icg_tree` absent from args)"
+                )
+            })??;
 
         // Start discovery status
         sqlx::query!(
@@ -1738,26 +1902,9 @@ impl SemOsVerbOp for GleifImportToClientGroup {
         .execute(&pool)
         .await?;
 
-        // Import the GLEIF tree (creates/updates entities)
+        // Persist the pre-fetched corporate tree (all DB writes).
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
-
-        // Use enhanced traversal if including funds, otherwise basic traversal
-        let tree_result = if include_funds {
-            let options = TreeFetchOptions {
-                max_depth,
-                include_managed_funds: true,
-                include_fund_structures: true,
-                include_master_feeder: true,
-                fund_type_filter: vec![],
-                fund_jurisdiction_filter: vec![],
-                max_funds_per_manco: max_funds_per_manco.or(Some(500)),
-            };
-            service
-                .import_corporate_tree_with_options(&root_lei, options)
-                .await?
-        } else {
-            service.import_corporate_tree(&root_lei, max_depth).await?
-        };
+        let tree_result = service.persist_corporate_tree(&root_lei, tree).await?;
 
         // Get all entities with LEIs that were part of this import
         // We use the imported_leis from tree_result to ensure we get exactly the entities
@@ -2100,6 +2247,7 @@ impl SemOsVerbOp for GleifImportToClientGroup {
         .execute(&pool)
         .await?;
 
+        let include_funds = json_extract_bool_opt(args, "include-funds").unwrap_or(false);
         let result = serde_json::json!({
             "group_id": group_id,
             "root_lei": root_lei,

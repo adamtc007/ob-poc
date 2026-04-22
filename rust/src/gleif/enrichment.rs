@@ -390,6 +390,19 @@ impl GleifEnrichmentService {
         self.client.fetch_corporate_tree(root_lei, max_depth).await
     }
 
+    /// Phase F.3b-6 (2026-04-22): HTTP-only fetch for the enhanced
+    /// corporate tree (with fund inclusion options). Used by
+    /// `GleifImportToClientGroup::pre_fetch` when `include-funds=true`.
+    pub async fn fetch_corporate_tree_with_options_only(
+        &self,
+        root_lei: &str,
+        options: super::client::TreeFetchOptions,
+    ) -> Result<super::client::CorporateTreeResult> {
+        self.client
+            .fetch_corporate_tree_with_options(root_lei, options)
+            .await
+    }
+
     /// Phase F.3b-4: DB-only persist phase. Takes the pre-fetched
     /// `CorporateTreeResult` and writes all entities + relationships.
     /// No HTTP.

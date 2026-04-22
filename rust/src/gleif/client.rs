@@ -36,7 +36,7 @@ pub struct CorporateTreeResult {
 }
 
 /// Options for controlling corporate tree traversal behavior
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TreeFetchOptions {
     /// Maximum depth for consolidation hierarchy traversal
     pub max_depth: usize,

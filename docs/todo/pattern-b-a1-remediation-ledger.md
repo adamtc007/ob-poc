@@ -1,9 +1,10 @@
 # Pattern A / Pattern B — A1 Remediation Ledger
 
-> **Status:** OPEN. Must close before the three-plane refactor is Done.
+> **Status: CLOSED 2026-04-22.** All 37 ops across 6 files remediated. Layer 1 L4 lint PASS with 0 grandfathered hits.
 > **Created:** 2026-04-18
-> **Decision reference:** D11 resolution = Option III (Hybrid). Pattern A gates Phase 0; Pattern B gates Phase 6 (not Phase 5 start).
-> **Do not delete this file until every row in §2 and §3 reads `CLOSED`.**
+> **Closed:** 2026-04-22 (late session)
+> **Decision reference:** D11 resolution = Option III (Hybrid). Pattern A gated Phase 0; Pattern B gated Phase 6 (not Phase 5 start). Both now CLOSED.
+> **This file remains in the repo as historical record** — the compromise was honoured in full.
 
 ---
 
@@ -188,9 +189,9 @@ HTTP through pre_fetch and DB writes through execute.
 | `GleifEnrich` | **CLOSED 2026-04-22** | `GleifEnrichmentService::fetch_all_for_enrich` (HTTP-only, bundles 9 GLEIF calls into `EnrichmentFetch`) + `persist_enrichment` (DB-only). GleifEnrich op wires pre_fetch → execute. Legacy `enrich_entity` kept as wrapper for non-op callers. |
 | `GleifImportTree` | **CLOSED 2026-04-22** | New `fetch_corporate_tree_only` + `persist_corporate_tree` methods on GleifEnrichmentService. The HTTP is a single `client.fetch_corporate_tree(root, depth)` BFS that returns a `CorporateTreeResult` (records + discovered relationships); all DB writes happen in persist. Added `Serialize+Deserialize` derives on `CorporateTreeResult` and `DiscoveredRelationship` for the args round-trip. |
 | `GleifRefresh` | **CLOSED 2026-04-22** | Reuses `fetch_all_for_enrich` + `persist_enrichment` from GleifEnrich split. pre_fetch resolves refresh targets (single entity or bulk-stale-discovery DB query), then fetches an `EnrichmentFetch` bundle per target. Execute loops through bundles and calls `persist_enrichment`; per-target HTTP errors counted separately from persist errors (both surface in the `errors` response field). |
-| `GleifImportManagedFunds` | **OPEN (needs redesign)** | Uses `get_or_create_entity_by_lei` helper which does conditional HTTP based on DB state (fetches LEI record only if entity doesn't already exist). Moving this to pre_fetch requires either (a) pre-fetching all POSSIBLE umbrella/ManCo records unconditionally then using whichever the DB didn't already have, or (b) two-pass with a pre-resolution DB check. Clean fit is unclear; likely needs a focused design slice. |
+| `GleifImportManagedFunds` | **CLOSED 2026-04-22** | Two-pass pre_fetch: (1) HTTP fetch funds list (+ optional manager record for fallback search), (2) collect all dependency LEIs (manager, ultimate_client, funds, umbrellas), DB-check each for entity existence, HTTP fetch records only for LEIs NOT in DB (pre-populate a `prefetched_records` map). Execute uses new `get_or_create_entity_by_lei_from_prefetched` helper that does DB checks + falls back to the pre-fetched record instead of HTTP. The original `get_or_create_entity_by_lei` function was removed entirely as the last A1 violation path. |
 | `GleifResolveSuccessor` | **CLOSED 2026-04-22** | Misclassified in original ledger — on inspection is pure HTTP (chase successor chain via `get_lei_record` loop, no DB writes). Straight pre_fetch migration; result under `_gleif_successor`. |
-| `GleifImportToClientGroup` | **OPEN (needs redesign)** | Same helper-conditional-HTTP pattern as `GleifImportManagedFunds`. Deferred to the same design slice. |
+| `GleifImportToClientGroup` | **CLOSED 2026-04-22** | Tree fetch (`fetch_corporate_tree_only` or `fetch_corporate_tree_with_options_only`) runs in pre_fetch; all HTTP outside txn. Execute does `persist_corporate_tree` + the client-group-specific DB work (discovery status update, entity membership, role assignments, relationship creation). `TreeFetchOptions` gained Serialize/Deserialize derives for the round-trip. Added `fetch_corporate_tree_with_options_only` to the service alongside the existing `fetch_corporate_tree_only`. |
 
 **EnrichmentFetch struct** (rust/src/gleif/enrichment.rs): serde-
 round-trippable bundle of `LeiRecord`, `BicMapping`s, direct-parent
@@ -204,7 +205,7 @@ service methods (`import_corporate_tree`, `refresh_entity`,
 `import_managed_funds`, etc.). Each method follows the same
 mechanical refactor — ~200-400 lines per method.
 
-**Status:** 15/17 ops CLOSED (§3.3a 11 + §3.3b 4); 2/17 OPEN (§3.3b remaining 2). **PARTIAL.**
+**Status:** 17/17 ops CLOSED (§3.3a 11 + §3.3b 6). **CLOSED 2026-04-22.**
 
 ### 3.4 File: `request_ops.rs` — helper-indirect gRPC (CLOSED 2026-04-22, F.1c)
 
@@ -233,12 +234,21 @@ array. L4 Layer 1 still passes with 0 grandfathered hits.
 
 Phase 5f is CLOSED when:
 
-- [ ] All three files in §3.1–§3.3 have their rows at **CLOSED**.
-- [ ] Lint L4 green across the entire `rust/src/domain_ops/` (no `#[allow(external_effects_in_verb)]` escape-hatch usage without accompanying TODO+ledger reference).
-- [ ] This ledger §3 reads **CLOSED** at the section level.
-- [ ] DoD item 19 in `three-plane-architecture-implementation-plan-v0.1.md` can be checked.
+- [x] All three files in §3.1–§3.3 have their rows at **CLOSED** (2026-04-22).
+- [x] Lint L4 green across the entire `rust/src/domain_ops/` — no `#[allow(external_effects_in_verb)]` escape-hatch usage. Layer 1 PASS at 0 grandfathered hits (request_ops, bpmn_lite, source_loader, gleif all migrated).
+- [x] This ledger §3 reads **CLOSED** at the section level (all rows CLOSED as of 2026-04-22 late-session).
+- [x] DoD item 19 in `three-plane-architecture-implementation-plan-v0.1.md` can be checked.
 
-Only then may Phase 6 begin.
+**Phase 5f CLOSED 2026-04-22.** Phase 6 may begin.
+
+**Saga follow-ups** (not gating — tracked outside the A1 ledger):
+
+- **BpmnStart orphan reaper.** Pre_fetch pattern satisfies A1 but the
+  pre-existing saga window (bpmn-server instance live with no DB trail
+  on outer-txn rollback) persists. A periodic reaper finding
+  correlation-less bpmn instances and cancelling them is the clean fix.
+  Not an A1 concern; tracked in the Three-Plane wiring follow-on under
+  §F.1 saga follow-ups.
 
 ---
 
@@ -264,10 +274,12 @@ Only then may Phase 6 begin.
 | phase | file | ops | status |
 |---|---|---|---|
 | 0g | sem_os_maintenance_ops.rs | 1 | **CLOSED 2026-04-18** |
-| 5f | bpmn_lite_ops.rs | 5 | OPEN |
-| 5f | source_loader_ops.rs | 16 | OPEN |
-| 5f | gleif_ops.rs | 17 | OPEN |
-| **open remaining** | | **38 ops across 3 files (all Phase 5f)** | |
-| **closed so far** | | **1 op across 1 file** | |
+| 0g | sem_os_postgres/src/ops/agent.rs (ActivateTeaching) | 1 | **CLOSED 2026-04-22** |
+| 5f §3.1 | bpmn_lite_ops.rs | 5 | **CLOSED 2026-04-22** (Inspect/Compile pre_fetch; Signal/Cancel outbox; Start pre_fetch + saga-follow-up) |
+| 5f §3.2 | source_loader_ops.rs | 12 (of 15, 3 no-I/O) | **CLOSED 2026-04-22** |
+| 5f §3.3 | gleif_ops.rs | 17 | **CLOSED 2026-04-22** (all 17 migrated via pre_fetch or service split) |
+| 5f §3.4 | domain_ops/request_ops.rs helper | 1 | **CLOSED 2026-04-22** |
+| **open remaining** | | **0 ops** | |
+| **closed so far** | | **37 ops across 6 files** | |
 
-When every remaining row reads CLOSED and lint L4 is green workspace-wide, the compromise of D11 has been honoured in full. Phase 0g has closed the Pattern A row; Pattern B (Phase 5f, 38 ops) blocks Phase 6 per D11.
+When every remaining row reads CLOSED and lint L4 is green workspace-wide, the compromise of D11 has been honoured in full. **2026-04-22: Phase 0g (Pattern A) + Phase 5f (Pattern B) both CLOSED.** D11 honoured in full.
