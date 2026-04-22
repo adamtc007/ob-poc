@@ -221,37 +221,19 @@ impl SemOsVerbOp for Create {
             Some("CBU with same name+jurisdiction already exists")
         };
 
-        // Phase C.1 (F7 follow-on, 2026-04-22): pilot emission of a
-        // `PendingStateAdvance` describing the declared state change
-        // (new CBU → onboarded). Emitted via `ctx.extensions` as a side
-        // channel so we don't break the `SemOsVerbOp::execute` signature
-        // (which returns `VerbExecutionOutcome`, not `VerbExecutionResult`).
-        // The dispatcher reads this side channel post-execute and shadow-
-        // emits a `tracing::debug!` event. Phase C.2 applies the advance
-        // via SemOS inside the Sequencer's outer transaction.
-        //
-        // Only emitted when the CBU was genuinely created (not idempotent
-        // skip) — no "non-event" should produce a state-advance signal.
+        // Phase C.1 pilot → C.3 rollout (F7 follow-on, 2026-04-22):
+        // emit PendingStateAdvance via the shared
+        // `emit_pending_state_advance` helper. Only on genuine creation
+        // (is_new=true); idempotent skips must not produce a
+        // state-advance signal.
         if is_new {
-            if let Some(ext_obj) = ctx.extensions.as_object_mut() {
-                ext_obj.insert(
-                    "_pending_state_advance".to_string(),
-                    serde_json::json!({
-                        "state_transitions": [{
-                            "entity_id": cbu_id.to_string(),
-                            "from_node": null,
-                            "to_node": "cbu:onboarded",
-                            "reason": "cbu.create pilot emission"
-                        }],
-                        "constellation_marks": [{
-                            "slot_path": "cbu/trading-profile",
-                            "entity_id": cbu_id.to_string()
-                        }],
-                        "writes_since_push_delta": 1,
-                        "catalogue_effects": []
-                    }),
-                );
-            }
+            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+                ctx,
+                cbu_id,
+                "cbu:onboarded",
+                "cbu/trading-profile",
+                "cbu.create — new client business unit",
+            );
         }
 
         Ok(VerbExecutionOutcome::Record(serde_json::json!({

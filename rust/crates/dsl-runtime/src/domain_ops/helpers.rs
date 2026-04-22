@@ -107,6 +107,59 @@ pub fn json_extract_cbu_id(
         .ok_or_else(|| anyhow!("Missing cbu or cbu-id argument"))
 }
 
+// ---------------------------------------------------------------------------
+// Phase C.3 helpers (F7 follow-on, 2026-04-22)
+// ---------------------------------------------------------------------------
+
+/// Emit a `PendingStateAdvance` via the `ctx.extensions["_pending_state_advance"]`
+/// side channel. Read by the dispatcher post-execute and shadow-logged; Phase C.2
+/// applies the advance via SemOS inside the Sequencer's outer scope.
+///
+/// Use from plugin ops that mutate state, AFTER the DB write has committed
+/// (or is guaranteed by the ambient txn). Only emit on a genuine state
+/// transition — idempotent returns that found an existing row should NOT
+/// emit, because no state advance occurred.
+///
+/// Arguments:
+/// - `ctx`: verb execution context — `ctx.extensions` will be promoted to
+///   an object if it isn't one already
+/// - `entity_id`: the entity whose DAG node transitioned
+/// - `to_node`: spec-defined state-machine node, e.g. `"cbu:onboarded"`,
+///   `"entity:ghost"`, `"kyc-case:open"`
+/// - `slot_path`: constellation slot that needs rehydration, e.g.
+///   `"cbu/trading-profile"`, `"entity/identity"`
+/// - `reason`: human-readable audit string
+pub fn emit_pending_state_advance(
+    ctx: &mut VerbExecutionContext,
+    entity_id: Uuid,
+    to_node: &str,
+    slot_path: &str,
+    reason: &str,
+) {
+    if !ctx.extensions.is_object() {
+        ctx.extensions = serde_json::Value::Object(serde_json::Map::new());
+    }
+    if let Some(ext_obj) = ctx.extensions.as_object_mut() {
+        ext_obj.insert(
+            "_pending_state_advance".to_string(),
+            serde_json::json!({
+                "state_transitions": [{
+                    "entity_id": entity_id.to_string(),
+                    "from_node": null,
+                    "to_node": to_node,
+                    "reason": reason,
+                }],
+                "constellation_marks": [{
+                    "slot_path": slot_path,
+                    "entity_id": entity_id.to_string(),
+                }],
+                "writes_since_push_delta": 1,
+                "catalogue_effects": [],
+            }),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

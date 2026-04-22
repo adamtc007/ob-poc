@@ -107,6 +107,18 @@ impl SemOsVerbOp for Ghost {
             );
         }
 
+        // Phase C.3 (F7 follow-on, 2026-04-22): emit PendingStateAdvance
+        // via the shared `emit_pending_state_advance` helper. Only on
+        // genuine creation — the idempotent early-return at line 66
+        // bypasses this code.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            entity_id,
+            "entity:ghost",
+            "entity/identity",
+            "entity.ghost — new ghost proper person",
+        );
+
         ctx.bind("entity", entity_id);
         Ok(VerbExecutionOutcome::Uuid(entity_id))
     }
