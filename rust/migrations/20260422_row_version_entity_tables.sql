@@ -26,9 +26,9 @@
 -- Tables covered (gate-surface entities per v0.3 R13 audit):
 --   "ob-poc".cbus
 --   "ob-poc".entities
---   "ob-poc".kyc_cases
+--   "ob-poc".cases            (KYC cases — original spec draft said `kyc_cases`; real schema uses `cases`)
 --   "ob-poc".deals
---   "ob-poc".client_groups
+--   "ob-poc".client_group     (singular — real schema; draft said `client_groups`)
 --
 -- Tables NOT covered by this migration (deliberate — not on the gate
 -- surface): taxonomy / registry catalog tables, audit trails, research
@@ -81,14 +81,14 @@ CREATE TRIGGER trg_entities_bump_row_version
     EXECUTE FUNCTION "ob-poc".bump_row_version();
 
 -- ---------------------------------------------------------------------------
--- kyc_cases
+-- cases (KYC cases)
 -- ---------------------------------------------------------------------------
-ALTER TABLE "ob-poc".kyc_cases
+ALTER TABLE "ob-poc".cases
     ADD COLUMN IF NOT EXISTS row_version bigint NOT NULL DEFAULT 1;
 
-DROP TRIGGER IF EXISTS trg_kyc_cases_bump_row_version ON "ob-poc".kyc_cases;
-CREATE TRIGGER trg_kyc_cases_bump_row_version
-    BEFORE UPDATE ON "ob-poc".kyc_cases
+DROP TRIGGER IF EXISTS trg_cases_bump_row_version ON "ob-poc".cases;
+CREATE TRIGGER trg_cases_bump_row_version
+    BEFORE UPDATE ON "ob-poc".cases
     FOR EACH ROW
     EXECUTE FUNCTION "ob-poc".bump_row_version();
 
@@ -105,14 +105,14 @@ CREATE TRIGGER trg_deals_bump_row_version
     EXECUTE FUNCTION "ob-poc".bump_row_version();
 
 -- ---------------------------------------------------------------------------
--- client_groups
+-- client_group
 -- ---------------------------------------------------------------------------
-ALTER TABLE "ob-poc".client_groups
+ALTER TABLE "ob-poc".client_group
     ADD COLUMN IF NOT EXISTS row_version bigint NOT NULL DEFAULT 1;
 
-DROP TRIGGER IF EXISTS trg_client_groups_bump_row_version ON "ob-poc".client_groups;
-CREATE TRIGGER trg_client_groups_bump_row_version
-    BEFORE UPDATE ON "ob-poc".client_groups
+DROP TRIGGER IF EXISTS trg_client_group_bump_row_version ON "ob-poc".client_group;
+CREATE TRIGGER trg_client_group_bump_row_version
+    BEFORE UPDATE ON "ob-poc".client_group
     FOR EACH ROW
     EXECUTE FUNCTION "ob-poc".bump_row_version();
 
