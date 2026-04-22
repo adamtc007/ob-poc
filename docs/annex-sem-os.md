@@ -28,11 +28,45 @@ Two practical consequences follow.
 | Crate | Purpose |
 |-------|---------|
 | `sem_os_core` | Pure domain types, ABAC, context resolution, ports (no sqlx) |
-| `sem_os_postgres` | PostgreSQL implementations of ports |
+| `sem_os_postgres` | PostgreSQL implementations of ports **+ every plugin-verb op body** (post Phase 5c-migrate slice #80) |
 | `sem_os_server` | Standalone REST API + JWT auth |
 | `sem_os_client` | Trait: in-process or HTTP access |
 | `sem_os_harness` | Integration test framework (102 scenarios) |
 | `sem_os_obpoc_adapter` | Verb YAML → seed bundle conversion |
+
+---
+
+## Plugin Verb Dispatch (post Phase 5c-migrate slice #80)
+
+A single trait — `sem_os_postgres::ops::SemOsVerbOp` — is the sole execution contract for every plugin verb. No `CustomOperation`, no `inventory::collect!`, no `#[register_custom_op]` proc-macro: these were deleted in slice #80 along with the `dsl-runtime-macros` crate.
+
+**Signature:**
+
+```rust
+#[async_trait]
+pub trait SemOsVerbOp: Send + Sync {
+    fn fqn(&self) -> &str;  // e.g. "entity.ghost"
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome>;
+}
+```
+
+**Registration — explicit, two-source:**
+
+1. `sem_os_postgres::ops::build_registry()` — the canonical `SemOsVerbOpRegistry` holding 567 ops that live in `sem_os_postgres::ops::<domain>::*` (no ob-poc internals reached from these op bodies).
+2. `ob_poc::domain_ops::extend_registry(&mut SemOsVerbOpRegistry)` — appends 119 Pattern B ops that live in `rust/src/domain_ops/*` because they bridge to ob-poc internals (`DslExecutor`, `TemplateExpander`, `BookingPrincipalRepository`, `gleif::client`, `bpmn_integration`, etc.) that can't be inverted behind a service trait without a disproportionate refactor.
+
+`ob-poc-web::main` calls both and threads the resulting registry into `ObPocVerbExecutor::with_sem_os_ops(...)`.
+
+**Dispatch path:** `ObPocVerbExecutor::execute_verb` (Stage 2.5 of the agent pipeline) opens a `PgTransactionScope` from the pool, looks up the op by FQN, calls `op.execute(args, ctx, &mut scope).await`. Commits on `Ok`, rolls back on `Err`. Platform services (attribute identity, lifecycle catalog, phrase bank, etc.) are accessed via `ctx.service::<dyn X>()?` — the service registry is threaded onto every context.
+
+**Test entry points:**
+- `cargo test -p ob-poc --lib -- test_plugin_verb_coverage` — asserts every YAML `behavior: plugin` verb has a matching FQN in the combined registry.
+- `cargo test -p ob-poc --lib -- test_extend_registry_adds_pattern_b_ops` — smoke test for Pattern B registration.
 
 ---
 
@@ -527,7 +561,7 @@ The Observatory renders as a standalone egui/eframe WASM application in a separa
 | `sem_os_core/src/observatory/graph_scene_projection.rs` | `project_graph_scene()` — HydratedConstellation → GraphSceneModel (layout strategy per ViewLevel) |
 | `ob-poc-types/src/graph_scene.rs` | WASM-safe types: GraphSceneModel, SceneNode, SceneEdge, LayoutStrategy, DrillTarget |
 | `api/observatory_routes.rs` | 6 REST endpoints under `/api/observatory/` |
-| `domain_ops/navigation_ops.rs` | 7 nav.* verb handlers (plugin ops) |
+| `sem_os_postgres::ops::nav` | 7 nav.* verb handlers (SemOsVerbOp impls; relocated from `rust/src/domain_ops/navigation_ops.rs` in Phase 5c-migrate slice #2) |
 | `config/verbs/navigation.yaml` | 7 nav.* verb YAML definitions |
 
 ### DAG Identity (2026-04-13)
@@ -833,7 +867,7 @@ SEM_OS_DATABASE_URL="postgresql:///data_designer" SEM_OS_JWT_SECRET=dev-secret \
 | `rust/crates/sem_os_core/src/observatory/graph_scene_projection.rs` | `project_graph_scene()` — constellation → scene |
 | `rust/crates/ob-poc-types/src/graph_scene.rs` | GraphSceneModel, SceneNode (WASM-safe) |
 | `rust/src/api/observatory_routes.rs` | Observatory REST endpoints |
-| `rust/src/domain_ops/navigation_ops.rs` | nav.* verb handlers |
+| `rust/crates/sem_os_postgres/src/ops/nav.rs` | nav.* SemOsVerbOp handlers (post Phase 5c-migrate slice #2) |
 | `rust/crates/sem_os_obpoc_adapter/src/scanner.rs` | Pure conversion functions |
 | `rust/crates/sem_os_obpoc_adapter/src/metadata.rs` | `DomainMetadata` loader |
 | `rust/config/sem_os_seeds/` | Universes, constellations, state machines, metadata |
