@@ -47,6 +47,79 @@ These three are the genuine remaining work. Everything else in the plan is eithe
 
 ---
 
+## Phase C.2-main prerequisite — token-to-DagNodeId resolver
+
+**Surfaced 2026-04-22 late-session** while writing the shape-contract tests in
+`rust/crates/dsl-runtime/src/domain_ops/helpers.rs`.
+
+**Gap:** the 72 C.3 emit sites all write pre-resolution taxonomy tokens
+(e.g. `"cbu:onboarded"`, `"entity:ghost"`, `"capital:transferred_out"`).
+`ob_poc_types::PendingStateAdvance.state_transitions[].to_node` is typed
+`DagNodeId(Uuid)`. Direct deserialisation fails (test:
+`emit_shape_is_not_directly_deserializable_into_typed_advance`). C.2-main
+is where the resolver lives — it must run BEFORE the typed advance is
+constructed and applied via SemOS.
+
+**Token inventory (emitted across 72 verbs, 15 domains):**
+
+| Namespace | Count | Registered in `node_state_registry.yaml`? |
+|-----------|-------|-------------------------------------------|
+| `billing-period:*` (5) | 5 | **No** |
+| `billing-profile:*` (3) | 3 | **No** |
+| `capital:*` (9) | 9 | **No** |
+| `cbu-role:*` (6) | 6 | **No** |
+| `cbu:onboarded` | 1 | Yes (registry has `cbu`) |
+| `client-group-membership:*` (2) | 2 | **No** |
+| `custody:ssi_configured` | 1 | **No** |
+| `deal:*` (2) | 2 | Yes (registry has `deal`) |
+| `document-version:*` (2) | 2 | Registry has `document`, not `document-version` |
+| `entity:*` (4) | 4 | Registry has `entity_kyc`/`entity_workstream`, not plain `entity` |
+| `investor:*` (8) | 8 | **No** |
+| `kyc-case:intake` | 1 | Registry has `kyc_case` (UNDERSCORE) — punctuation mismatch |
+| `ownership:*` (2) | 2 | **No** |
+| `partnership:*` (2) | 2 | **No** |
+| `remediation:*` (3) | 3 | **No** |
+| `requirement:requested` | 1 | **No** |
+| `research:*` (2) | 2 | **No** |
+| `tollgate-evaluation:overridden` | 1 | **No** |
+| `trading:profile_ca_updated` | 1 | Registry has `trading_profile`, not `trading` |
+
+**What C.2-main must resolve:**
+
+1. **Registry coverage.** ~13 of 15 namespaces have no entry in
+   `node_state_registry.yaml`. Either extend the YAML or carry the
+   taxonomy elsewhere. Decision needed before the resolver can be
+   implemented.
+2. **Punctuation normalisation.** Emitted tokens mix hyphen (`kyc-case`,
+   `cbu-role`, `billing-period`) with registry underscore
+   (`kyc_case`, `entity_kyc`). Resolver must either canonicalise or the
+   YAML must add kebab aliases.
+3. **Namespace alignment.** Several emitted namespaces are sub-levels
+   the registry doesn't yet model (`document-version` vs `document`,
+   `trading` vs `trading_profile`, `entity` vs `entity_kyc`). Decide
+   whether these are distinct state machines or sub-states of
+   registered ones.
+4. **UUID assignment.** Registry currently stores names only; `DagNodeId`
+   is `(Uuid)`. A node-id assignment step (either deterministic hash-of-
+   `<namespace>:<name>` or explicit UUIDs in the YAML) must land before
+   resolution can produce real `DagNodeId` values.
+
+**Priority:** this is a **pre-requisite for Phase C.2-main**, not a new
+blocker — C.2-main was already gated on B.2b. But it means C.2-main
+is NOT simply "plumbing apply into the Sequencer"; it's also a
+taxonomy-bridging design step that needs sign-off before code goes in.
+
+Until C.2-main lands, the emit sites work correctly as observed-and-
+logged side effects (shadow-logged at
+`rust/src/dsl_v2/executor.rs:1583-1591`). They produce no incorrect
+advance — just no advance at all. So downstream consumers (narration,
+constellation rehydration, progress UI) still see the legacy
+refresh-after-write path and not the declarative PendingStateAdvance
+union. This is intentional and safe; a regression only occurs if
+someone removes the resolver step after it lands.
+
+---
+
 ---
 
 ## Phase A — Envelope wiring (F5)
