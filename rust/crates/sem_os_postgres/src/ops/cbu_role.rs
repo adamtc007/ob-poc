@@ -198,6 +198,16 @@ impl SemOsVerbOp for AssignControl {
         .await?;
 
         ctx.bind("cbu_entity_role", role_result);
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            cbu_id,
+            "cbu-role:control-assigned",
+            "cbu/role-graph",
+            &format!(
+                "cbu.assign-control — {} has '{}' role over {} (under CBU {})",
+                controller_entity_id, role, controlled_entity_id, cbu_id
+            ),
+        );
         Ok(VerbExecutionOutcome::Record(json!({
             "role_id": role_result,
             "relationship_id": rel_result,
@@ -288,6 +298,16 @@ impl SemOsVerbOp for AssignTrustRole {
         .await?;
 
         ctx.bind("cbu_entity_role", role_result);
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            cbu_id,
+            "cbu-role:trust-role-assigned",
+            "cbu/role-graph",
+            &format!(
+                "cbu.assign-trust-role — {} is '{}' of trust {} (under CBU {})",
+                participant_entity_id, role, trust_entity_id, cbu_id
+            ),
+        );
         Ok(VerbExecutionOutcome::Record(json!({
             "role_id": role_result,
             "relationship_id": rel_result,
@@ -380,6 +400,16 @@ impl SemOsVerbOp for AssignFundRole {
         };
 
         ctx.bind("cbu_entity_role", role_result);
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            cbu_id,
+            "cbu-role:fund-role-assigned",
+            "cbu/role-graph",
+            &format!(
+                "cbu.assign-fund-role — entity {} assigned '{}' on CBU {}",
+                entity_id, role, cbu_id
+            ),
+        );
         Ok(VerbExecutionOutcome::Record(json!({
             "role_id": role_result,
             "relationship_id": rel_result,
@@ -431,6 +461,16 @@ impl SemOsVerbOp for AssignServiceProvider {
         .await?;
 
         ctx.bind("cbu_entity_role", role_result);
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            cbu_id,
+            "cbu-role:service-provider-assigned",
+            "cbu/role-graph",
+            &format!(
+                "cbu.assign-service-provider — {} serves as '{}' (under CBU {})",
+                provider_entity_id, role, cbu_id
+            ),
+        );
         Ok(VerbExecutionOutcome::Record(json!({
             "role_id": role_result,
             "message": format!(
@@ -493,6 +533,21 @@ impl SemOsVerbOp for AssignSignatory {
         .await?;
 
         ctx.bind("cbu_entity_role", role_result);
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            cbu_id,
+            "cbu-role:signatory-assigned",
+            "cbu/role-graph",
+            &format!(
+                "cbu.assign-signatory — {} as '{}' (authority {} {}; co-sig={}; CBU {})",
+                person_entity_id,
+                role,
+                authority_limit.as_ref().map(|d| d.to_string()).unwrap_or_else(|| "—".to_string()),
+                authority_currency,
+                requires_co_signatory,
+                cbu_id
+            ),
+        );
         Ok(VerbExecutionOutcome::Record(json!({
             "role_id": role_result,
             "message": format!("Assigned signatory role {} to {}", role, person_entity_id)
