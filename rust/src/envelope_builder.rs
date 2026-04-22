@@ -1,0 +1,237 @@
+//! Phase A (F5) — shadow envelope construction.
+//!
+//! Three-plane v0.3 §10.3 says the bi-plane boundary between SemOS and the
+//! DSL runtime is a [`GatedVerbEnvelope`] value. Pre-Phase-A, the envelope
+//! types were compile-only — stage 6 ("gate decision") produced no envelope,
+//! and the dispatch path operated on scattered args rather than a single
+//! boundary value. This module closes the gap by building a **shadow
+//! envelope** at each dispatch opportunity.
+//!
+//! # What "shadow" means
+//!
+//! The envelope is constructed alongside the existing dispatch path and
+//! emitted as a `tracing::debug!` event with structured fields. It does NOT
+//! gate execution yet — the data plane continues to consume `VerbCall` /
+//! args as before. Phase B (F6) is the slice that hoists transaction
+//! ownership into the Sequencer and makes the envelope the *primary*
+//! dispatch contract.
+//!
+//! # Why shadow first
+//!
+//! Structural refactor of the dispatch path requires:
+//!   1. every field of the envelope to be populated with real data, and
+//!   2. every consumer to migrate to envelope-based signatures.
+//!
+//! Shadow emission unblocks (1) incrementally: each field moves from
+//! `<phase_a_todo>` placeholder to real data in its own sub-slice, and the
+//! determinism harness can byte-compare the envelope across runs **before**
+//! it becomes load-bearing. Once every field is real, Phase B flips the
+//! contract.
+//!
+//! # Placeholder fields
+//!
+//! Several envelope fields have no live source in the current orchestrator:
+//!
+//! - [`CatalogueSnapshotId`] — SemOS catalogue revision. Today the
+//!   `SemOsContextEnvelope.fingerprint` is the closest proxy; Phase A later
+//!   adds a first-class `sem_reg.snapshots` revision column and plumbs it.
+//! - [`DagNodeId`] / [`DagNodeVersion`] — which constellation node the
+//!   invocation targets. Today the session carries `active_workspace` but no
+//!   per-entity node cursor; a Phase D prerequisite.
+//! - [`StateGateHash`] — TOCTOU fingerprint. Requires row-versioning
+//!   (Phase D / F9). This module emits the zero-hash placeholder for now.
+//! - [`ResolvedEntities`] — today's scope resolver returns a `Vec<Uuid>` of
+//!   CBU ids; this module wraps them in `ResolvedEntity` with empty state
+//!   snapshots. Phase A-2 will add `(entity_id, row_version)` pairs once
+//!   migrations land.
+//!
+//! Each placeholder is tagged `<phase_a_todo>` or `<phase_d_todo>` in the
+//! builder so the determinism harness can detect when a placeholder is
+//! replaced by real data.
+
+use ob_poc_types::{
+    AuthorisationProof,
+    CatalogueSnapshotId,
+    ClosedLoopMarker,
+    DagNodeId,
+    DagNodeVersion,
+    DiscoverySignals,
+    EnvelopeVersion,
+    GatedVerbEnvelope,
+    LogicalClock,
+    ResolvedEntities,
+    SessionScopeRef,
+    StateGateHash,
+    TraceId,
+    VerbArgs,
+    VerbRef,
+};
+use serde_json::Value as JsonValue;
+use uuid::Uuid;
+
+/// Inputs the Sequencer has at stage 6 — what the dispatch site already
+/// knows before it hands off to the runtime. Everything we can't yet
+/// populate is captured as an explicit placeholder.
+pub struct EnvelopeInputs<'a> {
+    pub session_id: Uuid,
+    /// Canonical verb FQN — e.g. `"cbu.create"`.
+    pub verb_fqn: &'a str,
+    /// Args resolved against the session's symbol table, as JSON. Phase B
+    /// will replace this with a typed arg shape per verb contract.
+    pub args: JsonValue,
+    /// `writes_since_push` on the session at the moment of gating.
+    pub writes_since_push_at_gate: u64,
+    /// CBU UUIDs currently in scope. Phase A-2 will pair each with a
+    /// `row_version` once migrations exist.
+    pub scope_cbu_ids: &'a [Uuid],
+    /// SemReg allowed-verbs fingerprint from the live envelope. Used as a
+    /// proxy for [`CatalogueSnapshotId`] until a first-class catalogue
+    /// revision column lands.
+    pub semreg_fingerprint_proxy: Option<&'a str>,
+    /// Logical clock value at gate time. Today: monotonic counter derived
+    /// from the session's trace sequence. Phase D: replaced by a proper
+    /// SemOS-issued logical clock.
+    pub logical_clock: u64,
+}
+
+/// Build a shadow envelope from the dispatch site's currently-available
+/// data. Placeholder fields are clearly marked so the determinism harness
+/// can distinguish "real data not yet plumbed" from "genuine value".
+pub fn build_shadow_envelope(inputs: &EnvelopeInputs<'_>) -> GatedVerbEnvelope {
+    let trace_id = TraceId(Uuid::new_v4());
+    let session_scope = SessionScopeRef(inputs.session_id);
+
+    // <phase_a_todo> CatalogueSnapshotId: derive from sem_reg snapshot
+    // revision column once the schema addition lands.  For now project
+    // the SemReg allowed-verbs fingerprint into a `u64` via stable hash
+    // so the field isn't zero.
+    let catalogue_snapshot_id = inputs
+        .semreg_fingerprint_proxy
+        .map(fingerprint_to_snapshot_id)
+        .unwrap_or(CatalogueSnapshotId(0));
+
+    // <phase_a_todo> Resolved entities: attach real row_version + state
+    // snapshot references when Phase D row-versioning lands. For now the
+    // state snapshot ref is empty and row_version is 0.
+    let mut entity_list: Vec<ob_poc_types::ResolvedEntity> = inputs
+        .scope_cbu_ids
+        .iter()
+        .map(|cbu_id| ob_poc_types::ResolvedEntity {
+            entity_id: *cbu_id,
+            entity_kind: "cbu".into(),
+            row_version: 0,
+        })
+        .collect();
+    // Spec §10.5 canonical encoding requires entity order by entity_id so
+    // the StateGateHash is deterministic. Sort here so the shadow envelope
+    // matches the future real encoding bit-for-bit.
+    entity_list.sort_by_key(|e| e.entity_id);
+    let resolved_entities = ResolvedEntities(entity_list);
+
+    // <phase_d_todo> StateGateHash: BLAKE3 over the §10.5 canonical
+    // encoding. Requires row-versioning first. Placeholder = zero hash.
+    let state_gate_hash = StateGateHash([0u8; 32]);
+
+    // <phase_a_todo> DagNodeId / DagNodeVersion: today no per-entity DAG
+    // cursor exists on the session. Placeholder = session_id as node id,
+    // version 0.
+    let dag_position = DagNodeId(inputs.session_id);
+    let dag_node_version = DagNodeVersion(0);
+
+    let authorisation = AuthorisationProof {
+        issued_at: LogicalClock(inputs.logical_clock),
+        session_scope,
+        state_gate_hash,
+        // <phase_d_todo> recheck_required flips to `true` when Phase D
+        // TOCTOU recheck is wired inside the dispatch transaction.
+        recheck_required: false,
+    };
+
+    GatedVerbEnvelope {
+        envelope_version: EnvelopeVersion::CURRENT,
+        catalogue_snapshot_id,
+        trace_id,
+        verb: VerbRef(inputs.verb_fqn.to_string()),
+        dag_position,
+        dag_node_version,
+        resolved_entities,
+        args: VerbArgs(inputs.args.clone()),
+        authorisation,
+        discovery_signals: DiscoverySignals::default(),
+        closed_loop_marker: ClosedLoopMarker {
+            writes_since_push_at_gate: inputs.writes_since_push_at_gate,
+        },
+    }
+}
+
+/// Project a SemReg fingerprint string (e.g. `"v1:ab12…"`) into a stable
+/// `CatalogueSnapshotId`. Two fingerprints with identical content produce
+/// the same id; different fingerprints produce different ids with extremely
+/// high probability.
+fn fingerprint_to_snapshot_id(fingerprint: &str) -> CatalogueSnapshotId {
+    // Slice a u64 out of the fingerprint's hex portion. Fingerprints are
+    // `v1:<64-hex>` (SHA-256 truncated), so take the first 16 hex chars.
+    let hex = fingerprint.trim_start_matches("v1:");
+    let chunk: String = hex.chars().take(16).collect();
+    let as_u64 = u64::from_str_radix(&chunk, 16).unwrap_or(0);
+    CatalogueSnapshotId(as_u64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shadow_envelope_populates_all_required_fields() {
+        let session_id = Uuid::new_v4();
+        let cbus = [Uuid::new_v4(), Uuid::new_v4()];
+        let inputs = EnvelopeInputs {
+            session_id,
+            verb_fqn: "cbu.create",
+            args: serde_json::json!({"name": "Test Fund"}),
+            writes_since_push_at_gate: 7,
+            scope_cbu_ids: &cbus,
+            semreg_fingerprint_proxy: Some("v1:deadbeef12345678"),
+            logical_clock: 42,
+        };
+        let env = build_shadow_envelope(&inputs);
+
+        assert_eq!(env.envelope_version, EnvelopeVersion::CURRENT);
+        assert_eq!(env.verb.0, "cbu.create");
+        assert_eq!(env.resolved_entities.0.len(), 2);
+        assert_eq!(env.authorisation.session_scope.0, session_id);
+        assert_eq!(env.authorisation.issued_at.0, 42);
+        assert_eq!(env.closed_loop_marker.writes_since_push_at_gate, 7);
+        // Catalogue snapshot id should be non-zero when a fingerprint is supplied.
+        assert_ne!(env.catalogue_snapshot_id.0, 0);
+        // Placeholder state-gate hash — asserts the <phase_d_todo> zero
+        // sentinel so a future refactor surfaces here when real data lands.
+        assert_eq!(env.authorisation.state_gate_hash.0, [0u8; 32]);
+    }
+
+    #[test]
+    fn shadow_envelope_with_no_fingerprint_has_zero_snapshot() {
+        let inputs = EnvelopeInputs {
+            session_id: Uuid::nil(),
+            verb_fqn: "entity.ensure",
+            args: serde_json::Value::Null,
+            writes_since_push_at_gate: 0,
+            scope_cbu_ids: &[],
+            semreg_fingerprint_proxy: None,
+            logical_clock: 0,
+        };
+        let env = build_shadow_envelope(&inputs);
+        assert_eq!(env.catalogue_snapshot_id.0, 0);
+        assert!(env.resolved_entities.0.is_empty());
+    }
+
+    #[test]
+    fn fingerprint_projection_is_stable() {
+        let a = fingerprint_to_snapshot_id("v1:deadbeef12345678abcdef");
+        let b = fingerprint_to_snapshot_id("v1:deadbeef12345678zzzz");
+        // Same first 16 hex chars → identical projections.
+        assert_eq!(a.0, b.0);
+        let c = fingerprint_to_snapshot_id("v1:0011223344556677");
+        assert_ne!(a.0, c.0);
+    }
+}

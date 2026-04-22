@@ -59,6 +59,12 @@ pub mod mcp;
 // Agentic DSL generation module
 pub mod agentic;
 
+// Phase A (F5): shadow envelope construction.
+// Builds a `GatedVerbEnvelope` alongside the existing dispatch path as a
+// determinism-harness observable. Does not gate execution yet — Phase B
+// (F6) is the slice that makes the envelope the primary dispatch contract.
+pub mod envelope_builder;
+
 // Graph visualization module
 #[cfg(feature = "database")]
 pub mod graph;

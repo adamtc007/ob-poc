@@ -5702,6 +5702,49 @@ impl ReplOrchestratorV2 {
                 &envelope,
             ));
 
+        // Phase A (F5, 2026-04-22): shadow-emit the GatedVerbEnvelope the
+        // spec says stage 6 produces. Shadow-only — does not gate dispatch.
+        // Phase B (F6) replaces the existing recheck-returns-failure path
+        // with envelope-primary dispatch.
+        let shadow_envelope = crate::envelope_builder::build_shadow_envelope(
+            &crate::envelope_builder::EnvelopeInputs {
+                session_id: session.id,
+                verb_fqn: &entry.verb,
+                args: serde_json::json!({
+                    "dsl_hash": entry_dsl.as_bytes().len(),
+                }),
+                writes_since_push_at_gate: session
+                    .workspace_stack
+                    .last()
+                    .map(|f| f.writes_since_push as u64)
+                    .unwrap_or(0),
+                // Session-scoped CBU ids. Workspace frame carries `subject_id`
+                // (Option<Uuid>); the full scope lives on the session, but
+                // at shadow-emit time we just project the active frame's
+                // subject. Phase A-2 threads the real scope list.
+                scope_cbu_ids: &session
+                    .workspace_stack
+                    .last()
+                    .and_then(|f| f.subject_id)
+                    .map(|id| vec![id])
+                    .unwrap_or_default(),
+                semreg_fingerprint_proxy: Some(
+                    envelope.fingerprint.0.as_str(),
+                ),
+                logical_clock: session.trace_sequence,
+            },
+        );
+        tracing::debug!(
+            session_id = %shadow_envelope.authorisation.session_scope.0,
+            trace_id = %shadow_envelope.trace_id.0,
+            verb = %shadow_envelope.verb.0,
+            envelope_version = shadow_envelope.envelope_version.0,
+            catalogue_snapshot_id = shadow_envelope.catalogue_snapshot_id.0,
+            resolved_entity_count = shadow_envelope.resolved_entities.0.len(),
+            writes_since_push = shadow_envelope.closed_loop_marker.writes_since_push_at_gate,
+            "Stage 6 shadow — GatedVerbEnvelope constructed"
+        );
+
         phase5_recheck_failure(&entry.verb, &envelope)
     }
 
