@@ -36,8 +36,11 @@ pub mod resolution;
 pub mod semantic_stage;
 pub mod session_input;
 pub mod session_stack;
+pub mod state_token_resolver;
 pub mod trading_matrix;
 pub mod viewport;
+
+pub use state_token_resolver::{resolve_pending_state_advance, resolve_state_token};
 
 // --------------------------------------------------------------------------
 // gated_envelope — Phase 0b boundary types (three-plane refactor).

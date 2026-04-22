@@ -1546,16 +1546,26 @@ async fn dispatch_plugin_via_sem_os_op_in_scope(
     // `PendingStateAdvance` the op emitted via its `ctx.extensions`
     // side channel. Uses the typed `peek_pending_state_advance`
     // accessor so the Sequencer's future Phase-C.2 apply path and
-    // the dispatcher's shadow log share one contract. 27+ verbs now
-    // emit (cbu, entity, kyc-case, deal, screening, client-group,
-    // investor families).
+    // the dispatcher's shadow log share one contract. 72+ verbs now
+    // emit across 15 domains.
+    //
+    // Phase C.2-main (2026-04-22 late): in addition to logging the raw
+    // payload, resolve each `to_node` taxonomy token into a stable
+    // `DagNodeId` via `ob_poc_types::resolve_pending_state_advance`.
+    // The resolved UUIDs are non-destructively appended as
+    // `to_node_resolved` on each state transition. When the real C.2
+    // apply path lands (blocked on B.2b.f follow-ups around
+    // apply-via-SemOS-in-txn), it will consume the resolved ids to
+    // construct a typed `PendingStateAdvance` for persistence.
     if let Some(advance) =
         dsl_runtime::domain_ops::helpers::peek_pending_state_advance(&sem_ctx)
     {
+        let resolved = ob_poc_types::resolve_pending_state_advance(advance);
         tracing::debug!(
             fqn,
             advance = %advance,
-            "Stage 9a shadow — PendingStateAdvance emitted"
+            resolved = %resolved,
+            "Stage 9a shadow — PendingStateAdvance emitted (raw + C.2 resolved)"
         );
     }
 
