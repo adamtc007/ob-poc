@@ -190,10 +190,9 @@ path = "src/bin/dsl_mcp.rs"
 required-features = ["mcp"]
 
 # Slice 4.1 (2026-04-22): `dsl_api` binary retired per user decision Q2(a).
-# `ob-poc-web` (`runbook-gate-vnext` ON) is now the sole authoritative
-# HTTP server for all production traffic. `Dockerfile.api` was deleted
-# alongside this binary — downstream deployments should build
-# `ob-poc-web` instead.
+# `ob-poc-web` is now the sole authoritative HTTP server for all production
+# traffic. `Dockerfile.api` was deleted alongside this binary — downstream
+# deployments should build `ob-poc-web` instead.
 
 [[bin]]
 name = "batch_test_harness"
@@ -206,14 +205,7 @@ path = "src/bin/sem_os_footprint_audit.rs"
 
 # Features for conditional compilation
 [features]
-# Slice 4.1 (2026-04-22): runbook-gate-vnext added to default features.
-# After `dsl_api` retirement, no consumer builds with the feature OFF —
-# ob-poc-web explicitly listed it, and `cargo build -p ob-poc` defaulted
-# to `server` without it. Moving it into default means every build
-# goes through the vnext runbook gate path; the
-# `cfg(not(feature = "runbook-gate-vnext"))` branches in agent_service.rs
-# are now dead code awaiting Slice 4.1-c deletion.
-default = ["server", "runbook-gate-vnext"]  # Enable for sqlx prepare; use --no-default-features to disable
+default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
 
 database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector"]  # Only enable database functionality when needed
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
@@ -222,8 +214,12 @@ mcp = ["database"]  # MCP/intent pipeline for semantic verb search
 # Slice 4.2 (2026-04-22): `vnext-repl` feature removed. REPL V2 is always enabled.
 # The feature existed as an alias for `database` during the V1→V2 migration and
 # was deprecated on 2026-03-22; no remaining cfg-gate depended on it post-cleanup.
+# Slice 4.1-d (2026-04-22): `runbook-gate-vnext` feature removed. After dsl_api
+# retirement there was one consumer (ob-poc-web) and one code path (the always-on
+# gated dispatch); the feature was absorbed into default. All #[cfg(feature =
+# "runbook-gate-vnext")] attribute sites in agent_service.rs were stripped —
+# the code compiles unconditionally.
 write-set-contract = []  # Enables contract-driven write_set derivation from verb YAML metadata (INV-8)
-runbook-gate-vnext = ["database"]  # All execution paths through compile_invocation() + execute_runbook() (INV-1, INV-11)
 
 
 

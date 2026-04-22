@@ -250,7 +250,6 @@ impl Default for AgentServiceConfig {
     }
 }
 
-#[cfg(feature = "runbook-gate-vnext")]
 fn agent_phase5_recheck_record(
     verb_fqn: &str,
     dsl_source: &str,
@@ -278,7 +277,6 @@ fn agent_phase5_recheck_record(
 }
 
 /// TOCTOU recheck: verify verb is still allowed in current SemOS envelope before execution.
-#[cfg(feature = "runbook-gate-vnext")]
 fn agent_phase5_recheck_failure(
     verb_fqn: &str,
     envelope: &crate::agent::sem_os_context_envelope::SemOsContextEnvelope,
@@ -288,7 +286,6 @@ fn agent_phase5_recheck_failure(
     Phase2Service::runtime_gate_failure(&phase2.artifacts, verb_fqn)
 }
 
-#[cfg(feature = "runbook-gate-vnext")]
 fn agent_execution_artifact(
     runbook_id: crate::runbook::types::CompiledRunbookId,
     step: &crate::runbook::executor::StepExecutionResult,
@@ -577,7 +574,6 @@ impl AgentService {
     /// Build an inner `RealDslExecutor` with the canonical registry + services
     /// chained in. All agent-side runbook-gate-vnext `RealDslExecutor`
     /// construction MUST flow through this helper.
-    #[cfg(feature = "runbook-gate-vnext")]
     fn build_real_dsl_executor(&self) -> crate::repl::executor_bridge::RealDslExecutor {
         let mut executor =
             crate::repl::executor_bridge::RealDslExecutor::new(self.pool.clone());
@@ -1215,7 +1211,6 @@ impl AgentService {
     ///
     /// INV-1: Every verb call is wrapped in a `CompiledRunbook` and executed
     /// through `execute_runbook()`. No raw `DslExecutor::execute_dsl()` call.
-    #[cfg(feature = "runbook-gate-vnext")]
     async fn execute_resolved_dsl(
         &self,
         session: &mut UnifiedSession,
