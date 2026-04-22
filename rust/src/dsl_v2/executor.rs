@@ -1876,6 +1876,101 @@ impl DslExecutor {
         tracing::debug!("execute_verb_in_tx: EXIT success");
         Ok(result.to_legacy())
     }
+
+    /// Phase B.2 (F6 follow-on, 2026-04-22): scope-aware variant of
+    /// `execute_verb_in_tx`. Unlike `execute_verb_in_tx`, this method:
+    ///
+    /// 1. Accepts `&mut dyn TransactionScope` — the Sequencer-owned
+    ///    scope threaded from stage 8, not a caller-owned `sqlx::Transaction`.
+    /// 2. **Dispatches plugin verbs through the scope** via
+    ///    [`dispatch_plugin_via_sem_os_op_in_scope`] (Phase B.1 primitive).
+    ///    The legacy `execute_verb_in_tx` refused plugin verbs because
+    ///    they needed their own per-verb scope; B.2 reverses that — the
+    ///    outer scope is the one the plugin uses.
+    /// 3. Runs generic verbs via `generic_executor.execute_in_tx` using
+    ///    `scope.transaction()` as the `&mut Transaction` handle.
+    ///
+    /// Durable verbs are still rejected — they route through the BPMN
+    /// dispatcher, not the plan executor.
+    #[allow(dead_code)] // Phase B.2a: method exists; callers migrate in B.2b.
+    async fn execute_verb_in_scope(
+        &self,
+        vc: &VerbCall,
+        ctx: &mut ExecutionContext,
+        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    ) -> Result<ExecutionResult> {
+        tracing::debug!("execute_verb_in_scope: ENTER {}.{}", vc.domain, vc.verb);
+
+        let runtime_verb = runtime_registry()
+            .get(&vc.domain, &vc.verb)
+            .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
+
+        // Durable verbs cannot participate in a caller-owned scope —
+        // they route through WorkflowDispatcher instead.
+        if let RuntimeBehavior::Durable(d) = &runtime_verb.behavior {
+            return Err(anyhow!(
+                "Durable verb {}.{} (process_key={}) cannot execute inside a \
+                 Sequencer-owned TransactionScope. Durable verbs require the V2 \
+                 REPL with WorkflowDispatcher.",
+                vc.domain,
+                vc.verb,
+                d.process_key
+            ));
+        }
+
+        // Plugin verbs: dispatch through the in-scope primitive. This is the
+        // Phase B.2 contract — the ambient scope already exists; the plugin
+        // op runs inside it and the outer caller owns commit/rollback.
+        if let RuntimeBehavior::Plugin(_) = &runtime_verb.behavior {
+            let fqn = format!("{}.{}", vc.domain, vc.verb);
+            let sem_os_ops = self.sem_os_ops.as_ref().ok_or_else(|| {
+                anyhow!(
+                    "Plugin {} has no SemOsVerbOp registered (SemOsVerbOpRegistry \
+                     is either absent on this executor or missing the FQN). Wire \
+                     `DslExecutor::with_sem_os_ops` at host startup.",
+                    fqn
+                )
+            })?;
+            let op = sem_os_ops.get(&fqn).ok_or_else(|| {
+                anyhow!(
+                    "Plugin {} has no SemOsVerbOp registered (SemOsVerbOpRegistry \
+                     is either absent on this executor or missing the FQN). Wire \
+                     `DslExecutor::with_sem_os_ops` at host startup.",
+                    fqn
+                )
+            })?;
+            return dispatch_plugin_via_sem_os_op_in_scope(
+                op.as_ref(),
+                &fqn,
+                vc,
+                ctx,
+                &self.service_registry,
+                scope,
+            )
+            .await;
+        }
+
+        // Generic CRUD verb: run via the generic executor using the scope's
+        // transaction handle.
+        tracing::debug!("execute_verb_in_scope: routing to GENERIC executor via scope");
+
+        let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+        let result = self
+            .generic_executor
+            .execute_in_tx(scope.transaction(), runtime_verb, &json_args)
+            .await?;
+
+        if runtime_verb.returns.capture {
+            if let GenericExecutionResult::Uuid(uuid) = &result {
+                if let Some(name) = &runtime_verb.returns.name {
+                    ctx.bind(name, *uuid);
+                }
+            }
+        }
+
+        tracing::debug!("execute_verb_in_scope: EXIT success");
+        Ok(result.to_legacy())
+    }
 }
 
 // ============================================================================
