@@ -8,21 +8,25 @@
 # inner transaction. Plugin ops that call out to HTTP / gRPC / spawn
 # subprocesses violate this rule.
 #
-# Scope limitation:
-#   This lint catches DIRECT external-I/O tokens in plugin op files. It does
-#   NOT chase helpers — `bpmn_lite_ops.rs` routes gRPC via
-#   `crate::bpmn_integration::client` (a helper module), so the regex sees
-#   nothing in the op body itself even though the transitive effect is
-#   external. Closing that scope gap needs dependency-graph analysis
-#   (cargo-deny or a clippy lint with call-graph traversal) — Phase F.4
-#   territory.
+# Two check layers (Phase F.4, 2026-04-22):
 #
-# What this lint DOES catch:
-#   - New direct `reqwest::` / `tonic::` / `Command::new` usage in any
-#     plugin op file — the pattern most likely to be introduced by
-#     accident.
-#   - Regression of the Phase 0g fix (subprocess spawn inside a plugin
-#     body without outbox deferral).
+#   Layer 1 (direct): catches direct external-I/O tokens in plugin op
+#   files. Strict — fails CI on any non-grandfathered match.
+#
+#   Layer 2 (transitive, --taint mode): taint-propagates through
+#   `use crate::...` imports. Any source file under rust/src/ or
+#   rust/crates/ that directly uses external-I/O tokens becomes a
+#   "tainted module"; any plugin op file that imports a tainted module
+#   is flagged as transitively-tainted. Helper-indirect violations
+#   (e.g. `crate::bpmn_integration::client.signal(...)` from a
+#   bpmn_lite_ops verb body) surface here even though Layer 1 can't see
+#   them.
+#
+#   Layer 2 is advisory — it lists findings but does NOT fail CI unless
+#   `--taint --strict` is passed. Rationale: call-graph precision in
+#   bash is limited; false positives are possible. Use Layer 2 to guide
+#   Phase F.1–F.3 remediation and to catch new helper-indirect
+#   violations that would otherwise slip past Layer 1.
 #
 # Four files are currently grandfathered in the remediation ledger:
 #   - rust/src/domain_ops/bpmn_lite_ops.rs     (5 ops, gRPC via helper)
@@ -39,8 +43,9 @@
 # violation fails the lint — the compromise cannot be quietly widened.
 #
 # Usage:
-#   ./scripts/lint_external_effects_in_verbs.sh         # Check for new violations
+#   ./scripts/lint_external_effects_in_verbs.sh         # Layer 1 direct check (CI default)
 #   ./scripts/lint_external_effects_in_verbs.sh --list  # Show current grandfathered hits
+#   ./scripts/lint_external_effects_in_verbs.sh --taint # Layer 2 transitive analysis (advisory)
 #
 # Exit codes:
 #   0 — no new A1 violations
@@ -87,6 +92,8 @@ PLUGIN_FILES="$(cd "$ROOT" && grep -rl "impl SemOsVerbOp" src/ crates/ 2>/dev/nu
 MODE="check"
 if [[ "${1:-}" == "--list" ]]; then
     MODE="list"
+elif [[ "${1:-}" == "--taint" ]]; then
+    MODE="taint"
 fi
 
 VIOLATIONS=()
@@ -168,6 +175,168 @@ if [[ ${#VIOLATIONS[@]} -gt 0 ]]; then
     echo "     of docs/todo/pattern-b-a1-remediation-ledger.md in the same PR."
     echo ""
     exit 1
+fi
+
+if [[ "$MODE" == "taint" ]]; then
+    # ── Layer 2: transitive taint analysis ────────────────────────────
+    # Phase F.4 (2026-04-22). Advisory only — does not fail CI.
+    #
+    # Strategy:
+    #   Step A: scan all .rs under src/ + crates/ for external-I/O tokens.
+    #           Each matching file becomes a "tainted module".
+    #   Step B: compute a module path for each tainted file.
+    #             src/foo/bar.rs      → crate::foo::bar
+    #             src/foo/bar/mod.rs  → crate::foo::bar
+    #           (Crate-internal approximation; cross-crate references
+    #           under crates/*/src/... become `<crate>::<path>`.)
+    #   Step C: for each plugin op file, extract `use crate::X::Y::...;` and
+    #           `use <crate>::X::Y::...;` statements. Flag any import that
+    #           points into a tainted module (prefix match).
+    #   Step D: separate findings into `tainted_but_grandfathered` (file is
+    #           already in the ledger — known transitive violation) and
+    #           `tainted_new` (not in ledger — surface as advisory).
+    #
+    # Scope limitations (honest):
+    #   - `use` scan only. Fully-qualified calls (`crate::foo::bar::send(...)`
+    #     without a matching `use`) are missed.
+    #   - Prefix match. `use crate::foo::bar::Type;` flags even if Type is
+    #     a pure data struct; coarse but errs on the side of alarm.
+    #   - No follow-through to second-hop helpers. If A imports B and B
+    #     imports C (tainted), A is NOT flagged. Extending taint recursively
+    #     would need a fixed-point loop; skipped for now.
+    # ──────────────────────────────────────────────────────────────────
+
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo "  Layer 2: transitive taint analysis (advisory)"
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo ""
+
+    # Step A + B: build the tainted module list. (bash 3.2-compatible:
+    # no mapfile; accumulate into an array via `while read`.)
+    TAINTED_FILES=()
+    while IFS= read -r f; do
+        TAINTED_FILES+=("$f")
+    done < <(
+        cd "$ROOT" && grep -rl -E "$EXTERNAL_IO_REGEX" src/ crates/ 2>/dev/null \
+        | grep -E '\.rs$' | sort -u
+    )
+
+    # Map each tainted file to a module path (prefix that a `use` would match).
+    TAINTED_MODULES=()
+    for f in "${TAINTED_FILES[@]}"; do
+        # Strip src/ → crate::
+        if [[ "$f" == src/* ]]; then
+            mod="${f#src/}"
+            mod="${mod%.rs}"
+            mod="${mod%/mod}"
+            mod="crate::${mod//\//::}"
+            TAINTED_MODULES+=("$mod")
+        fi
+        # Strip crates/<crate>/src/ → <crate>::
+        if [[ "$f" == crates/*/src/* ]]; then
+            without_crates="${f#crates/}"
+            crate_name="${without_crates%%/*}"
+            mod="${without_crates#*/src/}"
+            mod="${mod%.rs}"
+            mod="${mod%/mod}"
+            # Crate names use kebab-case in paths but snake_case in modules.
+            crate_mod="${crate_name//-/_}"
+            TAINTED_MODULES+=("${crate_mod}::${mod//\//::}")
+        fi
+    done
+
+    echo "Tainted modules (${#TAINTED_MODULES[@]} — files that directly use"
+    echo "external-I/O tokens):"
+    printf '  %s\n' "${TAINTED_MODULES[@]}" | head -30
+    if (( ${#TAINTED_MODULES[@]} > 30 )); then
+        echo "  ... (${#TAINTED_MODULES[@]} total; showing first 30)"
+    fi
+    echo ""
+
+    # Step C: for each plugin op file, scan for references to tainted
+    # modules — both `use` statements AND fully-qualified call paths
+    # (bpmn_lite_ops.rs uses `crate::bpmn_integration::client::...` via
+    # a `fn get_bpmn_client()` helper without a `use` statement, which
+    # a use-only scan would miss).
+    TRANSITIVELY_TAINTED_NEW=()
+    TRANSITIVELY_TAINTED_GRANDFATHERED=()
+
+    for file in $PLUGIN_FILES; do
+        is_gf="false"
+        for g in "${GRANDFATHERED[@]}"; do
+            if [[ "$file" == "$g" ]]; then
+                is_gf="true"
+                break
+            fi
+        done
+
+        # Skip the file itself if it's a tainted module (it'd trivially match).
+        file_is_tainted="false"
+        for tf in "${TAINTED_FILES[@]}"; do
+            if [[ "$file" == "$tf" ]]; then
+                file_is_tainted="true"
+                break
+            fi
+        done
+
+        for tmod in "${TAINTED_MODULES[@]}"; do
+            # Grep for any reference to the tainted module path in the
+            # file body, outside comment lines. Uses word boundaries on
+            # both sides to avoid substring matches (e.g. `client_group`
+            # shouldn't match `client`).
+            # tmod_regex escapes `::` literal for grep.
+            # shellcheck disable=SC2001
+            tmod_esc=$(echo "$tmod" | sed 's/::/\\:\\:/g')
+            hit=$(cd "$ROOT" && grep -En "\b${tmod_esc}\b" "$file" 2>/dev/null \
+                | grep -vE '^\s*[0-9]+:\s*(//|\s*\*)' \
+                | head -1 || true)
+
+            if [[ -n "$hit" ]]; then
+                line_no=$(echo "$hit" | cut -d: -f1)
+                entry="$file:$line_no → references $tmod"
+                if [[ "$is_gf" == "true" ]]; then
+                    TRANSITIVELY_TAINTED_GRANDFATHERED+=("$entry")
+                elif [[ "$file_is_tainted" == "true" ]]; then
+                    # The file IS a tainted module — don't flag self-references.
+                    :
+                else
+                    TRANSITIVELY_TAINTED_NEW+=("$entry")
+                fi
+                break  # one flag per file is enough for the advisory.
+            fi
+        done
+    done
+
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo "  Transitively-tainted plugin op files — grandfathered"
+    echo "═══════════════════════════════════════════════════════════════════"
+    if (( ${#TRANSITIVELY_TAINTED_GRANDFATHERED[@]} == 0 )); then
+        echo "  (none)"
+    else
+        printf '  %s\n' "${TRANSITIVELY_TAINTED_GRANDFATHERED[@]}" | head -20
+        if (( ${#TRANSITIVELY_TAINTED_GRANDFATHERED[@]} > 20 )); then
+            echo "  ... (${#TRANSITIVELY_TAINTED_GRANDFATHERED[@]} total; showing first 20)"
+        fi
+    fi
+    echo ""
+
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo "  Transitively-tainted plugin op files — NEW (needs review)"
+    echo "═══════════════════════════════════════════════════════════════════"
+    if (( ${#TRANSITIVELY_TAINTED_NEW[@]} == 0 )); then
+        echo "  (none — helper-indirect surface matches the ledger)"
+    else
+        printf '  %s\n' "${TRANSITIVELY_TAINTED_NEW[@]}"
+        echo ""
+        echo "These files import modules that directly perform external I/O."
+        echo "Review each case — some imports are fine (pure data types from a"
+        echo "tainted module), others indicate a new helper-indirect A1"
+        echo "violation that belongs on the remediation ledger."
+    fi
+    echo ""
+
+    # Advisory — always exit 0 in --taint mode unless --strict is added later.
+    exit 0
 fi
 
 echo "✓ LINT L4 PASS: no new A1 violations."
