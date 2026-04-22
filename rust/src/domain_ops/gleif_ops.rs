@@ -328,35 +328,47 @@ impl SemOsVerbOp for GleifRefresh {
     fn fqn(&self) -> &str {
         "gleif.refresh"
     }
-    async fn execute(
+
+    /// Phase F.3b (2026-04-22): DB discovery of refresh targets + all
+    /// HTTP enrichment bundles happen in pre_fetch. Execute replays the
+    /// fetched bundles into persist_enrichment calls inside the scope.
+    ///
+    /// For the single-entity mode: 1 DB lookup (entity-id → LEI) + 1
+    /// fetch bundle.
+    ///
+    /// For the bulk-refresh mode: 1 DB query (stale-entity discovery) +
+    /// N fetch bundles. This does the same N HTTP requests the legacy
+    /// loop did — just all before the txn opens. Bulk refreshes with
+    /// large N will be HTTP-latency-bound, same as before.
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let pool = scope.pool().clone();
-
+        pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
         let entity_id_arg = json_extract_uuid_opt(args, ctx, "entity-id");
-
         let stale_days = json_extract_int_opt(args, "stale-days").unwrap_or(30) as i32;
-
         let limit = json_extract_int_opt(args, "limit").unwrap_or(100) as i32;
 
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
 
-        match entity_id_arg {
+        // Resolve the (entity_id, lei) pairs to refresh.
+        let targets: Vec<(Uuid, String)> = match entity_id_arg {
             Some(entity_id) => {
-                // Refresh single entity
-                let result = service.refresh_entity(entity_id).await?;
-                Ok(VerbExecutionOutcome::Record(serde_json::json!({
-                    "refreshed": 1,
-                    "entity_id": entity_id,
-                    "lei": result.lei,
-                })))
+                let lei: Option<String> = sqlx::query_scalar(
+                    r#"SELECT lei FROM "ob-poc".entity_limited_companies WHERE entity_id = $1"#,
+                )
+                .bind(entity_id)
+                .fetch_optional(pool)
+                .await?
+                .flatten();
+                match lei {
+                    Some(l) => vec![(entity_id, l)],
+                    None => return Err(anyhow::anyhow!("Entity {} has no LEI", entity_id)),
+                }
             }
             None => {
-                // Find stale entities and refresh them
-                let stale_entities: Vec<(Uuid, String)> = sqlx::query_as(
+                sqlx::query_as(
                     r#"SELECT entity_id, lei FROM "ob-poc".entity_limited_companies
                        WHERE lei IS NOT NULL
                          AND (gleif_last_update IS NULL
@@ -365,29 +377,136 @@ impl SemOsVerbOp for GleifRefresh {
                 )
                 .bind(stale_days)
                 .bind(limit)
-                .fetch_all(&pool)
-                .await?;
+                .fetch_all(pool)
+                .await?
+            }
+        };
 
-                let mut refreshed = 0;
-                let mut errors = 0;
-
-                for (entity_id, lei) in stale_entities {
-                    match service.enrich_entity(entity_id, &lei).await {
-                        Ok(_) => refreshed += 1,
-                        Err(e) => {
-                            tracing::warn!("Failed to refresh entity {}: {}", entity_id, e);
-                            errors += 1;
-                        }
-                    }
+        // Fetch the enrichment bundle for each target. Errors are
+        // captured per-target so one bad fetch doesn't abort the whole
+        // refresh — execute logs them in the errors counter.
+        let mut bundles: Vec<serde_json::Value> = Vec::with_capacity(targets.len());
+        for (eid, lei) in &targets {
+            match service.fetch_all_for_enrich(lei).await {
+                Ok(fetch) => bundles.push(serde_json::json!({
+                    "entity_id": eid,
+                    "lei": lei,
+                    "fetched": serde_json::to_value(&fetch)?,
+                })),
+                Err(e) => {
+                    tracing::warn!(
+                        entity_id = %eid,
+                        lei = %lei,
+                        error = %e,
+                        "gleif.refresh: pre_fetch bundle failed for one target"
+                    );
+                    bundles.push(serde_json::json!({
+                        "entity_id": eid,
+                        "lei": lei,
+                        "error": e.to_string(),
+                    }));
                 }
-
-                Ok(VerbExecutionOutcome::Record(serde_json::json!({
-                    "refreshed": refreshed,
-                    "errors": errors,
-                    "stale_days": stale_days,
-                })))
             }
         }
+
+        Ok(Some(serde_json::json!({
+            "_gleif_refresh_bundles": bundles,
+            "_gleif_refresh_stale_days": stale_days,
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+
+        let bundles = args
+            .get("_gleif_refresh_bundles")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "gleif.refresh: pre_fetch result missing \
+                     (`_gleif_refresh_bundles` absent from args)"
+                )
+            })?;
+        let stale_days = args
+            .get("_gleif_refresh_stale_days")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(30) as i32;
+
+        let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
+        let mut refreshed = 0usize;
+        let mut errors = 0usize;
+
+        for bundle in bundles {
+            let entity_id: Option<Uuid> = bundle
+                .get("entity_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok());
+            let lei: Option<String> = bundle
+                .get("lei")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            if bundle.get("error").is_some() {
+                errors += 1;
+                continue;
+            }
+
+            let (Some(eid), Some(lei)) = (entity_id, lei) else {
+                errors += 1;
+                continue;
+            };
+
+            let fetched: crate::gleif::enrichment::EnrichmentFetch = match bundle
+                .get("fetched")
+                .cloned()
+                .map(serde_json::from_value::<crate::gleif::enrichment::EnrichmentFetch>)
+            {
+                Some(Ok(f)) => f,
+                _ => {
+                    errors += 1;
+                    continue;
+                }
+            };
+
+            match service.persist_enrichment(eid, &lei, fetched).await {
+                Ok(_) => refreshed += 1,
+                Err(e) => {
+                    tracing::warn!("Failed to persist refresh for entity {}: {}", eid, e);
+                    errors += 1;
+                }
+            }
+        }
+
+        // Single-entity mode echoes back entity_id + lei; bulk mode
+        // returns aggregate counts. Mirror the legacy response shape.
+        let is_single = args.get("entity-id").is_some();
+        let response = if is_single {
+            let single = args
+                .get("_gleif_refresh_bundles")
+                .and_then(|v| v.as_array())
+                .and_then(|a| a.first())
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            serde_json::json!({
+                "refreshed": refreshed,
+                "entity_id": single.get("entity_id"),
+                "lei": single.get("lei"),
+            })
+        } else {
+            serde_json::json!({
+                "refreshed": refreshed,
+                "errors": errors,
+                "stale_days": stale_days,
+            })
+        };
+
+        Ok(VerbExecutionOutcome::Record(response))
     }
 }
 
