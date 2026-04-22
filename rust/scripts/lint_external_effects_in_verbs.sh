@@ -64,11 +64,16 @@ GRANDFATHERED=(
     "src/domain_ops/bpmn_lite_ops.rs"
     "src/domain_ops/source_loader_ops.rs"
     "src/domain_ops/gleif_ops.rs"
-    "src/domain_ops/request_ops.rs"
     # 2026-04-22: `crates/sem_os_postgres/src/ops/agent.rs` removed from
     # grandfathered list — the `ActivateTeaching` subprocess spawn was
     # closed by outbox deferral (same pattern as Phase 0g
     # `MaintenanceReindexEmbeddingsOp`). Ledger §2.2 moved to CLOSED.
+    #
+    # 2026-04-22 (late): `src/domain_ops/request_ops.rs` removed from
+    # grandfathered list — the `try_send_bpmn_signal` helper was
+    # converted from a direct gRPC call to an outbox insert (§3.4
+    # F.1c remediation). The file no longer contains live external-I/O
+    # tokens inside verb bodies.
 )
 
 # ── External-I/O patterns ──────────────────────────────────────────────

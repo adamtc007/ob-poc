@@ -200,7 +200,30 @@ split is designed.
 
 **Status:** 11/17 ops CLOSED (§3.3a); 6/17 OPEN (§3.3b). **PARTIAL.**
 
-### 3.4 Phase 5f completion criteria
+### 3.4 File: `request_ops.rs` — helper-indirect gRPC (CLOSED 2026-04-22, F.1c)
+
+This file was added to the original grandfathered list at the lint
+level (taint propagation) because ~8 request lifecycle verbs
+(`request.cancel`, `request.remind`, `request.escalate`,
+`request.extend`, etc.) called a shared helper `try_send_bpmn_signal`
+that did a direct gRPC `client.signal(...)` call.
+
+| shape | resolution | status |
+|---|---|---|
+| Fire-and-forget gRPC signal via helper | **Outbox deferral.** `try_send_bpmn_signal` helper rewritten to (a) look up the active BPMN correlation for the case, (b) insert a `bpmn_signal` row into `public.outbox` (same effect_kind + idempotency key shape as `BpmnSignal::execute`), (c) append the audit entry to `communication_log`. All steps share the caller's ambient txn; the gRPC call is performed post-commit by the existing `BpmnSignalConsumer` drainer. Lazy `OnceLock<BpmnLiteConnection>` static and the `bpmn_client()` helper deleted entirely. | **CLOSED 2026-04-22** |
+
+Side effect: the audit trail type changed from `BPMN_SIGNAL` to
+`BPMN_SIGNAL_QUEUED` and now records the outbox_id + idempotency_key
+alongside the correlation metadata. Downstream readers of
+`communication_log` that filtered on `type = 'BPMN_SIGNAL'` need to
+update their filter to include `BPMN_SIGNAL_QUEUED`; confirmed no
+such reader exists in-repo.
+
+Lint script `rust/scripts/lint_external_effects_in_verbs.sh` —
+`src/domain_ops/request_ops.rs` removed from the `GRANDFATHERED`
+array. L4 Layer 1 still passes with 0 grandfathered hits.
+
+### 3.5 Phase 5f completion criteria
 
 Phase 5f is CLOSED when:
 

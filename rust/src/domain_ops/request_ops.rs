@@ -1309,39 +1309,23 @@ async fn try_unblock_workstream(workstream_id: Uuid, pool: &PgPool) -> Result<bo
     Ok(false)
 }
 
-/// Lazy BPMN gRPC client — created once from `BPMN_LITE_GRPC_URL` env var.
-/// Returns `None` when the env var is not set (BPMN integration disabled).
-#[cfg(feature = "database")]
-fn bpmn_client() -> Option<&'static crate::bpmn_integration::client::BpmnLiteConnection> {
-    use std::sync::OnceLock;
-    static CLIENT: OnceLock<Option<crate::bpmn_integration::client::BpmnLiteConnection>> =
-        OnceLock::new();
-    CLIENT
-        .get_or_init(|| {
-            if std::env::var("BPMN_LITE_GRPC_URL").is_err() {
-                tracing::debug!("BPMN_LITE_GRPC_URL not set — signal routing disabled");
-                return None;
-            }
-            match crate::bpmn_integration::client::BpmnLiteConnection::from_env() {
-                Ok(conn) => Some(conn),
-                Err(e) => {
-                    tracing::warn!(error = %e, "Failed to create BPMN client for signal routing");
-                    None
-                }
-            }
-        })
-        .as_ref()
-}
-
 /// Best-effort BPMN signal routing for lifecycle request operations.
 ///
-/// When a request is reminded/cancelled/escalated/extended, check if the
-/// associated case has an active BPMN correlation. If so, send a signal to
-/// the BPMN process alongside the legacy `outstanding_requests` DB update.
+/// Phase F.1c (2026-04-22, Pattern B §3.4): the direct gRPC call was
+/// removed. This helper now:
 ///
-/// This is additive — the legacy path always runs. BPMN signaling is best-effort:
-/// if the BPMN infrastructure is unavailable or the case has no active correlation,
-/// the function logs and returns without error.
+/// 1. Reads the active BPMN correlation for the case (DB read, fine
+///    inside the ambient txn).
+/// 2. Inserts a `bpmn_signal` row into `public.outbox` (DB write, same
+///    txn). The existing `BpmnSignalConsumer` drainer (registered
+///    alongside `MaintenanceSpawnConsumer` in ob-poc-web::main) performs
+///    the actual gRPC call post-commit.
+/// 3. Appends the audit entry to `outstanding_requests.communication_log`
+///    (DB write, same txn).
+///
+/// Net effect: zero gRPC/HTTP inside the verb body. If the outer txn
+/// rolls back, the outbox row is gone with it — no orphaned BPMN
+/// signals. Same atomicity + idempotency contract as `BpmnSignal::execute`.
 #[cfg(feature = "database")]
 async fn try_send_bpmn_signal(
     case_id: Option<Uuid>,
@@ -1380,55 +1364,80 @@ async fn try_send_bpmn_signal(
         }
     };
 
-    // Send gRPC signal to BPMN-Lite — best-effort, never fails the main operation.
-    if let Some(client) = bpmn_client() {
-        let payload_bytes = serde_json::to_vec(payload).unwrap_or_default();
-        match client
-            .signal(
-                correlation.process_instance_id,
-                signal_name,
-                Some(&payload_bytes),
-            )
-            .await
-        {
-            Ok(()) => {
-                tracing::info!(
-                    case_id = %case_id,
-                    process_instance_id = %correlation.process_instance_id,
-                    signal = signal_name,
-                    "BPMN signal sent for lifecycle event"
-                );
-            }
-            Err(e) => {
-                tracing::warn!(
-                    case_id = %case_id,
-                    process_instance_id = %correlation.process_instance_id,
-                    signal = signal_name,
-                    error = %e,
-                    "BPMN signal failed (non-blocking)"
-                );
-            }
-        }
+    // Defer the actual signal via public.outbox — same pattern as
+    // `BpmnSignal::execute` uses. Idempotency key collapses duplicate
+    // signals from a single txn.
+    let outbox_id = uuid::Uuid::new_v4();
+    let trace_id = uuid::Uuid::new_v4();
+    let payload_bytes = serde_json::to_vec(payload).unwrap_or_default();
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(signal_name.as_bytes());
+    hasher.update(b"\x00");
+    hasher.update(&payload_bytes);
+    let payload_hash = hasher.finalize().to_hex().to_string();
+    let idempotency_key = format!(
+        "bpmn_signal:{}:{}:{}",
+        correlation.process_instance_id,
+        signal_name,
+        &payload_hash[..16]
+    );
+
+    let outbox_payload = serde_json::json!({
+        "instance_id": correlation.process_instance_id,
+        "message_name": signal_name,
+        "payload": serde_json::to_string(payload).unwrap_or_default(),
+    });
+
+    if let Err(e) = sqlx::query(
+        r#"
+        INSERT INTO public.outbox
+            (id, trace_id, envelope_version, effect_kind, payload, idempotency_key, status)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, 'pending')
+        ON CONFLICT (idempotency_key, effect_kind) DO NOTHING
+        "#,
+    )
+    .bind(outbox_id)
+    .bind(trace_id)
+    .bind(1i16)
+    .bind("bpmn_signal")
+    .bind(&outbox_payload)
+    .bind(&idempotency_key)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!(
+            case_id = %case_id,
+            signal = signal_name,
+            error = %e,
+            "Failed to queue bpmn_signal in public.outbox (non-blocking)"
+        );
     } else {
-        tracing::debug!(
+        tracing::info!(
             case_id = %case_id,
             process_instance_id = %correlation.process_instance_id,
             signal = signal_name,
-            "BPMN client not available, skipping signal"
+            %idempotency_key,
+            "bpmn.signal queued to public.outbox for request lifecycle event"
         );
     }
 
-    // Record the signal in the communication_log for audit regardless of send result
+    // Record the signal in the communication_log for audit regardless
+    // of outbox status. This is the same pre-F.1c audit trail, now
+    // reflecting "queued" instead of "sent" — the drainer updates the
+    // outbox row when the actual gRPC call completes.
     let signal_log = serde_json::json!({
         "timestamp": chrono::Utc::now(),
-        "type": "BPMN_SIGNAL",
+        "type": "BPMN_SIGNAL_QUEUED",
         "signal_name": signal_name,
         "process_instance_id": correlation.process_instance_id,
         "correlation_id": correlation.correlation_id,
+        "outbox_id": outbox_id,
+        "idempotency_key": idempotency_key,
         "payload": payload,
     });
 
-    // Best-effort audit — fire and forget
     let _ = sqlx::query!(
         r#"
         UPDATE "ob-poc".outstanding_requests
