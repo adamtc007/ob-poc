@@ -5457,6 +5457,26 @@ impl ReplOrchestratorV2 {
                         )
                         .await;
 
+                    // Phase A.3 (F5 follow-on, 2026-04-22): per-step stage-8
+                    // shadow event carrying the turn's trace_id. Complements
+                    // the aggregate DispatchLoopOutput emission at
+                    // `execute_runbook_from` tail with a per-step signal the
+                    // determinism harness can bind fixtures against before
+                    // Phase B promotes the envelope to the dispatch contract.
+                    tracing::debug!(
+                        trace_id = ?session.last_trace_id,
+                        session_id = %session.id,
+                        entry_id = %entry_id,
+                        sequence = entry_sequence,
+                        verb = %session.runbook.entries[idx].verb,
+                        outcome_kind = match &gate_outcome {
+                            StepOutcome::Completed { .. } => "completed",
+                            StepOutcome::Failed { .. } => "failed",
+                            StepOutcome::Parked { .. } => "parked",
+                            StepOutcome::Skipped { .. } => "skipped",
+                        },
+                        "Stage 8 — per-step dispatch outcome"
+                    );
                     match gate_outcome {
                         StepOutcome::Completed { result } => {
                             tracing::info!(
