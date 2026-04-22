@@ -61,19 +61,19 @@ ROOT="$SCRIPT_DIR/.."
 # (Phase F.1-F.3). Until remediation, they are the ONLY files allowed to
 # contain external-I/O inside verb bodies.
 GRANDFATHERED=(
-    "src/domain_ops/bpmn_lite_ops.rs"
-    "src/domain_ops/source_loader_ops.rs"
-    "src/domain_ops/gleif_ops.rs"
-    # 2026-04-22: `crates/sem_os_postgres/src/ops/agent.rs` removed from
-    # grandfathered list — the `ActivateTeaching` subprocess spawn was
-    # closed by outbox deferral (same pattern as Phase 0g
-    # `MaintenanceReindexEmbeddingsOp`). Ledger §2.2 moved to CLOSED.
+    # 2026-04-22 (late — Phase 5f CLOSED): all four original
+    # grandfathered files (bpmn_lite_ops, source_loader_ops, gleif_ops,
+    # request_ops) have been fully remediated. bpmn_lite_ops: pre_fetch
+    # for compile/inspect/start, outbox for signal/cancel.
+    # source_loader_ops: all 12 I/O ops via pre_fetch. gleif_ops: all 17
+    # ops via pre_fetch (4 read + 1 dispatcher direct; 6 write-interleaved
+    # via service split; 6 pure-HTTP via pre_fetch). request_ops helper:
+    # outbox. The agent.rs regression from Slice #80 was closed by
+    # outbox deferral (same pattern as Phase 0g).
     #
-    # 2026-04-22 (late): `src/domain_ops/request_ops.rs` removed from
-    # grandfathered list — the `try_send_bpmn_signal` helper was
-    # converted from a direct gRPC call to an outbox insert (§3.4
-    # F.1c remediation). The file no longer contains live external-I/O
-    # tokens inside verb bodies.
+    # This list is intentionally empty. Any new A1 violation now fails
+    # the lint immediately — the D11 compromise has been fully honoured
+    # and there is no budget for widening it.
 )
 
 # ── External-I/O patterns ──────────────────────────────────────────────
