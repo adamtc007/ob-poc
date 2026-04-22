@@ -226,6 +226,15 @@ impl SemOsVerbOp for Create {
         .execute(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: new deal enters at PROSPECT state.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            deal_id,
+            "deal:prospect",
+            "deal/lifecycle",
+            "deal.create — new deal at PROSPECT",
+        );
+
         Ok(VerbExecutionOutcome::Uuid(deal_id))
     }
 }
@@ -416,6 +425,23 @@ impl SemOsVerbOp for UpdateStatus {
         .execute(scope.executor())
         .await?;
 
+        // Phase C.3 rollout: deal.update-status is the primary
+        // state-transition verb for the deal lifecycle. Validator above
+        // (`is_valid_deal_status_transition` + KYC gate) guarantees a
+        // genuine state advance by the time we reach this line.
+        let to_node = format!("deal:{}", new_status.to_lowercase());
+        let reason = format!(
+            "deal.update-status — {} → {}",
+            current_status, new_status
+        );
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            deal_id,
+            &to_node,
+            "deal/lifecycle",
+            &reason,
+        );
+
         let result = DealStatusUpdateResult {
             deal_id,
             old_status: current_status,
@@ -482,6 +508,21 @@ impl SemOsVerbOp for Cancel {
         .bind(&reason)
         .execute(scope.executor())
         .await?;
+
+        // Phase C.3 rollout: deal cancellation is a terminal state
+        // advance. Reason string captures the operator-supplied reason
+        // so narration can surface it downstream.
+        let advance_reason = format!(
+            "deal.cancel — {} → CANCELLED ({})",
+            current_status, reason
+        );
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            deal_id,
+            "deal:cancelled",
+            "deal/lifecycle",
+            &advance_reason,
+        );
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
