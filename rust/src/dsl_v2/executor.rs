@@ -2251,6 +2251,95 @@ impl DslExecutor {
         Ok(results)
     }
 
+    /// Phase B.2a (F6 follow-on, 2026-04-22): execute a plan atomically
+    /// inside a caller-supplied `TransactionScope`. The scope owns the
+    /// transaction boundary — this method does NOT begin, commit, or
+    /// roll back. The Sequencer (Phase B.2b) opens one outer scope for
+    /// the runbook, calls this method per step, commits at stage 9a,
+    /// and rolls back on first failure.
+    ///
+    /// Difference from [`Self::execute_plan_atomic`]:
+    /// - Does not open / commit / rollback. Caller owns the boundary.
+    /// - Dispatches plugin verbs through `execute_verb_in_scope`
+    ///   (which in turn uses `dispatch_plugin_via_sem_os_op_in_scope`).
+    /// - Generic verbs route through `scope.transaction()` instead of
+    ///   a freshly-begun `sqlx::Transaction`.
+    ///
+    /// On any step error, returns `Err` immediately — caller decides
+    /// to roll back the outer scope. Step outputs up to that point are
+    /// NOT returned to the caller (they are gone with the rollback).
+    #[allow(dead_code)] // Phase B.2a: method exists; Sequencer migrates in B.2b.
+    pub async fn execute_plan_atomic_in_scope(
+        &self,
+        plan: &super::execution_plan::ExecutionPlan,
+        ctx: &mut ExecutionContext,
+        scope: &mut dyn dsl_runtime::tx::TransactionScope,
+    ) -> Result<Vec<ExecutionResult>> {
+        validate_all_resolved(plan)?;
+
+        tracing::info!(
+            scope_id = ?scope.scope_id(),
+            "execute_plan_atomic_in_scope: starting with {} steps in caller-owned scope",
+            plan.steps.len()
+        );
+
+        let mut results: Vec<ExecutionResult> = Vec::with_capacity(plan.steps.len());
+
+        for (step_index, step) in plan.steps.iter().enumerate() {
+            let mut vc = step.verb_call.clone();
+
+            // Inject values from previous steps.
+            for inj in &step.injections {
+                if let Some(ExecutionResult::Uuid(id)) = results.get(inj.from_step) {
+                    vc.arguments.push(super::ast::Argument {
+                        key: inj.into_arg.clone(),
+                        value: AstNode::string(id.to_string()),
+                        span: super::ast::Span::default(),
+                    });
+                }
+            }
+
+            let result = self.execute_verb_in_scope(&vc, ctx, scope).await
+                .map_err(|e| {
+                    tracing::error!(
+                        step_index,
+                        verb = format!("{}.{}", vc.domain, vc.verb).as_str(),
+                        error = %e,
+                        "execute_plan_atomic_in_scope: step failed — caller must rollback scope"
+                    );
+                    e
+                })?;
+
+            // Handle :as bindings exactly as execute_plan_atomic does.
+            if let Some(ref binding_name) = step.bind_as {
+                match &result {
+                    ExecutionResult::Uuid(id) => {
+                        ctx.bind(binding_name, *id);
+                        let alias = format!("{}_id", step.verb_call.domain);
+                        ctx.bind(&alias, *id);
+                    }
+                    ExecutionResult::RecordSet(records) => {
+                        ctx.bind_json(binding_name, serde_json::Value::Array(records.clone()));
+                    }
+                    ExecutionResult::Record(record) => {
+                        ctx.bind_json(binding_name, record.clone());
+                    }
+                    _ => {}
+                }
+            }
+
+            results.push(result);
+        }
+
+        tracing::info!(
+            scope_id = ?scope.scope_id(),
+            "execute_plan_atomic_in_scope: {} steps produced; scope still open (caller commits/rolls back)",
+            results.len()
+        );
+
+        Ok(results)
+    }
+
     /// Execute a compiled execution plan atomically with optional advisory locking
     ///
     /// This is the full-featured atomic execution method that:
