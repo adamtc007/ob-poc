@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use dsl_runtime::domain_ops::helpers::{
-    json_extract_bool_opt, json_extract_int, json_extract_int_opt, json_extract_string,
+    self, json_extract_bool_opt, json_extract_int, json_extract_int_opt, json_extract_string,
     json_extract_string_list, json_extract_string_opt, json_extract_uuid,
 };
 use dsl_runtime::service_traits::TradingProfileDocument;
@@ -37,12 +37,21 @@ async fn load_ca_section(
 
 async fn save_ca_section(
     docs: &dyn TradingProfileDocument,
+    ctx: &mut VerbExecutionContext,
     profile_id: Uuid,
     mut doc: TradingMatrixDocument,
     ca: TradingMatrixCorporateActions,
+    verb_fqn: &str,
 ) -> Result<TradingMatrixDocument> {
     doc.corporate_actions = Some(ca);
     docs.save_document(profile_id, &doc).await?;
+    helpers::emit_pending_state_advance(
+        ctx,
+        profile_id,
+        "trading:profile_ca_updated",
+        "trading-profile/corporate-actions",
+        verb_fqn,
+    );
     Ok(doc)
 }
 
@@ -83,7 +92,7 @@ impl SemOsVerbOp for EnableEventTypes {
                 ca.enabled_event_types.push(et);
             }
         }
-        let doc = save_ca_section(docs.as_ref(), profile_id, doc, ca.clone()).await?;
+        let doc = save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca.clone(), self.fqn()).await?;
         Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "enabled_count": ca.enabled_event_types.len(),
@@ -111,7 +120,7 @@ impl SemOsVerbOp for DisableEventTypes {
         let (doc, mut ca) = load_ca_section(docs.as_ref(), profile_id).await?;
         ca.enabled_event_types
             .retain(|et| !event_types.contains(et));
-        save_ca_section(docs.as_ref(), profile_id, doc, ca).await?;
+        save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca, self.fqn()).await?;
         Ok(VerbExecutionOutcome::Affected(event_types.len() as u64))
     }
 }
@@ -140,7 +149,7 @@ impl SemOsVerbOp for SetNotificationPolicy {
             sla_hours,
             escalation_contact,
         });
-        save_ca_section(docs.as_ref(), profile_id, doc, ca).await?;
+        save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca, self.fqn()).await?;
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -175,7 +184,7 @@ impl SemOsVerbOp for SetElectionPolicy {
             evidence_required,
             auto_instruct_threshold,
         });
-        save_ca_section(docs.as_ref(), profile_id, doc, ca).await?;
+        save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca, self.fqn()).await?;
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -210,7 +219,7 @@ impl SemOsVerbOp for SetDefaultOption {
                 default_option,
             });
         }
-        save_ca_section(docs.as_ref(), profile_id, doc, ca).await?;
+        save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca, self.fqn()).await?;
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -233,7 +242,7 @@ impl SemOsVerbOp for RemoveDefaultOption {
         let docs = ctx.service::<dyn TradingProfileDocument>()?;
         let (doc, mut ca) = load_ca_section(docs.as_ref(), profile_id).await?;
         ca.default_options.retain(|o| o.event_type != event_type);
-        save_ca_section(docs.as_ref(), profile_id, doc, ca).await?;
+        save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca, self.fqn()).await?;
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -272,7 +281,7 @@ impl SemOsVerbOp for AddCutoffRule {
             warning_days,
             escalation_days,
         });
-        save_ca_section(docs.as_ref(), profile_id, doc, ca).await?;
+        save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca, self.fqn()).await?;
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -299,7 +308,7 @@ impl SemOsVerbOp for RemoveCutoffRule {
             !(r.market_code.as_deref() == market_code.as_deref()
                 && r.depository_code.as_deref() == depository_code.as_deref())
         });
-        save_ca_section(docs.as_ref(), profile_id, doc, ca).await?;
+        save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca, self.fqn()).await?;
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -340,7 +349,7 @@ impl SemOsVerbOp for LinkProceedsSsi {
                 ssi_reference,
             });
         }
-        save_ca_section(docs.as_ref(), profile_id, doc, ca).await?;
+        save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca, self.fqn()).await?;
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -372,7 +381,7 @@ impl SemOsVerbOp for RemoveProceedsSsi {
             !(std::mem::discriminant(&m.proceeds_type) == std::mem::discriminant(&proceeds_type)
                 && m.currency.as_deref() == currency.as_deref())
         });
-        save_ca_section(docs.as_ref(), profile_id, doc, ca).await?;
+        save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca, self.fqn()).await?;
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
