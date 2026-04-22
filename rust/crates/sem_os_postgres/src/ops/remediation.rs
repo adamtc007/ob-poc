@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use dsl_runtime::cross_workspace::remediation;
 use dsl_runtime::domain_ops::helpers::{
-    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+    self, json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
@@ -70,6 +70,13 @@ impl SemOsVerbOp for Defer {
         let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
         let reason = json_extract_string(args, "reason")?;
         remediation::defer(scope.pool(), remediation_id, &reason, None).await?;
+        helpers::emit_pending_state_advance(
+            ctx,
+            remediation_id,
+            "remediation:deferred",
+            "remediation/lifecycle",
+            "remediation.defer",
+        );
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(
             DeferResult {
                 remediation_id,
@@ -102,6 +109,13 @@ impl SemOsVerbOp for RevokeDeferral {
     ) -> Result<VerbExecutionOutcome> {
         let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
         remediation::revoke_deferral(scope.pool(), remediation_id).await?;
+        helpers::emit_pending_state_advance(
+            ctx,
+            remediation_id,
+            "remediation:detection_active",
+            "remediation/lifecycle",
+            "remediation.revoke-deferral",
+        );
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(
             RevokeResult {
                 remediation_id,
@@ -135,6 +149,13 @@ impl SemOsVerbOp for ConfirmExternalCorrection {
         let remediation_id = json_extract_uuid(args, ctx, "remediation-id")?;
         let provider_ref = json_extract_string(args, "provider-ref")?;
         remediation::mark_resolved(scope.pool(), remediation_id, None).await?;
+        helpers::emit_pending_state_advance(
+            ctx,
+            remediation_id,
+            "remediation:resolved",
+            "remediation/lifecycle",
+            "remediation.confirm-external-correction",
+        );
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(
             ConfirmResult {
                 remediation_id,

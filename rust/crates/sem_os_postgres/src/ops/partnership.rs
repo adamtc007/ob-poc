@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use dsl_runtime::domain_ops::helpers::{
-    json_extract_string, json_extract_string_opt, json_extract_uuid,
+    self, json_extract_string, json_extract_string_opt, json_extract_uuid,
 };
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
@@ -94,6 +94,14 @@ impl SemOsVerbOp for RecordContribution {
         .execute(scope.executor())
         .await?;
 
+        helpers::emit_pending_state_advance(
+            ctx,
+            partner_id,
+            "partnership:capital_contributed",
+            "partnership/capital",
+            "partnership.record-contribution",
+        );
+
         let unfunded = commitment - new_contributed
             + partner.capital_returned.unwrap_or(rust_decimal::Decimal::ZERO);
 
@@ -159,6 +167,14 @@ impl SemOsVerbOp for RecordDistribution {
         .bind(partner.id)
         .execute(scope.executor())
         .await?;
+
+        helpers::emit_pending_state_advance(
+            ctx,
+            partner_id,
+            "partnership:capital_distributed",
+            "partnership/capital",
+            "partnership.record-distribution",
+        );
 
         Ok(VerbExecutionOutcome::Record(json!({
             "partnership_capital_id": partner.id.to_string(),

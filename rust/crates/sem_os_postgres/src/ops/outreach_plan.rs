@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
+use dsl_runtime::domain_ops::helpers::{self, json_extract_string_opt, json_extract_uuid};
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
@@ -286,6 +286,14 @@ impl SemOsVerbOp for PlanGenerate {
                 "status": item_row.1,
             }));
         }
+
+        helpers::emit_pending_state_advance(
+            ctx,
+            case_id,
+            "research:outreach_plan_generated",
+            "research/outreach-plan",
+            "research.outreach.plan-generate",
+        );
 
         Ok(VerbExecutionOutcome::Record(json!({
             "plan_id": plan_id,

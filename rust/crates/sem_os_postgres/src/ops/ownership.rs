@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use dsl_runtime::domain_ops::helpers::{
-    json_extract_int_opt, json_extract_string_opt, json_extract_uuid,
+    self, json_extract_int_opt, json_extract_string_opt, json_extract_uuid,
 };
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
@@ -63,6 +63,15 @@ impl SemOsVerbOp for Compute {
                 .bind(as_of)
                 .fetch_one(scope.executor())
                 .await?;
+        if count > 0 {
+            helpers::emit_pending_state_advance(
+                ctx,
+                issuer_entity_id,
+                "ownership:snapshots_derived",
+                "ownership/snapshots",
+                "ownership.compute",
+            );
+        }
         Ok(VerbExecutionOutcome::Record(json!({
             "issuer_entity_id": issuer_entity_id,
             "as_of_date": as_of.to_string(),
@@ -457,6 +466,13 @@ impl SemOsVerbOp for Reconcile {
         .await?;
 
         ctx.bind("ownership_reconciliation_run", run_id);
+        helpers::emit_pending_state_advance(
+            ctx,
+            issuer_entity_id,
+            "ownership:reconciled",
+            "ownership/reconciliation",
+            "ownership.reconcile",
+        );
         Ok(VerbExecutionOutcome::Uuid(run_id))
     }
 }

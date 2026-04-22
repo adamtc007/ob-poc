@@ -16,7 +16,7 @@ use sqlx::Row;
 use uuid::Uuid;
 
 use dsl_runtime::domain_ops::helpers::{
-    json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
+    self, json_extract_int_opt, json_extract_string, json_extract_string_opt, json_extract_uuid,
     json_extract_uuid_opt,
 };
 use dsl_runtime::tx::TransactionScope;
@@ -65,9 +65,18 @@ impl SemOsVerbOp for RecordResponse {
         .fetch_one(scope.executor())
         .await?;
 
+        let target_entity_id: Uuid = row.get("target_entity_id");
+        helpers::emit_pending_state_advance(
+            ctx,
+            target_entity_id,
+            "research:outreach_responded",
+            "research/outreach",
+            "research.outreach.record-response",
+        );
+
         Ok(VerbExecutionOutcome::Record(json!({
             "request_id": row.get::<Uuid, _>("request_id"),
-            "target_entity_id": row.get::<Uuid, _>("target_entity_id"),
+            "target_entity_id": target_entity_id,
             "request_type": row.get::<String, _>("request_type"),
             "response_type": response_type,
             "status": "responded",
