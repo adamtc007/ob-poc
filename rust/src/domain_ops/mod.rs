@@ -327,9 +327,9 @@ pub use onboarding::OnboardingAutoComplete;
 // Phase 5c — refdata_loader relocated. Types accessed via dsl_runtime::domain_ops::refdata_loader.
 // Phase 5c — refdata_ops relocated. Types accessed via dsl_runtime::domain_ops::refdata_ops.
 pub use request_ops::{
-    DocumentRequestOp, DocumentUploadOp, DocumentWaiveOp, RequestCancelOp, RequestCreateOp,
-    RequestEscalateOp, RequestExtendOp, RequestFulfillOp, RequestOverdueOp, RequestRemindOp,
-    RequestWaiveOp,
+    DocumentRequest, DocumentUpload, DocumentWaive, RequestCancel, RequestCreate,
+    RequestEscalate, RequestExtend, RequestFulfill, RequestOverdue, RequestRemind,
+    RequestWaive,
 };
 
 // Phase 5a — semantic_ops relocated to dsl-runtime. Inventory registration
@@ -618,6 +618,21 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(source_loader_ops::SecEdgarFetchBeneficialOwners));
     registry.register(Arc::new(source_loader_ops::SecEdgarFetchFilings));
     registry.register(Arc::new(source_loader_ops::SecEdgarImportCompany));
+
+    // Phase B Pattern B slice #76: request.* + document.* (11 verbs —
+    // outstanding requests + blocker auto-unblock + bpmn-lite signal
+    // routing; bridges to crate::bpmn_integration).
+    registry.register(Arc::new(request_ops::RequestCreate));
+    registry.register(Arc::new(request_ops::RequestOverdue));
+    registry.register(Arc::new(request_ops::RequestFulfill));
+    registry.register(Arc::new(request_ops::RequestCancel));
+    registry.register(Arc::new(request_ops::RequestExtend));
+    registry.register(Arc::new(request_ops::RequestRemind));
+    registry.register(Arc::new(request_ops::RequestEscalate));
+    registry.register(Arc::new(request_ops::RequestWaive));
+    registry.register(Arc::new(request_ops::DocumentRequest));
+    registry.register(Arc::new(request_ops::DocumentUpload));
+    registry.register(Arc::new(request_ops::DocumentWaive));
 }
 
 #[cfg(test)]
@@ -711,18 +726,20 @@ mod tests {
         assert!(!registry.has("regulatory.registration", "verify"));
         assert!(!registry.has("regulatory.status", "check"));
         // Outstanding Request operations
-        assert!(registry.has("request", "create"));
-        assert!(registry.has("request", "overdue"));
-        assert!(registry.has("request", "fulfill"));
-        assert!(registry.has("request", "cancel"));
-        assert!(registry.has("request", "extend"));
-        assert!(registry.has("request", "remind"));
-        assert!(registry.has("request", "escalate"));
-        assert!(registry.has("request", "waive"));
+        // Phase 5c-migrate Phase B Pattern B slice #76: request_ops moved to
+        // `sem_os_postgres::ops::request` via `extend_registry()`.
+        assert!(!registry.has("request", "create"));
+        assert!(!registry.has("request", "overdue"));
+        assert!(!registry.has("request", "fulfill"));
+        assert!(!registry.has("request", "cancel"));
+        assert!(!registry.has("request", "extend"));
+        assert!(!registry.has("request", "remind"));
+        assert!(!registry.has("request", "escalate"));
+        assert!(!registry.has("request", "waive"));
         // Document request operations
-        assert!(registry.has("document", "request"));
-        assert!(registry.has("document", "upload"));
-        assert!(registry.has("document", "waive-request"));
+        assert!(!registry.has("document", "request"));
+        assert!(!registry.has("document", "upload"));
+        assert!(!registry.has("document", "waive-request"));
         // KYC case operations
         // Phase 5c-migrate Phase B slice #62: kyc_case_ops moved to
         // `sem_os_postgres::ops::kyc_case::*`.

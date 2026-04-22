@@ -1,17 +1,26 @@
-//! Outstanding Request Operations
+//! Outstanding Request Operations (11 plugin verbs) — `request.*`, `document.*`
+//! lifecycle ops for fire-and-forget request tracking, auto-fulfillment, and
+//! BPMN signal routing.
 //!
-//! Fire-and-forget request operations for document requests, verifications, etc.
-//! These operations create requests that are tracked asynchronously and can
-//! auto-fulfill when matching responses arrive.
+//! Phase 5c-migrate Phase B Pattern B slice #76: ported from
+//! `CustomOperation` + `inventory::collect!` to `SemOsVerbOp`. Stays in
+//! `ob-poc::domain_ops::request_ops` because the ops bridge to
+//! `crate::bpmn_integration::{client, correlation}` — upstream of
+//! `sem_os_postgres`.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, Utc};
-use dsl_runtime_macros::register_custom_op;
+use sem_os_postgres::ops::SemOsVerbOp;
 use serde_json::json;
 use uuid::Uuid;
 
-use super::CustomOperation;
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_bool_opt, json_extract_int_opt, json_extract_string, json_extract_string_opt,
+    json_extract_uuid, json_extract_uuid_opt,
+};
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -45,37 +54,29 @@ pub struct LinkedIds {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Create an outstanding request (generic)
-#[register_custom_op]
-pub struct RequestCreateOp;
+pub struct RequestCreate;
 
 #[async_trait]
-impl CustomOperation for RequestCreateOp {
-    fn domain(&self) -> &'static str {
-        "request"
+impl SemOsVerbOp for RequestCreate {
+    fn fqn(&self) -> &str {
+        "request.create"
     }
-
-    fn verb(&self) -> &'static str {
-        "create"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Creates outstanding request with computed defaults from request_types config"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+
         // Extract required args
-        let subject_type = super::helpers::json_extract_string(args, "subject-type")?;
+        let subject_type = json_extract_string(args, "subject-type")?;
 
-        let subject_id = super::helpers::json_extract_uuid(args, ctx, "subject-id")?;
+        let subject_id = json_extract_uuid(args, ctx, "subject-id")?;
 
-        let request_type = super::helpers::json_extract_string(args, "type")?;
+        let request_type = json_extract_string(args, "type")?;
 
-        let request_subtype = super::helpers::json_extract_string(args, "subtype")?;
+        let request_subtype = json_extract_string(args, "subtype")?;
 
         // Get defaults from request_types config
         let config = sqlx::query!(
@@ -87,7 +88,7 @@ impl CustomOperation for RequestCreateOp {
             request_type,
             request_subtype
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?;
 
         let default_due_days = config
@@ -105,10 +106,10 @@ impl CustomOperation for RequestCreateOp {
         let max_reminders = config.as_ref().and_then(|c| c.max_reminders).unwrap_or(3);
 
         // Optional args with defaults
-        let due_in_days = super::helpers::json_extract_int_opt(args, "due-in-days")
-            .unwrap_or(default_due_days as i64);
+        let due_in_days =
+            json_extract_int_opt(args, "due-in-days").unwrap_or(default_due_days as i64);
 
-        let due_date: NaiveDate = super::helpers::json_extract_string_opt(args, "due-date")
+        let due_date: NaiveDate = json_extract_string_opt(args, "due-date")
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| {
                 (Utc::now() + Duration::days(due_in_days))
@@ -116,13 +117,13 @@ impl CustomOperation for RequestCreateOp {
                     .date()
             });
 
-        let blocks = super::helpers::json_extract_bool_opt(args, "blocks").unwrap_or(blocks_by_default);
+        let blocks = json_extract_bool_opt(args, "blocks").unwrap_or(blocks_by_default);
 
-        let blocker_message = super::helpers::json_extract_string_opt(args, "message");
+        let blocker_message = json_extract_string_opt(args, "message");
 
-        let requested_from_label = super::helpers::json_extract_string_opt(args, "from");
+        let requested_from_label = json_extract_string_opt(args, "from");
 
-        let requested_from_entity_id = super::helpers::json_extract_uuid_opt(args, ctx, "from-entity");
+        let requested_from_entity_id = json_extract_uuid_opt(args, ctx, "from-entity");
 
         let request_details: serde_json::Value = args
             .get("details")
@@ -143,7 +144,7 @@ impl CustomOperation for RequestCreateOp {
             .unwrap_or(json!({}));
 
         // Derive linked IDs based on subject_type
-        let linked = derive_linked_ids(&subject_type, subject_id, pool).await?;
+        let linked = derive_linked_ids(&subject_type, subject_id, &pool).await?;
 
         // Create the request
         let row = sqlx::query!(
@@ -187,7 +188,7 @@ impl CustomOperation for RequestCreateOp {
             blocks,
             blocker_message,
         )
-        .fetch_one(pool)
+        .fetch_one(&pool)
         .await?;
 
         // If blocking and attached to workstream, update workstream status
@@ -212,12 +213,12 @@ impl CustomOperation for RequestCreateOp {
                     row.request_id,
                     blocker_msg
                 )
-                .execute(pool)
+                .execute(&pool)
                 .await?;
             }
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "request_id": row.request_id,
             "request_type": request_type,
             "request_subtype": request_subtype,
@@ -230,46 +231,33 @@ impl CustomOperation for RequestCreateOp {
             }
         })))
     }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Overdue Operation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// List overdue requests
-#[register_custom_op]
-pub struct RequestOverdueOp;
+pub struct RequestOverdue;
 
 #[async_trait]
-impl CustomOperation for RequestOverdueOp {
-    fn domain(&self) -> &'static str {
-        "request"
+impl SemOsVerbOp for RequestOverdue {
+    fn fqn(&self) -> &str {
+        "request.overdue"
     }
-
-    fn verb(&self) -> &'static str {
-        "overdue"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Queries overdue requests with optional grace period consideration"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let case_id = super::helpers::json_extract_uuid_opt(args, ctx, "case-id");
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
 
-        let cbu_id = super::helpers::json_extract_uuid_opt(args, ctx, "cbu-id");
+        let case_id = json_extract_uuid_opt(args, ctx, "case-id");
 
-        let include_grace = super::helpers::json_extract_bool_opt(args, "include-grace-period")
-            .unwrap_or(false);
+        let cbu_id = json_extract_uuid_opt(args, ctx, "cbu-id");
+
+        let include_grace = json_extract_bool_opt(args, "include-grace-period").unwrap_or(false);
 
         let rows = sqlx::query!(
             r#"
@@ -308,7 +296,7 @@ impl CustomOperation for RequestOverdueOp {
             cbu_id,
             include_grace
         )
-        .fetch_all(pool)
+        .fetch_all(&pool)
         .await?;
 
         let results: Vec<serde_json::Value> = rows
@@ -335,51 +323,39 @@ impl CustomOperation for RequestOverdueOp {
             })
             .collect();
 
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
-    }
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Fulfill Operation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Mark request as fulfilled
-#[register_custom_op]
-pub struct RequestFulfillOp;
+pub struct RequestFulfill;
 
 #[async_trait]
-impl CustomOperation for RequestFulfillOp {
-    fn domain(&self) -> &'static str {
-        "request"
+impl SemOsVerbOp for RequestFulfill {
+    fn fqn(&self) -> &str {
+        "request.fulfill"
     }
-
-    fn verb(&self) -> &'static str {
-        "fulfill"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Fulfills request and potentially unblocks workstream"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
 
-        let fulfillment_type = super::helpers::json_extract_string_opt(args, "fulfillment-type");
+        let request_id = json_extract_uuid(args, ctx, "request-id")?;
 
-        let reference_id = super::helpers::json_extract_uuid_opt(args, ctx, "reference-id");
+        let fulfillment_type = json_extract_string_opt(args, "fulfillment-type");
 
-        let reference_type = super::helpers::json_extract_string_opt(args, "reference-type");
+        let reference_id = json_extract_uuid_opt(args, ctx, "reference-id");
 
-        let notes = super::helpers::json_extract_string_opt(args, "notes");
+        let reference_type = json_extract_string_opt(args, "reference-type");
+
+        let notes = json_extract_string_opt(args, "notes");
 
         // Update the request
         let updated = sqlx::query!(
@@ -400,7 +376,7 @@ impl CustomOperation for RequestFulfillOp {
             reference_type,
             notes
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?;
 
         let Some(row) = updated else {
@@ -414,53 +390,41 @@ impl CustomOperation for RequestFulfillOp {
         let mut workstream_unblocked = false;
         if row.blocks_subject.unwrap_or(false) {
             if let Some(ws_id) = row.workstream_id {
-                workstream_unblocked = try_unblock_workstream(ws_id, pool).await?;
+                workstream_unblocked = try_unblock_workstream(ws_id, &pool).await?;
             }
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "request_id": request_id,
             "status": "FULFILLED",
             "workstream_unblocked": workstream_unblocked
         })))
     }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Cancel Operation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Cancel a pending request
-#[register_custom_op]
-pub struct RequestCancelOp;
+pub struct RequestCancel;
 
 #[async_trait]
-impl CustomOperation for RequestCancelOp {
-    fn domain(&self) -> &'static str {
-        "request"
+impl SemOsVerbOp for RequestCancel {
+    fn fqn(&self) -> &str {
+        "request.cancel"
     }
-
-    fn verb(&self) -> &'static str {
-        "cancel"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Cancels request and potentially unblocks workstream"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
 
-        let reason = super::helpers::json_extract_string(args, "reason")?;
+        let request_id = json_extract_uuid(args, ctx, "request-id")?;
+
+        let reason = json_extract_string(args, "reason")?;
 
         let updated = sqlx::query!(
             r#"
@@ -473,7 +437,7 @@ impl CustomOperation for RequestCancelOp {
             request_id,
             reason
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?;
 
         let Some(row) = updated else {
@@ -486,7 +450,7 @@ impl CustomOperation for RequestCancelOp {
         // Try to unblock workstream
         if row.blocks_subject.unwrap_or(false) {
             if let Some(ws_id) = row.workstream_id {
-                try_unblock_workstream(ws_id, pool).await?;
+                try_unblock_workstream(ws_id, &pool).await?;
             }
         }
 
@@ -498,54 +462,42 @@ impl CustomOperation for RequestCancelOp {
                 "request_id": request_id,
                 "reason": reason,
             }),
-            pool,
+            &pool,
         )
         .await;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
-    }
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(1))
     }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Extend Operation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Extend request due date
-#[register_custom_op]
-pub struct RequestExtendOp;
+pub struct RequestExtend;
 
 #[async_trait]
-impl CustomOperation for RequestExtendOp {
-    fn domain(&self) -> &'static str {
-        "request"
+impl SemOsVerbOp for RequestExtend {
+    fn fqn(&self) -> &str {
+        "request.extend"
     }
-
-    fn verb(&self) -> &'static str {
-        "extend"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Extends due date with audit trail"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
 
-        let reason = super::helpers::json_extract_string(args, "reason")?;
+        let request_id = json_extract_uuid(args, ctx, "request-id")?;
+
+        let reason = json_extract_string(args, "reason")?;
 
         // Get new due date from either days or explicit date
-        let days = super::helpers::json_extract_int_opt(args, "days");
+        let days = json_extract_int_opt(args, "days");
 
-        let new_due_date = super::helpers::json_extract_string_opt(args, "new-due-date")
+        let new_due_date = json_extract_string_opt(args, "new-due-date")
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
 
         if days.is_none() && new_due_date.is_none() {
@@ -561,7 +513,7 @@ impl CustomOperation for RequestExtendOp {
                     r#"SELECT due_date FROM "ob-poc".outstanding_requests WHERE request_id = $1"#,
                     request_id
                 )
-                .fetch_optional(pool)
+                .fetch_optional(&pool)
                 .await?
                 .flatten()
                 .ok_or_else(|| anyhow!("Request {} not found", request_id))?;
@@ -584,7 +536,7 @@ impl CustomOperation for RequestExtendOp {
             r#"SELECT case_id FROM "ob-poc".outstanding_requests WHERE request_id = $1"#,
             request_id
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?
         .flatten();
 
@@ -607,7 +559,7 @@ impl CustomOperation for RequestExtendOp {
             new_date,
             extension_log
         )
-        .execute(pool)
+        .execute(&pool)
         .await?;
 
         if result.rows_affected() == 0 {
@@ -626,52 +578,40 @@ impl CustomOperation for RequestExtendOp {
                 "new_due_date": new_date.to_string(),
                 "reason": reason,
             }),
-            pool,
+            &pool,
         )
         .await;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
-    }
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(1))
     }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Remind Operation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Send reminder for pending request
-#[register_custom_op]
-pub struct RequestRemindOp;
+pub struct RequestRemind;
 
 #[async_trait]
-impl CustomOperation for RequestRemindOp {
-    fn domain(&self) -> &'static str {
-        "request"
+impl SemOsVerbOp for RequestRemind {
+    fn fqn(&self) -> &str {
+        "request.remind"
     }
-
-    fn verb(&self) -> &'static str {
-        "remind"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Records reminder with rate limiting"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
 
-        let channel = super::helpers::json_extract_string_opt(args, "channel")
-            .unwrap_or_else(|| "EMAIL".to_string());
+        let request_id = json_extract_uuid(args, ctx, "request-id")?;
 
-        let message = super::helpers::json_extract_string_opt(args, "message");
+        let channel =
+            json_extract_string_opt(args, "channel").unwrap_or_else(|| "EMAIL".to_string());
+
+        let message = json_extract_string_opt(args, "message");
 
         // Check if we can send another reminder
         let current = sqlx::query!(
@@ -682,7 +622,7 @@ impl CustomOperation for RequestRemindOp {
             "#,
             request_id
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?
         .ok_or_else(|| anyhow!("Request {} not found or not PENDING", request_id))?;
 
@@ -712,7 +652,7 @@ impl CustomOperation for RequestRemindOp {
             request_id,
             reminder_log
         )
-        .execute(pool)
+        .execute(&pool)
         .await?;
 
         // Best-effort BPMN signal for active workflow correlation
@@ -724,58 +664,46 @@ impl CustomOperation for RequestRemindOp {
                 "channel": channel,
                 "reminder_count": current.reminder_count.unwrap_or(0) + 1,
             }),
-            pool,
+            &pool,
         )
         .await;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
-    }
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(1))
     }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Escalate Operation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Escalate overdue request
-#[register_custom_op]
-pub struct RequestEscalateOp;
+pub struct RequestEscalate;
 
 #[async_trait]
-impl CustomOperation for RequestEscalateOp {
-    fn domain(&self) -> &'static str {
-        "request"
+impl SemOsVerbOp for RequestEscalate {
+    fn fqn(&self) -> &str {
+        "request.escalate"
     }
-
-    fn verb(&self) -> &'static str {
-        "escalate"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Escalates request with level tracking"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
 
-        let escalate_to = super::helpers::json_extract_uuid_opt(args, ctx, "escalate-to");
+        let request_id = json_extract_uuid(args, ctx, "request-id")?;
 
-        let reason = super::helpers::json_extract_string_opt(args, "reason");
+        let escalate_to = json_extract_uuid_opt(args, ctx, "escalate-to");
+
+        let reason = json_extract_string_opt(args, "reason");
 
         // Fetch case_id before update for BPMN signal routing
         let case_id = sqlx::query_scalar!(
             r#"SELECT case_id FROM "ob-poc".outstanding_requests WHERE request_id = $1"#,
             request_id
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?
         .flatten();
 
@@ -793,7 +721,7 @@ impl CustomOperation for RequestEscalateOp {
             escalate_to,
             reason
         )
-        .execute(pool)
+        .execute(&pool)
         .await?;
 
         if result.rows_affected() == 0 {
@@ -812,51 +740,39 @@ impl CustomOperation for RequestEscalateOp {
                 "escalate_to": escalate_to,
                 "reason": reason,
             }),
-            pool,
+            &pool,
         )
         .await;
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
-    }
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(1))
     }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Request Waive Operation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Waive a request requirement
-#[register_custom_op]
-pub struct RequestWaiveOp;
+pub struct RequestWaive;
 
 #[async_trait]
-impl CustomOperation for RequestWaiveOp {
-    fn domain(&self) -> &'static str {
-        "request"
+impl SemOsVerbOp for RequestWaive {
+    fn fqn(&self) -> &str {
+        "request.waive"
     }
-
-    fn verb(&self) -> &'static str {
-        "waive"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Waives request with approval tracking and unblocks workstream"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let request_id = super::helpers::json_extract_uuid(args, ctx, "request-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
 
-        let reason = super::helpers::json_extract_string(args, "reason")?;
+        let request_id = json_extract_uuid(args, ctx, "request-id")?;
 
-        let approved_by = super::helpers::json_extract_uuid(args, ctx, "approved-by")?;
+        let reason = json_extract_string(args, "reason")?;
+
+        let approved_by = json_extract_uuid(args, ctx, "approved-by")?;
 
         let updated = sqlx::query!(
             r#"
@@ -873,7 +789,7 @@ impl CustomOperation for RequestWaiveOp {
             reason,
             approved_by
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?;
 
         let Some(row) = updated else {
@@ -886,50 +802,38 @@ impl CustomOperation for RequestWaiveOp {
         // Try to unblock workstream
         if row.blocks_subject.unwrap_or(false) {
             if let Some(ws_id) = row.workstream_id {
-                try_unblock_workstream(ws_id, pool).await?;
+                try_unblock_workstream(ws_id, &pool).await?;
             }
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
-    }
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(1))
     }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Document Request Operation (convenience wrapper)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Request a document (creates outstanding request, fire-and-forget)
-#[register_custom_op]
-pub struct DocumentRequestOp;
+pub struct DocumentRequest;
 
 #[async_trait]
-impl CustomOperation for DocumentRequestOp {
-    fn domain(&self) -> &'static str {
-        "document"
+impl SemOsVerbOp for DocumentRequest {
+    fn fqn(&self) -> &str {
+        "document.request"
     }
-
-    fn verb(&self) -> &'static str {
-        "request"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Creates DOCUMENT type outstanding request with computed defaults"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let doc_type = super::helpers::json_extract_string(args, "type")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
+
+        let doc_type = json_extract_string(args, "type")?;
 
         // Resolve subject (workstream > entity > case)
-        let subject = resolve_document_subject(args, ctx, pool).await?;
+        let subject = resolve_document_subject(args, ctx, &pool).await?;
 
         // Get defaults from request_types
         let config = sqlx::query!(
@@ -940,7 +844,7 @@ impl CustomOperation for DocumentRequestOp {
             "#,
             doc_type
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?;
 
         let default_due_days = config
@@ -957,17 +861,17 @@ impl CustomOperation for DocumentRequestOp {
             .unwrap_or(true);
         let max_reminders = config.as_ref().and_then(|c| c.max_reminders).unwrap_or(3);
 
-        let due_in_days = super::helpers::json_extract_int_opt(args, "due-in-days")
-            .unwrap_or(default_due_days as i64);
+        let due_in_days =
+            json_extract_int_opt(args, "due-in-days").unwrap_or(default_due_days as i64);
 
         let due_date = (Utc::now() + Duration::days(due_in_days))
             .naive_utc()
             .date();
 
-        let requested_from = super::helpers::json_extract_string_opt(args, "from")
-            .unwrap_or_else(|| "client".to_string());
+        let requested_from =
+            json_extract_string_opt(args, "from").unwrap_or_else(|| "client".to_string());
 
-        let notes = super::helpers::json_extract_string_opt(args, "notes");
+        let notes = json_extract_string_opt(args, "notes");
 
         let blocker_message = format!(
             "Awaiting {} from {}",
@@ -1014,7 +918,7 @@ impl CustomOperation for DocumentRequestOp {
             blocks_by_default,
             blocker_message,
         )
-        .fetch_one(pool)
+        .fetch_one(&pool)
         .await?;
 
         // If blocking and attached to workstream, update workstream status
@@ -1034,12 +938,12 @@ impl CustomOperation for DocumentRequestOp {
                     row.request_id,
                     blocker_message
                 )
-                .execute(pool)
+                .execute(&pool)
                 .await?;
             }
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "request_id": row.request_id,
             "request_type": "DOCUMENT",
             "request_subtype": doc_type,
@@ -1052,48 +956,36 @@ impl CustomOperation for DocumentRequestOp {
             }
         })))
     }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Document Upload Operation (auto-fulfillment)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Upload a document (auto-fulfills matching outstanding request)
-#[register_custom_op]
-pub struct DocumentUploadOp;
+pub struct DocumentUpload;
 
 #[async_trait]
-impl CustomOperation for DocumentUploadOp {
-    fn domain(&self) -> &'static str {
-        "document"
+impl SemOsVerbOp for DocumentUpload {
+    fn fqn(&self) -> &str {
+        "document.upload"
     }
-
-    fn verb(&self) -> &'static str {
-        "upload"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Catalogs document and auto-fulfills matching pending request"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let doc_type = super::helpers::json_extract_string(args, "type")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
 
-        let file_path = super::helpers::json_extract_string(args, "file-path")?;
+        let doc_type = json_extract_string(args, "type")?;
 
-        let notes = super::helpers::json_extract_string_opt(args, "notes");
+        let file_path = json_extract_string(args, "file-path")?;
+
+        let notes = json_extract_string_opt(args, "notes");
 
         // Resolve subject
-        let subject = resolve_document_subject(args, ctx, pool).await?;
+        let subject = resolve_document_subject(args, ctx, &pool).await?;
 
         // Store the document in catalog
         let document_id = sqlx::query_scalar!(
@@ -1121,7 +1013,7 @@ impl CustomOperation for DocumentUploadOp {
             file_path,
             json!({"notes": notes, "uploaded_via": "document.upload"})
         )
-        .fetch_one(pool)
+        .fetch_one(&pool)
         .await?;
 
         // Try to find and fulfill matching pending request
@@ -1156,7 +1048,7 @@ impl CustomOperation for DocumentUploadOp {
             subject.entity_id,
             subject.case_id
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?;
 
         let mut workstream_unblocked = false;
@@ -1165,12 +1057,12 @@ impl CustomOperation for DocumentUploadOp {
         if let Some(ref req) = fulfilled_request {
             if req.blocks_subject.unwrap_or(false) {
                 if let Some(ws_id) = req.workstream_id {
-                    workstream_unblocked = try_unblock_workstream(ws_id, pool).await?;
+                    workstream_unblocked = try_unblock_workstream(ws_id, &pool).await?;
                 }
             }
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(json!({
+        Ok(VerbExecutionOutcome::Record(json!({
             "document_id": document_id,
             "document_type": doc_type,
             "fulfilled_request_id": fulfilled_request.as_ref().map(|r| r.request_id),
@@ -1181,47 +1073,35 @@ impl CustomOperation for DocumentUploadOp {
             }
         })))
     }
-    fn is_migrated(&self) -> bool {
-        true
-    }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Document Waive Request Operation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Waive document requirement (for outstanding requests)
-#[register_custom_op]
-pub struct DocumentWaiveOp;
+pub struct DocumentWaive;
 
 #[async_trait]
-impl CustomOperation for DocumentWaiveOp {
-    fn domain(&self) -> &'static str {
-        "document"
+impl SemOsVerbOp for DocumentWaive {
+    fn fqn(&self) -> &str {
+        "document.waive-request"
     }
-
-    fn verb(&self) -> &'static str {
-        "waive-request"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Waives document request by type for a workstream"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
-        let workstream_id = super::helpers::json_extract_uuid(args, ctx, "workstream-id")?;
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let pool = scope.pool().clone();
 
-        let doc_type = super::helpers::json_extract_string(args, "type")?;
+        let workstream_id = json_extract_uuid(args, ctx, "workstream-id")?;
 
-        let reason = super::helpers::json_extract_string(args, "reason")?;
+        let doc_type = json_extract_string(args, "type")?;
 
-        let approved_by = super::helpers::json_extract_uuid(args, ctx, "approved-by")?;
+        let reason = json_extract_string(args, "reason")?;
+
+        let approved_by = json_extract_uuid(args, ctx, "approved-by")?;
 
         // Find and waive matching request
         let updated = sqlx::query!(
@@ -1243,7 +1123,7 @@ impl CustomOperation for DocumentWaiveOp {
             reason,
             approved_by
         )
-        .fetch_optional(pool)
+        .fetch_optional(&pool)
         .await?;
 
         let Some(row) = updated else {
@@ -1256,16 +1136,12 @@ impl CustomOperation for DocumentWaiveOp {
 
         // Try to unblock workstream
         if row.blocks_subject.unwrap_or(false) {
-            try_unblock_workstream(workstream_id, pool).await?;
+            try_unblock_workstream(workstream_id, &pool).await?;
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Affected(1))
-    }
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Affected(1))
     }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helper Functions
@@ -1330,11 +1206,11 @@ async fn derive_linked_ids(
 #[cfg(feature = "database")]
 async fn resolve_document_subject(
     args: &serde_json::Value,
-    ctx: &dsl_runtime::VerbExecutionContext,
+    ctx: &VerbExecutionContext,
     pool: &PgPool,
 ) -> Result<DocumentSubject> {
     // Try workstream first
-    if let Some(ws_id) = super::helpers::json_extract_uuid_opt(args, ctx, "workstream-id") {
+    if let Some(ws_id) = json_extract_uuid_opt(args, ctx, "workstream-id") {
         let row = sqlx::query!(
             r#"
             SELECT w.workstream_id, w.entity_id, c.case_id, c.cbu_id
@@ -1359,7 +1235,7 @@ async fn resolve_document_subject(
     }
 
     // Try entity
-    if let Some(entity_id) = super::helpers::json_extract_uuid_opt(args, ctx, "entity-id") {
+    if let Some(entity_id) = json_extract_uuid_opt(args, ctx, "entity-id") {
         return Ok(DocumentSubject {
             subject_type: "ENTITY".to_string(),
             subject_id: entity_id,
@@ -1369,7 +1245,7 @@ async fn resolve_document_subject(
     }
 
     // Try case
-    if let Some(case_id) = super::helpers::json_extract_uuid_opt(args, ctx, "case-id") {
+    if let Some(case_id) = json_extract_uuid_opt(args, ctx, "case-id") {
         let row = sqlx::query!(
             r#"SELECT case_id, cbu_id FROM "ob-poc".cases WHERE case_id = $1"#,
             case_id
