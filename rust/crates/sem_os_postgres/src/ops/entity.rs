@@ -211,6 +211,18 @@ impl SemOsVerbOp for Identify {
         .await?;
 
         tracing::info!(entity_id = %entity_id, "Entity transitioned from GHOST to IDENTIFIED");
+
+        // Phase C.3 rollout: GHOST → IDENTIFIED state transition. The
+        // precondition check at line 156 guarantees we only reach here
+        // on a genuine advance.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            entity_id,
+            "entity:identified",
+            "entity/identity",
+            "entity.identify — GHOST → IDENTIFIED",
+        );
+
         ctx.bind("entity", entity_id);
         Ok(VerbExecutionOutcome::Uuid(entity_id))
     }
@@ -240,6 +252,19 @@ impl SemOsVerbOp for EnsureOrPlaceholder {
         let (entity_id, is_placeholder) = resolver
             .ensure_or_placeholder(entity_ref, &kind, cbu_id, name_hint)
             .await?;
+
+        // Phase C.3 rollout: emit only when a new placeholder was
+        // created (is_placeholder=true). The idempotent "found existing
+        // entity" case is not a state advance.
+        if is_placeholder {
+            dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+                ctx,
+                entity_id,
+                "entity:placeholder",
+                "entity/identity",
+                "entity.ensure-or-placeholder — new placeholder created",
+            );
+        }
 
         ctx.bind("entity", entity_id);
         Ok(VerbExecutionOutcome::Record(json!({
@@ -277,6 +302,20 @@ impl SemOsVerbOp for ResolvePlaceholder {
                 resolved_by,
             })
             .await?;
+
+        // Phase C.3 rollout: placeholder → resolved entity. Terminal
+        // state transition for the placeholder (it's effectively
+        // consumed by the resolved entity).
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            placeholder_id,
+            "entity:resolved",
+            "entity/identity",
+            &format!(
+                "entity.resolve-placeholder — placeholder {} → entity {}",
+                placeholder_id, resolved_entity_id
+            ),
+        );
 
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
     }

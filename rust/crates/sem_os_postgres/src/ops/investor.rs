@@ -85,6 +85,14 @@ impl SemOsVerbOp for StartKyc {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
+        // Phase C.3 rollout: investor KYC lifecycle advance.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            "investor:kyc-in-progress",
+            "investor/lifecycle",
+            "investor.start-kyc — KYC_IN_PROGRESS",
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -122,6 +130,13 @@ impl SemOsVerbOp for ApproveKyc {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            "investor:kyc-approved",
+            "investor/lifecycle",
+            "investor.approve-kyc — KYC_APPROVED",
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -158,6 +173,13 @@ impl SemOsVerbOp for RejectKyc {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            "investor:rejected",
+            "investor/lifecycle",
+            &format!("investor.reject-kyc — REJECTED ({})", reason),
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -193,6 +215,13 @@ impl SemOsVerbOp for MarkEligible {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            "investor:eligible-to-subscribe",
+            "investor/lifecycle",
+            "investor.mark-eligible — ELIGIBLE_TO_SUBSCRIBE",
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -237,6 +266,13 @@ impl SemOsVerbOp for RecordSubscription {
             .execute(scope.executor())
             .await?;
         }
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            "investor:subscribed",
+            "investor/lifecycle",
+            "investor.record-subscription — SUBSCRIBED",
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -269,6 +305,13 @@ impl SemOsVerbOp for Activate {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            "investor:active-holder",
+            "investor/lifecycle",
+            "investor.activate — ACTIVE_HOLDER",
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -304,6 +347,13 @@ impl SemOsVerbOp for StartRedemption {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            "investor:redeeming",
+            "investor/lifecycle",
+            "investor.start-redemption — REDEEMING",
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -345,6 +395,13 @@ impl SemOsVerbOp for CompleteRedemption {
         .bind(investor_id)
         .execute(scope.executor())
         .await?;
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            "investor:offboarded",
+            "investor/lifecycle",
+            "investor.complete-redemption — OFFBOARDED (full redemption)",
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -388,6 +445,13 @@ impl SemOsVerbOp for Offboard {
         .bind(investor_id)
         .execute(scope.executor())
         .await?;
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            "investor:offboarded",
+            "investor/lifecycle",
+            &format!("investor.offboard — OFFBOARDED ({})", reason),
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -435,6 +499,13 @@ impl SemOsVerbOp for Suspend {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            "investor:suspended",
+            "investor/lifecycle",
+            &format!("investor.suspend — {} → SUSPENDED ({})", current, reason),
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
@@ -483,6 +554,14 @@ impl SemOsVerbOp for Reinstate {
         .bind(&notes)
         .fetch_one(scope.executor())
         .await?;
+        let to_node = format!("investor:{}", pre_state.to_lowercase().replace('_', "-"));
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            investor_id,
+            &to_node,
+            "investor/lifecycle",
+            &format!("investor.reinstate — SUSPENDED → {}", pre_state),
+        );
         Ok(VerbExecutionOutcome::Uuid(id))
     }
 }
