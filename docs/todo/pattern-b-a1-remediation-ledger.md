@@ -51,6 +51,19 @@ Per **Decision D11 (2026-04-18, Option III)**, these are grandfathered into the 
 |---|---|---|---|---|
 | `MaintenanceReindexEmbeddingsOp` | 391–560 (Phase 0g rewrite) | ~~`tokio::process::Command::new("cargo")` spawns `cargo run --release -- populate_embeddings` subprocess~~ — REMOVED | **Outbox deferral complete.** `execute` and `execute_json` now insert a `maintenance_spawn` row into `public.outbox` (migration 131) and return `{"status": "queued", ...}`. No subprocess in verb body. Phase 5e drainer will consume the row and spawn the subprocess post-commit. | **CLOSED 2026-04-18** |
 
+### 2.2 File: `sem_os_postgres/src/ops/agent.rs` (added 2026-04-22)
+
+| op | lines | external effect | resolution path | status |
+|---|---|---|---|---|
+| `ActivateTeaching` | ~796 | `tokio::process::Command::new("cargo")` spawns `cargo run --release -p ob-semantic-matcher --bin populate_embeddings` subprocess inside the verb body. Same shape as the Phase-0g-remediated `MaintenanceReindexEmbeddingsOp` but in a different file — likely introduced during the Slice-#80 relocation of CustomOperation impls. Caught 2026-04-22 by the new `lint_external_effects_in_verbs.sh` (L4 script). | **Outbox deferral, same pattern as 2.1.** Reuse `OutboxEffectKind::MaintenanceSpawn` + the existing `MaintenanceSpawnConsumer`. Rewrite `execute` to insert an outbox row instead of spawning directly. Admin synchronous path preserved via the same `cargo run` command. | **OPEN** |
+
+**Completion criteria for 2.2:**
+
+- [x] Lint L4 catches the violation — `scripts/lint_external_effects_in_verbs.sh` grandfathers this file explicitly as of 2026-04-22 (no new violations permitted while the ledger row is open).
+- [ ] `ActivateTeaching::execute` rewritten to `INSERT INTO public.outbox ... effect_kind='maintenance_spawn'` with idempotency key `activate_teaching:<trace_id>:<date>`.
+- [ ] Lint L4 passes against `sem_os_postgres/src/ops/agent.rs` — remove from `GRANDFATHERED` in the lint script.
+- [ ] Row above moves to **CLOSED**.
+
 **Completion criteria for 0g (all met):**
 
 - [x] `OutboxEffectKind::MaintenanceSpawn` variant added to `ob-poc-types::gated_envelope::OutboxEffectKind` (Phase 0b).
