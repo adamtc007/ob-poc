@@ -2058,94 +2058,46 @@ impl DslExecutor {
         plan: &super::execution_plan::ExecutionPlan,
         ctx: &mut ExecutionContext,
     ) -> Result<Vec<ExecutionResult>> {
-        // PRE-FLIGHT: Ensure all EntityRefs have been resolved before execution
-        validate_all_resolved(plan)?;
+        use crate::sequencer_tx::PgTransactionScope;
 
+        // Phase B.2b-β (2026-04-22): thin wrapper over
+        // `execute_plan_atomic_in_scope`. Opens a `PgTransactionScope`
+        // for the plan's duration, delegates step execution to the
+        // in-scope variant, commits on Ok, rolls back on Err. The
+        // Sequencer migration (B.2b-ζ) calls `execute_plan_atomic_in_scope`
+        // directly with an outer scope owning multiple plans so each
+        // runbook step shares the same transaction.
         tracing::info!(
-            "execute_plan_atomic: starting atomic execution with {} steps",
+            "execute_plan_atomic: starting atomic execution with {} steps (self-scoped)",
             plan.steps.len()
         );
 
-        // Start a transaction
-        let mut tx = self.pool.begin().await?;
+        let mut scope = PgTransactionScope::begin(&self.pool).await?;
 
-        let mut results: Vec<ExecutionResult> = Vec::with_capacity(plan.steps.len());
+        let outcome = {
+            let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+            self.execute_plan_atomic_in_scope(plan, ctx, scope_dyn).await
+        };
 
-        for (step_index, step) in plan.steps.iter().enumerate() {
-            // Clone the verb call so we can inject values
-            let mut vc = step.verb_call.clone();
-
-            tracing::debug!(
-                "execute_plan_atomic: step {} verb={}.{} bind_as={:?}",
-                step_index,
-                &vc.domain,
-                &vc.verb,
-                &step.bind_as
-            );
-
-            // Inject values from previous steps
-            for inj in &step.injections {
-                if let Some(ExecutionResult::Uuid(id)) = results.get(inj.from_step) {
-                    vc.arguments.push(super::ast::Argument {
-                        key: inj.into_arg.clone(),
-                        value: AstNode::string(id.to_string()),
-                        span: super::ast::Span::default(),
-                    });
-                }
+        match outcome {
+            Ok(results) => {
+                scope.commit().await?;
+                tracing::info!(
+                    "execute_plan_atomic: committed {} steps successfully",
+                    results.len()
+                );
+                Ok(results)
             }
-
-            // Execute the verb call within the transaction
-            let result = match self.execute_verb_in_tx(&vc, ctx, &mut tx).await {
-                Ok(r) => r,
-                Err(e) => {
-                    // Rollback on any error
-                    tracing::error!(
-                        "execute_plan_atomic: step {} ({}.{}) failed: {}. Rolling back.",
-                        step_index,
-                        vc.domain,
-                        vc.verb,
-                        e
+            Err(e) => {
+                if let Err(rollback_err) = scope.rollback().await {
+                    tracing::warn!(
+                        %rollback_err,
+                        "execute_plan_atomic: rollback failed after step error"
                     );
-                    tx.rollback().await?;
-                    return Err(e);
                 }
-            };
-
-            tracing::debug!(
-                "execute_plan_atomic: step {} completed with result {:?}",
-                step_index,
-                result
-            );
-
-            // Handle explicit :as binding
-            if let Some(ref binding_name) = step.bind_as {
-                match &result {
-                    ExecutionResult::Uuid(id) => {
-                        ctx.bind(binding_name, *id);
-                        let alias = format!("{}_id", step.verb_call.domain);
-                        ctx.bind(&alias, *id);
-                    }
-                    ExecutionResult::RecordSet(records) => {
-                        ctx.bind_json(binding_name, serde_json::Value::Array(records.clone()));
-                    }
-                    ExecutionResult::Record(record) => {
-                        ctx.bind_json(binding_name, record.clone());
-                    }
-                    _ => {}
-                }
+                Err(e)
             }
-
-            results.push(result);
         }
-
-        // All steps succeeded - commit the transaction
-        tx.commit().await?;
-        tracing::info!(
-            "execute_plan_atomic: committed {} steps successfully",
-            results.len()
-        );
-
-        Ok(results)
     }
 
     /// Phase B.2a (F6 follow-on, 2026-04-22): execute a plan atomically
@@ -2165,7 +2117,12 @@ impl DslExecutor {
     /// On any step error, returns `Err` immediately — caller decides
     /// to roll back the outer scope. Step outputs up to that point are
     /// NOT returned to the caller (they are gone with the rollback).
-    #[allow(dead_code)] // Phase B.2a: method exists; Sequencer migrates in B.2b.
+    ///
+    /// Post B.2b-β (2026-04-22): this is the canonical atomic-plan entry
+    /// point. `execute_plan_atomic` is a thin wrapper that opens a self-
+    /// scoped transaction and calls this method. The Sequencer (B.2b-ζ)
+    /// will call this directly with its outer scope, sharing a single
+    /// transaction across multiple runbook steps.
     pub async fn execute_plan_atomic_in_scope(
         &self,
         plan: &super::execution_plan::ExecutionPlan,
