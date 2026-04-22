@@ -1481,36 +1481,40 @@ impl DslExecutor {
 // Plugin dispatch via SemOsVerbOp (post-5c-migrate slice #80)
 // ============================================================================
 
-/// Dispatch a plugin op through its [`sem_os_postgres::ops::SemOsVerbOp`]
-/// impl, bridging between the legacy `ExecutionContext` / `VerbCall` /
-/// `ExecutionResult` types and the SemOS-native `VerbExecutionContext` /
-/// JSON args / `VerbExecutionOutcome`.
+/// Dispatch a plugin op against an **existing** `TransactionScope`. Phase
+/// B.1 (F6 follow-on, 2026-04-22) primitive: the caller owns the
+/// transaction boundary — this function does NOT begin, commit, or roll
+/// back. Used by:
 ///
-/// Post-slice-#80 this is the single point where legacy DslExecutor
-/// callers (template ops, `execute_dsl` recursion) and SemOS-native ops
-/// meet. The thunk:
+/// - [`dispatch_plugin_via_sem_os_op`] — the legacy wrapper that opens
+///   its own per-verb scope (back-compat; still the single-dispatch-site
+///   today).
+/// - Future Phase B.2: the Sequencer's stage-8 dispatch loop will open
+///   one outer scope and call this helper for every verb in the
+///   runbook, so multi-step runbooks commit atomically or roll back
+///   together.
 ///
-/// 1. Builds a `VerbExecutionContext` from the caller's `ExecutionContext`
-///    (copies symbols + session-scoped fields into `extensions`).
+/// The function:
+/// 1. Builds a `VerbExecutionContext` from the caller's
+///    `ExecutionContext` (copies symbols + session-scoped fields into
+///    `extensions`).
 /// 2. Converts the `VerbCall` arguments to a JSON object.
-/// 3. Opens a `PgTransactionScope` and calls `op.execute(...)`.
-/// 4. Commits on Ok / rolls back on Err.
-/// 5. Syncs `sem_ctx` mutations back: new symbol bindings + pending_* side
-///    channels unpacked from `sem_ctx.extensions` into the caller's
+/// 3. Calls `op.execute(args, sem_ctx, scope)`.
+/// 4. On error, returns `Err`; caller decides to commit or rollback.
+/// 5. Syncs `sem_ctx` mutations back: new symbol bindings + pending_*
+///    side channels unpacked from `sem_ctx.extensions` into the caller's
 ///    `ExecutionContext.pending_*` fields.
 /// 6. Converts `VerbExecutionOutcome` back to `ExecutionResult`.
 #[cfg(feature = "database")]
-async fn dispatch_plugin_via_sem_os_op(
+async fn dispatch_plugin_via_sem_os_op_in_scope(
     op: &dyn sem_os_postgres::ops::SemOsVerbOp,
     fqn: &str,
     vc: &VerbCall,
     ctx: &mut ExecutionContext,
-    pool: &PgPool,
     services: &std::sync::Arc<dsl_runtime::ServiceRegistry>,
+    scope: &mut dyn dsl_runtime::tx::TransactionScope,
 ) -> Result<ExecutionResult> {
     use crate::sem_os_runtime::verb_executor_adapter as adapter;
-    use crate::sequencer_tx::PgTransactionScope;
-    use dsl_runtime::tx::TransactionScope;
     use sem_os_core::principal::Principal;
 
     // 1. Build sem_ctx from legacy ctx.
@@ -1564,31 +1568,10 @@ async fn dispatch_plugin_via_sem_os_op(
     // 2. Convert VerbCall args → JSON.
     let args = adapter::verb_call_to_json(vc);
 
-    // 3. Dispatch under a Sequencer-owned transaction scope.
-    let mut scope = PgTransactionScope::begin(pool).await.map_err(|e| {
-        anyhow!("sem_os_op({}): begin txn failed: {}", fqn, e)
-    })?;
-    let outcome = {
-        let scope_dyn: &mut dyn TransactionScope = &mut scope;
-        match op.execute(&args, &mut sem_ctx, scope_dyn).await {
-            Ok(outcome) => {
-                scope.commit().await.map_err(|e| {
-                    anyhow!("sem_os_op({}): commit failed: {}", fqn, e)
-                })?;
-                outcome
-            }
-            Err(e) => {
-                if let Err(rollback_err) = scope.rollback().await {
-                    tracing::warn!(
-                        fqn,
-                        %rollback_err,
-                        "sem_os_op rollback failed after op error"
-                    );
-                }
-                return Err(anyhow!("sem_os_op({}) failed: {}", fqn, e));
-            }
-        }
-    };
+    // 3. Dispatch against the caller-supplied scope. No begin / commit /
+    //    rollback — transaction boundary is the caller's responsibility.
+    let outcome = op.execute(&args, &mut sem_ctx, scope).await
+        .map_err(|e| anyhow!("sem_os_op({}) failed: {}", fqn, e))?;
 
     // 4. Sync sem_ctx mutations back into the caller's ExecutionContext.
     for (name, uuid) in &sem_ctx.symbols {
@@ -1601,6 +1584,66 @@ async fn dispatch_plugin_via_sem_os_op(
 
     // 5. Convert outcome back to legacy ExecutionResult.
     Ok(adapter::from_verb_outcome(outcome))
+}
+
+/// Legacy wrapper that opens + commits its own `PgTransactionScope` per
+/// verb. Still the single-dispatch-site today (Phase B.2 moves all
+/// callers to [`dispatch_plugin_via_sem_os_op_in_scope`] with a
+/// Sequencer-owned outer scope).
+///
+/// Bridges between the legacy `ExecutionContext` / `VerbCall` /
+/// `ExecutionResult` types and the SemOS-native `VerbExecutionContext` /
+/// JSON args / `VerbExecutionOutcome`.
+///
+/// This wrapper:
+/// 1. Opens a `PgTransactionScope`.
+/// 2. Delegates to `dispatch_plugin_via_sem_os_op_in_scope`.
+/// 3. Commits on `Ok`.
+/// 4. Rolls back on `Err`.
+#[cfg(feature = "database")]
+async fn dispatch_plugin_via_sem_os_op(
+    op: &dyn sem_os_postgres::ops::SemOsVerbOp,
+    fqn: &str,
+    vc: &VerbCall,
+    ctx: &mut ExecutionContext,
+    pool: &PgPool,
+    services: &std::sync::Arc<dsl_runtime::ServiceRegistry>,
+) -> Result<ExecutionResult> {
+    use crate::sequencer_tx::PgTransactionScope;
+
+    // 1. Open a Sequencer-owned per-verb transaction scope. Phase B.2
+    //    replaces this with an outer scope threaded from the Sequencer's
+    //    stage-8 loop so multi-step runbooks commit atomically.
+    let mut scope = PgTransactionScope::begin(pool).await.map_err(|e| {
+        anyhow!("sem_os_op({}): begin txn failed: {}", fqn, e)
+    })?;
+
+    // 2. Dispatch against the scope.
+    let outcome = {
+        let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
+        dispatch_plugin_via_sem_os_op_in_scope(op, fqn, vc, ctx, services, scope_dyn).await
+    };
+
+    // 3/4. Commit on Ok, rollback on Err. Caller never sees the per-verb
+    //      scope; the outcome is the aggregated result.
+    match outcome {
+        Ok(result) => {
+            scope.commit().await.map_err(|e| {
+                anyhow!("sem_os_op({}): commit failed: {}", fqn, e)
+            })?;
+            Ok(result)
+        }
+        Err(e) => {
+            if let Err(rollback_err) = scope.rollback().await {
+                tracing::warn!(
+                    fqn,
+                    %rollback_err,
+                    "sem_os_op rollback failed after op error"
+                );
+            }
+            Err(e)
+        }
+    }
 }
 
 // ============================================================================
