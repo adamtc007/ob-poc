@@ -1511,7 +1511,30 @@ async fn dispatch_plugin_via_sem_os_op_in_scope(
     sem_ctx.extensions = serde_json::Value::Object(ext_map);
 
     // 2. Convert VerbCall args → JSON.
-    let args = adapter::verb_call_to_json(vc);
+    let mut args = adapter::verb_call_to_json(vc);
+
+    // 2b. Phase F.1 (2026-04-22): pre-fetch hook. Ops that need
+    //     external I/O to answer a read (bpmn.inspect being the
+    //     canonical case) implement `pre_fetch` to do that work
+    //     BEFORE the transaction scope is entered — the gRPC/HTTP
+    //     round-trip happens outside the txn, satisfying A1.
+    //
+    //     Pre-fetch returns an optional JSON object whose keys are
+    //     merged into `args` so the op's normal `execute(args, ...)`
+    //     path sees the pre-fetched data with no external I/O of
+    //     its own. Default `Ok(None)` makes this a no-op for ops
+    //     that don't need it.
+    if let Some(pre_fetched) = op.pre_fetch(&args, &mut sem_ctx).await
+        .map_err(|e| anyhow!("sem_os_op({}) pre_fetch failed: {}", fqn, e))?
+    {
+        if let (Some(existing_obj), serde_json::Value::Object(pf_obj)) =
+            (args.as_object_mut(), pre_fetched)
+        {
+            for (k, v) in pf_obj {
+                existing_obj.insert(k, v);
+            }
+        }
+    }
 
     // 3. Dispatch against the caller-supplied scope. No begin / commit /
     //    rollback — transaction boundary is the caller's responsibility.

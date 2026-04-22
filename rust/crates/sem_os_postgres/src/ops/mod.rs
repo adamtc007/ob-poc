@@ -965,4 +965,28 @@ pub trait SemOsVerbOp: Send + Sync {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome>;
+
+    /// Phase F.1 (2026-04-22): optional pre-fetch step for ops that
+    /// need external I/O (HTTP, gRPC) to answer a read.
+    ///
+    /// Called by the dispatcher **before** the scope/transaction opens.
+    /// The returned JSON object is merged into `args` under its own
+    /// keys so `execute()` can read the pre-fetched data synchronously
+    /// from its normal args parameter — with no external I/O inside
+    /// the inner txn (A1 invariant satisfied).
+    ///
+    /// Default: no pre-fetch. Override on read-only ops that must
+    /// reach external services to build their response (e.g.
+    /// `bpmn.inspect`).
+    ///
+    /// Returning `Err` here short-circuits the verb — the op never
+    /// enters `execute()` and the dispatcher surfaces the error to
+    /// the caller.
+    async fn pre_fetch(
+        &self,
+        _args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+    ) -> Result<Option<serde_json::Value>> {
+        Ok(None)
+    }
 }

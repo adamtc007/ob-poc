@@ -303,6 +303,15 @@ impl SemOsVerbOp for BpmnCancel {
 
 // =============================================================================
 // bpmn.inspect
+//
+// Phase F.1 (2026-04-22, Pattern B ledger §3.1): gRPC call moved from
+// the `execute` body into `pre_fetch`. The dispatcher calls `pre_fetch`
+// BEFORE opening the transaction scope, so the external `client.inspect`
+// round-trip happens outside the inner txn — A1 invariant satisfied.
+//
+// `pre_fetch` returns the inspection payload under the `_inspection`
+// key; `execute` reads it back from args and formats the typed result
+// with no I/O of its own.
 // =============================================================================
 
 pub struct BpmnInspect;
@@ -312,12 +321,12 @@ impl SemOsVerbOp for BpmnInspect {
     fn fqn(&self) -> &str {
         "bpmn.inspect"
     }
-    async fn execute(
+
+    async fn pre_fetch(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
+    ) -> Result<Option<serde_json::Value>> {
         let instance_id = json_get_required_uuid(args, "instance-id")?;
 
         let client = get_bpmn_client()?;
@@ -330,6 +339,28 @@ impl SemOsVerbOp for BpmnInspect {
             bytecode_version_hex: hex::encode(&inspection.bytecode_version),
             domain_payload_hash: inspection.domain_payload_hash,
         };
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(typed)?))
+        Ok(Some(serde_json::json!({
+            "_inspection": serde_json::to_value(typed)?
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        // Pre-fetch populated `_inspection`. If it's missing something
+        // went wrong upstream — surface that rather than silently
+        // falling back to an in-txn gRPC call.
+        let inspection = args
+            .get("_inspection")
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!(
+                "bpmn.inspect: pre_fetch result missing — dispatcher did not \
+                 merge `_inspection` into args. This indicates a dispatcher \
+                 regression (Phase F.1 pre-fetch hook must run before execute)."
+            ))?;
+        Ok(VerbExecutionOutcome::Record(inspection))
     }
 }
