@@ -157,6 +157,19 @@ impl SemOsVerbOp for Create {
         .fetch_one(scope.executor())
         .await?;
 
+        // Phase C.3 rollout (F7 follow-on, 2026-04-22): emit
+        // PendingStateAdvance for the new KYC case. Always emits —
+        // kyc-case.create is not idempotent (every call creates a
+        // fresh case_id), so every successful execution is a genuine
+        // state transition.
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            case_id,
+            "kyc-case:intake",
+            "kyc-case/workstream",
+            "kyc-case.create — new KYC case at intake",
+        );
+
         let result = KycCaseCreateResult {
             case_id,
             case_ref,
@@ -228,6 +241,23 @@ impl SemOsVerbOp for UpdateStatus {
         .bind(&notes)
         .execute(scope.executor())
         .await?;
+
+        // Phase C.3 rollout: state-transition emission. Status lives in
+        // the DAG as `kyc-case:<lowercase-status>`. The LifecycleCatalog
+        // service validates `is_valid_transition` above, so reaching
+        // this line guarantees a genuine advance occurred.
+        let to_node = format!("kyc-case:{}", requested_status.to_lowercase());
+        let reason = format!(
+            "kyc-case.update-status — {} → {}",
+            current_status, requested_status
+        );
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            case_id,
+            &to_node,
+            "kyc-case/workstream",
+            &reason,
+        );
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
@@ -320,6 +350,22 @@ impl SemOsVerbOp for Close {
                 deal_gate_updated = true;
             }
         }
+
+        // Phase C.3 rollout: terminal state transition. A close is
+        // always a genuine state advance (we validated REVIEW → closed
+        // above). Terminal status determines the DAG target node.
+        let to_node = format!("kyc-case:{}", status.to_lowercase());
+        let reason = format!(
+            "kyc-case.close — REVIEW → {} (deal_gate_updated={})",
+            status, deal_gate_updated
+        );
+        dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
+            ctx,
+            case_id,
+            &to_node,
+            "kyc-case/workstream",
+            &reason,
+        );
 
         let result = KycCaseCloseResult {
             case_id,
