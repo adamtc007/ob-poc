@@ -598,6 +598,26 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // batch_executor::BatchExecutor, runtime_registry}).
     registry.register(Arc::new(template_ops::TemplateInvoke));
     registry.register(Arc::new(template_ops::TemplateBatch));
+
+    // Phase B Pattern B slice #75: research.{sources,companies-house,
+    // sec-edgar}.* (15 verbs — external source loaders bridging to
+    // crate::research::sources::* + crate::research::companies_house::*
+    // + crate::research::sec_edgar::*).
+    registry.register(Arc::new(source_loader_ops::SourcesList));
+    registry.register(Arc::new(source_loader_ops::SourcesInfo));
+    registry.register(Arc::new(source_loader_ops::SourcesSearch));
+    registry.register(Arc::new(source_loader_ops::SourcesFetch));
+    registry.register(Arc::new(source_loader_ops::SourcesFindForJurisdiction));
+    registry.register(Arc::new(source_loader_ops::CompaniesHouseSearch));
+    registry.register(Arc::new(source_loader_ops::CompaniesHouseFetchCompany));
+    registry.register(Arc::new(source_loader_ops::CompaniesHouseFetchPsc));
+    registry.register(Arc::new(source_loader_ops::CompaniesHouseFetchOfficers));
+    registry.register(Arc::new(source_loader_ops::CompaniesHouseImportCompany));
+    registry.register(Arc::new(source_loader_ops::SecEdgarSearch));
+    registry.register(Arc::new(source_loader_ops::SecEdgarFetchCompany));
+    registry.register(Arc::new(source_loader_ops::SecEdgarFetchBeneficialOwners));
+    registry.register(Arc::new(source_loader_ops::SecEdgarFetchFilings));
+    registry.register(Arc::new(source_loader_ops::SecEdgarImportCompany));
 }
 
 #[cfg(test)]
@@ -889,24 +909,23 @@ mod tests {
         assert!(!registry.has("agent", "read-history"));
         assert!(!registry.has("agent", "set-selection-threshold"));
         assert!(!registry.has("agent", "set-execution-mode"));
-        // Research source loader operations
-        assert!(registry.has("research.sources", "list"));
-        assert!(registry.has("research.sources", "info"));
-        assert!(registry.has("research.sources", "search"));
-        assert!(registry.has("research.sources", "fetch"));
-        assert!(registry.has("research.sources", "find-for-jurisdiction"));
-        // Companies House operations
-        assert!(registry.has("research.companies-house", "search"));
-        assert!(registry.has("research.companies-house", "fetch-company"));
-        assert!(registry.has("research.companies-house", "fetch-psc"));
-        assert!(registry.has("research.companies-house", "fetch-officers"));
-        assert!(registry.has("research.companies-house", "import-company"));
-        // SEC EDGAR operations
-        assert!(registry.has("research.sec-edgar", "search"));
-        assert!(registry.has("research.sec-edgar", "fetch-company"));
-        assert!(registry.has("research.sec-edgar", "fetch-beneficial-owners"));
-        assert!(registry.has("research.sec-edgar", "fetch-filings"));
-        assert!(registry.has("research.sec-edgar", "import-company"));
+        // Phase 5c-migrate Phase B Pattern B slice #75: source_loader_ops moved to
+        // `sem_os_postgres::ops::source_loader` via `extend_registry()`.
+        assert!(!registry.has("research.sources", "list"));
+        assert!(!registry.has("research.sources", "info"));
+        assert!(!registry.has("research.sources", "search"));
+        assert!(!registry.has("research.sources", "fetch"));
+        assert!(!registry.has("research.sources", "find-for-jurisdiction"));
+        assert!(!registry.has("research.companies-house", "search"));
+        assert!(!registry.has("research.companies-house", "fetch-company"));
+        assert!(!registry.has("research.companies-house", "fetch-psc"));
+        assert!(!registry.has("research.companies-house", "fetch-officers"));
+        assert!(!registry.has("research.companies-house", "import-company"));
+        assert!(!registry.has("research.sec-edgar", "search"));
+        assert!(!registry.has("research.sec-edgar", "fetch-company"));
+        assert!(!registry.has("research.sec-edgar", "fetch-beneficial-owners"));
+        assert!(!registry.has("research.sec-edgar", "fetch-filings"));
+        assert!(!registry.has("research.sec-edgar", "import-company"));
         // Phase 5c-migrate Phase B slice #31: manco + ownership governance
         // controller ops moved to `sem_os_postgres::ops::manco::*`.
         assert!(!registry.has("manco", "group.derive"));

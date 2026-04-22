@@ -1,19 +1,26 @@
-//! Research Source Loader Custom Operations
-//!
-//! Plugin handlers for the SourceLoader trait, enabling DSL verbs to interact with
+//! Research source loader verbs (15 plugin verbs) — `research.sources.*`,
+//! `research.companies-house.*`, `research.sec-edgar.*`. Plugin handlers
+//! for the SourceLoader trait, enabling DSL verbs to interact with
 //! pluggable research data sources (GLEIF, Companies House, SEC EDGAR, etc.).
 //!
-//! Rationale: These operations require external API calls and the SourceRegistry
-//! abstraction layer to search, fetch, and normalize data from multiple sources.
+//! Phase 5c-migrate Phase B Pattern B slice #75: ported from
+//! `CustomOperation` + `inventory::collect!` to `SemOsVerbOp`. Stays in
+//! `ob-poc::domain_ops::source_loader_ops` because the ops bridge to
+//! `crate::research::sources::*` — upstream of `sem_os_postgres`.
+//!
+//! Rationale: These operations require external API calls and the
+//! SourceRegistry abstraction layer to search, fetch, and normalize
+//! data from multiple sources.
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dsl_runtime_macros::register_custom_op;
+use sem_os_postgres::ops::SemOsVerbOp;
 
-use super::helpers::{
+use dsl_runtime::domain_ops::helpers::{
     json_extract_bool_opt, json_extract_int_opt, json_extract_string_opt, json_extract_uuid_opt,
 };
-use super::CustomOperation;
+use dsl_runtime::tx::TransactionScope;
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 #[cfg(feature = "database")]
 use {
@@ -35,27 +42,19 @@ use {
 // =============================================================================
 
 /// List all available research sources
-#[register_custom_op]
-pub struct SourceListOp;
+pub struct SourcesList;
 
 #[async_trait]
-impl CustomOperation for SourceListOp {
-    fn domain(&self) -> &'static str {
-        "research.sources"
+impl SemOsVerbOp for SourcesList {
+    fn fqn(&self) -> &str {
+        "research.sources.list"
     }
-    fn verb(&self) -> &'static str {
-        "list"
-    }
-    fn rationale(&self) -> &'static str {
-        "Lists all available research sources from the SourceRegistry"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         _args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let registry = build_source_registry();
 
         let sources: Vec<serde_json::Value> = registry
@@ -72,36 +71,24 @@ impl CustomOperation for SourceListOp {
             })
             .collect();
 
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(sources))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(sources))
     }
 }
 
 /// Get information about a specific research source
-#[register_custom_op]
-pub struct SourceInfoOp;
+pub struct SourcesInfo;
 
 #[async_trait]
-impl CustomOperation for SourceInfoOp {
-    fn domain(&self) -> &'static str {
-        "research.sources"
+impl SemOsVerbOp for SourcesInfo {
+    fn fqn(&self) -> &str {
+        "research.sources.info"
     }
-    fn verb(&self) -> &'static str {
-        "info"
-    }
-    fn rationale(&self) -> &'static str {
-        "Returns detailed information about a specific research source"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
 
@@ -119,36 +106,24 @@ impl CustomOperation for SourceInfoOp {
             "key_type": source.key_type(),
         });
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
 /// Search a specific source for entities
-#[register_custom_op]
-pub struct SourceSearchOp;
+pub struct SourcesSearch;
 
 #[async_trait]
-impl CustomOperation for SourceSearchOp {
-    fn domain(&self) -> &'static str {
-        "research.sources"
+impl SemOsVerbOp for SourcesSearch {
+    fn fqn(&self) -> &str {
+        "research.sources.search"
     }
-    fn verb(&self) -> &'static str {
-        "search"
-    }
-    fn rationale(&self) -> &'static str {
-        "Searches a specific source for entities by name - requires external API call"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
         let query = json_extract_string_opt(args, "query")
@@ -190,42 +165,31 @@ impl CustomOperation for SourceSearchOp {
             })
             .collect();
 
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Fetch entity data from a source by key
-#[register_custom_op]
-pub struct SourceFetchOp;
+pub struct SourcesFetch;
 
 #[async_trait]
-impl CustomOperation for SourceFetchOp {
-    fn domain(&self) -> &'static str {
-        "research.sources"
+impl SemOsVerbOp for SourcesFetch {
+    fn fqn(&self) -> &str {
+        "research.sources.fetch"
     }
-    fn verb(&self) -> &'static str {
-        "fetch"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches entity data from a source by key - requires external API call"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
         let key = json_extract_string_opt(args, "key")
             .ok_or_else(|| anyhow::anyhow!(":key required"))?;
         let include_raw = json_extract_bool_opt(args, "include-raw").unwrap_or(false);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        let pool = scope.pool().clone();
 
         let registry = build_source_registry();
 
@@ -256,40 +220,28 @@ impl CustomOperation for SourceFetchOp {
 
         // Log research action if decision-id provided
         if let Some(dec_id) = decision_id {
-            log_research_action(pool, dec_id, &format!("{}:fetch", source_id), &result, 0, 0)
+            log_research_action(&pool, dec_id, &format!("{}:fetch", source_id), &result, 0, 0)
                 .await?;
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
 /// Find the best source for a jurisdiction and data type
-#[register_custom_op]
-pub struct SourceFindForJurisdictionOp;
+pub struct SourcesFindForJurisdiction;
 
 #[async_trait]
-impl CustomOperation for SourceFindForJurisdictionOp {
-    fn domain(&self) -> &'static str {
-        "research.sources"
+impl SemOsVerbOp for SourcesFindForJurisdiction {
+    fn fqn(&self) -> &str {
+        "research.sources.find-for-jurisdiction"
     }
-    fn verb(&self) -> &'static str {
-        "find-for-jurisdiction"
-    }
-    fn rationale(&self) -> &'static str {
-        "Finds the best available source for a given jurisdiction and data type"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let jurisdiction = json_extract_string_opt(args, "jurisdiction")
             .ok_or_else(|| anyhow::anyhow!(":jurisdiction required"))?;
         let data_type = json_extract_string_opt(args, "data-type")
@@ -321,11 +273,7 @@ impl CustomOperation for SourceFindForJurisdictionOp {
             })
             .collect();
 
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
@@ -334,27 +282,19 @@ impl CustomOperation for SourceFindForJurisdictionOp {
 // =============================================================================
 
 /// Search Companies House for UK companies
-#[register_custom_op]
-pub struct ChSearchOp;
+pub struct CompaniesHouseSearch;
 
 #[async_trait]
-impl CustomOperation for ChSearchOp {
-    fn domain(&self) -> &'static str {
-        "research.companies-house"
+impl SemOsVerbOp for CompaniesHouseSearch {
+    fn fqn(&self) -> &str {
+        "research.companies-house.search"
     }
-    fn verb(&self) -> &'static str {
-        "search"
-    }
-    fn rationale(&self) -> &'static str {
-        "Searches UK Companies House API for companies by name"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let query = json_extract_string_opt(args, "query")
             .ok_or_else(|| anyhow::anyhow!(":query required"))?;
         let limit = json_extract_int_opt(args, "limit").map(|l| l as usize);
@@ -385,39 +325,28 @@ impl CustomOperation for ChSearchOp {
             })
             .collect();
 
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Fetch company profile from Companies House
-#[register_custom_op]
-pub struct ChFetchCompanyOp;
+pub struct CompaniesHouseFetchCompany;
 
 #[async_trait]
-impl CustomOperation for ChFetchCompanyOp {
-    fn domain(&self) -> &'static str {
-        "research.companies-house"
+impl SemOsVerbOp for CompaniesHouseFetchCompany {
+    fn fqn(&self) -> &str {
+        "research.companies-house.fetch-company"
     }
-    fn verb(&self) -> &'static str {
-        "fetch-company"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches company profile from UK Companies House API"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        let pool = scope.pool().clone();
 
         let loader = CompaniesHouseLoader::from_env()?;
 
@@ -431,44 +360,33 @@ impl CustomOperation for ChFetchCompanyOp {
 
         // Log research action if decision-id provided
         if let Some(dec_id) = decision_id {
-            log_research_action(pool, dec_id, "companies-house:fetch-company", &result, 0, 0)
+            log_research_action(&pool, dec_id, "companies-house:fetch-company", &result, 0, 0)
                 .await?;
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
 /// Fetch PSC (Persons with Significant Control) from Companies House
-#[register_custom_op]
-pub struct ChFetchPscOp;
+pub struct CompaniesHouseFetchPsc;
 
 #[async_trait]
-impl CustomOperation for ChFetchPscOp {
-    fn domain(&self) -> &'static str {
-        "research.companies-house"
+impl SemOsVerbOp for CompaniesHouseFetchPsc {
+    fn fqn(&self) -> &str {
+        "research.companies-house.fetch-psc"
     }
-    fn verb(&self) -> &'static str {
-        "fetch-psc"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches PSC (beneficial owners) from UK Companies House API"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
         let include_ceased = json_extract_bool_opt(args, "include-ceased").unwrap_or(false);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        let pool = scope.pool().clone();
 
         let loader = CompaniesHouseLoader::from_env()?;
 
@@ -505,7 +423,7 @@ impl CustomOperation for ChFetchPscOp {
         // Log research action if decision-id provided
         if let Some(dec_id) = decision_id {
             log_research_action(
-                pool,
+                &pool,
                 dec_id,
                 "companies-house:fetch-psc",
                 &serde_json::json!({ "holders": results.len() }),
@@ -515,36 +433,24 @@ impl CustomOperation for ChFetchPscOp {
             .await?;
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Fetch officers (directors, secretaries) from Companies House
-#[register_custom_op]
-pub struct ChFetchOfficersOp;
+pub struct CompaniesHouseFetchOfficers;
 
 #[async_trait]
-impl CustomOperation for ChFetchOfficersOp {
-    fn domain(&self) -> &'static str {
-        "research.companies-house"
+impl SemOsVerbOp for CompaniesHouseFetchOfficers {
+    fn fqn(&self) -> &str {
+        "research.companies-house.fetch-officers"
     }
-    fn verb(&self) -> &'static str {
-        "fetch-officers"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches officers from UK Companies House API"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
         let include_resigned = json_extract_bool_opt(args, "include-resigned").unwrap_or(false);
@@ -575,41 +481,30 @@ impl CustomOperation for ChFetchOfficersOp {
             })
             .collect();
 
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Import company (and optionally PSC/officers) from Companies House to database
-#[register_custom_op]
-pub struct ChImportCompanyOp;
+pub struct CompaniesHouseImportCompany;
 
 #[async_trait]
-impl CustomOperation for ChImportCompanyOp {
-    fn domain(&self) -> &'static str {
-        "research.companies-house"
+impl SemOsVerbOp for CompaniesHouseImportCompany {
+    fn fqn(&self) -> &str {
+        "research.companies-house.import-company"
     }
-    fn verb(&self) -> &'static str {
-        "import-company"
-    }
-    fn rationale(&self) -> &'static str {
-        "Imports company from Companies House and creates entity in database"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let company_number = json_extract_string_opt(args, "company-number")
             .ok_or_else(|| anyhow::anyhow!(":company-number required"))?;
         let include_psc = json_extract_bool_opt(args, "include-psc").unwrap_or(true);
         let include_officers = json_extract_bool_opt(args, "include-officers").unwrap_or(false);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        let pool = scope.pool().clone();
 
         let loader = CompaniesHouseLoader::from_env()?;
 
@@ -621,7 +516,7 @@ impl CustomOperation for ChImportCompanyOp {
         let entity = loader.fetch_entity(&company_number, Some(options)).await?;
 
         // Create entity in database
-        let entity_id = create_entity_from_normalized(pool, &entity).await?;
+        let entity_id = create_entity_from_normalized(&pool, &entity).await?;
 
         let mut psc_count = 0;
         let mut officer_count = 0;
@@ -657,7 +552,7 @@ impl CustomOperation for ChImportCompanyOp {
         // Log research action if decision-id provided
         if let Some(dec_id) = decision_id {
             log_research_action(
-                pool,
+                &pool,
                 dec_id,
                 "companies-house:import-company",
                 &result,
@@ -667,11 +562,7 @@ impl CustomOperation for ChImportCompanyOp {
             .await?;
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
@@ -680,27 +571,19 @@ impl CustomOperation for ChImportCompanyOp {
 // =============================================================================
 
 /// Search SEC EDGAR for US public companies
-#[register_custom_op]
-pub struct SecSearchOp;
+pub struct SecEdgarSearch;
 
 #[async_trait]
-impl CustomOperation for SecSearchOp {
-    fn domain(&self) -> &'static str {
-        "research.sec-edgar"
+impl SemOsVerbOp for SecEdgarSearch {
+    fn fqn(&self) -> &str {
+        "research.sec-edgar.search"
     }
-    fn verb(&self) -> &'static str {
-        "search"
-    }
-    fn rationale(&self) -> &'static str {
-        "Searches SEC EDGAR API for companies by name"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let query = json_extract_string_opt(args, "query")
             .ok_or_else(|| anyhow::anyhow!(":query required"))?;
         let limit = json_extract_int_opt(args, "limit").map(|l| l as usize);
@@ -726,39 +609,28 @@ impl CustomOperation for SecSearchOp {
             })
             .collect();
 
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Fetch company from SEC EDGAR
-#[register_custom_op]
-pub struct SecFetchCompanyOp;
+pub struct SecEdgarFetchCompany;
 
 #[async_trait]
-impl CustomOperation for SecFetchCompanyOp {
-    fn domain(&self) -> &'static str {
-        "research.sec-edgar"
+impl SemOsVerbOp for SecEdgarFetchCompany {
+    fn fqn(&self) -> &str {
+        "research.sec-edgar.fetch-company"
     }
-    fn verb(&self) -> &'static str {
-        "fetch-company"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches company information from SEC EDGAR API"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        let pool = scope.pool().clone();
 
         let loader = SecEdgarLoader::new()?;
 
@@ -772,44 +644,33 @@ impl CustomOperation for SecFetchCompanyOp {
 
         // Log research action if decision-id provided
         if let Some(dec_id) = decision_id {
-            log_research_action(pool, dec_id, "sec-edgar:fetch-company", &result, 0, 0).await?;
+            log_research_action(&pool, dec_id, "sec-edgar:fetch-company", &result, 0, 0).await?;
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
 /// Fetch 13D/13G beneficial ownership filings from SEC EDGAR
-#[register_custom_op]
-pub struct SecFetchBeneficialOwnersOp;
+pub struct SecEdgarFetchBeneficialOwners;
 
 #[async_trait]
-impl CustomOperation for SecFetchBeneficialOwnersOp {
-    fn domain(&self) -> &'static str {
-        "research.sec-edgar"
+impl SemOsVerbOp for SecEdgarFetchBeneficialOwners {
+    fn fqn(&self) -> &str {
+        "research.sec-edgar.fetch-beneficial-owners"
     }
-    fn verb(&self) -> &'static str {
-        "fetch-beneficial-owners"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches 13D/13G beneficial ownership filings from SEC EDGAR API"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let _include_13d = json_extract_bool_opt(args, "include-13d").unwrap_or(true);
         let _include_13g = json_extract_bool_opt(args, "include-13g").unwrap_or(true);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        let pool = scope.pool().clone();
 
         let loader = SecEdgarLoader::new()?;
 
@@ -837,7 +698,7 @@ impl CustomOperation for SecFetchBeneficialOwnersOp {
         // Log research action if decision-id provided
         if let Some(dec_id) = decision_id {
             log_research_action(
-                pool,
+                &pool,
                 dec_id,
                 "sec-edgar:fetch-beneficial-owners",
                 &serde_json::json!({ "holders": results.len() }),
@@ -847,36 +708,24 @@ impl CustomOperation for SecFetchBeneficialOwnersOp {
             .await?;
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::RecordSet(results))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::RecordSet(results))
     }
 }
 
 /// Fetch recent SEC filings
-#[register_custom_op]
-pub struct SecFetchFilingsOp;
+pub struct SecEdgarFetchFilings;
 
 #[async_trait]
-impl CustomOperation for SecFetchFilingsOp {
-    fn domain(&self) -> &'static str {
-        "research.sec-edgar"
+impl SemOsVerbOp for SecEdgarFetchFilings {
+    fn fqn(&self) -> &str {
+        "research.sec-edgar.fetch-filings"
     }
-    fn verb(&self) -> &'static str {
-        "fetch-filings"
-    }
-    fn rationale(&self) -> &'static str {
-        "Fetches recent SEC filings from EDGAR API"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        _ctx: &mut dsl_runtime::VerbExecutionContext,
-        _pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let _limit = json_extract_int_opt(args, "limit").unwrap_or(50);
@@ -895,43 +744,32 @@ impl CustomOperation for SecFetchFilingsOp {
             .cloned()
             .unwrap_or_else(|| serde_json::json!([]));
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(
+        Ok(VerbExecutionOutcome::Record(
             serde_json::json!({ "filings": filings }),
         ))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
     }
 }
 
 /// Import SEC company to database
-#[register_custom_op]
-pub struct SecImportCompanyOp;
+pub struct SecEdgarImportCompany;
 
 #[async_trait]
-impl CustomOperation for SecImportCompanyOp {
-    fn domain(&self) -> &'static str {
-        "research.sec-edgar"
+impl SemOsVerbOp for SecEdgarImportCompany {
+    fn fqn(&self) -> &str {
+        "research.sec-edgar.import-company"
     }
-    fn verb(&self) -> &'static str {
-        "import-company"
-    }
-    fn rationale(&self) -> &'static str {
-        "Imports SEC company and creates entity in database"
-    }
-    #[cfg(feature = "database")]
-    async fn execute_json(
+    async fn execute(
         &self,
         args: &serde_json::Value,
-        ctx: &mut dsl_runtime::VerbExecutionContext,
-        pool: &PgPool,
-    ) -> Result<dsl_runtime::VerbExecutionOutcome> {
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let cik = json_extract_string_opt(args, "cik")
             .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let include_beneficial_owners =
             json_extract_bool_opt(args, "include-beneficial-owners").unwrap_or(true);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
+        let pool = scope.pool().clone();
 
         let loader = SecEdgarLoader::new()?;
 
@@ -943,7 +781,7 @@ impl CustomOperation for SecImportCompanyOp {
         let entity = loader.fetch_entity(&cik, Some(options)).await?;
 
         // Create entity in database
-        let entity_id = create_entity_from_normalized(pool, &entity).await?;
+        let entity_id = create_entity_from_normalized(&pool, &entity).await?;
 
         let mut bo_count = 0;
 
@@ -964,14 +802,10 @@ impl CustomOperation for SecImportCompanyOp {
 
         // Log research action if decision-id provided
         if let Some(dec_id) = decision_id {
-            log_research_action(pool, dec_id, "sec-edgar:import-company", &result, 1, 0).await?;
+            log_research_action(&pool, dec_id, "sec-edgar:import-company", &result, 1, 0).await?;
         }
 
-        Ok(dsl_runtime::VerbExecutionOutcome::Record(result))
-    }
-
-    fn is_migrated(&self) -> bool {
-        true
+        Ok(VerbExecutionOutcome::Record(result))
     }
 }
 
