@@ -469,6 +469,10 @@ impl IdempotencyKey {
 /// - `ExternalNotify` — HTTP POST to an external subscriber.
 /// - `MaintenanceSpawn` — admin subprocess spawn deferred post-commit
 ///   (Phase 0g Pattern A per D11).
+/// - `BpmnSignal` — deferred gRPC signal to bpmn-lite
+///   (Phase F.1 Pattern B fire-and-forget, 2026-04-22).
+/// - `BpmnCancel` — deferred gRPC cancel to bpmn-lite
+///   (Phase F.1 Pattern B fire-and-forget, 2026-04-22).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum OutboxEffectKind {
@@ -477,6 +481,8 @@ pub enum OutboxEffectKind {
     ConstellationBroadcast,
     ExternalNotify,
     MaintenanceSpawn,
+    BpmnSignal,
+    BpmnCancel,
 }
 
 /// A post-commit effect queued inside the stage-8 transaction and consumed

@@ -743,7 +743,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // graceful-shutdown path if we ever add one.
     let _outbox_drainer_handle = {
         use ob_poc::outbox::{
-            MaintenanceSpawnConsumer, NarrateConsumer, OutboxDrainerConfig, OutboxDrainerImpl,
+            BpmnCancelConsumer, BpmnSignalConsumer, MaintenanceSpawnConsumer, NarrateConsumer,
+            OutboxDrainerConfig, OutboxDrainerImpl,
         };
         let mut drainer = OutboxDrainerImpl::new(pool.clone(), OutboxDrainerConfig::default());
         drainer.register(Arc::new(MaintenanceSpawnConsumer::new()))?;
@@ -752,6 +753,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Transitional log-only sink today; future WebSocket push
         // path lands here.
         drainer.register(Arc::new(NarrateConsumer::new()))?;
+        // Phase F.1b (Pattern B A1 remediation, 2026-04-22): BPMN-Lite
+        // fire-and-forget consumers. `bpmn.signal` and `bpmn.cancel`
+        // verbs write to public.outbox inside the ambient txn instead
+        // of calling gRPC directly. These consumers drain the rows
+        // post-commit and send the signal / cancel to the BPMN
+        // service. Failure is retryable with bounded attempts.
+        drainer.register(Arc::new(BpmnSignalConsumer::new()))?;
+        drainer.register(Arc::new(BpmnCancelConsumer::new()))?;
         tracing::info!("OutboxDrainer: spawning background task");
         drainer.spawn()
     };

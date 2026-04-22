@@ -41,12 +41,14 @@
 //! - `Terminal` outcomes are immediate failures (e.g. malformed
 //!   payload, missing consumer). No retry; alerting trigger.
 
+mod bpmn_signal;
 mod consumer;
 mod drainer;
 mod maintenance_spawn;
 mod narrate;
 pub mod narration_emit;
 
+pub use bpmn_signal::{BpmnCancelConsumer, BpmnSignalConsumer};
 pub use consumer::AsyncOutboxConsumer;
 pub use drainer::{OutboxDrainerImpl, OutboxDrainerConfig, OutboxDrainerHandle};
 pub use maintenance_spawn::MaintenanceSpawnConsumer;
