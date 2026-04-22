@@ -9,7 +9,7 @@
 | Phase | v0.3 mapping | State at end of session | Commits this session |
 |-------|--------------|-------------------------|---------------------|
 | **A** — envelope wiring (F5) | 5c-wire | **COMPLETE** (A.1-A.4). Shadow envelope + trace_id threading + real BLAKE3 StateGateHash all shipped. Placeholder fields tagged `<phase_a_todo>` for future concretization (DagNodeId, WorkspaceSnapshotId) but hash is deterministic and cross-run byte-identical. | 44585376, 9a1f76c6, 0b60d9df, d57a91be |
-| **B** — single-dispatch (F6) | 5c-migrate final | **PRIMITIVES COMPLETE** (B.1, B.2a). `dispatch_plugin_via_sem_os_op_in_scope`, `execute_verb_in_scope`, `execute_plan_atomic_in_scope` all exist, tested, `#[allow(dead_code)]`-gated until B.2b migrates the Sequencer. **B.2b remaining: 1-2 weeks dedicated** to hoist Sequencer outer scope. | 00033390, bf49dd2b, c3942912 |
+| **B** — single-dispatch (F6) | 5c-migrate final | **B.2b α-ε COMPLETE.** Transaction plumbing all the way from `execute_runbook_in_scope` down to `execute_verb_in_scope` works and is proven by `test_in_scope_rollback_delivers_cross_step_atomicity` — cross-step atomicity is available on demand via the new public `execute_runbook_in_scope` API. **B.2b-ζ remaining (Sequencer cutover): needs a design call on park/error/lock semantics — see §"Phase B.2b-ζ open questions" below.** | 00033390, bf49dd2b, c3942912, f662b74d, 46bcfdcc, def658d0, 4db19367, a96e80c4, 3a1857fe |
 | **C** — PendingStateAdvance (F7) | 5c-migrate state-advance | **PATTERN COMPLETE + ROLLOUT SUBSTANTIVELY COMPLETE: 72 verbs emitting across 15 domains.** Shared `emit_pending_state_advance` + `emit_pending_state_advance_batch` (multi-entity fan-out) + `peek/take_pending_state_advance` accessors ready. Families with full coverage: cbu, entity, kyc_case, deal, screening, client_group, investor (11), document, tollgate, cbu_role, billing, capital, ownership, partnership, outreach, custody, remediation, trading_profile_ca (10 via save wrapper). Remaining verbs = edge cases (cron ticks, recompute sweeps, cache-only mutations) that need case-by-case evaluation, not mechanical rollout. **Apply-in-txn (C.2 main) needs B.2b first.** | 12cc4dc1, e632270a, 2d174449, 607a3b80, 0fdeab11, ea612b31, 4ed2dd65, 1f5f235e, b6c697b8, 7429f46d, 5adc441f |
 | **D** — TOCTOU + row-version (F8, F9) | 5d | **MIGRATION STAGED** (D.1). SQL ready at `rust/migrations/20260422_row_version_entity_tables.sql`; NOT yet applied (needs operator approval). D.2 backfill + D.3 recheck require D.1 applied first. | 91aea971 |
 | **E** — dual-schema YAML (F10) | Phase 6 | **NOT STARTED.** 4-8 week effort per original plan: new `round-trip-harness` crate + YAML schema extensions + per-verb effect-equivalence proofs. | — |
@@ -44,6 +44,90 @@ After the 2026-04-22 session, three distinct work items remain and none can hone
 3. **Phase E — dual-schema YAML + round-trip harness.** New crate (`round-trip-harness/`) + YAML schema extensions + per-verb effect-equivalence proofs (N ≥ 50 fixtures per dissolved CRUD verb). Blocks CRUD dissolution, which is 50-60% of the 625-op surface. 4-8 weeks.
 
 These three are the genuine remaining work. Everything else in the plan is either mechanical rollout (C.3 remainder, F.1 inspect/compile/start) or documented-and-tracked (F.2-F.4 Pattern B remediation for source_loader/gleif/request).
+
+---
+
+## Phase B.2b-ζ open questions
+
+Phase B.2b-ζ is the final step: point `Sequencer::execute_entry_via_gate`
+at `execute_runbook_in_scope` instead of `execute_runbook_with_pool`, with
+the Sequencer opening an outer `PgTransactionScope` around the whole
+runbook execution. Before that lands, three semantic decisions are needed:
+
+### 1. Park atomicity
+
+**Current behavior:** when entry N parks (e.g. awaits a BPMN signal),
+entries 1..N-1 are already committed because each opens its own
+transaction. User resumes later; entries N..end execute in fresh txns.
+
+**Outer-scope problem:** a single `PgTransactionScope` cannot stay open
+across a park. Txns don't survive process restarts, connection pool
+recycling, or multi-hour user delays.
+
+**Options:**
+- (a) **Commit on park.** Scope covers "entries since last park"
+  — park commits the current scope; resume opens a new scope for
+  the continuation. Closest to current behavior; breaks "whole
+  runbook atomic" claim but keeps user experience intact.
+- (b) **Savepoints per entry.** Outer scope wraps the whole
+  runbook; each entry gets a SAVEPOINT; park releases the
+  savepoint. Complex to reason about; doesn't survive process
+  restart either.
+- (c) **Non-durable runbooks atomic, durable ones NOT.** Split
+  the path: only runbooks with NO durable steps use
+  `execute_runbook_in_scope`; anything touching a durable verb
+  falls back to `execute_runbook_with_pool`. Narrow win, explicit
+  carve-out.
+
+**Recommendation:** option (a) at first, since it matches current
+UX. Document that runbooks spanning parks are NOT atomic across
+the park boundary.
+
+### 2. Error recovery UX
+
+**Current behavior:** entry 5 fails → entries 1-4 stay committed; user
+sees "entry 5 failed" and can fix and retry.
+
+**Outer-scope behavior:** entry 5 fails → whole scope rolls back →
+entries 1-4 un-commit. User sees "runbook failed, all steps undone."
+
+This is a **real UX change**. Users may have expected the intermediate
+CBUs or entities to persist. Needs product sign-off before rolling out
+— possibly an opt-in feature flag initially.
+
+### 3. Advisory lock lifetime
+
+**Current behavior:** `execute_runbook_with_pool` opens a SEPARATE
+`_lock_tx` that holds advisory locks for the runbook's duration.
+Data mutations happen in per-entry txns, locks in the parallel txn.
+
+**Outer-scope behavior:** locks should be acquired ON the outer
+scope (same txn as data). `execute_runbook_in_scope` leaves lock
+acquisition to the caller; the Sequencer in B.2b-ζ must:
+
+```rust
+let mut scope = PgTransactionScope::begin(&pool).await?;
+// acquire advisory locks on scope.transaction()
+let tx = scope.transaction();
+acquire_locks(tx, &lock_keys, LockMode::Timeout(...)).await?;
+// run runbook
+execute_runbook_in_scope(store, id, None, &bridge, &mut scope).await?;
+// commit or rollback (releases locks on the same txn)
+```
+
+Lock acquisition helper needs adapting — `acquire_advisory_locks`
+currently opens a NEW transaction from the pool; the B.2b-ζ version
+takes the scope's existing transaction.
+
+### Summary
+
+α through ε landed in one session (2026-04-22); ζ is a ~2-3 day
+slice once (1), (2), (3) are answered. The public
+`execute_runbook_in_scope` API is available for any caller ready
+to commit to outer-scope semantics — so a feature-flagged rollout
+is viable: V2 REPL gets `execute_runbook_in_scope` behind a flag,
+legacy paths keep `execute_runbook_with_pool` until confidence
+accrues.
 
 ---
 
