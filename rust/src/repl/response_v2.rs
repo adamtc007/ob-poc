@@ -43,6 +43,14 @@ pub struct ReplResponseV2 {
     /// actions or on contextual queries ("what's next", "where are we").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub narration: Option<ob_poc_types::narration::NarrationPayload>,
+
+    /// Phase A.2 (F5 follow-on, 2026-04-22): correlation id for this turn.
+    /// One `trace_id` per utterance — threaded into the shadow
+    /// `GatedVerbEnvelope` and every `tracing::debug!` event downstream so
+    /// an utterance can be followed from stage 1 through stage 9b by a
+    /// single grep.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<Uuid>,
 }
 
 // ---------------------------------------------------------------------------
@@ -179,6 +187,7 @@ mod tests {
             step_count: 1,
             session_feedback: None,
             narration: None,
+            trace_id: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -200,6 +209,7 @@ mod tests {
             step_count: 0,
             session_feedback: None,
             narration: None,
+            trace_id: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -231,6 +241,7 @@ mod tests {
             step_count: 0,
             session_feedback: None,
             narration: None,
+            trace_id: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();
@@ -259,6 +270,7 @@ mod tests {
             step_count: 1,
             session_feedback: None,
             narration: None,
+            trace_id: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();

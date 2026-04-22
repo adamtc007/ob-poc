@@ -92,13 +92,19 @@ pub struct EnvelopeInputs<'a> {
     /// from the session's trace sequence. Phase D: replaced by a proper
     /// SemOS-issued logical clock.
     pub logical_clock: u64,
+    /// Phase A.2 (F5 follow-on, 2026-04-22): explicit turn-level trace_id
+    /// from the session. When `Some`, the envelope carries this id —
+    /// enabling correlation between the `ReplResponseV2.trace_id` seen by
+    /// the frontend and the `GatedVerbEnvelope.trace_id` in runtime logs.
+    /// When `None`, a fresh id is generated (legacy behaviour).
+    pub trace_id: Option<Uuid>,
 }
 
 /// Build a shadow envelope from the dispatch site's currently-available
 /// data. Placeholder fields are clearly marked so the determinism harness
 /// can distinguish "real data not yet plumbed" from "genuine value".
 pub fn build_shadow_envelope(inputs: &EnvelopeInputs<'_>) -> GatedVerbEnvelope {
-    let trace_id = TraceId(Uuid::new_v4());
+    let trace_id = TraceId(inputs.trace_id.unwrap_or_else(Uuid::new_v4));
     let session_scope = SessionScopeRef(inputs.session_id);
 
     // <phase_a_todo> CatalogueSnapshotId: derive from sem_reg snapshot
@@ -193,6 +199,7 @@ mod tests {
             scope_cbu_ids: &cbus,
             semreg_fingerprint_proxy: Some("v1:deadbeef12345678"),
             logical_clock: 42,
+            trace_id: None,
         };
         let env = build_shadow_envelope(&inputs);
 
@@ -219,10 +226,41 @@ mod tests {
             scope_cbu_ids: &[],
             semreg_fingerprint_proxy: None,
             logical_clock: 0,
+            trace_id: None,
         };
         let env = build_shadow_envelope(&inputs);
         assert_eq!(env.catalogue_snapshot_id.0, 0);
         assert!(env.resolved_entities.0.is_empty());
+    }
+
+    #[test]
+    fn shadow_envelope_reuses_provided_trace_id() {
+        // Phase A.2 regression: when the caller supplies a trace_id from
+        // the session, the envelope must carry THAT id — not a fresh one.
+        // This is what makes the frontend-visible `ReplResponseV2.trace_id`
+        // and runtime-log `GatedVerbEnvelope.trace_id` the same id, so one
+        // grep threads an utterance from stage 1 through stage 9b.
+        let pinned = Uuid::new_v4();
+        let inputs = EnvelopeInputs {
+            session_id: Uuid::nil(),
+            verb_fqn: "cbu.create",
+            args: serde_json::Value::Null,
+            writes_since_push_at_gate: 0,
+            scope_cbu_ids: &[],
+            semreg_fingerprint_proxy: None,
+            logical_clock: 0,
+            trace_id: Some(pinned),
+        };
+        let env = build_shadow_envelope(&inputs);
+        assert_eq!(env.trace_id.0, pinned);
+
+        // And when None is supplied, a fresh UUID is generated.
+        let inputs_no_id = EnvelopeInputs {
+            trace_id: None,
+            ..inputs
+        };
+        let env_fresh = build_shadow_envelope(&inputs_no_id);
+        assert_ne!(env_fresh.trace_id.0, pinned);
     }
 
     #[test]

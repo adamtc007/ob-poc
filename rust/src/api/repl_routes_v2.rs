@@ -549,6 +549,7 @@ async fn create_session_v2(
         step_count: 0,
         session_feedback: Some(session_feedback),
         narration: None,
+        trace_id: None,
     };
 
     Ok(Json(CreateSessionResponseV2 {

@@ -45,6 +45,8 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
         runbook_plan: None,
         session_feedback,
         narration: resp.narration.clone(),
+        // Phase A.2 (F5 follow-on): forward the turn-level correlation id.
+        trace_id: resp.trace_id,
     };
 
     match resp.kind {
@@ -254,6 +256,7 @@ mod tests {
             step_count: 0,
             session_feedback: None,
             narration: None,
+            trace_id: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.decision.is_some());
@@ -285,6 +288,7 @@ mod tests {
             step_count: 0,
             session_feedback: None,
             narration: None,
+            trace_id: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.decision.is_some());
@@ -313,6 +317,7 @@ mod tests {
             step_count: 0,
             session_feedback: None,
             narration: None,
+            trace_id: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         let d = chat.decision.unwrap();
@@ -339,6 +344,7 @@ mod tests {
             step_count: 1,
             session_feedback: None,
             narration: None,
+            trace_id: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.coder_proposal.is_some());
@@ -360,6 +366,7 @@ mod tests {
             step_count: 0,
             session_feedback: None,
             narration: None,
+            trace_id: None,
         };
         let chat = repl_to_chat_response(resp, Uuid::nil());
         assert!(chat.message.contains("Could not find"));
