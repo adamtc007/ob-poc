@@ -93,6 +93,11 @@ domains:
           type: uuid
           name: request_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list:
         description: List outstanding requests
@@ -157,6 +162,11 @@ domains:
           default: PENDING
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       overdue:
         description: List overdue requests
@@ -205,6 +215,11 @@ domains:
           default: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ═══════════════════════════════════════════════════════════════════════════
       # Request lifecycle
@@ -264,6 +279,11 @@ domains:
           maps_to: fulfillment_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       cancel:
         description: Cancel a pending request
@@ -303,6 +323,11 @@ domains:
           maps_to: status_reason
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       extend:
         description: Extend request due date
@@ -347,6 +372,11 @@ domains:
           required: true
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remind:
         description: Send reminder for pending request
@@ -393,6 +423,11 @@ domains:
           required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       escalate:
         description: Escalate overdue request
@@ -436,6 +471,11 @@ domains:
           maps_to: escalation_reason
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       waive:
         description: Waive a request requirement
@@ -479,3 +519,8 @@ domains:
           description: Senior user approving waiver
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation

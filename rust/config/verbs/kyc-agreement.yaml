@@ -83,6 +83,11 @@ domains:
         returns:
           type: uuid
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       read:
         description: "Get service agreement details"
@@ -118,6 +123,11 @@ domains:
           maps_to: sponsor_cbu_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list:
         description: "List service agreements for a sponsor"
@@ -154,6 +164,11 @@ domains:
           maps_to: status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       update-status:
         description: "Update agreement status"
@@ -189,3 +204,8 @@ domains:
           maps_to: status
         returns:
           type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

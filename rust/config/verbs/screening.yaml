@@ -56,6 +56,11 @@ domains:
         returns:
           type: uuid
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       sanctions:
         description: Run sanctions list screening
@@ -126,6 +131,11 @@ domains:
         returns:
           type: uuid
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       adverse-media:
         description: Run adverse media screening
@@ -182,6 +192,11 @@ domains:
         returns:
           type: uuid
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       run:
         description: Initiate a workstream screening. Idempotent by (workstream_id, screening_type).
@@ -278,6 +293,11 @@ domains:
           type: uuid
           name: screening_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       complete:
         description: Record workstream screening completion.
@@ -346,6 +366,11 @@ domains:
             maps_to: match_count
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       review-hit:
         description: Review a screening hit for a workstream screening.
@@ -419,6 +444,11 @@ domains:
               primary_key: red_flag_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       bulk-refresh:
         description: Refresh screening coverage for all workstreams in a case.
@@ -470,6 +500,11 @@ domains:
               - CONSOLIDATED
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-by-workstream:
         description: List screenings for a workstream.
@@ -519,3 +554,8 @@ domains:
             maps_to: status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

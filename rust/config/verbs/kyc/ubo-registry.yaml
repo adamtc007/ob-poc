@@ -87,6 +87,11 @@ domains:
           type: uuid
           name: registry_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       promote:
         description: "Promote a UBO registry entry from CANDIDATE to IDENTIFIED"
@@ -116,6 +121,11 @@ domains:
             description: Notes on identification
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       advance:
         description: "Advance a UBO registry entry through the state machine"
@@ -155,6 +165,11 @@ domains:
             description: Notes on transition
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       waive:
         description: "Waive a UBO registry entry with authority and reason"
@@ -188,6 +203,11 @@ domains:
             description: Authority granting the waiver
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       reject:
         description: "Reject a UBO registry entry (terminal state)"
@@ -217,6 +237,11 @@ domains:
             description: Reason for rejection
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       expire:
         description: "Expire a UBO registry entry (terminal state)"
@@ -245,3 +270,8 @@ domains:
             description: Reason for expiry
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation

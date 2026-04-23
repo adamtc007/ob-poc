@@ -75,6 +75,11 @@ domains:
           type: uuid
           name: holding_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       transfer:
         description: Transfer shares between shareholders (creates movement records)
@@ -141,6 +146,11 @@ domains:
         returns:
           type: uuid
           name: transfer_id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       reconcile:
         description: |
@@ -192,6 +202,11 @@ domains:
             type: integer
           - name: shareholders
             type: array
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       get-ownership-chain:
         description: |
@@ -235,6 +250,11 @@ domains:
         returns:
           type: record_set
           description: Array of ownership paths with computed indirect %
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       issue-shares:
         description: Issue additional shares (increases issued_shares)
@@ -279,6 +299,11 @@ domains:
           required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       cancel-shares:
         description: Cancel/buyback shares (decreases issued_shares)
@@ -323,6 +348,11 @@ domains:
           required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       list-by-issuer:
         description: List all share classes for an issuing entity
@@ -360,6 +390,11 @@ domains:
             primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-shareholders:
         description: List all shareholders for a share class
@@ -402,3 +437,8 @@ domains:
           default: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

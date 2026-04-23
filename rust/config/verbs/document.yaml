@@ -140,6 +140,11 @@ domains:
           fields:
             task_id: uuid
             requirement_id: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       solicit-batch:
         description: Solicit multiple documents from an entity and track through to fulfillment
@@ -221,6 +226,11 @@ domains:
             task_id: uuid
             expected_count: integer
             requirement_ids: list
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ========================================================================
       # KYC Request Tracking (merged from doc-request)
@@ -317,6 +327,11 @@ domains:
           type: uuid
           name: request_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       mark-requested:
         description: Mark a document request as formally requested.
@@ -362,6 +377,11 @@ domains:
               primary_key: request_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       mark-received:
         description: Record receipt against a document request.
@@ -420,6 +440,11 @@ domains:
               primary_key: doc_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       verify-request:
         description: Verify a document request as satisfied by a valid document.
@@ -473,6 +498,11 @@ domains:
             maps_to: verification_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       reject-request:
         description: Reject a document request submission.
@@ -521,6 +551,11 @@ domains:
             maps_to: rejection_reason
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       waive-request:
         description: Waive a document request requirement.
@@ -568,6 +603,11 @@ domains:
             maps_to: verification_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       list-requests-by-workstream:
         description: List document requests for a workstream.
@@ -612,6 +652,11 @@ domains:
             maps_to: status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ========================================================================
       # Document Cataloging (legacy)
@@ -667,6 +712,11 @@ domains:
           type: uuid
           name: doc_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       extract:
         description: Extract data from document using AI/OCR
@@ -695,6 +745,11 @@ domains:
             description: Document to extract from
         returns:
           type: void
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ========================================================================
       # Document Creation (for internal/API sources)
@@ -772,6 +827,11 @@ domains:
             type: uuid
             entity_kind: document
             description: ID of the newly created document
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       upload-version:
         description: Upload a new version of a document (Layer C - immutable submission)
@@ -825,6 +885,11 @@ domains:
             version_id: uuid
             version_no: integer
             cargo_ref: string
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ========================================================================
       # QA / Verification
@@ -872,6 +937,11 @@ domains:
             description: QA operator identifier
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       reject:
         description: QA rejects a document version with reason code
@@ -946,6 +1016,11 @@ domains:
             description: QA operator identifier
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       start-qa:
         description: Move document version to QA queue
@@ -981,6 +1056,11 @@ domains:
             value: "'in_qa'"
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       # ========================================================================
       # Queries
@@ -1017,6 +1097,11 @@ domains:
             maps_to: document_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-versions:
         description: List all versions of a document
@@ -1049,6 +1134,11 @@ domains:
             maps_to: document_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       for-entity:
         description: List all documents for an entity
@@ -1100,6 +1190,11 @@ domains:
               primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       missing-for-entity:
         description: List missing document requirements for an entity
@@ -1159,6 +1254,11 @@ domains:
             required_state: string
             attempt_count: integer
             last_rejection_code: string
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       compute-requirements:
         description: Compute governed document requirement matrix for an entity
@@ -1197,3 +1297,8 @@ domains:
               primary_key: entity_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

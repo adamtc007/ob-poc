@@ -123,6 +123,11 @@ domains:
             type: uuid
             entity_kind: case
             description: ID of the newly created KYC case
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       update-status:
         description: Update case status with transition validation
         invocation_phrases:
@@ -181,6 +186,11 @@ domains:
             maps_to: notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       escalate:
         description: Escalate case to higher authority
         invocation_phrases:
@@ -237,6 +247,11 @@ domains:
               - BOARD
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
       assign:
         description: Assign case to analyst and/or reviewer
         invocation_phrases:
@@ -304,6 +319,11 @@ domains:
               primary_key: entity_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       set-risk-rating:
         description: Set case risk rating
         invocation_phrases:
@@ -361,6 +381,11 @@ domains:
               - PROHIBITED
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       close:
         description: Close the case (validates REVIEW status, emits deal gate event when APPROVED with linked deal)
         invocation_phrases:
@@ -423,6 +448,11 @@ domains:
             Returns KycCaseCloseResult with case_id, status, closed_at timestamp,
             and deal_gate_updated flag indicating whether a KYC_GATE_COMPLETED
             event was emitted to deal_events.
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
       read:
         description: Read case details
         invocation_phrases:
@@ -467,6 +497,11 @@ domains:
               primary_key: case_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       list-by-cbu:
         description: List cases for a CBU
         invocation_phrases:
@@ -510,6 +545,11 @@ domains:
             maps_to: status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       reopen:
         description: Reopen a closed case for remediation or review
         invocation_phrases:
@@ -580,6 +620,11 @@ domains:
               - DISCOVERY
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       summarize:
         description: Summarize full case state with workstreams and embedded awaiting requests
         invocation_phrases:
@@ -624,3 +669,8 @@ domains:
             embedded `awaiting` arrays. Requests appear as child nodes of
             workstreams, not as a separate list. Includes summary counts
             and attention items for overdue requests.
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

@@ -67,3 +67,8 @@ domains:
           - name: gaps_blocking_skeleton
             type: integer
             description: "Number of gaps blocking SKELETON_READY gate"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

@@ -102,7 +102,6 @@ allowed_verbs:
   - ubo.verify
 
 forbidden_verbs:
-  - kyc.delete-case
   - entity.delete
 
 risk_policy:

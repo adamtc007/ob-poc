@@ -61,6 +61,11 @@ domains:
         returns:
           type: record
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       attach-document:
         description: "Link a document to an evidence record"
@@ -96,6 +101,11 @@ domains:
               primary_key: doc_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       mark-verified:
         description: "Verify (QA approve) an evidence record"
@@ -129,6 +139,11 @@ domains:
             description: Verification notes
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       mark-rejected:
         description: "Reject an evidence record (clears document link for re-submission)"
@@ -158,6 +173,11 @@ domains:
             description: Reason for rejection
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       mark-waived:
         description: "Waive an evidence requirement with documented authority"
@@ -191,3 +211,8 @@ domains:
             description: Authority granting the waiver
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
