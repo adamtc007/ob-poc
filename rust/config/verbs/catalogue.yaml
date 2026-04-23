@@ -1,0 +1,154 @@
+# Catalogue Workspace Verbs — P.8 Authorship Prototype (2026-04-23)
+#
+# Four authorship verbs for the lightweight Catalogue workspace
+# prototype per pilot plan §P.8. Each verb operates on a filesystem
+# staging area (rust/config/verb_staging/) rather than directly on the
+# authoritative config/verbs/ tree. Commit moves staged changes into
+# the authoritative tree; rollback discards; list shows pending.
+#
+# Three-axis declarations per pilot plan §P.8:
+# - commit is the highest tier (requires_explicit_authorisation) —
+#   it changes the authoritative catalogue.
+# - propose is reviewable — staging is reversible.
+# - rollback is requires_confirmation — discards work.
+# - list is benign — read-only.
+
+domains:
+  catalogue:
+    description: "Catalogue authorship workspace (P.8 prototype)"
+    invocation_hints:
+      - propose verb
+      - commit verb
+      - rollback catalogue change
+      - list proposals
+      - catalogue change
+      - authorship
+    verbs:
+
+      propose-verb-declaration:
+        description: "Stage a new or updated verb declaration for review"
+        invocation_phrases:
+          - "propose verb change"
+          - "stage verb declaration"
+          - "draft verb update"
+          - "submit catalogue change for review"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: catalogue_proposal
+          subject_kinds: [verb]
+          phase_tags: [authoring]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: verb-fqn
+            type: string
+            required: true
+            description: "FQN of the verb being changed (e.g. trading-profile.submit)"
+          - name: proposed-declaration
+            type: json
+            required: true
+            description: "The full verb YAML fragment as JSON (will be staged)"
+          - name: rationale
+            type: string
+            required: false
+        returns:
+          type: uuid
+          name: proposal_id
+          capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      commit-verb-declaration:
+        description: "Promote a staged proposal to the authoritative catalogue"
+        invocation_phrases:
+          - "commit verb change"
+          - "publish catalogue change"
+          - "approve and apply proposal"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: catalogue_proposal
+          subject_kinds: [catalogue_proposal]
+          phase_tags: [governance]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: proposal
+            type: uuid
+            required: true
+          - name: approver
+            type: string
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      rollback-verb-declaration:
+        description: "Discard a staged proposal (revert to prior authoritative state)"
+        invocation_phrases:
+          - "rollback catalogue proposal"
+          - "discard verb change"
+          - "cancel proposed verb"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: catalogue_proposal
+          subject_kinds: [catalogue_proposal]
+          phase_tags: [governance]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: proposal
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+
+      list-proposals:
+        description: "List pending and recently-committed verb-declaration proposals"
+        invocation_phrases:
+          - "list proposals"
+          - "show pending verb changes"
+          - "list catalogue proposals"
+          - "show staging"
+        metadata:
+          tier: diagnostics
+          source_of_truth: catalog
+          scope: global
+          noun: catalogue_proposal
+          subject_kinds: [catalogue_proposal]
+          phase_tags: [read]
+          side_effects: facts_only
+          harm_class: read_only
+        behavior: plugin
+        args:
+          - name: status-filter
+            type: string
+            required: false
+            valid_values: [pending, committed, rolled_back, all]
+            default: pending
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
