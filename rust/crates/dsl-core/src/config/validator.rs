@@ -127,6 +127,14 @@ pub enum WellFormednessError {
         location: Location,
         dag: String,
     },
+    /// Two or more escalation rules within the same verb share a name.
+    /// Names must be unique per verb so audit-trail records of which rule
+    /// fired are unambiguous.
+    DuplicateRuleName {
+        location: Location,
+        rule_name: String,
+        occurrences: usize,
+    },
 }
 
 impl std::fmt::Display for WellFormednessError {
@@ -160,6 +168,15 @@ impl std::fmt::Display for WellFormednessError {
                     "{location}: transitions.dag='{dag}' does not match any known DAG taxonomy"
                 )
             }
+            Self::DuplicateRuleName {
+                location,
+                rule_name,
+                occurrences,
+            } => write!(
+                f,
+                "{location}: escalation rule name '{rule_name}' appears {occurrences} times — \
+                 rule names must be unique per verb for audit-trail determinism"
+            ),
         }
     }
 }
@@ -308,10 +325,33 @@ fn validate_consequence(
     declared_args: &HashSet<String>,
     report: &mut ValidationReport,
 ) {
+    // --- well-formedness: duplicate rule names (P.1.d) ---
+    // Rule names must be unique per verb so audit-trail records are
+    // unambiguous about which rule fired. Flag any name that appears > 1.
+    let mut name_counts: std::collections::HashMap<&str, usize> =
+        std::collections::HashMap::new();
+    for rule in &conseq.escalation {
+        *name_counts.entry(rule.name.as_str()).or_insert(0) += 1;
+    }
+    // Emit one error per duplicated name (not per occurrence) — keeps the
+    // report concise.
+    let mut reported_dups: HashSet<String> = HashSet::new();
+    for rule in &conseq.escalation {
+        let count = name_counts[rule.name.as_str()];
+        if count > 1 && reported_dups.insert(rule.name.clone()) {
+            report
+                .well_formedness
+                .push(WellFormednessError::DuplicateRuleName {
+                    location: Location::verb_path(fqn, "consequence.escalation"),
+                    rule_name: rule.name.clone(),
+                    occurrences: count,
+                });
+        }
+    }
+
     for rule in &conseq.escalation {
         // Tier monotonicity (P11): a rule's tier must be >= baseline, else
-        // it's dead code. We treat this as a well-formedness error (it
-        // breaks the invariant of the effective-tier fold).
+        // it's dead code. We treat `<` as a well-formedness error.
         if rule.tier < conseq.baseline {
             report
                 .well_formedness
@@ -322,10 +362,22 @@ fn validate_consequence(
                     baseline: conseq.baseline,
                 });
         }
+        // --- policy-sanity warning: unreachable escalation (P.1.d) ---
+        // A rule whose tier equals baseline can never change the effective
+        // tier via max(). It's a no-op — not a bug (unlike tier < baseline
+        // which is a bug), but worth flagging so authors consolidate rules.
+        // Narrow warning per v1.1 §6.2 — mechanically-dead rule only;
+        // does not opine on "should this be higher."
+        if rule.tier == conseq.baseline {
+            report.warnings.push(PolicyWarning::UnreachableEscalation {
+                location: Location::verb_path(fqn, "consequence.escalation"),
+                rule_name: rule.name.clone(),
+            });
+        }
         // Arg references.
-        let mut missing_args: HashSet<String> = HashSet::new();
-        collect_predicate_arg_refs(&rule.when, &mut missing_args);
-        for arg in missing_args {
+        let mut referenced_args: HashSet<String> = HashSet::new();
+        collect_predicate_arg_refs(&rule.when, &mut referenced_args);
+        for arg in referenced_args {
             if !declared_args.contains(&arg) {
                 report
                     .well_formedness
@@ -720,6 +772,204 @@ mod tests {
             r.well_formedness[0],
             WellFormednessError::UnknownDagReference { .. }
         ));
+    }
+
+    // =========================================================================
+    // P.1.d — policy-sanity warnings + duplicate-rule-name well-formedness
+    // =========================================================================
+
+    #[test]
+    fn unreachable_escalation_warning_when_rule_tier_equals_baseline() {
+        // Narrow warning: a rule whose tier == baseline can never raise
+        // effective_tier via max(). Mechanically dead, not a bug.
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Reviewable,
+                escalation: vec![EscalationRule {
+                    name: "redundant".into(),
+                    when: EscalationPredicate::ContextFlag { flag: "f".into() },
+                    tier: ConsequenceTier::Reviewable, // == baseline → dead
+                    reason: None,
+                }],
+            },
+            transitions: None,
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        // NOT a structural or well-formedness error — just a warning.
+        assert!(r.structural.is_empty());
+        assert!(r.well_formedness.is_empty());
+        assert_eq!(r.warnings.len(), 1);
+        assert!(matches!(
+            r.warnings[0],
+            PolicyWarning::UnreachableEscalation { .. }
+        ));
+    }
+
+    #[test]
+    fn escalation_tier_above_baseline_does_not_warn() {
+        // Sanity: the reachable case is silent.
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![EscalationRule {
+                    name: "real".into(),
+                    when: EscalationPredicate::ContextFlag { flag: "f".into() },
+                    tier: ConsequenceTier::Reviewable, // > baseline → real
+                    reason: None,
+                }],
+            },
+            transitions: None,
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert!(r.is_clean());
+        assert!(r.warnings.is_empty());
+    }
+
+    #[test]
+    fn duplicate_rule_name_is_well_formedness_error() {
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![
+                    EscalationRule {
+                        name: "shared".into(),
+                        when: EscalationPredicate::ContextFlag { flag: "a".into() },
+                        tier: ConsequenceTier::Reviewable,
+                        reason: None,
+                    },
+                    EscalationRule {
+                        name: "shared".into(), // duplicate
+                        when: EscalationPredicate::ContextFlag { flag: "b".into() },
+                        tier: ConsequenceTier::RequiresConfirmation,
+                        reason: None,
+                    },
+                ],
+            },
+            transitions: None,
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        // One error per duplicated name, not per occurrence.
+        let dup_errors: Vec<_> = r
+            .well_formedness
+            .iter()
+            .filter(|e| matches!(e, WellFormednessError::DuplicateRuleName { .. }))
+            .collect();
+        assert_eq!(dup_errors.len(), 1);
+        let WellFormednessError::DuplicateRuleName {
+            rule_name,
+            occurrences,
+            ..
+        } = dup_errors[0]
+        else {
+            panic!();
+        };
+        assert_eq!(rule_name, "shared");
+        assert_eq!(*occurrences, 2);
+    }
+
+    #[test]
+    fn three_or_more_duplicates_reports_once() {
+        let mk_rule = |name: &str, flag: &str, tier: ConsequenceTier| EscalationRule {
+            name: name.into(),
+            when: EscalationPredicate::ContextFlag { flag: flag.into() },
+            tier,
+            reason: None,
+        };
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![
+                    mk_rule("collision", "a", ConsequenceTier::Reviewable),
+                    mk_rule("collision", "b", ConsequenceTier::RequiresConfirmation),
+                    mk_rule("collision", "c", ConsequenceTier::RequiresExplicitAuthorisation),
+                ],
+            },
+            transitions: None,
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        let dup_errors: Vec<_> = r
+            .well_formedness
+            .iter()
+            .filter(|e| matches!(e, WellFormednessError::DuplicateRuleName { .. }))
+            .collect();
+        assert_eq!(dup_errors.len(), 1, "one error per name, not per occurrence");
+        if let WellFormednessError::DuplicateRuleName { occurrences, .. } = dup_errors[0] {
+            assert_eq!(*occurrences, 3);
+        }
+    }
+
+    #[test]
+    fn p10_silence_on_unusual_legitimate_combinations() {
+        // v1.1 §6.2 enumerates legitimate unusual combinations that the
+        // validator MUST NOT warn on. This test asserts the warning list
+        // is empty for each of them, in addition to the error list.
+
+        // (1) State-preserving + requires_explicit_authorisation (exports).
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![ExternalEffect::Emitting],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::RequiresExplicitAuthorisation,
+                escalation: vec![],
+            },
+            transitions: None,
+        });
+        let r = validate_verb("export.verb", &vc, &ValidationContext::default());
+        assert!(r.is_clean() && r.warnings.is_empty());
+
+        // (2) State-transition + benign (cosmetic reordering).
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![],
+            },
+            transitions: Some(VerbTransitions {
+                dag: "any".into(),
+                edges: vec![TransitionEdge {
+                    from: "a".into(),
+                    to: "b".into(),
+                }],
+            }),
+        });
+        let r = validate_verb("reorder.verb", &vc, &ValidationContext::default());
+        assert!(r.is_clean() && r.warnings.is_empty());
+
+        // (3) State-transition + external_effects: [] + requires_explicit_authorisation
+        // (sanctions-state advance).
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::RequiresExplicitAuthorisation,
+                escalation: vec![],
+            },
+            transitions: Some(VerbTransitions {
+                dag: "any".into(),
+                edges: vec![TransitionEdge {
+                    from: "pending".into(),
+                    to: "sanctioned".into(),
+                }],
+            }),
+        });
+        let r = validate_verb("sanction.apply", &vc, &ValidationContext::default());
+        assert!(r.is_clean() && r.warnings.is_empty());
     }
 
     #[test]
