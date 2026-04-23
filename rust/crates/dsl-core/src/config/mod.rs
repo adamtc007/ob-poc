@@ -20,18 +20,25 @@
 //! let csg_rules = loader.load_csg_rules()?;
 //! ```
 
+pub mod escalation;
 pub mod loader;
 pub mod phrase_gen;
 pub mod types;
 
+pub use escalation::{
+    compute_effective_tier, compute_effective_tier_with_trace, evaluate_predicate,
+    EvaluationContext,
+};
 pub use loader::ConfigLoader;
 pub use phrase_gen::generate_phrases;
 pub use types::{
-    ActionClass, AppliesTo, ArgConfig, ArgType, ArgValidation, ConfirmPolicyConfig, ConstraintRule,
-    CrudConfig, CrudOperation, CsgRulesConfig, DomainConfig, DurableConfig, DurableRuntime,
-    FuzzyCheckConfig, GraphQueryConfig, GraphQueryOperation, HarmClass, JurisdictionCondition,
-    JurisdictionRule, LookupConfig, ResolutionMode, ReturnTypeConfig, ReturnsConfig, RuleCondition,
-    RuleRequirement, RuleSeverity, SearchKeyConfig, SlotType, SourceOfTruth, VerbBehavior,
-    VerbConfig, VerbConsumes, VerbLifecycle, VerbMetadata, VerbOutputConfig, VerbProduces,
-    VerbScope, VerbSentences, VerbStatus, VerbTier, VerbsConfig, WarningRule,
+    ActionClass, AppliesTo, ArgConfig, ArgType, ArgValidation, ConfirmPolicyConfig, ConsequenceDeclaration,
+    ConsequenceTier, ConstraintRule, CrudConfig, CrudOperation, CsgRulesConfig, DomainConfig,
+    DurableConfig, DurableRuntime, EscalationPredicate, EscalationRule, ExternalEffect, FuzzyCheckConfig,
+    GraphQueryConfig, GraphQueryOperation, HarmClass, JurisdictionCondition, JurisdictionRule,
+    LookupConfig, ResolutionMode, ReturnTypeConfig, ReturnsConfig, RuleCondition, RuleRequirement,
+    RuleSeverity, SearchKeyConfig, SlotType, SourceOfTruth, StateEffect, ThreeAxisDeclaration,
+    TransitionEdge, VerbBehavior, VerbConfig, VerbConsumes, VerbLifecycle, VerbMetadata,
+    VerbOutputConfig, VerbProduces, VerbScope, VerbSentences, VerbStatus, VerbTier, VerbTransitions,
+    VerbsConfig, WarningRule,
 };
