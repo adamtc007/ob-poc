@@ -135,6 +135,16 @@ pub enum WellFormednessError {
         rule_name: String,
         occurrences: usize,
     },
+    /// A pack file references a verb FQN that isn't declared in any verb
+    /// YAML nor as a macro. Typically caused by pack-authoring against an
+    /// *expected* verb surface that was never YAML-implemented (pilot A-2
+    /// found 11 such cases in instrument-matrix.yaml). Catching this at
+    /// catalogue-load time prevents drift accumulation across packs
+    /// workspace-wide.
+    PackFqnWithoutDeclaration {
+        pack_name: String,
+        fqn: String,
+    },
 }
 
 impl std::fmt::Display for WellFormednessError {
@@ -176,6 +186,11 @@ impl std::fmt::Display for WellFormednessError {
                 f,
                 "{location}: escalation rule name '{rule_name}' appears {occurrences} times — \
                  rule names must be unique per verb for audit-trail determinism"
+            ),
+            Self::PackFqnWithoutDeclaration { pack_name, fqn } => write!(
+                f,
+                "pack '{pack_name}' references verb '{fqn}' which is not declared in any \
+                 verb YAML or macro — pack entry is stale or verb is missing"
             ),
         }
     }
@@ -431,6 +446,60 @@ pub fn validate_verbs_config(
         }
     }
     report
+}
+
+/// Build the set of declared FQN strings from a `VerbsConfig`. Used by
+/// pack-hygiene validation (see [`validate_pack_fqns`]) to distinguish
+/// declared verbs from pack references.
+///
+/// Each entry is `domain_name.verb_name` — matches the format used in
+/// pack `allowed_verbs:` lists.
+pub fn collect_declared_fqns(config: &VerbsConfig) -> HashSet<String> {
+    let mut out = HashSet::new();
+    for (domain_name, domain) in &config.domains {
+        for verb_name in domain.verbs.keys() {
+            out.insert(format!("{domain_name}.{verb_name}"));
+        }
+    }
+    out
+}
+
+/// V1.2-5 pack-hygiene check: verify every FQN in a pack's
+/// `allowed_verbs` list resolves to either (a) a declared verb in
+/// `VerbsConfig`, or (b) a macro FQN from the macro registry.
+///
+/// Callers provide:
+/// - `declared_verbs`: set of `domain.verb_name` FQNs from
+///   [`collect_declared_fqns`].
+/// - `macro_fqns`: set of macro FQNs (from `config/verb_schemas/macros/`
+///   YAML — loaded separately by the caller, since macros are a distinct
+///   YAML surface).
+/// - `pack_entries`: iterator of `(pack_name, fqn)` tuples from all pack
+///   `allowed_verbs` lists.
+///
+/// Returns a list of [`WellFormednessError::PackFqnWithoutDeclaration`]
+/// entries, one per pack FQN that doesn't resolve. Empty list = clean.
+///
+/// This was the class of bug A-2 found: `matrix-overlay.apply`,
+/// `delivery.create`, etc. were listed in the Instrument Matrix pack
+/// but never YAML-implemented. Running this check as part of
+/// catalogue-load would catch this drift at author time.
+pub fn validate_pack_fqns(
+    declared_verbs: &HashSet<String>,
+    macro_fqns: &HashSet<String>,
+    pack_entries: impl IntoIterator<Item = (String, String)>,
+) -> Vec<WellFormednessError> {
+    let mut errors = Vec::new();
+    for (pack_name, fqn) in pack_entries {
+        if declared_verbs.contains(&fqn) || macro_fqns.contains(&fqn) {
+            continue;
+        }
+        errors.push(WellFormednessError::PackFqnWithoutDeclaration {
+            pack_name,
+            fqn,
+        });
+    }
+    errors
 }
 
 // Silence `unused` warnings for fields / variants reserved for P.1.d.
@@ -994,5 +1063,105 @@ mod tests {
         });
         let r = validate_verb("test.verb", &vc, &ValidationContext::default());
         assert!(r.is_clean());
+    }
+
+    // =========================================================================
+    // V1.2-5 — pack-hygiene validation
+    // =========================================================================
+
+    #[test]
+    fn pack_fqn_that_resolves_to_declared_verb_is_clean() {
+        let declared: HashSet<String> = ["foo.bar", "baz.qux"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        let macros: HashSet<String> = HashSet::new();
+        let pack = vec![
+            ("test-pack".to_string(), "foo.bar".to_string()),
+            ("test-pack".to_string(), "baz.qux".to_string()),
+        ];
+        let errs = validate_pack_fqns(&declared, &macros, pack);
+        assert!(errs.is_empty(), "all pack entries resolve → clean");
+    }
+
+    #[test]
+    fn pack_fqn_that_resolves_to_macro_is_clean() {
+        let declared: HashSet<String> = HashSet::new();
+        let macros: HashSet<String> = ["instrument.setup-equity"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        let pack = vec![(
+            "instrument-matrix".to_string(),
+            "instrument.setup-equity".to_string(),
+        )];
+        let errs = validate_pack_fqns(&declared, &macros, pack);
+        assert!(errs.is_empty(), "macro-resolved pack entry is clean");
+    }
+
+    #[test]
+    fn unresolved_pack_fqn_reports_error() {
+        let declared: HashSet<String> =
+            ["foo.bar"].iter().map(|s| (*s).to_string()).collect();
+        let macros: HashSet<String> = HashSet::new();
+        // `baz.qux` isn't in either declared or macro sets.
+        let pack = vec![
+            ("test-pack".to_string(), "foo.bar".to_string()),
+            ("test-pack".to_string(), "baz.qux".to_string()),
+        ];
+        let errs = validate_pack_fqns(&declared, &macros, pack);
+        assert_eq!(errs.len(), 1);
+        match &errs[0] {
+            WellFormednessError::PackFqnWithoutDeclaration { pack_name, fqn } => {
+                assert_eq!(pack_name, "test-pack");
+                assert_eq!(fqn, "baz.qux");
+            }
+            _ => panic!("expected PackFqnWithoutDeclaration"),
+        }
+    }
+
+    #[test]
+    fn multiple_unresolved_fqns_report_one_per_entry() {
+        // A-2's 11-FQN scenario (pruned in commit 17d6593b). If those
+        // pack entries were still around, validator would surface one
+        // error per entry.
+        let declared: HashSet<String> = HashSet::new();
+        let macros: HashSet<String> = HashSet::new();
+        let pack = vec![
+            ("instrument-matrix".to_string(), "matrix-overlay.apply".to_string()),
+            ("instrument-matrix".to_string(), "matrix-overlay.diff".to_string()),
+            ("instrument-matrix".to_string(), "delivery.create".to_string()),
+        ];
+        let errs = validate_pack_fqns(&declared, &macros, pack);
+        assert_eq!(errs.len(), 3);
+    }
+
+    #[test]
+    fn collect_declared_fqns_aggregates_across_domains() {
+        let yaml = r#"
+version: "1.0"
+domains:
+  foo:
+    description: "test"
+    verbs:
+      bar:
+        description: "test"
+        behavior: crud
+      baz:
+        description: "test"
+        behavior: crud
+  qux:
+    description: "test"
+    verbs:
+      wobble:
+        description: "test"
+        behavior: crud
+"#;
+        let cfg: VerbsConfig = serde_yaml::from_str(yaml).unwrap();
+        let declared = collect_declared_fqns(&cfg);
+        assert_eq!(declared.len(), 3);
+        assert!(declared.contains("foo.bar"));
+        assert!(declared.contains("foo.baz"));
+        assert!(declared.contains("qux.wobble"));
     }
 }

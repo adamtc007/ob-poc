@@ -37,8 +37,9 @@ pub use runbook_composition::{
     RunbookTierTrace,
 };
 pub use validator::{
-    validate_verb, validate_verbs_config, Location, PolicyWarning, StructuralError,
-    ValidationContext, ValidationReport, WellFormednessError,
+    collect_declared_fqns, validate_pack_fqns, validate_verb, validate_verbs_config,
+    Location, PolicyWarning, StructuralError, ValidationContext, ValidationReport,
+    WellFormednessError,
 };
 pub use loader::ConfigLoader;
 pub use phrase_gen::generate_phrases;
