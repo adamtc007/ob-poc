@@ -436,4 +436,185 @@ domain gating.
 >
 > Adam's framing is the test. Apply consistently.
 
-**End of pass 3.**
+---
+
+## 9. Addendum — Adam's sharper framing (post-commit clarification)
+
+After pass 3 landed, Adam offered a sharper statement of what the
+DAG is:
+
+> *"'how' i mean operational run time issues — we are capturing
+> static ref data mostly — and enough setup / config info to allow the
+> service resources to be configured (e.g. accounts to be opened, tax
+> flags set, trade and instruction routings — BIC / SWIFT / FIX etc —
+> to be configured)"*
+
+This is a sharper lens than "what vs how" alone. The DAG is **the
+upstream declarative specification that feeds downstream service-
+resource provisioning.** Specifically:
+
+**What the DAG carries:**
+1. **Static reference data** — asset classes, jurisdictions, identifiers,
+   endpoint codes (BIC, SWIFT, FIX session IDs, DTC participant codes,
+   custodian names, broker identifiers, subcustodian networks).
+2. **Standing configuration** — what each mandate is *set up to do*:
+   policies, rates, preferences, routings, thresholds.
+3. **Config lifecycle** — the governance state of that config
+   (draft → approved → active → retired). Includes config-level
+   intermediate states like `parallel_run` (the config is in test mode
+   — a static property of the config itself, not a runtime event).
+4. **Enough info for service resources to be provisioned** — accounts
+   to be opened, tax flags to be set, trade/instruction routings wired.
+
+**What the DAG does NOT carry:**
+1. **Operational run-time events** — daily settlement runs, recon
+   executions, margin call events, CA processing flows, broken
+   trades, FIX session drops.
+2. **Service execution state** — partial settlement mechanics, UAT
+   certification progression, processing/settlement status of
+   individual events.
+3. **Incident / exception lifecycle** — investigations, write-offs,
+   escalations.
+
+### 9.1 What this refines in pass 3
+
+**Most pass-3 decisions stand unchanged.** Under this sharper lens:
+
+- `reconciliation` slot (config-level lifecycle) ✅ correct — recon
+  config is what-we-compare-against; recon RUN events are operational
+  and excluded.
+- `collateral_management` slot (config-level lifecycle) ✅ correct —
+  CSA config is what-we've-arranged; margin call events are
+  operational.
+- `parallel_run` state on `trading_profile` and `settlement_pattern`
+  ✅ correct — this is the CONFIG's state ("the config is in pilot
+  test"), not a runtime event.
+- `superseded` state ✅ correct — graph attribute + state transition,
+  both config-level.
+- Trade gateway 4-state lifecycle (no UAT) ✅ correct — `defined` /
+  `enabled` / `active` / `suspended` are all config states. UAT cert
+  is operational and excluded (service resource territory).
+- `isda_framework` stateless (read-only from legal-ops) ✅ correct —
+  we don't own the ISDA lifecycle.
+- Exclusions — exception handling, partial settlement, FIX cert
+  progression ✅ correctly out of scope.
+
+**One pass-3 decision needs refinement.**
+
+### 9.2 `corporate_action_event` — narrow from 6 states to 3
+
+Pass-3 proposed a 6-state CA event lifecycle:
+`announced → response_due → elected → default_applied → processed → settled`.
+
+Under the sharper lens, `processed` and `settled` are **operational
+runtime events** — they're *how* the election gets settled, not
+*what* the mandate has decided. The DAG's legitimate scope per event
+is: "did the mandate elect, and what was elected?"
+
+**Revised `corporate_action_event` slot — 3 states (decision-capture only):**
+
+```mermaid
+stateDiagram-v2
+    [*] --> election_pending
+    election_pending --> elected: corporate-action-event.elect
+    election_pending --> default_applied: default election at cutoff (from policy)
+    elected --> [*]
+    default_applied --> [*]
+```
+
+**States:**
+
+- `election_pending` — event has been announced and attached to the
+  mandate; no election yet.
+- `elected` — mandate actively chose an election.
+- `default_applied` — cutoff passed, `corporate_action_policy.default_option`
+  applied automatically.
+
+**Processing + settlement** of the election are operational runtime
+— tracked in service profile, not this slot. Downstream consumers
+(settlement ops, custody feeds) read the elected decision from here
+and execute; their execution state is their own concern.
+
+**Revised verbs (P.3 scope):**
+
+| Transition | Verb |
+|---|---|
+| (event feed) → election_pending | `corporate-action-event.attach` |
+| election_pending → elected | `corporate-action-event.elect` |
+| election_pending → default_applied | (automatic at cutoff) |
+
+**State-preserving:** `corporate-action-event.read`, `.list-pending-election`.
+
+**DROPPED from P.3 scope** (no longer in DAG):
+- `corporate-action-event.confirm-processed` — operational.
+- `corporate-action-event.confirm-settled` — operational.
+
+### 9.3 Revised state counts
+
+| Slot | Pass-3 states | Revised | Delta |
+|---|---|---|---|
+| corporate_action_event | 6 | 3 | **-3** |
+| All others | unchanged | unchanged | 0 |
+| **Total** | 59 | **56** | **-3** |
+
+P.3 verb scope reduces by 2 verbs (dropped `confirm-processed`,
+`confirm-settled`). Net P.3 scope: ~22 new verbs (was 24).
+
+### 9.4 Borderline note — `delivery` slot
+
+`delivery` currently has a 5-state machine per schema (PENDING /
+IN_PROGRESS / DELIVERED / FAILED / CANCELLED). Under the sharper lens,
+this IS operational — it tracks the execution of individual service
+deliveries, not config.
+
+**Decision: keep as-is per A-1 v3.** Schema is authoritative;
+retrofitting the slot out of the DAG would require schema changes and
+migration. Flag in P.9 findings as "borderline — operational slot
+retained because schema persists it; future refactor could relocate
+delivery tracking out of the IM workspace."
+
+### 9.5 Pattern codified
+
+The DAG sits **one layer upstream** of operations:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  INSTRUMENT MATRIX DAG (this workspace)                  │
+│    - ref data (asset types, identifiers, endpoints)      │
+│    - standing config (policies, routings, thresholds)    │
+│    - config lifecycle (draft→active→retired, parallel)   │
+│    - enough to provision downstream                      │
+└──────────────────────────────────────────────────────────┘
+                            │
+                            ▼ (feeds provisioning of)
+┌──────────────────────────────────────────────────────────┐
+│  SERVICE RESOURCES (downstream of DAG)                   │
+│    - accounts opened                                     │
+│    - tax flags set                                       │
+│    - SWIFT/FIX/BIC routings configured                   │
+│    - custodian relationships wired                       │
+└──────────────────────────────────────────────────────────┘
+                            │
+                            ▼ (operated by)
+┌──────────────────────────────────────────────────────────┐
+│  SERVICE PROFILE / OPERATIONS (not in DAG)               │
+│    - runtime events (recon runs, margin calls)           │
+│    - exception handling (fails, breaks, investigations)  │
+│    - execution quality (UAT, SLA, cert)                  │
+│    - processing/settlement lifecycle                     │
+└──────────────────────────────────────────────────────────┘
+```
+
+Three layers, clear boundaries. The DAG is the spec; service resources
+are the provisioned infrastructure; operations run on top. Rule of
+thumb: if a proposed state or verb describes DAILY ACTIVITY on the
+provisioned infrastructure, it's operational (layer 3). If it
+describes the CONFIG ITSELF and its governance, it's DAG (layer 1).
+
+**Codify this diagram in v1.1 of the refinement paper** — it's a
+clean architectural statement that resolves many of the edge-case
+"should this be a DAG slot?" questions.
+
+---
+
+**End of pass 3 + addendum.**
