@@ -253,13 +253,174 @@ Effort-per-workspace trend:
 
 ---
 
-## 7. Closure
+## 7. DAG business-reality gaps — review pending Tranche 2 closure
+
+Post-closure, a business-knowledge review pass (parallel to the IM
+pilot Passes 2-3 methodology) surfaced material gaps between the Deal
+DAG as authored and how a real commercial deal in financial-services
+asset-servicing operates. Captured here, not remediated yet — per
+Adam's direction: hold until all 4 primary workspaces are declared,
+then see which gaps are Deal-specific vs cross-workspace patterns.
+
+### 7.1 P0 — Material business gaps
+
+**G-1. BAC (Business Acceptance Committee) approval gate is missing.**
+Real commercial deals pass through BAC as an internal approval gate
+— separate from rate-card AGREED (bilateral with client) and contract
+SIGNED (legal execution). BAC reviews revenue above thresholds, new
+jurisdictions, non-standard pricing, credit exposure. The schema
+already hints at this: `deal_documents.document_type` includes
+`BOARD_APPROVAL`, but there's no BAC state in the deal lifecycle.
+
+Proposed remediation: add `BAC_APPROVAL` state between NEGOTIATING
+and KYC_CLEARANCE (or parallel to it). New verbs: `deal.submit-for-bac`,
+`deal.bac-approve`, `deal.bac-reject`, `deal.escalate-to-committee`.
+
+**G-2. Pricing-committee approval separate from rate-card negotiation.**
+Before a rate card can be PROPOSED to a client (especially for
+discounts past threshold, bespoke products, new geographies), pricing
+committee often requires internal approval. Today the DAG goes
+DRAFT → PROPOSED in a single step. Real pipeline:
+DRAFT → PENDING_INTERNAL_APPROVAL → APPROVED_INTERNALLY → PROPOSED.
+
+Proposed remediation: add two states to `deal_rate_card_lifecycle`,
+or factor pricing approval into a commercial-governance sub-workspace.
+
+**G-3. Terminal-state granularity — CANCELLED is too coarse.**
+One bucket loses commercial post-mortem signal. Real distinctions:
+- **LOST** (competitor won)
+- **REJECTED** (internal BAC said no)
+- **WITHDRAWN** (client walked away)
+- **CANCELLED** (we walked away)
+
+Drives different sales attribution, pipeline forecasting, win/loss
+analytics.
+
+Proposed remediation: split `CANCELLED` into four terminal-negative
+states. Schema change needed (expand `deals_status_check`).
+
+**G-4. Amendment / renegotiation mid-life has no home.**
+Active deals get scope extensions, annual rate reviews, SLA changes,
+repricing. There's no amendment state in the DAG — cycling back to
+NEGOTIATING is wrong (deal is still ACTIVE; revenue still flowing;
+existing contracts still in force during amendment). Matches
+V1.3-CAND-7 (parallel child lifecycle).
+
+Proposed remediation: model amendment as a parallel `deal_amendment`
+entity with its own 4-5 state lifecycle; cross-constraint that
+amendments can only be created when parent deal is ACTIVE.
+
+**G-5. Deal SUSPENDED state missing.**
+Real deals get suspended (regulatory hold, billing dispute, client
+distress, re-papering). Different from WINDING_DOWN (exiting).
+Billing has SUSPENDED; deal itself should too. Without it, a
+regulatory hold on an ACTIVE deal has no clean state.
+
+Proposed remediation: add `SUSPENDED` state between ACTIVE and
+WINDING_DOWN with bidirectional transitions ACTIVE ↔ SUSPENDED.
+
+### 7.2 P1 — Semantic refinements
+
+**G-6. KYC_CLEARANCE should be a gate, not a phase.**
+KYC runs in parallel with commercial negotiation, not sequentially.
+Preliminary KYC starts at QUALIFYING (sanctions / PEP); full KYC
+runs alongside NEGOTIATING; KYC is a precondition on CONTRACTED,
+not a standalone phase. The existing `state_machines/deal_lifecycle.yaml`
+already has KYC_CLEARANCE as a serial phase — that's legacy
+modelling, likely wrong, was preserved in my DAG.
+
+Proposed remediation: remove KYC_CLEARANCE as a phase; move it to
+a precondition on NEGOTIATING → CONTRACTED. Matches V1.3-CAND-2
+cross-workspace constraints.
+
+**G-7. SLA lifecycle — marked stateless, business concept has states.**
+SLAs have states: NEGOTIATED → ACTIVE → BREACHED → IN_REMEDIATION →
+RESOLVED (or WAIVED). Breaches trigger penalty calculations that
+feed into billing. Schema doesn't have a status column today, but
+the business concept clearly has lifecycle.
+
+Proposed remediation: promote `deal_sla` from stateless to stateful.
+Schema change needed (add `sla_status` column). Flag as a DAG-DSL
+alignment break for remediation.
+
+**G-8. Internal vs counterparty participant roles.**
+`deal_participants.role` captures counterparty roles (CONTRACTING_PARTY,
+GUARANTOR, INTRODUCER, INVESTMENT_MANAGER, FUND_ADMIN). Real deals
+also track internal accountability: **deal sponsor**, **relationship
+manager (RM)**, **coverage banker**, **product SME**, **legal
+counsel**, **operations lead**. These drive workflow routing and
+reporting.
+
+Proposed remediation: model internal ownership as deal-level
+attributes (`deal.sponsor_id`, `deal.rm_id`, `deal.coverage_banker_id`)
+rather than polluting the participant role enum.
+
+**G-9. Deal hierarchy — master/schedule/addendum.**
+`deal_documents.role` already knows about PRIMARY/ADDENDUM/SCHEDULE/
+SIDE_LETTER. Real deals have hierarchy — a schedule is subordinate
+to a master; schedule can't go ACTIVE if master is SUSPENDED. My
+DAG treats every deal as independent.
+
+Proposed remediation: add `deal.parent_deal_id` and a cross-slot
+constraint — child deal state must be consistent with parent deal
+state.
+
+**G-10. Commercial vs operational lifecycle duality.**
+I bundled them into one 10-state machine. Real architecture has two
+linked-but-distinct lifecycles:
+- Commercial (sales + BAC owned): PROSPECT → QUALIFYING →
+  NEGOTIATING → BAC_APPROVAL → CONTRACTED
+- Operational (ops owned): CONTRACTED → ONBOARDING → ACTIVE →
+  SUSPENDED/WINDING_DOWN → OFFBOARDED
+
+Linked at CONTRACTED. Different owners, different governance,
+different reports. This is likely NOT Deal-specific — worth
+reviewing against CBU / KYC / IM after all 4 workspaces are
+declared.
+
+Proposed remediation: hold judgement until cross-workspace
+reconciliation pass.
+
+### 7.3 P2 — Flags, not urgent
+
+**G-11.** Legal review as explicit phase (or a deal_document
+sub-state).
+
+**G-12.** Expected revenue / pipeline valuation — arguably
+out-of-DAG (valuation data, not state), but needed for BAC
+threshold logic and pipeline forecasting.
+
+**G-13.** Coverage / cross-sell tracking — partially in
+`client_principal_relationship`, not wired into deal state.
+
+### 7.4 Hold-and-review plan
+
+Per Adam's direction (2026-04-23), these gaps are logged but
+deferred pending Tranche 2 closure across all 4 primary workspaces.
+The review at that point asks:
+- Which gaps are Deal-specific (apply to Deal DAG only)?
+- Which are cross-workspace patterns (e.g. BAC-like committee gates
+  likely exist in CBU onboarding approvals too; terminal-state
+  granularity might apply to every workspace; suspended-state is
+  probably universal)?
+- Which warrant v1.3 amendments vs per-workspace DAG fixes?
+
+Once CBU is declared and the cross-workspace reconciliation pass
+completes, re-visit this section with a consolidated remediation
+plan.
+
+---
+
+## 8. Closure
 
 **Deal Tranche 2 CLOSED.** 9 phases delivered. 100% runtime-triage
 alignment on valid fixtures. 2 fixture bugs flagged as follow-ups.
 4 new v1.3 candidates captured — including reinforcement of
 V1.3-CAND-2 cross-workspace-constraints which now has evidence from
 both KYC (producer side) and Deal (consumer side).
+
+**13 DAG business-reality gaps logged in §7 for hold-and-review
+after Tranche 2 closure.**
 
 Next: **CBU workspace** (fourth and final primary workspace for Tranche 2).
 
