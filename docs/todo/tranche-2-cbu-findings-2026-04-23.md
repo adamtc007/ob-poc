@@ -329,12 +329,49 @@ re-authoring items for the next CBU DAG iteration**:
    primacy explicit. The CBU is its street-facing identities + its
    operating capability.
 
+6. **CBU should AGGREGATE operational-readiness from other
+   workspaces, not defer to them (V1.3-CAND-13 — new).** The
+   cross-workspace corollary of the re-centring. Today I scattered
+   operational preconditions across 4 DAGs: Deal.CONTRACTED
+   requires KYC.APPROVED; CBU.VALIDATED requires KYC case APPROVED;
+   etc. Each is a pair-wise "A blocks B" constraint
+   (V1.3-CAND-2/5 territory).
+
+   Under the CBU reframe, there's a different pattern: CBU is the
+   entity whose operational state is **derived from the
+   conjunction** of other workspaces' states. Not "A blocks B" but
+   "C's state IS DERIVED FROM the state of A + B + D":
+
+   ```
+   CBU.operationally_active = DERIVED FROM:
+     kyc_case.status = APPROVED                           (KYC)
+     deal.status ∈ {CONTRACTED, ONBOARDING, ACTIVE}       (Deal)
+     im.trading_enablement ∈ {trade-permissioned,         (IM — see
+                              actively-trading}            §10 of IM
+                                                           findings)
+     cbu_evidence.all_verified = true                     (CBU)
+   ```
+
+   This is **projection/aggregation across DAGs**, distinct from
+   the blocking-constraint pattern in V1.3-CAND-2/5. It needs its
+   own v1.3 schema support.
+
+   **New v1.3 candidate: V1.3-CAND-13 — cross-workspace aggregate
+   state.** A slot's state can be DERIVED from the state of slots
+   in other workspaces, not just blocked-by them. CBU
+   `operationally_active` is the first instance. Likely applies to
+   other workspace-spanning compound states (e.g. "client fully
+   onboarded" = Deal.ACTIVE + all-CBUs-VALIDATED +
+   all-kyc-cases-APPROVED).
+
 **Implication for the cross-workspace reconciliation:** the CBU
 workspace needs re-centring as "the operational money-making unit"
 first, "a record with evidence" second. Gaps G-1 through G-13 in
 §7.1-7.3 are consequences of this foundational mis-centring; many
 will collapse into a single "re-anchor the CBU DAG on
-operational-purpose-first" remediation in v1.3.
+operational-purpose-first" remediation in v1.3. The IM workspace
+needs a paired phase-axis re-anchor (see IM pilot findings §10
+addendum).
 
 The reconciliation should begin with this foundational re-framing
 before working through the per-gap catalogue.

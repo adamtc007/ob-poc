@@ -356,3 +356,113 @@ amendments.
 The Instrument Matrix region is ready for Tranche 2 inheritance
 — its reconciled catalogue + DAG taxonomy + runtime-validated
 config provides the seed for estate-scale reconciliation.
+
+---
+
+## 10. Post-Tranche-2 phase-axis reconsideration (addendum — 2026-04-23)
+
+**Context:** added after CBU Tranche 2 closure when Adam surfaced
+the foundational framing that CBU is "the money-making apparatus a
+client has set up on the street." The reframing exposes that the IM
+workspace's purpose — like CBU's — is not best captured by the
+data's own lifecycle. See `tranche-2-cbu-findings-2026-04-23.md` §7.0
+for the parallel correction.
+
+### 10.1 What IM's phase axis currently captures
+
+My IM `overall_lifecycle` is centred on the **instrument matrix
+data's** own lifecycle: research → proposed → under-review →
+approved → active → superseded / archived. The phases track the
+maturity of the reference data — what instruments can be traded,
+what settlement routes apply, what CA policies govern, etc.
+
+This is technically correct at a data-modelling level. It IS the
+lifecycle of the data.
+
+### 10.2 What the phase axis SHOULD capture (under CBU reframing)
+
+The IM workspace's **purpose** isn't to have correct data — its
+purpose is to **make a CBU trading-capable on specific instruments
+and markets**. The data is the mechanism; **CBU trading
+enablement** is the outcome.
+
+Under the CBU-as-money-making-apparatus framing, IM is part of the
+apparatus itself: it's the configuration layer that converts a
+legally-formed CBU into something that can actually transact on
+the street and generate returns.
+
+The correct phase axis is likely **CBU-trading-enablement**:
+
+1. **dormant** — CBU exists, no mandate, no instrument universe
+2. **configuring** — trading profile being drafted, instrument
+   universe being populated, CA policy being set, SSIs being set up
+3. **trade-permissioned** — mandate approved, instrument universe
+   active, CA policy live, SSIs in place — CBU CAN trade
+4. **actively-trading** — first trade executed; ongoing trading
+   activity; volume / position data accumulating
+5. **restricted** — partial trading hold (e.g. some markets pulled
+   due to sanctions; specific instrument class removed from
+   universe)
+6. **trading-suspended** — full suspension (regulatory, operational,
+   dispute)
+7. **winding-down-trading** — no new positions; unwind mode
+8. **trading-retired** — no activity; historical
+
+The DATA lifecycle (proposed → approved → superseded) becomes a
+**sub-process feeding** the enablement axis, not the primary axis
+of the workspace.
+
+### 10.3 Why this matters
+
+The pilot's phase model is **technically complete** (data moves
+correctly through states) but **commercially under-weighted**: the
+phases don't capture what the IM actually does for a CBU. This
+mirrors the CBU mis-centring (§7.0 of CBU findings) — in both
+cases I modelled the plumbing's own lifecycle rather than the
+purpose the plumbing serves.
+
+### 10.4 Scope of rework
+
+**Not a full re-do.** The slot inventory is fine (trading_profile,
+instrument_universe, ssi, CA policy, reconciliation, collateral,
+exceptions — all still needed). Changes required:
+
+| Area | Change | Effort |
+|---|---|---|
+| `overall_lifecycle` phase list | Re-anchor on CBU-trading-enablement (8 phases); data-lifecycle becomes internal sub-process | Medium — 30 min |
+| Phase `derivation:` clauses | Re-express in terms of CBU-observable state (has-mandate, has-universe, has-first-trade) not data-states | Medium — 15 min |
+| Cross-slot constraints | Add: `cbu.actively_trading requires trading_profile.ACTIVE AND first_trade_at IS NOT NULL` | Small — 5 min |
+| New slot(s) | Consider adding `trading_activity` slot tracking first-trade-at, last-trade-at, dormancy detection | Small — 10 min |
+
+**Total estimated rework: ~1 hour.** Not breaking; additive
+re-centring.
+
+### 10.5 Pairing with cross-workspace aggregate state
+
+This rework is tightly coupled with the new v1.3 candidate (see
+CBU findings §7.0 addendum) that CBU should aggregate
+operational-readiness from KYC + Deal + IM + evidence. IM's
+re-centred phase axis FEEDS the CBU aggregate; Deal.ACTIVE and
+KYC.APPROVED also feed it; evidence.all_verified also feeds it.
+
+The reconciliation picture:
+
+```
+CBU.operationally_active = DERIVED FROM:
+  kyc_case.status = APPROVED          (KYC workspace)
+  deal.status ∈ {CONTRACTED, ONBOARDING, ACTIVE}  (Deal workspace)
+  im.trading_enablement ∈ {actively-trading, trade-permissioned}  (IM workspace)
+  cbu_evidence.all_verified = true    (CBU workspace)
+```
+
+### 10.6 Hold-and-review posture
+
+Consistent with Deal findings §7 and CBU findings §7 hold posture:
+**gap logged, DAG preserved.** Rework will be bundled into the
+cross-workspace reconciliation pass alongside:
+- CBU §7.0 operational-purpose re-centring (major)
+- IM §10 phase-axis re-anchor (medium)
+- V1.3 candidate: CBU-as-aggregate-operational-state (new)
+- Consolidated remediation plan for Deal §7 + CBU §7 gaps
+
+**§10 end — addendum closes.**
