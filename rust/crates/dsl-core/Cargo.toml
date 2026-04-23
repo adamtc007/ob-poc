@@ -27,6 +27,7 @@ rust_decimal = { version = "1", features = ["serde"] }
 
 [dev-dependencies]
 pretty_assertions = "1"
+tempfile = "3"
 
 [features]
 default = []

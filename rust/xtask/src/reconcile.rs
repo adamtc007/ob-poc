@@ -17,8 +17,12 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use dsl_core::config::{
-    validate_verbs_config, ConfigLoader, ValidationContext, VerbsConfig,
+    collect_declared_fqns, flatten_pack_entries, load_packs_from_dir,
+    validate_pack_fqns, validate_verbs_config, ConfigLoader, ValidationContext,
+    VerbsConfig,
 };
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 #[derive(Debug, Subcommand)]
 pub enum ReconcileAction {
@@ -55,6 +59,46 @@ fn load_catalogue() -> Result<VerbsConfig> {
         .context("catalogue load failed (pre-DB; pure YAML)")
 }
 
+fn collect_macro_fqns() -> HashSet<String> {
+    // Macros live at config/verb_schemas/macros/*.yaml with their FQN as
+    // the top-level key (kind: macro).
+    let mut out = HashSet::new();
+    let macros_dir = PathBuf::from("config/verb_schemas/macros");
+    if !macros_dir.exists() {
+        return out;
+    }
+    let Ok(entries) = std::fs::read_dir(&macros_dir) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("yaml") {
+            continue;
+        }
+        let Ok(raw) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(value) = serde_yaml::from_str::<serde_yaml::Value>(&raw) else {
+            continue;
+        };
+        if let Some(mapping) = value.as_mapping() {
+            for (key, body) in mapping {
+                if let (Some(fqn), Some(body_map)) = (key.as_str(), body.as_mapping()) {
+                    // Only include entries explicitly marked `kind: macro`.
+                    let is_macro = body_map
+                        .get(serde_yaml::Value::String("kind".to_string()))
+                        .and_then(|v| v.as_str())
+                        == Some("macro");
+                    if is_macro {
+                        out.insert(fqn.to_string());
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 async fn validate(strict_warnings: bool) -> Result<()> {
     println!("===========================================");
     println!("  cargo x reconcile --validate");
@@ -62,7 +106,11 @@ async fn validate(strict_warnings: bool) -> Result<()> {
 
     let cfg = load_catalogue()?;
     let total: usize = cfg.domains.values().map(|d| d.verbs.len()).sum();
-    println!("Loaded {} domains, {} verbs from config/verbs/", cfg.domains.len(), total);
+    println!(
+        "Loaded {} domains, {} verbs from config/verbs/",
+        cfg.domains.len(),
+        total
+    );
 
     let ctx = ValidationContext {
         require_declaration: false,
@@ -70,14 +118,36 @@ async fn validate(strict_warnings: bool) -> Result<()> {
     };
     let report = validate_verbs_config(&cfg, &ctx);
 
+    // V1.2-5 — pack-hygiene cross-check.
+    let packs_dir = PathBuf::from("config/packs");
+    let pack_errors = if packs_dir.exists() {
+        let declared = collect_declared_fqns(&cfg);
+        let macros = collect_macro_fqns();
+        let packs = load_packs_from_dir(&packs_dir)
+            .context("loading config/packs/ for V1.2-5 check")?;
+        println!(
+            "Loaded {} packs from config/packs/ ({} declared verbs + {} macros for cross-check)",
+            packs.len(),
+            declared.len(),
+            macros.len()
+        );
+        validate_pack_fqns(&declared, &macros, flatten_pack_entries(&packs))
+    } else {
+        Vec::new()
+    };
+
     let struct_n = report.structural.len();
-    let wf_n = report.well_formedness.len();
+    let wf_n = report.well_formedness.len() + pack_errors.len();
     let warn_n = report.warnings.len();
 
     println!();
-    println!("Structural errors:      {struct_n}");
-    println!("Well-formedness errors: {wf_n}");
-    println!("Policy-sanity warnings: {warn_n}");
+    println!("Structural errors:           {struct_n}");
+    println!(
+        "Well-formedness errors:      {wf_n}  ({} three-axis + {} pack-hygiene)",
+        report.well_formedness.len(),
+        pack_errors.len()
+    );
+    println!("Policy-sanity warnings:      {warn_n}");
 
     if struct_n > 0 {
         println!("\nStructural errors:");
@@ -85,9 +155,15 @@ async fn validate(strict_warnings: bool) -> Result<()> {
             println!("  ✗ {e}");
         }
     }
-    if wf_n > 0 {
-        println!("\nWell-formedness errors:");
+    if !report.well_formedness.is_empty() {
+        println!("\nWell-formedness errors (three-axis):");
         for e in &report.well_formedness {
+            println!("  ✗ {e}");
+        }
+    }
+    if !pack_errors.is_empty() {
+        println!("\nWell-formedness errors (pack hygiene — V1.2-5):");
+        for e in &pack_errors {
             println!("  ✗ {e}");
         }
     }

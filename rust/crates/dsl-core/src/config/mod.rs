@@ -22,10 +22,13 @@
 
 pub mod escalation;
 pub mod loader;
+pub mod pack_loader;
 pub mod phrase_gen;
 pub mod runbook_composition;
 pub mod types;
 pub mod validator;
+
+pub use pack_loader::{flatten_pack_entries, load_packs_from_dir, LoadedPack};
 
 pub use escalation::{
     compute_effective_tier, compute_effective_tier_with_trace, evaluate_predicate,
