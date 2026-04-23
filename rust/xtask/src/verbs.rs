@@ -489,6 +489,86 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<
         }
     }
 
+    // =========================================================================
+    // P.1.h — three-axis declaration check (v1.1 P1 / P10 / P11 / P13)
+    //
+    // Runs the pure-function catalogue validator from dsl-core alongside
+    // the tiering linter. Reports structural errors, well-formedness
+    // errors, and conservative policy-sanity warnings per v1.1 §6.2.
+    //
+    // Rollout-mode defaults: require_declaration=false + known_dags empty
+    // (matches the startup gate in ob-poc-web::main). Catches mechanical
+    // inconsistencies in whatever verbs DO carry three_axis declarations;
+    // missing declarations are silent until P.3 flips require_declaration
+    // per-workspace.
+    // =========================================================================
+    {
+        use dsl_core::config::{validate_verbs_config, ValidationContext};
+        println!("\n===========================================");
+        println!("  Three-Axis Declaration Lint (v1.1 P1)");
+        println!("===========================================");
+        let ctx = ValidationContext {
+            require_declaration: false,
+            ..ValidationContext::default()
+        };
+        let three_axis_report = validate_verbs_config(&verbs_config, &ctx);
+
+        let declared = verbs_config
+            .domains
+            .values()
+            .flat_map(|d| d.verbs.values())
+            .filter(|v| v.three_axis.is_some())
+            .count();
+        let total = verbs_config
+            .domains
+            .values()
+            .map(|d| d.verbs.len())
+            .sum::<usize>();
+        println!(
+            "  Declared:             {} / {}",
+            declared, total
+        );
+        println!(
+            "  Structural errors:    {}",
+            three_axis_report.structural.len()
+        );
+        println!(
+            "  Well-formedness errs: {}",
+            three_axis_report.well_formedness.len()
+        );
+        println!(
+            "  Policy-sanity warns:  {}",
+            three_axis_report.warnings.len()
+        );
+
+        if !three_axis_report.is_clean() {
+            println!("\n  Issues:");
+            for e in &three_axis_report.structural {
+                println!("    ERROR [structural]       {}", e);
+            }
+            for e in &three_axis_report.well_formedness {
+                println!("    ERROR [well-formedness]  {}", e);
+            }
+        }
+        if !three_axis_report.warnings.is_empty() && !errors_only {
+            for w in &three_axis_report.warnings {
+                println!("    WARN  [policy-sanity]    {}", w);
+            }
+        }
+
+        // Fail the lint if any error is present (matching the tiering-linter
+        // exit semantic). Warnings alone don't fail.
+        if !three_axis_report.is_clean() {
+            println!("\n===========================================");
+            println!(
+                "  FAILED: {} three-axis errors in the catalogue",
+                three_axis_report.error_count()
+            );
+            println!("===========================================");
+            std::process::exit(1);
+        }
+    }
+
     // Exit with error code if there are errors
     if report.has_errors() {
         println!("\n===========================================");
