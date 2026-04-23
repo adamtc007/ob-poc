@@ -1,0 +1,284 @@
+# Instrument Matrix CBU-Instance Maintenance Macros (Pilot P.2 — 2026-04-23)
+#
+# Macros for maintaining CBU-LEVEL instrument matrix instances (streetside).
+# Distinct from instrument-template-maintenance.yaml which operates on
+# templates at the group level.
+#
+# Key distinction:
+#   * Template prunes are FORWARD-ONLY — existing clones unaffected;
+#     only future clones inherit the change.
+#   * CBU-instance prunes ARE mandate amendments — they replay the full
+#     6-phase onboarding lifecycle (Adam pass-7 Q-CD: "full lifecycle
+#     — it's basically rework if we're tweaking branches").
+#
+# This file's macros wrap the amendment flow: prune on the active
+# mandate creates a new version (enters DRAFT), amendment flows through
+# matrix_scoped → im_configured → preferences_set → parallel_run before
+# the change becomes live via trading-profile.supersede.
+#
+# Consequence tier: CBU-instance prunes default to
+# `requires_explicit_authorisation` (destructive + affects active
+# mandate). P.4 tier review may adjust per specific classification.
+#
+# Companion docs:
+#   - docs/todo/instrument-matrix-dag-im-sanity-review-pass7-2026-04-23.md
+#     (overall lifecycle, amendments replay full flow)
+#   - docs/todo/instrument-matrix-dag-workspace-diagram-2026-04-23.md §4
+#     (cross-slot interaction rules — inform cascade semantics)
+#   - rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+#     (cross_slot_constraints — formal cascade rules)
+
+# =============================================================================
+# CBU-INSTANCE PRUNE OPERATIONS
+# =============================================================================
+
+instrument.cbu.prune-asset-family:
+  kind: macro
+  ui:
+    label: "Prune Asset Family from CBU Mandate"
+    description: >
+      Remove an asset family (equities, OTC derivatives, FX, etc.) from
+      an active CBU mandate. Because this mutates an active mandate, it
+      triggers the amendment flow — a new version of the trading
+      profile is created, the prune applied to the new version, and the
+      full 6-phase onboarding is replayed before supersede makes the
+      change live.
+    target-label: "Asset Family on CBU"
+  routing:
+    mode-tags: [structure, governance, destructive, amendment]
+    operator-domain: instrument
+  target:
+    operates-on: cbu-ref
+    produces: trading-profile  # new version created
+  args:
+    style: keyworded
+    required:
+      cbu:
+        type: ref
+        ref-kind: cbu
+      family:
+        type: str
+        ui-label: "Asset Family to Prune"
+        description: "equity | fixed_income | otc_derivatives | listed_derivatives | fx | money_market | funds"
+    optional:
+      reason:
+        type: str
+        ui-label: "Amendment Reason"
+      effective-from:
+        type: str
+        ui-label: "Target Effective Date"
+      cascade:
+        type: bool
+        default: true
+        ui-label: "Cascade to Dependents"
+  expands-to:
+    # Amendment flow: create new version → apply prune → submit → approve → parallel → go-live
+    - verb: trading-profile.create-new-version
+      args: { cbu: "${cbu}", note: "Prune asset family: ${family}" }
+    - verb: trading-profile.prune-asset-family
+      args: { cbu: "${cbu}", family: "${family}", cascade: "${cascade}" }
+    - verb: trading-profile.validate-universe-coverage
+      args: { cbu: "${cbu}" }
+    # (Subsequent submit/approve/parallel_run/go-live are operator-driven — macro
+    #  leaves the new version in DRAFT awaiting tier-appropriate review.)
+
+instrument.cbu.prune-market:
+  kind: macro
+  ui:
+    label: "Prune Market from CBU Mandate"
+    description: >
+      Remove a trading market (MIC) from an active CBU mandate. Triggers
+      amendment flow (new version, prune, through onboarding replay).
+      Cascades through settlement chain locations that serve only this
+      market, trade-gateway routing rules.
+    target-label: "Market on CBU"
+  routing:
+    mode-tags: [structure, governance, destructive, amendment]
+    operator-domain: instrument
+  target:
+    operates-on: cbu-ref
+    produces: trading-profile
+  args:
+    style: keyworded
+    required:
+      cbu:
+        type: ref
+        ref-kind: cbu
+      market:
+        type: str
+        ui-label: "Market MIC to Prune"
+    optional:
+      reason:
+        type: str
+      cascade:
+        type: bool
+        default: true
+  expands-to:
+    - verb: trading-profile.create-new-version
+      args: { cbu: "${cbu}", note: "Prune market: ${market}" }
+    - verb: trading-profile.prune-market
+      args: { cbu: "${cbu}", market: "${market}", cascade: "${cascade}" }
+    - verb: trading-profile.validate-universe-coverage
+      args: { cbu: "${cbu}" }
+
+instrument.cbu.prune-instrument-class:
+  kind: macro
+  ui:
+    label: "Prune Instrument Class from CBU Mandate"
+    description: >
+      Single-class prune with cascade on an active CBU mandate. Triggers
+      amendment flow. Use instead of remove-instrument-class when the
+      class has dependent config (settlement chains, ISDA coverage, etc.)
+      that must also be cleaned up.
+    target-label: "Instrument Class on CBU"
+  routing:
+    mode-tags: [structure, governance, destructive, amendment]
+    operator-domain: instrument
+  target:
+    operates-on: cbu-ref
+    produces: trading-profile
+  args:
+    style: keyworded
+    required:
+      cbu:
+        type: ref
+        ref-kind: cbu
+      instrument-class:
+        type: str
+        ui-label: "Class to Prune"
+    optional:
+      reason:
+        type: str
+      cascade:
+        type: bool
+        default: true
+  expands-to:
+    - verb: trading-profile.create-new-version
+      args: { cbu: "${cbu}", note: "Prune instrument class: ${instrument-class}" }
+    - verb: trading-profile.prune-instrument-class
+      args: { cbu: "${cbu}", class: "${instrument-class}", cascade: "${cascade}" }
+    - verb: trading-profile.validate-universe-coverage
+      args: { cbu: "${cbu}" }
+
+instrument.cbu.prune-counterparty:
+  kind: macro
+  ui:
+    label: "Prune Counterparty from CBU Mandate"
+    description: >
+      Remove a specific counterparty (broker, PB, executing dealer) from
+      an active CBU mandate. Distinct from pruning a counterparty TYPE
+      (which would prune the whole class). Cascades through associated
+      trade-gateway routing rules, ISDA coverage if derivatives, and any
+      settlement-chain hops that depend on this counterparty only.
+    target-label: "Counterparty on CBU"
+  routing:
+    mode-tags: [structure, governance, destructive, amendment]
+    operator-domain: instrument
+  target:
+    operates-on: cbu-ref
+    produces: trading-profile
+  args:
+    style: keyworded
+    required:
+      cbu:
+        type: ref
+        ref-kind: cbu
+      counterparty:
+        type: ref
+        ref-kind: legal-entity
+    optional:
+      reason:
+        type: str
+      cascade:
+        type: bool
+        default: true
+  expands-to:
+    - verb: trading-profile.create-new-version
+      args: { cbu: "${cbu}", note: "Prune counterparty: ${counterparty}" }
+    - verb: trading-profile.prune-counterparty
+      args: { cbu: "${cbu}", counterparty: "${counterparty}", cascade: "${cascade}" }
+    - verb: isda.remove-coverage
+      args: { cbu: "${cbu}", counterparty: "${counterparty}" }
+      when: filled
+
+# =============================================================================
+# CBU-INSTANCE PRUNE UTILITIES (read-only — impact analysis before prune)
+# =============================================================================
+
+instrument.cbu.prune-impact:
+  kind: macro
+  ui:
+    label: "Preview Prune Impact on CBU Mandate"
+    description: >
+      Read-only impact analysis — given a proposed prune (family, market,
+      class, or counterparty), reports what would cascade without
+      actually pruning. Recommended before invoking any destructive
+      prune macro.
+    target-label: "Prune Impact Preview"
+  routing:
+    mode-tags: [review, read-only]
+    operator-domain: instrument
+  target:
+    operates-on: cbu-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      cbu:
+        type: ref
+        ref-kind: cbu
+      prune-kind:
+        type: str
+        ui-label: "Prune Kind"
+        description: "asset_family | market | instrument_class | counterparty | counterparty_type"
+      prune-target:
+        type: str
+        ui-label: "Prune Target"
+        description: "The family/market/class/counterparty being pruned."
+  expands-to:
+    - verb: trading-profile.prune-impact
+      args: { cbu: "${cbu}", kind: "${prune-kind}", target: "${prune-target}" }
+    - verb: trading-profile.validate-universe-coverage
+      args: { cbu: "${cbu}" }
+
+# =============================================================================
+# CBU-INSTANCE TEMPLATE-SYNC (adopt template prunes into CBU)
+# =============================================================================
+
+instrument.cbu.sync-template-prune:
+  kind: macro
+  ui:
+    label: "Adopt Template Prune into CBU"
+    description: >
+      When a group template has been pruned (forward-only), existing
+      CBU clones retain the pruned classes/families by default. This
+      macro applies the same prune to a specific CBU, triggering the
+      amendment flow. Typical use: group policy change propagates to
+      CBUs individually (or via bulk sync).
+    target-label: "Template Prune Adoption"
+  routing:
+    mode-tags: [structure, governance, destructive, amendment]
+    operator-domain: instrument
+  target:
+    operates-on: cbu-ref
+    produces: trading-profile
+  args:
+    style: keyworded
+    required:
+      cbu:
+        type: ref
+        ref-kind: cbu
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+        ui-label: "Source Template (with prune applied)"
+    optional:
+      reason:
+        type: str
+  expands-to:
+    - verb: trading-profile.create-new-version
+      args: { cbu: "${cbu}", note: "Adopt prune from template: ${template}" }
+    - verb: trading-profile.sync-from-template
+      args: { cbu: "${cbu}", template: "${template}", prune-diff-only: true }
+    - verb: trading-profile.validate-universe-coverage
+      args: { cbu: "${cbu}" }

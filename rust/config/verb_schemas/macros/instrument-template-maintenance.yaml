@@ -452,3 +452,183 @@ instrument-template.review-coverage:
       args: { template: "${template}" }
     - verb: isda.list
       args: { template: "${template}" }
+
+# =============================================================================
+# TEMPLATE PRUNE OPERATIONS
+# =============================================================================
+# Prune = subtree deletion at classification level (asset family / market /
+# instrument class). Cascades through dependent configuration: settlement
+# chains, ISDA coverage, collateral management, trade gateway rules that
+# depend only on the pruned branch.
+#
+# Semantics (cascade rules):
+#   * Pruning an asset family removes all instrument classes under it.
+#   * Settlement chains whose ALL legs depend only on the pruned family
+#     are deactivated (chain.state: live → deactivated).
+#   * ISDA coverage entries that reference only pruned instrument types
+#     are removed. If collateral_management becomes orphaned (no ISDA
+#     coverage for any active derivative type), it terminates.
+#   * Trade-gateway routing rules specific to pruned markets / classes
+#     are removed. Gateway itself stays unless ALL its routing rules
+#     are pruned (then retires).
+#   * Pricing preferences (FA product) for pruned classes are removed.
+#   * Cash-sweep config that references pruned currencies is rewritten
+#     (or suspended if no remaining currencies).
+#
+# Template prunes are FORWARD-ONLY: existing CBU clones retain their
+# copy of the pruned branch. CBUs that WANT to adopt the prune must
+# invoke the corresponding instrument.cbu.prune-* macro (which triggers
+# their own mandate amendment — see instrument-cbu-maintenance.yaml).
+#
+# Consequence tier: all prune operations default to
+# `requires_explicit_authorisation` at template level (destructive,
+# affects all future CBU clones). P.4 tier review may soften based on
+# the specific classification being pruned.
+
+instrument-template.prune-asset-family:
+  kind: macro
+  ui:
+    label: "Prune Asset Family from Template"
+    description: >
+      Remove an entire asset family from a template — equities, fixed
+      income, OTC derivatives, listed derivatives, FX, money market,
+      or funds. Cascades through all instrument classes in that
+      family, settlement chains specific to it, ISDA coverage if
+      derivatives are pruned, and related trade-gateway routing rules.
+      Forward-only (existing clones unaffected).
+    target-label: "Asset Family"
+  routing:
+    mode-tags: [structure, governance, destructive]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+      family:
+        type: str
+        ui-label: "Asset Family to Prune"
+        description: "One of: equity, fixed_income, otc_derivatives, listed_derivatives, fx, money_market, funds"
+    optional:
+      reason:
+        type: str
+        ui-label: "Prune Reason"
+      cascade:
+        type: bool
+        ui-label: "Cascade to Dependents"
+        default: true
+        description: "If false, prune aborts when dependents exist. Recommended: true (default)."
+  expands-to:
+    - verb: trading-profile.prune-asset-family
+      args: { template: "${template}", family: "${family}", cascade: "${cascade}", reason: "${reason}" }
+    - verb: trading-profile.validate-universe-coverage
+      args: { template: "${template}" }
+      when: filled
+
+instrument-template.prune-market:
+  kind: macro
+  ui:
+    label: "Prune Market from Template"
+    description: >
+      Remove a specific market (MIC code) from a template. Cascades
+      through instrument classes scoped to the market, settlement
+      chain locations, trade-gateway routing rules. Forward-only.
+    target-label: "Market"
+  routing:
+    mode-tags: [structure, governance, destructive]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+      market:
+        type: str
+        ui-label: "Market MIC to Prune"
+    optional:
+      reason:
+        type: str
+        ui-label: "Prune Reason"
+      cascade:
+        type: bool
+        default: true
+  expands-to:
+    - verb: trading-profile.prune-market
+      args: { template: "${template}", market: "${market}", cascade: "${cascade}", reason: "${reason}" }
+
+instrument-template.prune-instrument-class:
+  kind: macro
+  ui:
+    label: "Prune Instrument Class from Template"
+    description: >
+      Single-class prune with cascade. Narrower than prune-asset-family
+      but wider than remove-instrument-class (which does no cascade).
+      Cascades through settlement chains that serve only this class,
+      ISDA coverage entries specific to it, trade gateway rules.
+    target-label: "Instrument Class"
+  routing:
+    mode-tags: [structure, governance, destructive]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+      instrument-class:
+        type: str
+        ui-label: "Instrument Class to Prune"
+    optional:
+      reason:
+        type: str
+      cascade:
+        type: bool
+        default: true
+  expands-to:
+    - verb: trading-profile.prune-instrument-class
+      args: { template: "${template}", class: "${instrument-class}", cascade: "${cascade}", reason: "${reason}" }
+
+instrument-template.prune-counterparty-type:
+  kind: macro
+  ui:
+    label: "Prune Counterparty Type from Template"
+    description: >
+      Remove a counterparty type (e.g. retire prime_broker relationship
+      class, deprecate executing_broker family). Cascades through
+      dependent trade-gateway rules and ISDA coverage entries.
+    target-label: "Counterparty Type"
+  routing:
+    mode-tags: [structure, governance, destructive]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+      counterparty-type:
+        type: str
+        ui-label: "Counterparty Type to Prune"
+    optional:
+      reason:
+        type: str
+      cascade:
+        type: bool
+        default: true
+  expands-to:
+    - verb: trading-profile.prune-counterparty-type
+      args: { template: "${template}", type: "${counterparty-type}", cascade: "${cascade}", reason: "${reason}" }

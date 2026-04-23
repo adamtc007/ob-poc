@@ -1134,3 +1134,133 @@ out_of_scope:
   # Product-gated — future scope
   - "Transfer Agency share class definitions — add when TA product declared a first-class DAG extension"
   - "Prime brokerage relationship lifecycle — add when PB product activated"
+
+# =============================================================================
+# 6. PRUNE SEMANTICS (subtree deletion with cascade)
+# =============================================================================
+# Prune = "remove this branch of the matrix, with cascade through
+# dependent config." Distinct from:
+#   - `retire-template`     → whole template offline
+#   - `remove-instrument-class` → single class removal, no cascade
+#   - `suspend-*`           → reversible hold
+# Prune is destructive (data removed / deactivated), typically consequence
+# tier requires_explicit_authorisation.
+#
+# Prune granularities:
+#   - asset_family    (7 families: equity / fixed_income / otc_derivatives /
+#                      listed_derivatives / fx / money_market / funds)
+#   - market          (MIC code — one market pruned)
+#   - instrument_class (single class with cascade)
+#   - counterparty    (specific counterparty removed — distinct from
+#                      counterparty_type which prunes a whole class)
+#   - counterparty_type (all counterparties of a category)
+#
+# Template-level prunes (operators: instrument-template.prune-*):
+#   - Forward-only: existing CBU clones retain their copy of the pruned
+#     branch; only future clones inherit.
+#
+# CBU-instance prunes (operators: instrument.cbu.prune-*):
+#   - Mutate an active mandate → trigger amendment flow (full 6-phase
+#     lifecycle replay per pass 7 Q-CD).
+#
+# Cascade rules — applied by prune verb handlers:
+# =============================================================================
+
+prune_cascade_rules:
+
+  - id: asset_family_prune_cascades
+    when: "pruning asset_family F from template/CBU"
+    cascades_to:
+      - target: instrument_class
+        rule: "all classes where family = F are removed"
+      - target: settlement_pattern
+        rule: "chains where ALL hops serve classes now removed → state: deactivated"
+      - target: isda_framework
+        rule: |
+          If F = otc_derivatives:
+            ISDA coverage for families=otc_derivatives removed.
+            If isda.add-coverage results in zero coverage → isda.remove-csa
+            as appropriate.
+      - target: collateral_management
+        rule: |
+          If F = otc_derivatives AND no remaining derivative exposure:
+            state: active → terminated (via collateral-management.terminate).
+      - target: trade_gateway
+        rule: |
+          Routing rules specific to F removed. Gateway itself stays unless
+          ALL its routing rules target pruned families → gateway: retired.
+      - target: cash_sweep
+        rule: |
+          If F pruning removes all currencies in sweep config → sweep
+          suspended (cash-sweep.suspend).
+      - target: pricing_preferences (FA product)
+        rule: "Pricing preferences for pruned classes removed."
+
+  - id: market_prune_cascades
+    when: "pruning market M from template/CBU"
+    cascades_to:
+      - target: settlement_pattern
+        rule: |
+          Settlement locations where market = M → removed. If a chain's
+          only hop was location M → chain: deactivated.
+      - target: trade_gateway
+        rule: "Routing rules for market M removed."
+      - target: instrument_class
+        rule: |
+          Market-scoped classes (where class.markets includes only M)
+          are removed (recursive prune — apply instrument_class cascade).
+
+  - id: instrument_class_prune_cascades
+    when: "pruning instrument_class C from template/CBU"
+    cascades_to:
+      - target: settlement_pattern
+        rule: "Chain hops specific to class C removed."
+      - target: isda_framework
+        rule: "ISDA coverage entries for class C removed."
+      - target: trade_gateway
+        rule: "Class-specific routing rules removed."
+      - target: pricing_preferences (FA)
+        rule: "Class-specific pricing preference removed."
+
+  - id: counterparty_prune_cascades
+    when: "pruning counterparty CP from CBU mandate"
+    cascades_to:
+      - target: trade_gateway
+        rule: "Routing rules that target CP exclusively removed."
+      - target: isda_framework
+        rule: "ISDA coverage with CP removed."
+      - target: collateral_management
+        rule: |
+          If CP was the only derivative counterparty → collateral_management
+          terminated.
+      - target: settlement_pattern
+        rule: "Chain hops where CP is the only carrier → chain deactivated."
+
+  - id: counterparty_type_prune_cascades
+    when: "pruning counterparty_type T from template"
+    cascades_to:
+      - target: counterparty (specific)
+        rule: "Every counterparty of type T is pruned (recursive)."
+
+# Pre-prune validation requirements:
+#
+# Before any prune executes, the handler MUST invoke:
+#   - trading-profile.prune-impact (read-only) — surface all cascade
+#     targets to the operator for confirmation.
+#   - validate-go-live-ready (after prune applied) — confirm mandate
+#     remains viable.
+#
+# If prune would leave mandate in invalid state (e.g. zero instrument
+# classes, no live settlement chain, active derivative exposure without
+# ISDA coverage), prune aborts — operator must explicitly terminate
+# the mandate instead.
+
+prune_pre_validation:
+  required_verbs:
+    - trading-profile.prune-impact      # mandatory read-only preview
+    - trading-profile.validate-universe-coverage  # post-prune sanity check
+  abort_conditions:
+    - "prune would remove all instrument classes from an ACTIVE mandate"
+    - "prune would leave ACTIVE mandate without live settlement chain"
+    - "prune creates derivative exposure without ISDA coverage"
+    - "prune orphans a cbu_resource_instance that cannot be decommissioned"
