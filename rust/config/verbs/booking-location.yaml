@@ -47,6 +47,11 @@ domains:
         returns:
           type: record
           name: booking_location
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update:
         description: "Update a booking location's fields"
@@ -77,6 +82,11 @@ domains:
         returns:
           type: uuid
           name: booking_location_id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list:
         description: "List all booking locations"
@@ -96,3 +106,8 @@ domains:
         returns:
           type: record_set
           name: booking_locations
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

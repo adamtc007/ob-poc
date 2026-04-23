@@ -70,6 +70,11 @@ domains:
           type: uuid
           name: message_type_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-message-types:
         description: "List available message types"
@@ -110,6 +115,11 @@ domains:
       # =========================================================================
       # TEMPLATE DEFINITIONS
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       create-template:
         description: "Create instruction message template"
@@ -174,6 +184,11 @@ domains:
           type: uuid
           name: template_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       read-template:
         description: "Read instruction template"
@@ -210,6 +225,11 @@ domains:
             maps_to: template_code
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-templates:
         description: "List instruction templates"
@@ -247,6 +267,11 @@ domains:
       # CBU TEMPLATE ASSIGNMENTS (Diagnostics Only)
       # Write operations removed - use trading-profile verbs for authoring
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-assignments:
         description: "List instruction template assignments for CBU"
@@ -298,6 +323,11 @@ domains:
       # FIELD OVERRIDES (Diagnostics Only)
       # Write operations removed - use trading-profile verbs for authoring
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-field-overrides:
         description: "List field overrides for assignment"
@@ -335,3 +365,8 @@ domains:
       # =========================================================================
       # RESOLUTION & VALIDATION
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

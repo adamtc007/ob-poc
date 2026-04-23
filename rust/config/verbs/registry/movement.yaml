@@ -80,6 +80,11 @@ domains:
           capture: true
         set_values:
           movement_type: subscription
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       redeem:
         description: Record a redemption (investor selling units). Idempotent via (holding_id, trade_date, reference).
@@ -159,6 +164,11 @@ domains:
           capture: true
         set_values:
           movement_type: redemption
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       transfer-in:
         description: Record an incoming transfer of units. Idempotent via (holding_id, trade_date, reference).
@@ -225,6 +235,11 @@ domains:
           capture: true
         set_values:
           movement_type: transfer_in
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       transfer-out:
         description: Record an outgoing transfer of units. Idempotent via (holding_id, trade_date, reference).
@@ -293,6 +308,11 @@ domains:
           movement_type: transfer_out
 
       # PE/VC specific movement types
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       record-commitment:
         description: Record LP commitment to PE/VC fund (total amount investor commits to invest)
         metadata:
@@ -366,6 +386,11 @@ domains:
           capture: true
         set_values:
           movement_type: commitment
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       capital-call:
         description: Record capital call (drawdown from LP commitment)
@@ -445,6 +470,11 @@ domains:
           capture: true
         set_values:
           movement_type: capital_call
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       distribute:
         description: Record distribution to LP (return of capital or profit)
@@ -539,6 +569,11 @@ domains:
           capture: true
         set_values:
           movement_type: distribution
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       distribute-recallable:
         description: Record a recallable distribution (can be called back by GP)
@@ -612,6 +647,11 @@ domains:
         set_values:
           movement_type: recallable_distribution
           is_recallable: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       confirm:
         description: Confirm a pending movement
@@ -652,6 +692,11 @@ domains:
             primary_key: id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       settle:
         description: Mark a movement as settled
@@ -696,6 +741,11 @@ domains:
           maps_to: settlement_date
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       cancel:
         description: Cancel a pending movement
@@ -740,6 +790,11 @@ domains:
           maps_to: notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       fail:
         description: Mark a movement as failed
@@ -788,6 +843,11 @@ domains:
           maps_to: notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       list-by-holding:
         description: List movements for a holding
@@ -833,6 +893,11 @@ domains:
           maps_to: status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       read:
         description: Read a movement by ID
@@ -870,3 +935,8 @@ domains:
             primary_key: id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

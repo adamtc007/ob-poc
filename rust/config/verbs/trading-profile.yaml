@@ -78,6 +78,11 @@ domains:
           type: uuid
           name: profile_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       read:
         description: Read a trading profile by ID
@@ -115,6 +120,11 @@ domains:
           maps_to: profile_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       get-active:
         description: Get the active trading profile for a CBU
@@ -151,6 +161,11 @@ domains:
             primary_key: cbu_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-versions:
         description: List all versions of trading profiles for a CBU
@@ -192,6 +207,11 @@ domains:
             primary_key: cbu_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       activate:
         description: Activate a trading profile (sets status to ACTIVE, supersedes previous active)
@@ -227,6 +247,11 @@ domains:
           description: User who activated the profile
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       materialize:
         description: Materialize trading profile to operational tables (universe, SSIs, booking rules)
@@ -281,6 +306,11 @@ domains:
         returns:
           type: record
           description: Materialization result with counts of records created/updated/deleted
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       diff:
         description: Compare two trading profile versions
@@ -322,6 +352,11 @@ domains:
       # DOCUMENT CONSTRUCTION VERBS
       # These verbs modify the JSONB document directly (source of truth)
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       create-draft:
         description: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
@@ -367,6 +402,11 @@ domains:
           type: uuid
           name: profile_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       clone-to:
         description: Clone a trading profile to another CBU, creating a new DRAFT profile
@@ -427,6 +467,11 @@ domains:
           type: uuid
           name: profile_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       create-new-version:
         description: Create a new draft version from the current ACTIVE profile. Used when modifying a live trading matrix.
@@ -477,6 +522,11 @@ domains:
           description: The new DRAFT profile ID (version = previous + 1)
 
       # --- Universe Section ---
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       add-component:
         description: Add a component to the trading profile document
@@ -691,6 +741,11 @@ domains:
           required: false
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remove-component:
         description: Remove a component from the trading profile document
@@ -750,6 +805,11 @@ domains:
           required: false
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       set-base-currency:
         description: Set base currency for trading profile
@@ -789,6 +849,11 @@ domains:
       # --- Booking Rules Section ---
 
       # --- ISDA/CSA Section ---
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       link-csa-ssi:
         description: Link CSA to collateral SSI in standing instructions
@@ -828,6 +893,11 @@ domains:
           type: affected
 
       # --- Investment Managers Section ---
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-im-scope:
         description: Update scope for existing IM mandate
@@ -872,6 +942,11 @@ domains:
           type: affected
 
       # --- Validation Verbs ---
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       validate-go-live-ready:
         description: Full validation for production readiness
@@ -908,6 +983,11 @@ domains:
         returns:
           type: record
           description: "{ ready: bool, blockers: [...], warnings: [...], coverage_pct: float }"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       validate-universe-coverage:
         description: Validate all universe entries have required SSIs and booking rules
@@ -949,6 +1029,11 @@ domains:
       #   - SUPERSEDED: Replaced by newer active version
       #   - ARCHIVED: Soft deleted
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       submit:
         description: Submit a validated trading profile for client review (transitions VALIDATED -> PENDING_REVIEW)
@@ -988,6 +1073,11 @@ domains:
         returns:
           type: record
           description: Updated profile with PENDING_REVIEW status
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       approve:
         description: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
@@ -1027,6 +1117,11 @@ domains:
         returns:
           type: record
           description: Updated profile with ACTIVE status
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       reject:
         description: Reject a pending trading profile (transitions PENDING_REVIEW -> DRAFT with rejection reason)
@@ -1066,6 +1161,11 @@ domains:
         returns:
           type: record
           description: Updated profile with DRAFT status and rejection notes
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       archive:
         description: Archive a trading profile (soft delete, transitions to ARCHIVED status)
@@ -1564,6 +1664,11 @@ domains:
       # Adds missing transitions + parallel_run + supersede per
       # instrument_matrix_dag.yaml trading_profile_lifecycle (9 states).
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       enter-parallel-run:
         description: "Enter parallel_run state (approved → parallel_run)"

@@ -44,6 +44,11 @@ domains:
             primary_key: cbu_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-ssis:
         description: List SSIs for a CBU (read from operational tables)
@@ -90,6 +95,11 @@ domains:
           maps_to: ssi_type
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-booking-rules:
         description: List booking rules for a CBU (read from operational tables)
@@ -133,6 +143,11 @@ domains:
           maps_to: is_active
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-agent-overrides:
         description: List agent overrides for an SSI
@@ -177,6 +192,11 @@ domains:
       # ========================================
       # VALIDATION - Check coverage and gaps
       # ========================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       derive-required-coverage:
         description: Compare universe to booking rules, find gaps
@@ -211,6 +231,11 @@ domains:
             primary_key: cbu_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       validate-booking-coverage:
         description: Validate that all universe entries have matching booking rules
@@ -250,6 +275,11 @@ domains:
             primary_key: cbu_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       lookup-ssi:
         description: Find SSI for given trade characteristics (simulate ALERT lookup)
@@ -310,6 +340,11 @@ domains:
       # ========================================
       # COMPOSITE - Bulk import
       # ========================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       setup-ssi:
         description: Bulk import SSIs from SSI_ONBOARDING document
@@ -361,3 +396,8 @@ domains:
           - PERMISSIVE
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

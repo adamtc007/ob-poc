@@ -71,6 +71,11 @@ domains:
         lifecycle:
           writes_tables:
           - custody.ca_event_types
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-event-types:
         description: "List CA event types"
@@ -117,6 +122,11 @@ domains:
       # CA preferences are CBU-specific operational config.
       # Source of truth: matrix (authored in trading profile, materialized to tables)
       # These verbs are PROJECTION tier - only used by materialize pipeline.
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       set-preferences:
         description: "Set corporate action processing preferences for CBU"
@@ -211,6 +221,11 @@ domains:
           - custody.cbu_ca_preferences
           reads_tables:
           - custody.ca_event_types
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-preferences:
         description: "List CA preferences for CBU"
@@ -255,6 +270,11 @@ domains:
         lifecycle:
           reads_tables:
           - custody.cbu_ca_preferences
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       remove-preference:
         description: "Remove CA preference"
@@ -293,6 +313,11 @@ domains:
       # =========================================================================
       # INSTRUCTION WINDOWS (OPERATIONAL - WRITTEN BY MATERIALIZE)
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       set-instruction-window:
         description: "Configure CA instruction deadline rules"
@@ -385,6 +410,11 @@ domains:
           - custody.cbu_ca_instruction_windows
           reads_tables:
           - custody.ca_event_types
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-instruction-windows:
         description: "List instruction window configurations"
@@ -430,6 +460,11 @@ domains:
       # =========================================================================
       # CA SSI MAPPING (OPERATIONAL - WRITTEN BY MATERIALIZE)
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       link-ca-ssi:
         description: "Link CA payment/delivery to specific SSI"
@@ -506,6 +541,11 @@ domains:
           reads_tables:
           - custody.ca_event_types
           - custody.cbu_ssi
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-ca-ssi-mappings:
         description: "List CA SSI mappings"
@@ -551,3 +591,8 @@ domains:
       # =========================================================================
       # VALIDATION & GAP ANALYSIS
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

@@ -75,6 +75,11 @@ domains:
           - "reviewed:none"
           writes_tables:
           - custody.trade_gateways
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       read-gateway:
         description: "Read gateway definition"
@@ -113,6 +118,11 @@ domains:
         lifecycle:
           reads_tables:
           - custody.trade_gateways
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-gateways:
         description: "List available gateways"
@@ -155,6 +165,11 @@ domains:
       # =========================================================================
       # CBU GATEWAY CONNECTIVITY
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       enable-gateway:
         description: "Enable gateway connectivity for CBU"
@@ -245,6 +260,11 @@ domains:
           - custody.cbu_gateway_connectivity
           reads_tables:
           - custody.trade_gateways
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       activate-gateway:
         description: "Activate gateway connectivity"
@@ -285,6 +305,11 @@ domains:
           - "requires_scope:cbu"
           writes_tables:
           - custody.cbu_gateway_connectivity
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       suspend-gateway:
         description: "Suspend gateway connectivity"
@@ -328,6 +353,11 @@ domains:
           - "requires_scope:cbu"
           writes_tables:
           - custody.cbu_gateway_connectivity
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-cbu-gateways:
         description: "List gateway connectivity for CBU"
@@ -376,6 +406,11 @@ domains:
       # =========================================================================
       # GATEWAY ROUTING RULES
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       add-routing-rule:
         description: "Add gateway routing rule for CBU"
@@ -483,6 +518,11 @@ domains:
           - custody.cbu_gateway_routing
           reads_tables:
           - custody.trade_gateways
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-routing-rules:
         description: "List gateway routing rules for CBU"
@@ -532,6 +572,11 @@ domains:
         lifecycle:
           reads_tables:
           - custody.cbu_gateway_routing
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       remove-routing-rule:
         description: "Remove routing rule"
@@ -567,6 +612,11 @@ domains:
       # =========================================================================
       # FALLBACK CONFIGURATION
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       set-fallback:
         description: "Configure fallback gateway"
@@ -650,6 +700,11 @@ domains:
           - custody.cbu_gateway_fallbacks
           reads_tables:
           - custody.trade_gateways
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-fallbacks:
         description: "List fallback configurations"
@@ -700,6 +755,11 @@ domains:
       # Adds the 2 missing transitions on trade_gateway_lifecycle per
       # instrument_matrix_dag.yaml.
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       reactivate-gateway:
         description: "Reactivate a suspended trade gateway (suspended → active)"

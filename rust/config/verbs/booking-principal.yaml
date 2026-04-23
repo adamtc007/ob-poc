@@ -62,6 +62,11 @@ domains:
         returns:
           type: record
           name: booking_principal
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update:
         description: "Update a booking principal's fields"
@@ -94,6 +99,11 @@ domains:
         returns:
           type: uuid
           name: booking_principal_id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       retire:
         description: "Retire a booking principal (checks active relationships first)"
@@ -122,6 +132,11 @@ domains:
         returns:
           type: record
           name: retire_result
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       evaluate:
         description: "Run full eligibility evaluation — snapshot client profile, gather rules, merge by boundary, check delivery, pin audit record"
@@ -183,6 +198,11 @@ domains:
         returns:
           type: record
           name: evaluation_result
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       select:
         description: "Record selection of a principal from an evaluation"
@@ -215,6 +235,11 @@ domains:
         returns:
           type: record
           name: selection_result
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       explain:
         description: "Retrieve full explain payload and audit trail for an evaluation"
@@ -247,6 +272,11 @@ domains:
         returns:
           type: record
           name: evaluation
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       coverage-matrix:
         description: "Generate coverage matrix showing principal × jurisdiction × service availability"
@@ -274,6 +304,11 @@ domains:
         returns:
           type: record_set
           name: coverage_entries
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       gap-report:
         description: "Generate gap report across regulatory, commercial, and operational boundaries"
@@ -293,6 +328,11 @@ domains:
         returns:
           type: record_set
           name: gaps
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       impact-analysis:
         description: "Analyse impact of retiring a booking principal on active client relationships"
@@ -317,3 +357,8 @@ domains:
         returns:
           type: record_set
           name: impact_entries
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

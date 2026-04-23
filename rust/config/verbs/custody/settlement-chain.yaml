@@ -77,6 +77,11 @@ domains:
             - "reviewed:none"
           writes_tables:
             - custody.settlement_locations
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-locations:
         description: "List settlement locations"
@@ -120,6 +125,11 @@ domains:
       # =========================================================================
       # SETTLEMENT CHAINS
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       create-chain:
         description: "Create settlement chain for CBU"
@@ -214,6 +224,11 @@ domains:
             - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_settlement_chains
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-chains:
         description: "List settlement chains for CBU"
@@ -261,6 +276,11 @@ domains:
         lifecycle:
           reads_tables:
             - custody.cbu_settlement_chains
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       deactivate-chain:
         description: "Deactivate a settlement chain"
@@ -304,6 +324,11 @@ domains:
       # =========================================================================
       # CHAIN HOPS (INTERMEDIARIES)
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       add-hop:
         description: "Add intermediary hop to settlement chain"
@@ -400,6 +425,11 @@ domains:
             - custody.settlement_chain_hops
           reads_tables:
             - custody.cbu_settlement_chains
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-hops:
         description: "List hops in a settlement chain"
@@ -436,6 +466,11 @@ domains:
         lifecycle:
           reads_tables:
             - custody.settlement_chain_hops
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       remove-hop:
         description: "Remove hop from settlement chain"
@@ -476,6 +511,11 @@ domains:
       # =========================================================================
       # SETTLEMENT LOCATION PREFERENCES
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       set-location-preference:
         description: "Set preferred settlement location for market/instrument"
@@ -567,6 +607,11 @@ domains:
             - custody.cbu_settlement_location_preferences
           reads_tables:
             - custody.settlement_locations
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-location-preferences:
         description: "List settlement location preferences for CBU"
@@ -611,6 +656,11 @@ domains:
       # =========================================================================
       # CROSS-BORDER CONFIGURATION
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       set-cross-border:
         description: "Configure cross-border settlement routing"
@@ -721,6 +771,11 @@ domains:
             - custody.cbu_cross_border_config
           reads_tables:
             - custody.settlement_locations
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-cross-border:
         description: "List cross-border configurations for CBU"
@@ -764,6 +819,11 @@ domains:
         lifecycle:
           reads_tables:
             - custody.cbu_cross_border_config
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       deactivate-cross-border:
         description: "Deactivate cross-border configuration"
@@ -809,6 +869,11 @@ domains:
       # instrument_matrix_dag.yaml. Implements Adam's pre-activation
       # lifecycle (pass-1 Q1) + parallel_run state (pass-5 Q-E).
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       request-review:
         description: "Submit a configured settlement chain for ops / treasury review"

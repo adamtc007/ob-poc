@@ -55,6 +55,11 @@ domains:
           type: uuid
           name: security_type_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list:
         description: List security types for an instrument class
         metadata:
@@ -92,3 +97,8 @@ domains:
             id_column: class_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

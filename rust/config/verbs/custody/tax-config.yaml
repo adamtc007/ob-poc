@@ -80,6 +80,11 @@ domains:
           - "reviewed:none"
           writes_tables:
           - custody.tax_jurisdictions
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-jurisdictions:
         description: "List tax jurisdictions"
@@ -122,6 +127,11 @@ domains:
       # =========================================================================
       # TAX TREATY RATES
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       set-treaty-rate:
         description: "Set bilateral tax treaty rate"
@@ -228,6 +238,11 @@ domains:
           - custody.tax_treaty_rates
           reads_tables:
           - custody.tax_jurisdictions
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-treaty-rates:
         description: "List treaty rates for jurisdiction pair"
@@ -272,6 +287,11 @@ domains:
       # =========================================================================
       # CBU TAX STATUS
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       set-tax-status:
         description: "Set CBU tax status for jurisdiction"
@@ -391,6 +411,11 @@ domains:
           - custody.cbu_tax_status
           reads_tables:
           - custody.tax_jurisdictions
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-tax-status:
         description: "List tax status for CBU"
@@ -435,6 +460,11 @@ domains:
       # =========================================================================
       # TAX RECLAIM CONFIGURATION
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       set-reclaim-config:
         description: "Configure tax reclaim processing"
@@ -539,6 +569,11 @@ domains:
           - custody.cbu_tax_reclaim_config
           reads_tables:
           - custody.tax_jurisdictions
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-reclaim-configs:
         description: "List reclaim configurations for CBU"
@@ -583,6 +618,11 @@ domains:
         lifecycle:
           reads_tables:
           - custody.cbu_tax_reclaim_config
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       deactivate-reclaim:
         description: "Deactivate reclaim configuration"
@@ -626,6 +666,11 @@ domains:
       # =========================================================================
       # TAX REPORTING OBLIGATIONS
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       set-reporting:
         description: "Set tax reporting obligation"
@@ -740,6 +785,11 @@ domains:
           - custody.cbu_tax_reporting
           reads_tables:
           - custody.tax_jurisdictions
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-reporting:
         description: "List tax reporting obligations for CBU"
@@ -788,3 +838,8 @@ domains:
       # =========================================================================
       # TAX LOOKUP AND VALIDATION
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

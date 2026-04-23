@@ -78,6 +78,11 @@ domains:
         returns:
           type: uuid
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       complete:
         description: Mark a service delivery as complete
@@ -151,6 +156,11 @@ domains:
           delivered_at: "now()"
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       fail:
         description: Mark a service delivery as failed
@@ -222,6 +232,11 @@ domains:
       # =========================================================================
       # P.3 ADDITIONS (2026-04-23) — DELIVERY LIFECYCLE TRANSITIONS
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       start:
         description: "Start a pending delivery (PENDING → IN_PROGRESS)"
