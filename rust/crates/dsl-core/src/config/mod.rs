@@ -23,12 +23,18 @@
 pub mod escalation;
 pub mod loader;
 pub mod phrase_gen;
+pub mod runbook_composition;
 pub mod types;
 pub mod validator;
 
 pub use escalation::{
     compute_effective_tier, compute_effective_tier_with_trace, evaluate_predicate,
     EvaluationContext,
+};
+pub use runbook_composition::{
+    component_a, component_b, component_c, compute_runbook_tier,
+    compute_runbook_tier_with_trace, AggregationRule, CrossScopeRule, RunbookStep,
+    RunbookTierTrace,
 };
 pub use validator::{
     validate_verb, validate_verbs_config, Location, PolicyWarning, StructuralError,
