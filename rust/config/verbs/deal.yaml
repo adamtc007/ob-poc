@@ -110,6 +110,11 @@ domains:
             type: uuid
             entity_kind: deal
             description: ID of the newly created deal
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       read:
         description: "Read the primary deal record by ID"
@@ -159,6 +164,11 @@ domains:
             maps_to: deal_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list:
         description: "List deals with optional filters"
@@ -219,6 +229,11 @@ domains:
             maps_to: sales_owner
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       search:
         description: "Search deal records by name or reference"
@@ -243,6 +258,11 @@ domains:
             description: "Search term for deal name or reference"
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       update:
         description: "Update primary deal record fields"
@@ -283,6 +303,11 @@ domains:
             maps_to: notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-status:
         description: "Transition deal status with lifecycle validation, including pre-contract KYC clearance"
@@ -349,6 +374,11 @@ domains:
               ]
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       cancel:
         description: "Cancel a deal (soft delete - sets status to CANCELLED)"
@@ -383,6 +413,11 @@ domains:
             description: "Cancellation reason"
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       # =========================================================================
       # DEAL PARTICIPANTS
@@ -445,6 +480,11 @@ domains:
             default: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remove-participant:
         description: "Remove a participant from a deal"
@@ -477,6 +517,11 @@ domains:
             maps_to: participant_role
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       list-participants:
         description: "List all participants in a deal"
@@ -505,6 +550,11 @@ domains:
             maps_to: deal_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # DEAL PRODUCTS (Commercial Scope)
@@ -568,6 +618,11 @@ domains:
           type: uuid
           name: deal_product_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-product-status:
         description: "Update the status of a product in the deal scope"
@@ -601,6 +656,11 @@ domains:
             valid_values: [PROPOSED, NEGOTIATING, AGREED, DECLINED, REMOVED]
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remove-product:
         description: "Remove a product from the deal scope (sets status to REMOVED)"
@@ -629,6 +689,11 @@ domains:
             maps_to: product_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       list-products:
         description: "List all products in the deal's commercial scope"
@@ -663,6 +728,11 @@ domains:
             valid_values: [PROPOSED, NEGOTIATING, AGREED, DECLINED, REMOVED]
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # DEAL CONTRACTS
@@ -710,6 +780,11 @@ domains:
             maps_to: sequence_order
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remove-contract:
         description: "Unlink a contract from a deal"
@@ -738,6 +813,11 @@ domains:
             maps_to: contract_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       list-contracts:
         description: "List all contracts linked to a deal"
@@ -766,6 +846,11 @@ domains:
             maps_to: deal_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # RATE CARDS
@@ -845,6 +930,11 @@ domains:
           type: uuid
           name: rate_card_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       add-rate-card-line:
         description: "Add a fee line to a rate card"
@@ -926,6 +1016,11 @@ domains:
           type: uuid
           name: line_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-rate-card-line:
         description: "Modify an existing rate card line"
@@ -966,6 +1061,11 @@ domains:
             maps_to: tier_brackets
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remove-rate-card-line:
         description: "Remove a fee line from a rate card"
@@ -989,6 +1089,11 @@ domains:
             maps_to: line_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       list-rate-card-lines:
         description: "List all fee lines for a rate card"
@@ -1032,6 +1137,11 @@ domains:
             maps_to: rate_card_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # RATE CARD NEGOTIATION
@@ -1070,6 +1180,11 @@ domains:
             maps_to: rate_card_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       counter-rate-card:
         description: "Client counter-offer - creates new version via clone"
@@ -1106,6 +1221,11 @@ domains:
           type: uuid
           name: new_rate_card_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       agree-rate-card:
         description: "Finalise rate card - both parties agree. Lines become immutable."
@@ -1138,6 +1258,11 @@ domains:
             maps_to: rate_card_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       list-rate-cards:
         description: "List all rate cards for a deal with status"
@@ -1179,6 +1304,11 @@ domains:
               [DRAFT, PROPOSED, COUNTER_PROPOSED, AGREED, SUPERSEDED, CANCELLED]
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-active-rate-cards:
         description: "List only the currently AGREED rate cards for a deal"
@@ -1207,6 +1337,11 @@ domains:
             maps_to: deal_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-rate-card-history:
         description: "Show rate card supersession chain history"
@@ -1239,6 +1374,11 @@ domains:
             maps_to: product_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # SLAs
@@ -1314,6 +1454,11 @@ domains:
           type: uuid
           name: sla_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remove-sla:
         description: "Remove an SLA from a deal"
@@ -1342,6 +1487,11 @@ domains:
             maps_to: sla_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       list-slas:
         description: "List SLAs for a deal"
@@ -1370,6 +1520,11 @@ domains:
             maps_to: deal_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # DOCUMENTS
@@ -1426,6 +1581,11 @@ domains:
               [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-document-status:
         description: "Update document status (e.g. DRAFT → SIGNED → EXECUTED)"
@@ -1460,6 +1620,11 @@ domains:
               [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-documents:
         description: "List all documents linked to a deal"
@@ -1488,6 +1653,11 @@ domains:
             maps_to: deal_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # UBO ASSESSMENTS
@@ -1526,6 +1696,11 @@ domains:
           type: uuid
           name: assessment_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-ubo-assessment:
         description: "Update UBO assessment status and risk rating"
@@ -1561,6 +1736,11 @@ domains:
             valid_values: [LOW, MEDIUM, HIGH, PROHIBITED]
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # =========================================================================
       # ONBOARDING HANDOFF
@@ -1658,6 +1838,11 @@ domains:
           type: uuid
           name: request_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       request-onboarding-batch:
         description: "Batch onboarding request - multiple existing CBUs to multiple products after KYC clearance and contracting"
@@ -1705,6 +1890,11 @@ domains:
             maps_to: requested_by
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       update-onboarding-status:
         description: "Update onboarding request status"
@@ -1747,6 +1937,11 @@ domains:
             maps_to: kyc_case_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-onboarding-requests:
         description: "List onboarding requests for a deal"
@@ -1782,6 +1977,11 @@ domains:
             maps_to: request_status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # SUMMARY & REPORTING
@@ -1824,6 +2024,11 @@ domains:
             maps_to: deal_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       read-timeline:
         description: "Read the deal event timeline for audit trail"
@@ -1879,3 +2084,8 @@ domains:
             description: "Filter events to this date"
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

@@ -36,8 +36,7 @@ allowed_verbs:
   - contract.create
   - billing.create-profile
 
-forbidden_verbs:
-  - deal.delete
+forbidden_verbs: []
 
 risk_policy:
   require_confirm_before_execute: true
@@ -75,7 +74,7 @@ templates:
         args:
           deal_name: "{answers.deal_name}"
           counterparty: "{answers.counterparty}"
-      - verb: deal.assign-rate-card
+      - verb: deal.propose-rate-card
         args:
           deal_ref: "$prev"
       - verb: contract.create
