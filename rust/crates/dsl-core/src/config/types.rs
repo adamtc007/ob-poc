@@ -102,6 +102,194 @@ pub struct VerbConfig {
     /// Typed output declarations for forward-reference resolution in runbook plans.
     #[serde(default)]
     pub outputs: Vec<VerbOutputConfig>,
+
+    /// Three-axis semantic declaration (Catalogue Platform Refinement v1.1 P1).
+    /// Optional during pilot rollout so existing un-declared verb YAMLs still
+    /// parse. Validator requires a declaration when the verb is within a
+    /// workspace that has been migrated (see pilot P.3). Absence during
+    /// rollout surfaces as a `DeclarationIncomplete` validator error, not a
+    /// parse error. YAML shape:
+    ///
+    /// ```yaml
+    /// behavior: plugin
+    /// description: ...
+    /// three_axis:
+    ///   state_effect: preserving
+    ///   external_effects: [observational]
+    ///   consequence:
+    ///     baseline: benign
+    /// ```
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub three_axis: Option<ThreeAxisDeclaration>,
+}
+
+// =============================================================================
+// Three-axis declaration types (v1.1 P1 / P10 / P11 / P13)
+// =============================================================================
+
+/// The three-axis declaration attached to a verb. Flattened into the parent
+/// `VerbConfig` at YAML deserialisation time. Separate struct so adding the
+/// declaration doesn't break struct-literal construction of `VerbConfig`
+/// throughout the codebase.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ThreeAxisDeclaration {
+    /// State effect (P1 first axis): whether the verb transitions DAG state
+    /// or preserves it. Required for a complete declaration.
+    pub state_effect: StateEffect,
+    /// External effects (P1 second axis): set of {observational, emitting,
+    /// navigating}. Empty set is valid and different from "not declared".
+    #[serde(default)]
+    pub external_effects: Vec<ExternalEffect>,
+    /// Consequence (P1 third axis): baseline tier plus optional escalation
+    /// rules (P11).
+    pub consequence: ConsequenceDeclaration,
+    /// Optional transitions block. Required when `state_effect == Transition`,
+    /// forbidden when `state_effect == Preserving` (validated structurally).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transitions: Option<VerbTransitions>,
+}
+
+/// State-effect axis (P1 first axis).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StateEffect {
+    /// The verb transitions some DAG node's state (e.g. `cbu.approve` moves
+    /// a CBU from `pending` to `approved`). MUST be paired with a
+    /// `transitions:` block listing the allowed edges.
+    Transition,
+    /// The verb preserves state. MUST have an empty or absent `transitions:`
+    /// block. P10 is explicit: state-preserving verbs can still be highly
+    /// consequential (e.g. exports, attestations, disclosures).
+    Preserving,
+}
+
+/// External-effect element (P1 second axis). A verb declares a SET of these;
+/// `[]` means the verb is internal-only (still potentially consequential
+/// per P10 when it's a state-transition).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExternalEffect {
+    /// Reads / observes external state without mutating it (e.g. GLEIF
+    /// lookup, GET to an HTTP source).
+    Observational,
+    /// Emits signals / events that propagate outside the immediate
+    /// transaction scope (e.g. BPMN signal, webhook POST, notification).
+    Emitting,
+    /// Navigates — changes agent / UI / REPL focus or viewport without
+    /// semantic state change.
+    Navigating,
+}
+
+/// Consequence axis (P1 third, P11 baseline+escalation, P13 policy).
+/// Effective tier = max(baseline, max(matching_escalation_rule.tier)).
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ConsequenceDeclaration {
+    /// Baseline floor — minimum authority required (P11).
+    pub baseline: ConsequenceTier,
+    /// Optional escalation rules that raise the tier at runtime. Monotonic:
+    /// rules can only raise tier, never lower (P11). Empty vec → effective
+    /// tier == baseline always.
+    #[serde(default)]
+    pub escalation: Vec<EscalationRule>,
+}
+
+/// Four-tier consequence taxonomy (v1.1 §6.2). Ordered by severity; a verb's
+/// effective tier is always the max of baseline and any matching escalation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConsequenceTier {
+    /// No user-visible consequence; safe for agentic autonomy.
+    Benign = 0,
+    /// Low-consequence; user sees a "doing X" message but no gate.
+    Reviewable = 1,
+    /// User confirmation required before execution.
+    RequiresConfirmation = 2,
+    /// Explicit authorisation — elevated permission / ABAC escalation /
+    /// compliance-visible action.
+    RequiresExplicitAuthorisation = 3,
+}
+
+/// One escalation rule (P11). Restricted DSL per v1.1 R6: equality,
+/// set-membership, threshold comparisons over declared typed inputs.
+/// No arbitrary code, no loops, no recursion. P.1.b produces the AST; this
+/// type is the serde-visible form.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct EscalationRule {
+    /// Human-readable rule name for decision-record auditability.
+    pub name: String,
+    /// The predicate — parsed from the restricted DSL in P.1.b.
+    pub when: EscalationPredicate,
+    /// Tier to escalate to when predicate matches. MUST be >= baseline
+    /// (validator enforces).
+    pub tier: ConsequenceTier,
+    /// Optional explanatory hint surfaced in REPL / Sage UX when the rule
+    /// fires.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// Restricted escalation predicate. Leaf nodes operate over
+/// (arg values, entity attributes, named context flags). Boolean
+/// combinators limited to AND / OR / NOT. NO arbitrary predicates.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(tag = "op", rename_all = "snake_case")]
+pub enum EscalationPredicate {
+    /// `arg.<name> == <value>` — string equality.
+    ArgEq {
+        arg: String,
+        value: serde_json::Value,
+    },
+    /// `arg.<name> in <values>` — membership in a constant set.
+    ArgIn {
+        arg: String,
+        values: Vec<serde_json::Value>,
+    },
+    /// `arg.<name> > <n>` — numeric threshold.
+    ArgGt { arg: String, value: f64 },
+    /// `arg.<name> >= <n>`.
+    ArgGte { arg: String, value: f64 },
+    /// `arg.<name> < <n>`.
+    ArgLt { arg: String, value: f64 },
+    /// `arg.<name> <= <n>`.
+    ArgLte { arg: String, value: f64 },
+    /// `entity.<kind>.<attr> == <value>`.
+    EntityAttrEq {
+        entity_kind: String,
+        attr: String,
+        value: serde_json::Value,
+    },
+    /// `entity.<kind>.<attr> in <values>`.
+    EntityAttrIn {
+        entity_kind: String,
+        attr: String,
+        values: Vec<serde_json::Value>,
+    },
+    /// `context.<flag>` — named boolean flag (session state).
+    ContextFlag { flag: String },
+    /// `and(<preds...>)` — boolean combinator.
+    And { preds: Vec<EscalationPredicate> },
+    /// `or(<preds...>)`.
+    Or { preds: Vec<EscalationPredicate> },
+    /// `not(<pred>)`.
+    Not { pred: Box<EscalationPredicate> },
+}
+
+/// Transitions block — listed edges the verb can traverse on the declared
+/// DAG. Structural check: state_effect == Transition ⇔ non-empty.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize)]
+pub struct VerbTransitions {
+    /// Reference to the DAG taxonomy YAML (e.g. `instrument_matrix_dag`).
+    pub dag: String,
+    /// Each edge: `from` and `to` must be states declared in the
+    /// referenced DAG. Well-formedness enforced in P.1.c.
+    pub edges: Vec<TransitionEdge>,
+}
+
+/// Single DAG edge.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct TransitionEdge {
+    pub from: String,
+    pub to: String,
 }
 
 /// Configuration for a verb output declaration.
@@ -2161,5 +2349,160 @@ returns:
         assert_eq!(config.args.len(), 2);
         assert!(config.returns.is_some());
         assert_eq!(config.returns.unwrap().name.as_deref(), Some("case_id"));
+    }
+
+    // =========================================================================
+    // Three-axis declaration tests (v1.1 P1 / P10 / P11 — pilot P.1.a)
+    // =========================================================================
+
+    #[test]
+    fn three_axis_state_effect_serde() {
+        let se: StateEffect = serde_yaml::from_str("transition").unwrap();
+        assert_eq!(se, StateEffect::Transition);
+        let se: StateEffect = serde_yaml::from_str("preserving").unwrap();
+        assert_eq!(se, StateEffect::Preserving);
+    }
+
+    #[test]
+    fn three_axis_external_effects_serde() {
+        let ee: ExternalEffect = serde_yaml::from_str("observational").unwrap();
+        assert_eq!(ee, ExternalEffect::Observational);
+        let ee: ExternalEffect = serde_yaml::from_str("emitting").unwrap();
+        assert_eq!(ee, ExternalEffect::Emitting);
+        let ee: ExternalEffect = serde_yaml::from_str("navigating").unwrap();
+        assert_eq!(ee, ExternalEffect::Navigating);
+    }
+
+    #[test]
+    fn three_axis_consequence_tier_ordering() {
+        // P11: effective_tier = max(baseline, max(matching_rule.tier))
+        assert!(ConsequenceTier::Benign < ConsequenceTier::Reviewable);
+        assert!(ConsequenceTier::Reviewable < ConsequenceTier::RequiresConfirmation);
+        assert!(
+            ConsequenceTier::RequiresConfirmation < ConsequenceTier::RequiresExplicitAuthorisation
+        );
+        let max = ConsequenceTier::Reviewable
+            .max(ConsequenceTier::RequiresExplicitAuthorisation);
+        assert_eq!(max, ConsequenceTier::RequiresExplicitAuthorisation);
+    }
+
+    #[test]
+    fn three_axis_declaration_full_roundtrip() {
+        let yaml = r#"
+state_effect: transition
+external_effects: [emitting, navigating]
+consequence:
+  baseline: reviewable
+  escalation:
+    - name: high_volume
+      when:
+        op: arg_gt
+        arg: count
+        value: 1000
+      tier: requires_confirmation
+      reason: "bulk operation"
+    - name: sanctions_listed
+      when:
+        op: entity_attr_eq
+        entity_kind: cbu
+        attr: sanctions_status
+        value: listed
+      tier: requires_explicit_authorisation
+transitions:
+  dag: instrument_matrix_dag
+  edges:
+    - from: draft
+      to: submitted
+"#;
+        let decl: ThreeAxisDeclaration = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(decl.state_effect, StateEffect::Transition);
+        assert_eq!(decl.external_effects.len(), 2);
+        assert_eq!(decl.consequence.baseline, ConsequenceTier::Reviewable);
+        assert_eq!(decl.consequence.escalation.len(), 2);
+        match &decl.consequence.escalation[0].when {
+            EscalationPredicate::ArgGt { arg, value } => {
+                assert_eq!(arg, "count");
+                assert!((value - 1000.0).abs() < f64::EPSILON);
+            }
+            _ => panic!("expected ArgGt"),
+        }
+        match &decl.consequence.escalation[1].when {
+            EscalationPredicate::EntityAttrEq { entity_kind, attr, value } => {
+                assert_eq!(entity_kind, "cbu");
+                assert_eq!(attr, "sanctions_status");
+                assert_eq!(value, &serde_json::json!("listed"));
+            }
+            _ => panic!("expected EntityAttrEq"),
+        }
+        let transitions = decl.transitions.as_ref().unwrap();
+        assert_eq!(transitions.dag, "instrument_matrix_dag");
+        assert_eq!(transitions.edges.len(), 1);
+    }
+
+    #[test]
+    fn three_axis_minimal_declaration_preserving_benign() {
+        let yaml = r#"
+state_effect: preserving
+consequence:
+  baseline: benign
+"#;
+        let decl: ThreeAxisDeclaration = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(decl.state_effect, StateEffect::Preserving);
+        assert!(decl.external_effects.is_empty());
+        assert_eq!(decl.consequence.baseline, ConsequenceTier::Benign);
+        assert!(decl.consequence.escalation.is_empty());
+        assert!(decl.transitions.is_none());
+    }
+
+    #[test]
+    fn three_axis_boolean_predicates() {
+        let yaml = r#"
+op: or
+preds:
+  - op: arg_eq
+    arg: mode
+    value: "delete"
+  - op: and
+    preds:
+      - op: arg_in
+        arg: action
+        values: [approve, reject]
+      - op: not
+        pred:
+          op: context_flag
+          flag: simulation_mode
+"#;
+        let pred: EscalationPredicate = serde_yaml::from_str(yaml).unwrap();
+        match pred {
+            EscalationPredicate::Or { preds } => {
+                assert_eq!(preds.len(), 2);
+                assert!(matches!(preds[0], EscalationPredicate::ArgEq { .. }));
+                assert!(matches!(preds[1], EscalationPredicate::And { .. }));
+            }
+            _ => panic!("expected Or"),
+        }
+    }
+
+    #[test]
+    fn three_axis_declaration_optional_on_verb_config() {
+        // Existing verb YAML (pre-v1.1) must still parse with three_axis absent.
+        let yaml = r#"
+description: "legacy verb"
+behavior: crud
+"#;
+        let vc: VerbConfig = serde_yaml::from_str(yaml).unwrap();
+        assert!(vc.three_axis.is_none());
+
+        let yaml = r#"
+description: "declared verb"
+behavior: plugin
+three_axis:
+  state_effect: preserving
+  consequence:
+    baseline: benign
+"#;
+        let vc: VerbConfig = serde_yaml::from_str(yaml).unwrap();
+        let decl = vc.three_axis.unwrap();
+        assert_eq!(decl.state_effect, StateEffect::Preserving);
     }
 }

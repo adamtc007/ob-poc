@@ -487,7 +487,7 @@ mod tests {
                 invocation_phrases: vec![],
                 policy: None,
                 confirm_policy: None,
-                outputs: vec![],
+                outputs: vec![], three_axis: None,
             },
         );
 
@@ -523,7 +523,7 @@ mod tests {
                     invocation_phrases: vec![],
                     policy: None,
                     confirm_policy: None,
-                    outputs: vec![],
+                    outputs: vec![], three_axis: None,
                 },
             );
         }
