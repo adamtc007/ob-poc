@@ -214,7 +214,20 @@ domains:
             baseline: benign
 
       activate:
-        description: Activate a trading profile (sets status to ACTIVE, supersedes previous active)
+        description: |
+          DEPRECATED — use trading-profile.go-live instead.
+
+          Legacy verb that directly transitioned APPROVED → ACTIVE. The pilot
+          P.2 lifecycle refactor introduced parallel_run as an explicit state
+          between approved and active: APPROVED → PARALLEL_RUN → ACTIVE via
+          enter-parallel-run + go-live respectively.
+
+          Retained for backward compatibility with the existing
+          activate_trading_profile handler; new code should route through
+          trading-profile.enter-parallel-run → trading-profile.go-live.
+
+          Tier tightened to match go-live: requires_explicit_authorisation
+          (live mandate activation has same blast radius regardless of path).
         invocation_phrases:
         - "activate trading profile"
         - "make profile active"
@@ -222,7 +235,6 @@ domains:
         - "switch to active profile"
         - "enable trading profile"
         - "set profile as active"
-        - "go live with profile"
         - "activate CBU profile"
         - "put mandate into production"
         - "promote profile to live"
@@ -233,9 +245,13 @@ domains:
           source_of_truth: matrix
           scope: cbu
           noun: trading_matrix
-          tags: [lifecycle, activation]
+          tags: [lifecycle, activation, deprecated]
           phase_tags: [trading]
           side_effects: state_write
+          status: deprecated
+          replaced_by: "trading-profile.go-live"
+          since_version: "0.1"
+          removal_version: "1.0"
         args:
         - name: profile-id
           type: uuid
@@ -251,7 +267,7 @@ domains:
           state_effect: preserving
           external_effects: [emitting]
           consequence:
-            baseline: reviewable
+            baseline: requires_explicit_authorisation
 
       materialize:
         description: Materialize trading profile to operational tables (universe, SSIs, booking rules)
