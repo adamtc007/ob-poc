@@ -185,8 +185,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     {
         use ob_poc::dsl_v2::config::{
-            validate_verbs_config, ValidationContext,
+            collect_declared_fqns, flatten_pack_entries, load_packs_from_dir,
+            validate_pack_fqns, validate_verbs_config, ValidationContext,
         };
+        use std::collections::HashSet;
+        use std::path::PathBuf;
         tracing::info!("Catalogue-load validator — running before DB pool init (P3)");
         let loader_for_validation = ConfigLoader::from_env();
         let verbs_config_for_validation = match loader_for_validation.load_verbs() {
@@ -200,7 +203,76 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             require_declaration: false, // rollout mode — P.3 flips per-workspace
             ..ValidationContext::default()
         };
-        let report = validate_verbs_config(&verbs_config_for_validation, &ctx);
+        let mut report = validate_verbs_config(&verbs_config_for_validation, &ctx);
+
+        // V1.2-5 pack-hygiene cross-check: every pack's allowed_verbs FQN
+        // must resolve to either a declared verb or a macro.
+        let packs_dir = std::env::var("OBPOC_PACKS_DIR")
+            .ok()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("rust/config/packs"));
+        let macros_dir = std::env::var("OBPOC_MACROS_DIR")
+            .ok()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("rust/config/verb_schemas/macros"));
+        if packs_dir.exists() {
+            let declared = collect_declared_fqns(&verbs_config_for_validation);
+            // Macro FQN collection: top-level keys marked `kind: macro`.
+            let mut macros: HashSet<String> = HashSet::new();
+            if macros_dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(&macros_dir) {
+                    for entry in entries.flatten() {
+                        let p = entry.path();
+                        if p.extension().and_then(|e| e.to_str()) != Some("yaml") {
+                            continue;
+                        }
+                        let Ok(raw) = std::fs::read_to_string(&p) else { continue; };
+                        let Ok(v) = serde_yaml::from_str::<serde_yaml::Value>(&raw) else {
+                            continue;
+                        };
+                        if let Some(m) = v.as_mapping() {
+                            for (k, b) in m {
+                                if let (Some(fqn), Some(body)) =
+                                    (k.as_str(), b.as_mapping())
+                                {
+                                    if body
+                                        .get(serde_yaml::Value::String("kind".into()))
+                                        .and_then(|x| x.as_str())
+                                        == Some("macro")
+                                    {
+                                        macros.insert(fqn.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            match load_packs_from_dir(&packs_dir) {
+                Ok(packs) => {
+                    let pack_errors = validate_pack_fqns(
+                        &declared,
+                        &macros,
+                        flatten_pack_entries(&packs),
+                    );
+                    if !pack_errors.is_empty() {
+                        report.well_formedness.extend(pack_errors);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Pack-hygiene check skipped — could not load packs dir {:?}: {}",
+                        packs_dir, e
+                    );
+                }
+            }
+        } else {
+            tracing::debug!(
+                "Pack-hygiene check skipped — packs dir {:?} not found",
+                packs_dir
+            );
+        }
+
         let strict = std::env::var("OBPOC_CATALOGUE_VALIDATOR_STRICT")
             .map(|v| v.to_lowercase() != "false")
             .unwrap_or(true);
@@ -244,7 +316,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         } else {
             tracing::info!(
-                "Catalogue validator clean ({} verbs / {} warnings) — P3 gate passed.",
+                "Catalogue validator clean ({} verbs / {} warnings) — P3 + V1.2-5 pack-hygiene gate passed.",
                 verbs_config_for_validation
                     .domains
                     .values()

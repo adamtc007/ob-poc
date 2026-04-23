@@ -490,28 +490,79 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<
     }
 
     // =========================================================================
-    // P.1.h — three-axis declaration check (v1.1 P1 / P10 / P11 / P13)
+    // P.1.h + V1.2-5 — three-axis + pack-hygiene declaration checks
     //
     // Runs the pure-function catalogue validator from dsl-core alongside
     // the tiering linter. Reports structural errors, well-formedness
-    // errors, and conservative policy-sanity warnings per v1.1 §6.2.
+    // errors (three-axis + pack-hygiene), and conservative policy-sanity
+    // warnings per v1.1 §6.2 + v1.2 amendment V1.2-5.
     //
     // Rollout-mode defaults: require_declaration=false + known_dags empty
     // (matches the startup gate in ob-poc-web::main). Catches mechanical
     // inconsistencies in whatever verbs DO carry three_axis declarations;
     // missing declarations are silent until P.3 flips require_declaration
-    // per-workspace.
+    // per-workspace. Pack-hygiene check is ALWAYS on.
     // =========================================================================
     {
-        use dsl_core::config::{validate_verbs_config, ValidationContext};
+        use dsl_core::config::{
+            collect_declared_fqns, flatten_pack_entries, load_packs_from_dir,
+            validate_pack_fqns, validate_verbs_config, ValidationContext,
+        };
+        use std::collections::HashSet;
+        use std::path::PathBuf;
         println!("\n===========================================");
-        println!("  Three-Axis Declaration Lint (v1.1 P1)");
+        println!("  Three-Axis + Pack-Hygiene Lint (v1.1 P1 + v1.2 V1.2-5)");
         println!("===========================================");
         let ctx = ValidationContext {
             require_declaration: false,
             ..ValidationContext::default()
         };
-        let three_axis_report = validate_verbs_config(&verbs_config, &ctx);
+        let mut three_axis_report = validate_verbs_config(&verbs_config, &ctx);
+
+        // V1.2-5 pack-hygiene cross-check.
+        let packs_dir = PathBuf::from("config/packs");
+        let macros_dir = PathBuf::from("config/verb_schemas/macros");
+        let mut pack_errors = Vec::new();
+        if packs_dir.exists() {
+            let declared_fqns = collect_declared_fqns(&verbs_config);
+            let mut macros: HashSet<String> = HashSet::new();
+            if macros_dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(&macros_dir) {
+                    for entry in entries.flatten() {
+                        let p = entry.path();
+                        if p.extension().and_then(|e| e.to_str()) != Some("yaml") {
+                            continue;
+                        }
+                        let Ok(raw) = std::fs::read_to_string(&p) else { continue; };
+                        let Ok(v) = serde_yaml::from_str::<serde_yaml::Value>(&raw) else {
+                            continue;
+                        };
+                        if let Some(m) = v.as_mapping() {
+                            for (k, b) in m {
+                                if let (Some(fqn), Some(body)) =
+                                    (k.as_str(), b.as_mapping())
+                                {
+                                    if body
+                                        .get(serde_yaml::Value::String("kind".into()))
+                                        .and_then(|x| x.as_str())
+                                        == Some("macro")
+                                    {
+                                        macros.insert(fqn.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if let Ok(packs) = load_packs_from_dir(&packs_dir) {
+                pack_errors =
+                    validate_pack_fqns(&declared_fqns, &macros, flatten_pack_entries(&packs));
+                three_axis_report
+                    .well_formedness
+                    .extend(pack_errors.clone());
+            }
+        }
 
         let declared = verbs_config
             .domains
@@ -533,8 +584,10 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<
             three_axis_report.structural.len()
         );
         println!(
-            "  Well-formedness errs: {}",
-            three_axis_report.well_formedness.len()
+            "  Well-formedness errs: {}  ({} three-axis + {} pack-hygiene)",
+            three_axis_report.well_formedness.len(),
+            three_axis_report.well_formedness.len() - pack_errors.len(),
+            pack_errors.len()
         );
         println!(
             "  Policy-sanity warns:  {}",
@@ -561,7 +614,7 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<
         if !three_axis_report.is_clean() {
             println!("\n===========================================");
             println!(
-                "  FAILED: {} three-axis errors in the catalogue",
+                "  FAILED: {} three-axis + pack-hygiene errors in the catalogue",
                 three_axis_report.error_count()
             );
             println!("===========================================");
