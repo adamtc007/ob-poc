@@ -36,12 +36,9 @@ allowed_verbs:
   - cbu.list
   - cbu.update
   - cbu.rename
-  - cbu.suspend
-  - cbu.activate
   - cbu.inspect
   - cbu.assign-role
   - cbu.remove-role
-  - cbu.assign-product
   - cbu.add-product
   - cbu.remove-product
   - cbu.list-subscriptions
@@ -49,9 +46,7 @@ allowed_verbs:
   - entity.read
   - entity.list
   - entity.update
-  - entity.link
   - trading-profile.read
-  - trading-profile.update
   # Product suite macros
   - structure.product-suite-custody-fa-ta
   - structure.product-suite-full

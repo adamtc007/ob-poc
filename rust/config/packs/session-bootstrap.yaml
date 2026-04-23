@@ -26,7 +26,6 @@ optional_context: []
 allowed_verbs:
   - session.load-cluster
   - session.load-galaxy
-  - session.load-cbu
 
 forbidden_verbs: []
 

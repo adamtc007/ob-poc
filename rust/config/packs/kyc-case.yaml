@@ -32,9 +32,6 @@ workspaces:
 
 allowed_verbs:
   - kyc-case.create
-  - kyc.assign-reviewer
-  - kyc.submit-case
-  - kyc.approve-case
   - ubo.discover
   - ownership.compute
   - document.solicit
