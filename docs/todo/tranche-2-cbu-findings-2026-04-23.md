@@ -254,6 +254,91 @@ Deal findings §7 — gaps logged but DAG preserved, to be re-reviewed
 in the cross-workspace reconciliation so universal patterns can be
 separated from CBU-specific.
 
+### 7.0 FOUNDATIONAL FRAMING — what a CBU actually IS (dominates the review)
+
+**Adam's correction (2026-04-23):** CBU is a construct Adam coined.
+It is NOT a generic "trading entity" or "client record" or "fund."
+It is his name for **the money-making apparatus a commercial client
+has established on the market to generate returns**.
+
+- The parent (Allianz, BlackRock) is the commercial client.
+- The CBU is what the client BUILT to make money.
+- One client typically has many CBUs (each a distinct trading unit
+  with its own mandate, investor register, custody setup, billing).
+- The `cbu_category` enum (FUND_MANDATE, CORPORATE_GROUP,
+  INSTITUTIONAL_ACCOUNT, RETAIL_CLIENT, FAMILY_TRUST,
+  CORRESPONDENT_BANK) is NOT categorical reference data — each is
+  a different SHAPE of money-making apparatus with different revenue
+  mechanics and service-consumption patterns.
+
+**This framing exposes that my DAG is fundamentally mis-centred.**
+I modelled CBU as a discovery/validation entity (state column is
+`chk_cbu_status` — DISCOVERED → VALIDATED). But validation is just
+"can we onboard this thing." The whole purpose of the CBU is to be
+**operationally active in the market making money**. VALIDATED is
+the *beginning* of the CBU's purpose, not a workspace-terminal state.
+
+This framing escalates three gaps from P0/P1 into **foundational
+re-authoring items for the next CBU DAG iteration**:
+
+1. **Operational lifecycle belongs to CBU, not to IM/Deal/KYC.**
+   The CBU IS the revenue-generation locus. Moving operational
+   state (ACTIVE trading, SUSPENDED, WINDING_DOWN, OFFBOARDED,
+   ARCHIVED) into the CBU DAG where it belongs is NOT a P0 "add 4
+   states" — it's a correction to the fundamental modelling
+   posture. My earlier cop-out (§7 G-1) deferring operational
+   lifecycle to adjacent workspaces was wrong because it treats
+   CBU as a passive record rather than the active trading unit.
+
+2. **Revenue realization is the point of the entity.** The thing
+   that justifies all the evidence, roles, investors, holdings
+   infrastructure is that the CBU makes money on the street. My
+   DAG has NO state, NO slot, NO lifecycle phase for "first trade
+   executed," "first invoice generated," "actively trading," "dormant
+   but open," "profitably operating vs loss-making" (last one
+   arguably out-of-scope). Without this, the CBU DAG describes the
+   **plumbing** of a CBU but not the **purpose** of a CBU.
+
+3. **Service consumption is first-class, not categorical.** A CBU
+   consumes services (custody, TA, FA, securities lending, FX,
+   trading, reporting) to operate on the street. Real clients turn
+   services on / off / upgrade / downgrade over the CBU's life. I
+   have `cbu.add-product` / `cbu.remove-product` as CRUD but no state
+   machine per-service-per-CBU. Service-consumption lifecycle
+   (proposed → provisioned → active → suspended → wound-down) is
+   what makes a CBU operationally real; my DAG treats it as ref
+   data.
+
+4. **`cbu_category` should gate operational capabilities.** Fund
+   categories have investors / NAVs / share-classes; corporate-group
+   categories don't; family-trust categories have different
+   evidence / KYC shape; correspondent-bank categories have
+   clearing/settlement-specific apparatus. I listed `cbu_category`
+   as CATEGORICAL in the DAG — it should be driving conditional
+   slot activation and lifecycle variance. The existing
+   `product_module_gates` section has some of this (investor +
+   holding + share_class gated by FUND_MANDATE) but not enough.
+
+5. **Market-facing identity is first-class.** LEI, BIC, depo
+   account references, sub-account numbers at DTC / Euroclear /
+   Clearstream are the CBU's **street-facing identity** — the
+   addresses through which the CBU exists in the market. Owned by
+   the CBU conceptually, though provisioned in adjacent workspaces.
+   My DAG references these obliquely through custody slots but
+   doesn't make the "this is the CBU's identity on the street"
+   primacy explicit. The CBU is its street-facing identities + its
+   operating capability.
+
+**Implication for the cross-workspace reconciliation:** the CBU
+workspace needs re-centring as "the operational money-making unit"
+first, "a record with evidence" second. Gaps G-1 through G-13 in
+§7.1-7.3 are consequences of this foundational mis-centring; many
+will collapse into a single "re-anchor the CBU DAG on
+operational-purpose-first" remediation in v1.3.
+
+The reconciliation should begin with this foundational re-framing
+before working through the per-gap catalogue.
+
 ### 7.1 P0 — Material business gaps
 
 **G-1. CBU operational lifecycle beyond VALIDATED is undefined.**
