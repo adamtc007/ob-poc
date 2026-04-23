@@ -162,6 +162,99 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Starting OB-POC Hybrid Web Server");
 
+    // =========================================================================
+    // P.1.g — DB-free catalogue-load gate (v1.1 P3 / DoD item 7)
+    //
+    // MUST run before any DB connectivity. The catalogue validator is a
+    // pure-function library over YAML input — no DB, no HTTP. Its job is
+    // to catch structural and well-formedness errors in the verb catalogue
+    // before we bring up the rest of the stack.
+    //
+    // Rollout-mode defaults (can be tightened per-workspace later):
+    //   require_declaration = false  — un-declared verbs don't fail startup
+    //   known_dags          = empty  — P.2 populates this when the DAG
+    //                                   taxonomy YAML lands; until then,
+    //                                   `UnknownDagReference` checks skip.
+    //
+    // Hard-gate behaviour: structural + well-formedness errors abort
+    // startup. Warnings log via tracing::warn and continue.
+    //
+    // Emergency bypass: `OBPOC_CATALOGUE_VALIDATOR_STRICT=false` demotes
+    // errors to warnings. Off by default — the gate is the architectural
+    // enforcement of P3.
+    // =========================================================================
+    {
+        use ob_poc::dsl_v2::config::{
+            validate_verbs_config, ValidationContext,
+        };
+        tracing::info!("Catalogue-load validator — running before DB pool init (P3)");
+        let loader_for_validation = ConfigLoader::from_env();
+        let verbs_config_for_validation = match loader_for_validation.load_verbs() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!("Catalogue validator: failed to load verb YAMLs: {}", e);
+                return Err(format!("catalogue-load failed pre-DB: {}", e).into());
+            }
+        };
+        let ctx = ValidationContext {
+            require_declaration: false, // rollout mode — P.3 flips per-workspace
+            ..ValidationContext::default()
+        };
+        let report = validate_verbs_config(&verbs_config_for_validation, &ctx);
+        let strict = std::env::var("OBPOC_CATALOGUE_VALIDATOR_STRICT")
+            .map(|v| v.to_lowercase() != "false")
+            .unwrap_or(true);
+        // Log warnings regardless of strict mode.
+        for w in &report.warnings {
+            tracing::warn!("catalogue warning: {}", w);
+        }
+        if !report.is_clean() {
+            let total = report.error_count();
+            if strict {
+                tracing::error!(
+                    "Catalogue validator found {} error(s) — aborting startup before DB pool.",
+                    total
+                );
+                for e in &report.structural {
+                    tracing::error!("structural: {}", e);
+                }
+                for e in &report.well_formedness {
+                    tracing::error!("well-formedness: {}", e);
+                }
+                tracing::error!(
+                    "Fix the errors or set OBPOC_CATALOGUE_VALIDATOR_STRICT=false to demote \
+                     them to warnings (not recommended — P3 invariant is the gate)."
+                );
+                return Err(format!(
+                    "catalogue validator returned {} errors pre-DB",
+                    total
+                )
+                .into());
+            } else {
+                for e in &report.structural {
+                    tracing::warn!("structural (demoted): {}", e);
+                }
+                for e in &report.well_formedness {
+                    tracing::warn!("well-formedness (demoted): {}", e);
+                }
+                tracing::warn!(
+                    "OBPOC_CATALOGUE_VALIDATOR_STRICT=false — {} errors demoted to warnings",
+                    total
+                );
+            }
+        } else {
+            tracing::info!(
+                "Catalogue validator clean ({} verbs / {} warnings) — P3 gate passed.",
+                verbs_config_for_validation
+                    .domains
+                    .values()
+                    .map(|d| d.verbs.len())
+                    .sum::<usize>(),
+                report.warnings.len()
+            );
+        }
+    }
+
     // Database connection pool configuration
     // Production-ready settings for concurrent connections
     let database_url =
