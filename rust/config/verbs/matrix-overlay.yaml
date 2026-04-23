@@ -396,7 +396,7 @@ domains:
           state_effect: preserving
           external_effects: [emitting]
           consequence:
-            baseline: reviewable
+            baseline: benign
 
       unified-gaps:
         description: "Get all gaps from both lifecycle and service domains"
@@ -449,7 +449,7 @@ domains:
           state_effect: preserving
           external_effects: [emitting]
           consequence:
-            baseline: reviewable
+            baseline: benign
 
       compare-products:
         description: "Compare what different products add to a matrix entry"

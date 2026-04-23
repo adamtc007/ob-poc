@@ -369,6 +369,14 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+            escalation:
+              - name: non_standard_vehicle
+                when:
+                  op: arg_in
+                  arg: vehicle-type
+                  values: ["OVERNIGHT_REPO", "TRI_PARTY_REPO", "MANUAL"]
+                tier: requires_confirmation
+                reason: "Non-standard cash-sweep vehicle — risk profile differs from approved STIF/MMF defaults."
 
       suspend:
         description: Suspend cash sweep

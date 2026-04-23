@@ -84,7 +84,15 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
+            escalation:
+              - name: large_subscription
+                when:
+                  op: arg_gt
+                  arg: amount
+                  value: 10000000
+                tier: requires_explicit_authorisation
+                reason: "Subscription over 10M (base currency) — elevated authority required."
 
       redeem:
         description: Record a redemption (investor selling units). Idempotent via (holding_id, trade_date, reference).
@@ -168,7 +176,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       transfer-in:
         description: Record an incoming transfer of units. Idempotent via (holding_id, trade_date, reference).
@@ -239,7 +247,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       transfer-out:
         description: Record an outgoing transfer of units. Idempotent via (holding_id, trade_date, reference).
@@ -390,7 +398,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       capital-call:
         description: Record capital call (drawdown from LP commitment)
@@ -474,7 +482,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       distribute:
         description: Record distribution to LP (return of capital or profit)
@@ -573,7 +581,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       distribute-recallable:
         description: Record a recallable distribution (can be called back by GP)
@@ -651,7 +659,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       confirm:
         description: Confirm a pending movement
@@ -696,7 +704,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       settle:
         description: Mark a movement as settled
@@ -745,7 +753,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       cancel:
         description: Cancel a pending movement

@@ -1077,7 +1077,24 @@ domains:
           state_effect: preserving
           external_effects: [emitting]
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
+            escalation:
+              - name: high_risk_jurisdiction
+                when:
+                  op: entity_attr_in
+                  entity_kind: cbu
+                  attr: jurisdiction
+                  values: ["IR", "KP", "RU", "BY", "SY"]
+                tier: requires_explicit_authorisation
+                reason: "CBU jurisdiction is on the high-risk / sanctions watchlist — compliance sign-off required before submission."
+              - name: derivatives_scope
+                when:
+                  op: entity_attr_eq
+                  entity_kind: trading_profile
+                  attr: has_derivatives_in_scope
+                  value: true
+                tier: requires_explicit_authorisation
+                reason: "Profile includes derivative instruments — requires compliance + risk sign-off."
 
       approve:
         description: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
@@ -1121,7 +1138,7 @@ domains:
           state_effect: preserving
           external_effects: [emitting]
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       reject:
         description: Reject a pending trading profile (transitions PENDING_REVIEW -> DRAFT with rejection reason)
@@ -1165,7 +1182,7 @@ domains:
           state_effect: preserving
           external_effects: [emitting]
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       archive:
         description: Archive a trading profile (soft delete, transitions to ARCHIVED status)
@@ -2059,7 +2076,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: requires_confirmation
+            baseline: requires_explicit_authorisation
 
       list-components:
         description: "List all components of a trading profile / template"

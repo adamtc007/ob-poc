@@ -264,7 +264,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       activate-gateway:
         description: "Activate gateway connectivity"
@@ -309,7 +309,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
 
       suspend-gateway:
         description: "Suspend gateway connectivity"
