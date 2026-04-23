@@ -134,6 +134,110 @@ domains:
           type: uuid
           name: new_intent_id
 
+      # =========================================================================
+      # P.3 ADDITIONS (2026-04-23) — SERVICE-INTENT LIFECYCLE TRANSITIONS
+      # Adds transition verbs for the 3-state service_intent_lifecycle per
+      # instrument_matrix_dag.yaml (active / suspended / cancelled).
+      # =========================================================================
+
+      suspend:
+        description: "Suspend an active service intent (temporary hold)"
+        invocation_phrases:
+          - "suspend service intent"
+          - "pause intent"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: service_intent
+          subject_kinds: [service-intent]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+        - name: intent-id
+          type: uuid
+          required: true
+        - name: reason
+          type: string
+          required: false
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: active
+                to: suspended
+
+      resume:
+        description: "Resume a suspended service intent (suspended → active)"
+        invocation_phrases:
+          - "resume service intent"
+          - "reactivate intent"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: service_intent
+          subject_kinds: [service-intent]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+        - name: intent-id
+          type: uuid
+          required: true
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: suspended
+                to: active
+
+      cancel:
+        description: "Cancel a service intent (terminal)"
+        invocation_phrases:
+          - "cancel service intent"
+          - "terminate intent"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: service_intent
+          subject_kinds: [service-intent]
+          phase_tags: [archive, terminate]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+        - name: intent-id
+          type: uuid
+          required: true
+        - name: reason
+          type: string
+          required: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: active
+                to: cancelled
+              - from: suspended
+                to: cancelled
+
   discovery:
     description: "Resource discovery operations"
 

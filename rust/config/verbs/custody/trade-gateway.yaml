@@ -694,3 +694,76 @@ domains:
       # =========================================================================
       # RESOLUTION & VALIDATION
       # =========================================================================
+
+      # =========================================================================
+      # P.3 ADDITIONS (2026-04-23) — TRADE-GATEWAY LIFECYCLE TRANSITIONS
+      # Adds the 2 missing transitions on trade_gateway_lifecycle per
+      # instrument_matrix_dag.yaml.
+      # =========================================================================
+
+      reactivate-gateway:
+        description: "Reactivate a suspended trade gateway (suspended → active)"
+        invocation_phrases:
+          - "reactivate gateway"
+          - "resume gateway"
+          - "re-enable gateway"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trade_gateway
+          subject_kinds: [trade-gateway]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: gateway
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: suspended
+                to: active
+
+      retire-gateway:
+        description: "Retire a trade gateway (terminal — broker relationship ended)"
+        invocation_phrases:
+          - "retire gateway"
+          - "decommission gateway"
+          - "remove gateway"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trade_gateway
+          subject_kinds: [trade-gateway]
+          phase_tags: [archive, terminate]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: gateway
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: active
+                to: retired
+              - from: suspended
+                to: retired

@@ -1558,3 +1558,651 @@ domains:
         returns:
           type: record
           description: "{ enabled_event_types: [...], notification_policy: {...}, election_policy: {...}, default_options: [...], cutoff_rules: [...], proceeds_ssi_mappings: [...] }"
+
+      # =========================================================================
+      # P.3 ADDITIONS (2026-04-23) — TRADING-PROFILE LIFECYCLE TRANSITIONS
+      # Adds missing transitions + parallel_run + supersede per
+      # instrument_matrix_dag.yaml trading_profile_lifecycle (9 states).
+      # =========================================================================
+
+      enter-parallel-run:
+        description: "Enter parallel_run state (approved → parallel_run)"
+        invocation_phrases:
+          - "enter parallel run"
+          - "start shadow trading"
+          - "begin parallel run"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [parallel_run]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: APPROVED
+                to: PARALLEL_RUN
+
+      go-live:
+        description: "Go-live on a mandate (parallel_run → active)"
+        invocation_phrases:
+          - "go live"
+          - "activate mandate"
+          - "launch trading profile"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [active]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: PARALLEL_RUN
+                to: ACTIVE
+
+      abort-parallel-run:
+        description: "Abort parallel run — roll back to approved"
+        invocation_phrases:
+          - "abort parallel run"
+          - "rollback parallel mandate"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: PARALLEL_RUN
+                to: APPROVED
+
+      suspend:
+        description: "Suspend active mandate (operational hold)"
+        invocation_phrases:
+          - "suspend mandate"
+          - "suspend trading profile"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: ACTIVE
+                to: SUSPENDED
+
+      reactivate:
+        description: "Reactivate a suspended mandate (suspended → active)"
+        invocation_phrases:
+          - "reactivate mandate"
+          - "resume trading profile"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [operational]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: SUSPENDED
+                to: ACTIVE
+
+      supersede:
+        description: "Supersede active version with newer version (active → superseded)"
+        invocation_phrases:
+          - "supersede mandate"
+          - "replace trading profile version"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [archive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: new-version
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: ACTIVE
+                to: SUPERSEDED
+
+      # =========================================================================
+      # P.3 ADDITIONS — TEMPLATE MAINTENANCE VERBS
+      # Support for template-lifecycle + content-maintenance macros.
+      # =========================================================================
+
+      retire-template:
+        description: "Retire a template (available → unavailable)"
+        invocation_phrases:
+          - "retire template"
+          - "deprecate template"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile-template]
+          phase_tags: [archive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: template
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: transition
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+          transitions:
+            dag: instrument_matrix_dag
+            edges:
+              - from: available
+                to: unavailable
+
+      add-instrument-class:
+        description: "Add instrument class to trading profile / template"
+        invocation_phrases:
+          - "add instrument class"
+          - "enable instrument class"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [matrix_scoped]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: instrument-class
+            type: string
+            required: true
+          - name: market
+            type: string
+            required: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      remove-instrument-class:
+        description: "Remove instrument class from trading profile / template (no cascade)"
+        invocation_phrases:
+          - "remove instrument class"
+          - "disable instrument class"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [matrix_scoped]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: instrument-class
+            type: string
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+
+      add-market:
+        description: "Add market to trading profile / template"
+        invocation_phrases:
+          - "add market"
+          - "enable market"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [matrix_scoped]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: market
+            type: string
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      remove-market:
+        description: "Remove market from trading profile / template (no cascade)"
+        invocation_phrases:
+          - "remove market"
+          - "disable market"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [matrix_scoped]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: market
+            type: string
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+
+      add-counterparty-type:
+        description: "Add counterparty type to template"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile-template]
+          phase_tags: [matrix_scoped]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: template
+            type: uuid
+            required: true
+          - name: counterparty-type
+            type: string
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      publish-template-version:
+        description: "Publish a new template version as default for cloning"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile-template]
+          phase_tags: [governance]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: template-version
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+
+      list-components:
+        description: "List all components of a trading profile / template"
+        invocation_phrases:
+          - "list components"
+          - "show trading profile components"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [read]
+          side_effects: none
+          harm_class: read_only
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      # =========================================================================
+      # P.3 ADDITIONS — PRUNE VERBS (DESTRUCTIVE, WITH CASCADE)
+      # See instrument_matrix_dag.yaml §6 for cascade rules.
+      # Prune verbs baseline to requires_explicit_authorisation.
+      # =========================================================================
+
+      prune-asset-family:
+        description: "Prune asset family from profile/template with cascade"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [governance, destructive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: family
+            type: string
+            required: true
+            valid_values: [equity, fixed_income, otc_derivatives, listed_derivatives, fx, money_market, funds]
+          - name: cascade
+            type: boolean
+            required: false
+            default: true
+          - name: reason
+            type: string
+            required: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      prune-market:
+        description: "Prune market from profile/template with cascade"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [governance, destructive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: market
+            type: string
+            required: true
+          - name: cascade
+            type: boolean
+            required: false
+            default: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      prune-instrument-class:
+        description: "Prune single instrument class with cascade"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [governance, destructive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: instrument-class
+            type: string
+            required: true
+          - name: cascade
+            type: boolean
+            required: false
+            default: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      prune-counterparty:
+        description: "Prune specific counterparty from CBU mandate with cascade"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [governance, destructive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: counterparty
+            type: uuid
+            required: true
+          - name: cascade
+            type: boolean
+            required: false
+            default: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      prune-counterparty-type:
+        description: "Prune counterparty type (all counterparties of category)"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile-template]
+          phase_tags: [governance, destructive]
+          side_effects: state_write
+          harm_class: irreversible
+        behavior: plugin
+        args:
+          - name: template
+            type: uuid
+            required: true
+          - name: counterparty-type
+            type: string
+            required: true
+          - name: cascade
+            type: boolean
+            required: false
+            default: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      prune-impact:
+        description: "Read-only impact analysis before invoking a destructive prune"
+        invocation_phrases:
+          - "prune impact"
+          - "preview prune"
+          - "what would prune remove"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [review, read-only]
+          side_effects: none
+          harm_class: read_only
+        behavior: plugin
+        args:
+          - name: profile
+            type: uuid
+            required: true
+          - name: kind
+            type: string
+            required: true
+            valid_values: [asset_family, market, instrument_class, counterparty, counterparty_type]
+          - name: target
+            type: string
+            required: true
+        returns:
+          type: record
+          description: "{ slots_affected: [...], verbs_cascaded: [...], abort_conditions: [...] }"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      sync-from-template:
+        description: "Sync a CBU mandate from its group template (adopt forward-only template changes)"
+        invocation_phrases:
+          - "sync from template"
+          - "pull template updates"
+          - "adopt template changes"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_profile
+          subject_kinds: [trading-profile]
+          phase_tags: [amendment]
+          side_effects: state_write
+          harm_class: reversible
+        behavior: plugin
+        args:
+          - name: cbu
+            type: uuid
+            required: true
+          - name: template
+            type: uuid
+            required: true
+          - name: prune-diff-only
+            type: boolean
+            required: false
+            default: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
