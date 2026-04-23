@@ -564,45 +564,47 @@ model diverges from how an IM actually operates.
 
 ### 6.2 Gaps — missing slots / concepts from the IM mandate model
 
-**G-1 (HIGH priority): Counterparty slot is implicit, not explicit.**
+**G-1 — Counterparty approval — RESOLVED 2026-04-23 (Adam).**
 
-An IM mandate is structurally a set of relationships with counterparties
-— brokers, dealers, prime brokers, exchanges. Today this is scattered:
-- `trade_gateway` covers broker-routing config.
-- `isda_framework` covers derivative-counterparty legal framework.
-- `booking_principal` covers IM-side booking.
-- Nothing unifies "the set of approved counterparties on this mandate."
+**Decision:** **(b) counterparty approval lives outside Instrument Matrix;
+IM references it read-only.** Instrument Matrix does NOT gain a new slot.
 
-In a real IM, counterparty approval has its own lifecycle:
-`proposed → kyc_review → approved → active → suspended → terminated`.
-Approval typically flows through Credit + Compliance + Trading + Ops,
-distinct from trade_gateway (which is the technical config).
+**Architectural implication:** counterparty lifecycle (`proposed →
+kyc_review → approved → active → suspended → terminated`) lives in the
+KYC / credit workspace. Instrument Matrix verbs that need counterparty
+state (e.g. `trade-gateway.activate-gateway` checking whether the
+broker is approved, or `isda.add-coverage` checking whether the
+ISDA counterparty is approved) reach across workspace boundary via
+cross-workspace facts (per `cross_workspace` plane) rather than
+owning the state.
 
-**Recommendation:** Phase P.2 + P.3 should either (a) add an explicit
-`counterparty` slot with its own state machine, OR (b) document that
-counterparty-approval lives in KYC / credit workspace (not in
-Instrument Matrix). Need Adam's call.
+**Consequence for pilot:** no new slot in A-1 v3 inventory. The
+`trade_gateway` and `isda_framework` slots continue to model technical
+and legal framework config respectively; counterparty APPROVAL state
+is sourced from the KYC/credit workspace via a shared-atom reference.
+Flag for P.9 findings: document the counterparty-approval → IM
+boundary explicitly, so downstream operators know where to look.
 
-**G-2 (MEDIUM): Benchmark / investment guidelines slot.**
+**G-2 — Investment guidelines / benchmark — RESOLVED 2026-04-23 (Adam).**
 
-Mandates reference a benchmark (MSCI World, BBG Agg) and carry IG
-constraints (max leverage, turnover limits, sector caps, ESG overlays).
-Today the pack has no benchmark or IG slot. These might live at
-CBU level rather than IM — but since they constrain trading, they
-belong in the mandate model.
+**Decision:** **CBU level, not mandate level.** Investment guidelines
+(leverage caps, sector concentration, benchmark reference, ESG
+overlays, turnover limits) are attributes of the CBU, not the trading
+profile.
 
-**Recommendation:** Flag for Adam. Likely a new slot
-`investment_guidelines` with states
-`proposed → approved → active → breached → amended → terminated`.
+**Architectural implication:** these become data attributes on the
+`cbus` row (or on a child table scoped to CBU). They're NOT a new
+Instrument Matrix slot. The CBU's 7-state lifecycle from §2.2 is
+unchanged — guidelines are static attributes, not lifecycle state.
 
-**G-3 (MEDIUM): Risk-limit / position-limit slot.**
+**Consequence for pilot:** IM validator (`trading-profile.validate-go-live-ready`)
+should read CBU-level investment-guideline attributes when validating
+a mandate — but this is a data read, not a slot-state check.
 
-Concentration caps, leverage limits, notional limits — these are
-enforced at trade time but defined at mandate level. Analogous to G-2
-but operationally distinct.
+**G-3 — Risk limits — subsumed under G-2.**
 
-**Recommendation:** Either subsumed by G-2 investment_guidelines or
-its own slot `risk_limits`.
+Position limits / leverage / concentration caps all sit at CBU-level
+per G-2's resolution. No separate slot.
 
 **G-4 (LOW): Cash-account slot.**
 
@@ -710,8 +712,8 @@ right; for estate-scale, revisit.
 | Add `superseded` terminal state to trading_profile_lifecycle | P.2 | Author in `instrument_matrix_dag.yaml` |
 | Declare 10+ missing transition verbs (suspend/reactivate across settlement_pattern, trade_gateway, service_resource, service_intent, delivery, trading_profile) | P.3 | Add YAML declarations, mark `state_effect: transition` with proper transitions block |
 | ISDA is a read-only projection from external legal system | P.9 | v1.1 candidate amendment |
-| Counterparty slot (G-1) gap | P.9 | Flag for estate-scale review; don't add to pilot |
-| Investment-guidelines slot (G-2) gap | P.9 | Flag for estate-scale review |
+| Counterparty slot (G-1) — **RESOLVED: IM references external KYC/credit workspace, no new slot** | P.9 | Document the cross-workspace boundary in findings; no pilot-scope change |
+| Investment-guidelines slot (G-2) — **RESOLVED: CBU-level attributes, not mandate-level** | P.9 | IM validator reads CBU attrs when validating mandate go-live; no new slot |
 | Cross-slot constraints need formal declaration | P.2 | Add `cross_slot_constraints:` section to DAG taxonomy YAML |
 | Hybrid persistence pattern for document-shaped slots | v1.1 | Amendment candidate |
 | Trading-profile amendment branching (minor/material/urgent) | P.9 | v1.1 candidate amendment |
