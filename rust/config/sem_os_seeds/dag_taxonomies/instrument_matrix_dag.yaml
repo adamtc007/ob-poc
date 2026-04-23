@@ -1,0 +1,1136 @@
+# Instrument Matrix — DAG Taxonomy (Pilot P.2 — 2026-04-23)
+#
+# Declarative lifecycle + semantic layer over the existing
+# products/services/SRDEFs/service_intents pipeline. Pilot P.2
+# authoring deliverable per the Instrument Matrix pilot plan.
+#
+# ARCHITECTURE (passes 1-7 of sanity review — see docs/todo/):
+#
+#   Layer 1 (THIS DAG)    — ref data + standing config + config lifecycle
+#   Layer 2 (downstream)  — service resources (accounts, SWIFT/FIX/BIC)
+#   Layer 3 (ops runtime) — event processing, exceptions, partials (not in DAG)
+#
+# Three orthogonal axes govern the DAG's content:
+#
+#   1. Vertical (what vs how): config states + transitions only; runtime
+#      events are out of scope.
+#   2. Horizontal (product-modular): slot/verb reachability is gated by
+#      the CBU's service_intents set (e.g. pricing_preference only when
+#      product.fund_accounting is enrolled).
+#   3. Temporal (onboarding lifecycle): per-CBU overall state threads
+#      through six phases: onboarding_requested → matrix_scoped →
+#      im_configured → preferences_set → parallel_run → active.
+#
+# CONSUMPTION:
+#
+#   - catalogue-load validator (P.1.c) uses this to check structural
+#     consistency before DB pool init (P3 invariant).
+#   - verb-level three_axis declarations (P.3) cross-reference slot
+#     states declared here.
+#   - Observatory / agent surface derives the overall lifecycle state
+#     per CBU using the derivation rules below.
+#
+# MAINTENANCE:
+#
+#   Changes to this file belong in the SemOsMaintenance workspace
+#   under governance. The existing constellation maps
+#   (instrument_template.yaml + trading_streetside.yaml) are runtime
+#   navigation maps and remain authoritative for REPL / agent
+#   positioning; this file is authoritative for state-machine
+#   semantics.
+
+version: "1.0"
+workspace: instrument_matrix
+dag_id: instrument_matrix_dag
+
+# =============================================================================
+# 1. OVERALL INSTRUMENT-MATRIX LIFECYCLE (per CBU, derived)
+# =============================================================================
+# Aggregates per-slot states + CBU state + service readiness into a single
+# six-phase onboarding progression.  Per-CBU derivation — no stored column.
+# (Adam pass-7 Q-CB: derived, not stored.)
+# =============================================================================
+
+overall_lifecycle:
+  id: instrument_matrix_overall_lifecycle
+  scope: per_cbu
+  derived: true
+  description: >
+    Aggregate lifecycle of the CBU's instrument-matrix instance.
+    Phase is derived from the underlying slot states + cbus.status +
+    cbu_service_readiness.  Not persisted — computed on read.
+
+  phases:
+
+    - name: onboarding_requested
+      description: |
+        CBU has been requested for onboarding. service_intents rows exist.
+        CBU record exists but is not yet validated. No matrix scoped yet.
+      derivation:
+        all_of:
+          - "cbus.status IN [DISCOVERED, VALIDATION_PENDING]"
+          - "EXISTS service_intents WHERE cbu_id = this.cbu_id"
+      progression_verbs:
+        - cbu.submit-for-validation  # upstream — advances CBU status
+      next_phase: matrix_scoped
+
+    - name: matrix_scoped
+      description: |
+        Vanilla instrument matrix cloned from template. Instrument scope
+        captured: what the fund is trading (exchange-traded, OTC
+        derivatives, cash options, CA options, FX options, special
+        settlement instructions). IM identity and BNY routings not yet
+        configured.
+      derivation:
+        all_of:
+          - "cbus.status = VALIDATED"
+          - "cbu_trading_profiles.status = 'DRAFT'"
+          - "EXISTS cbu_trading_profile_components WHERE profile_id = this.profile_id"
+      progression_verbs:
+        - trading-profile.submit
+      next_phase: im_configured
+
+    - name: im_configured
+      description: |
+        IM identity and BNY-side instruction framework configured.
+        Booking principals, trade gateways, settlement chains, custody
+        SSIs all defined and submitted. "Who is the IM and how are
+        they instructing BNY."
+      derivation:
+        all_of:
+          - "cbu_trading_profiles.status = 'SUBMITTED'"
+          - "COUNT booking_principal WHERE cbu_id = this.cbu_id AND status = 'active' >= 1"
+          - "COUNT cbu_settlement_chains WHERE cbu_id = this.cbu_id AND is_active = true >= 1"
+          - "at_least_one_trade_gateway_enabled"
+      progression_verbs:
+        - trading-profile.approve
+      next_phase: preferences_set
+
+    - name: preferences_set
+      description: |
+        Product-conditional lifecycle-service preferences applied.
+        Which slots must be populated depends on the CBU's
+        service_intents — custody-only needs fewer; full-service
+        (custody + FA + TA + derivatives) needs all.
+        Examples: FA → pricing preferences per instrument class;
+        derivatives → collateral management active; recon → streams
+        configured; CA policy → default elections set.
+      derivation:
+        all_of:
+          - "cbu_trading_profiles.status = 'APPROVED'"
+          - "all_product_conditional_slots_active"  # see product_module_gates below
+      progression_verbs:
+        - trading-profile.enter-parallel-run
+      next_phase: parallel_run
+
+    - name: parallel_run
+      description: |
+        Matrix in shadow mode. Resources provisioned. Real settlement
+        feeds running alongside existing config (for amendments) or
+        against empty book (for new onboardings). 1-2 cycles typical
+        before go-live.
+      derivation:
+        all_of:
+          - "cbu_trading_profiles.status = 'PARALLEL_RUN'"
+      progression_verbs:
+        - trading-profile.go-live
+        - trading-profile.abort-parallel-run  # rollback to approved
+      next_phase: active
+
+    - name: active
+      description: |
+        Mandate live. Trading flowing. All service resources active,
+        readiness green across all active service_intents.
+      derivation:
+        all_of:
+          - "cbu_trading_profiles.status = 'ACTIVE'"
+          - "cbu_service_readiness.all_green_for_active_intents"
+      progression_verbs:
+        - trading-profile.suspend
+        - trading-profile.archive
+        - trading-profile.create-new-version  # enters amending
+      next_phase: (stable — terminal on archive, branching on amend/suspend)
+
+    - name: amending
+      description: |
+        New version of trading profile in progress. Full six-phase
+        replay: any amendment re-traverses onboarding_requested
+        through parallel_run for the new version. Active version
+        continues running until new version goes live. Minor / material
+        / urgent branching is NOT modeled (Adam Q-CD: full lifecycle
+        rework).
+      derivation:
+        all_of:
+          - "cbu_trading_profiles.status = 'ACTIVE'"
+          - "EXISTS newer_version WHERE parent_profile_id = this.profile_id AND newer_version.status IN [DRAFT, SUBMITTED, APPROVED, PARALLEL_RUN]"
+      progression_verbs:
+        - (operations on the newer version, which itself progresses through the six phases)
+      next_phase: active (when newer version goes live, old is superseded)
+
+    - name: suspended
+      description: |
+        Operational hold — mandate paused, not terminated. Rare
+        (typically regulatory investigation or counterparty concern).
+      derivation:
+        any_of:
+          - "cbu_trading_profiles.status = 'SUSPENDED'"
+          - "cbus.status = 'SUSPENDED'"
+      progression_verbs:
+        - trading-profile.reactivate
+        - trading-profile.archive  # terminate without reactivating
+      next_phase: active or archived
+
+    - name: archived
+      description: |
+        Terminal. Mandate terminated (fund wound down, client departed,
+        service contract expired). No return path.
+      derivation:
+        any_of:
+          - "cbu_trading_profiles.status = 'ARCHIVED'"
+          - "cbus.status = 'ARCHIVED'"
+      progression_verbs: []  # terminal
+      next_phase: (none)
+
+# =============================================================================
+# 2. PER-SLOT STATE MACHINES (21 slots)
+# =============================================================================
+# Organized by constellation per existing constellation_maps/*.yaml structure.
+# For each stateful slot: state machine with states, transitions, verbs.
+# For each stateless slot: rationale for statelessness.
+# =============================================================================
+
+slots:
+
+  # ---------------------------------------------------------------------------
+  # 2.1 Instrument.workspace constellation (1 slot)
+  # ---------------------------------------------------------------------------
+
+  - id: workspace_root
+    constellation: instrument.workspace
+    stateless: true
+    rationale: "Projection/aggregation root over IM domains; has no entity lifecycle."
+    source_entity: null
+    verbs: []
+
+  # ---------------------------------------------------------------------------
+  # 2.2 Instrument.template constellation (6 slots)
+  # ---------------------------------------------------------------------------
+
+  - id: group
+    constellation: instrument.template
+    stateless: false
+    state_machine:
+      id: group_discovery_lifecycle
+      source_entity: '"ob-poc".client_group'
+      state_column: discovery_status
+      scope: per_group
+      description: |
+        Client-group discovery lifecycle. Driven by the research /
+        GLEIF-import pipeline. Prerequisite for creating any trading
+        mandate under the group.
+      states:
+        - id: not_started
+          entry: true
+          description: "Group record created; no discovery activity yet."
+        - id: in_progress
+          description: "Research / GLEIF import running."
+        - id: complete
+          description: "Discovery confirmed; group facts validated."
+        - id: stale
+          description: "Time-based staleness trigger fired; refresh needed."
+        - id: failed
+          description: "Research fault; needs investigation."
+      transitions:
+        - from: not_started
+          to: in_progress
+          via: "research pipeline kick-off (upstream trigger)"
+        - from: in_progress
+          to: complete
+          via: "discovery confirmed signal (backend)"
+        - from: in_progress
+          to: failed
+          via: "research fault signal (backend)"
+        - from: complete
+          to: stale
+          via: "time-decay trigger"
+        - from: stale
+          to: in_progress
+          via: "refresh trigger"
+        - from: failed
+          to: in_progress
+          via: "retry trigger"
+      terminal_states: []
+
+  - id: trading_profile_template
+    constellation: instrument.template
+    stateless: false
+    state_machine:
+      id: trading_profile_template_lifecycle
+      source_entity: '"ob-poc".cbu_trading_profiles'
+      state_column: status
+      scope: per_template  # row WHERE cbu_id IS NULL (template rows)
+      description: |
+        Template-level trading profile lifecycle. Simpler than the
+        streetside lifecycle (Adam Q6: templates are either available
+        or not). Templates are group-level artefacts cloned to CBU
+        instances.
+      states:
+        - id: available
+          entry: true
+          description: "Template is published and available for cloning to new CBUs."
+        - id: unavailable
+          description: |
+            Template retired or deprecated. Existing CBU instances cloned
+            from it remain unaffected — template change is forward-only.
+      transitions:
+        - from: available
+          to: unavailable
+          via: trading-profile.retire-template
+      terminal_states: [unavailable]
+
+  - id: settlement_pattern_template
+    constellation: instrument.template
+    stateless: false
+    state_machine:
+      id: settlement_pattern_lifecycle
+      source_entity: '"ob-poc".cbu_settlement_chains'
+      state_column: (derived — see below)
+      description: |
+        Settlement chain lifecycle. Schema today uses only `is_active`;
+        DAG formalises the pre-activation lifecycle (Adam Q1: "it has
+        a pre-activation lifecycle"). Parallel_run state added per
+        pass-7 Q-E. `superseded_by` graph attribute for chain
+        replacement (new chain replaces old — common when sub-custodian
+        changes).
+
+        State derivation notes:
+        - draft / configured / reviewed / parallel_run are currently
+          conceptual; schema has no state column yet. Will require a
+          migration to persist — track in P.9 findings.
+        - live ≡ cbu_settlement_chains.is_active = true
+        - deactivated ≡ cbu_settlement_chains.is_active = false
+      states:
+        - id: draft
+          entry: true
+          description: "Chain created but no hops defined."
+        - id: configured
+          description: "Hops added; locations defined; SSIs attached."
+        - id: reviewed
+          description: "Ops / treasury review signed off."
+        - id: parallel_run
+          description: "Running alongside incumbent chain for 1-2 cycles."
+        - id: live
+          description: "Active settlement chain; new trades route through."
+        - id: suspended
+          description: "Operational hold (sub-custodian issue, CA in-flight)."
+        - id: deactivated
+          description: "Chain retired. `superseded_by` may reference replacement."
+      transitions:
+        - from: draft
+          to: configured
+          via: settlement-chain.add-hop
+        - from: draft
+          to: configured
+          via: settlement-chain.define-location
+        - from: configured
+          to: reviewed
+          via: settlement-chain.request-review       # NEW verb — P.3
+        - from: reviewed
+          to: parallel_run
+          via: settlement-chain.enter-parallel-run   # NEW verb — P.3
+        - from: parallel_run
+          to: live
+          via: settlement-chain.go-live              # NEW verb — P.3
+        - from: parallel_run
+          to: reviewed
+          via: settlement-chain.abort-parallel-run   # NEW verb — P.3
+        - from: live
+          to: suspended
+          via: settlement-chain.suspend              # NEW verb — P.3
+        - from: suspended
+          to: live
+          via: settlement-chain.reactivate           # NEW verb — P.3
+        - from: live
+          to: deactivated
+          via: settlement-chain.deactivate-chain
+        - from: suspended
+          to: deactivated
+          via: settlement-chain.deactivate-chain
+      terminal_states: [deactivated]
+      graph_attributes:
+        - name: superseded_by
+          description: "Reference to replacement chain. Populated when a chain is deactivated because a new one takes over."
+          type: uuid
+          references: cbu_settlement_chains.chain_id
+
+  - id: isda_framework
+    constellation: instrument.template
+    stateless: true
+    rationale: |
+      ISDA agreement lifecycle (negotiated → signed → executed → amended →
+      terminated) lives in external legal-ops system. IM treats ISDA
+      coverage as a read-only projection: 'do we have coverage yes/no'.
+      (Adam Q2.) Schema has `is_active` boolean which matches the
+      binary yes/no model. Mandate-level collateral management lifecycle
+      lives in the collateral_management slot (pass 3), not here.
+    source_entity: '"ob-poc".isda_agreements'
+    verbs:
+      - isda.create
+      - isda.list
+      - isda.add-csa
+      - isda.remove-csa
+      - isda.add-coverage
+      - isda.remove-coverage
+
+  - id: corporate_action_policy
+    constellation: instrument.template
+    stateless: true
+    rationale: |
+      CA policy is standing config on the trading profile (what elections
+      to make by default, which event types to enable). No separate
+      entity; policy is a set of attributes on cbu_trading_profiles.
+      (Adam pass-3 R-5: 'CA policy is a what, not a how'.)
+      Event-level lifecycle lives in corporate_action_event slot.
+    source_entity: '"ob-poc".cbu_trading_profiles (CA-prefixed columns)'
+    verbs:
+      - trading-profile.ca.get-policy
+      - trading-profile.ca.set-election-policy
+      - trading-profile.ca.set-notification-policy
+      - trading-profile.ca.enable-event-types
+      - trading-profile.ca.disable-event-types
+      - trading-profile.ca.set-default-option
+      - trading-profile.ca.remove-default-option
+      - trading-profile.ca.link-proceeds-ssi
+      - trading-profile.ca.remove-proceeds-ssi
+      - trading-profile.ca.add-cutoff-rule
+      - trading-profile.ca.remove-cutoff-rule
+      - corporate-action.list-event-types
+      - corporate-action.define-event-type
+      - corporate-action.set-preferences
+      - corporate-action.list-preferences
+
+  - id: trade_gateway
+    constellation: instrument.template
+    stateless: false
+    state_machine:
+      id: trade_gateway_lifecycle
+      source_entity: "(hybrid — JSON document + is_active column for query speed)"
+      state_column: (document body — not SQL CHECK)
+      description: |
+        Broker / exchange gateway lifecycle. Hybrid persistence per
+        Adam Q3: document-shaped config (FIX session details, routing
+        rules, ticker maps) with `is_active` column for query speed.
+        State machine lives on document body; is_active is a
+        materialized view.
+
+        Intermediate UAT / FIX-certification states are NOT in the DAG
+        (Adam Q-F: UAT is service-resource setup — how, not what).
+      states:
+        - id: defined
+          entry: true
+          description: "Gateway config authored; IM-side ready."
+        - id: enabled
+          description: "Config complete on IM side; awaiting counterparty."
+        - id: active
+          description: "Counterparty confirmed; session live."
+        - id: suspended
+          description: "Operational hold (cert expiry, session down)."
+        - id: retired
+          description: "Gateway relationship terminated."
+      transitions:
+        - from: defined
+          to: enabled
+          via: trade-gateway.enable-gateway
+        - from: enabled
+          to: active
+          via: trade-gateway.activate-gateway
+        - from: active
+          to: suspended
+          via: trade-gateway.suspend-gateway
+        - from: suspended
+          to: active
+          via: trade-gateway.reactivate-gateway     # NEW verb — P.3
+        - from: active
+          to: retired
+          via: trade-gateway.retire-gateway         # NEW verb — P.3
+        - from: suspended
+          to: retired
+          via: trade-gateway.retire-gateway
+      terminal_states: [retired]
+
+  # ---------------------------------------------------------------------------
+  # 2.3 Trading.streetside constellation (11 slots)
+  # ---------------------------------------------------------------------------
+
+  - id: cbu
+    constellation: trading.streetside
+    stateless: false
+    state_machine:
+      id: cbu_lifecycle
+      source_entity: '"ob-poc".cbus'
+      state_column: status
+      scope: per_cbu
+      description: |
+        CBU validation + operational lifecycle. Extended to 7 states
+        per Adam Q7 (adds SUSPENDED + ARCHIVED — migration in
+        rust/migrations/20260423_extend_cbu_status_check.sql).
+        ACTIVELY_TRADING is a derived attribute, not a state
+        (Adam pass-3 R-4).
+      states:
+        - id: DISCOVERED
+          entry: true
+          description: "CBU identified via research; data incomplete."
+        - id: VALIDATION_PENDING
+          description: "Submitted for data validation."
+        - id: VALIDATED
+          description: "Data validated; CBU can have trading profiles."
+        - id: UPDATE_PENDING_PROOF
+          description: "Proposed data update awaiting evidence."
+        - id: VALIDATION_FAILED
+          description: "Validation rejected; needs correction."
+        - id: SUSPENDED
+          description: "Operational hold — CBU temporarily inactive (Q7)."
+        - id: ARCHIVED
+          description: "Terminal — CBU closed (Q7)."
+      transitions:
+        - from: DISCOVERED
+          to: VALIDATION_PENDING
+          via: cbu.submit-for-validation
+        - from: VALIDATION_PENDING
+          to: VALIDATED
+          via: "(backend validation pass)"
+        - from: VALIDATION_PENDING
+          to: VALIDATION_FAILED
+          via: "(backend validation fail)"
+        - from: VALIDATION_FAILED
+          to: VALIDATION_PENDING
+          via: cbu.resubmit
+        - from: VALIDATED
+          to: UPDATE_PENDING_PROOF
+          via: cbu.propose-update
+        - from: UPDATE_PENDING_PROOF
+          to: VALIDATED
+          via: cbu.accept-update
+        - from: UPDATE_PENDING_PROOF
+          to: VALIDATION_FAILED
+          via: cbu.reject-update
+        - from: VALIDATED
+          to: SUSPENDED
+          via: cbu.suspend
+        - from: SUSPENDED
+          to: VALIDATED
+          via: cbu.reactivate
+        - from: VALIDATED
+          to: ARCHIVED
+          via: cbu.archive
+        - from: SUSPENDED
+          to: ARCHIVED
+          via: cbu.archive
+      terminal_states: [ARCHIVED]
+
+  - id: trading_profile
+    constellation: trading.streetside
+    stateless: false
+    state_machine:
+      id: trading_profile_lifecycle
+      source_entity: '"ob-poc".cbu_trading_profiles'
+      state_column: status
+      scope: per_profile  # row WHERE cbu_id IS NOT NULL (streetside instances)
+      description: |
+        The mandate itself — streetside instance cloned from template.
+        Extended to 9 states per passes 3+7: parallel_run between
+        approved and active, plus superseded terminal state for
+        version-replacement audit.
+      states:
+        - id: DRAFT
+          entry: true
+          description: "Profile being edited; not yet submitted."
+        - id: SUBMITTED
+          description: "Submitted for compliance / ops review."
+        - id: APPROVED
+          description: "Approved but not yet activated. Ready for parallel run."
+        - id: PARALLEL_RUN
+          description: "Running shadow alongside incumbent (or empty for new mandate)."
+        - id: ACTIVE
+          description: "Mandate live — trading flowing."
+        - id: SUSPENDED
+          description: "Operational hold."
+        - id: REJECTED
+          description: "Rejected in review — revertible to draft."
+        - id: SUPERSEDED
+          description: |
+            Version replaced by newer version (Adam pass-3 recommendation).
+            Distinct from ARCHIVED which means 'mandate terminated.'
+        - id: ARCHIVED
+          description: "Terminal — mandate terminated."
+      transitions:
+        - from: DRAFT
+          to: SUBMITTED
+          via: trading-profile.submit
+        - from: SUBMITTED
+          to: APPROVED
+          via: trading-profile.approve
+        - from: SUBMITTED
+          to: REJECTED
+          via: trading-profile.reject
+        - from: REJECTED
+          to: DRAFT
+          via: trading-profile.create-draft
+        - from: APPROVED
+          to: PARALLEL_RUN
+          via: trading-profile.enter-parallel-run   # NEW verb — P.3
+        - from: PARALLEL_RUN
+          to: ACTIVE
+          via: trading-profile.go-live              # NEW verb — P.3
+        - from: PARALLEL_RUN
+          to: APPROVED
+          via: trading-profile.abort-parallel-run   # NEW verb — P.3
+        - from: ACTIVE
+          to: SUSPENDED
+          via: trading-profile.suspend              # NEW verb — P.3
+        - from: SUSPENDED
+          to: ACTIVE
+          via: trading-profile.reactivate           # NEW verb — P.3
+        - from: ACTIVE
+          to: SUPERSEDED
+          via: trading-profile.supersede            # NEW verb — P.3 (new version goes live)
+        - from: ACTIVE
+          to: ARCHIVED
+          via: trading-profile.archive
+        - from: SUSPENDED
+          to: ARCHIVED
+          via: trading-profile.archive
+      terminal_states: [ARCHIVED, SUPERSEDED]
+
+  - id: custody
+    constellation: trading.streetside
+    stateless: true
+    rationale: |
+      Custody slot is a compositional projection over entity_settlement_identity
+      scoped to CBU counterparties. No dedicated slot table. The SSIs
+      themselves (entity_settlement_identity rows) may have states, but
+      the slot as a CBU-surface concept is a view.
+    source_entity: '"ob-poc".entity_settlement_identity (projected)'
+    verbs:
+      - cbu-custody.list-universe
+      - cbu-custody.list-ssis
+      - cbu-custody.list-booking-rules
+      - cbu-custody.list-agent-overrides
+      - cbu-custody.derive-required-coverage
+      - cbu-custody.validate-booking-coverage
+      - cbu-custody.lookup-ssi
+      - cbu-custody.setup-ssi
+
+  - id: booking_principal
+    constellation: trading.streetside
+    stateless: true
+    rationale: |
+      Booking principal is a rule-evaluation entity — evaluates client
+      / CBU / product to select the IM-side booking branch. Not a
+      stateful lifecycle entity per Adam Q8. `retire` verb is more
+      'remove-rule' than 'transition-to-retired-state'.
+    source_entity: '"ob-poc".booking_principal'
+    verbs:
+      - booking-principal.create
+      - booking-principal.update
+      - booking-principal.retire
+      - booking-principal.evaluate
+      - booking-principal.select
+      - booking-principal.explain
+      - booking-principal.coverage-matrix
+      - booking-principal.gap-report
+      - booking-principal.impact-analysis
+
+  - id: cash_sweep
+    constellation: trading.streetside
+    stateless: true
+    rationale: |
+      Cash sweep is binary (active / not) per Adam Q9a. DSL verbs
+      (suspend, reactivate, remove) collapse to is_active toggle. Not
+      a lifecycle entity. v1.1 candidate finding: consolidate DSL
+      verbs to a simpler set-active / unset-active pair (pass 3 §3.2).
+    source_entity: '"ob-poc".cbu_cash_sweep_config'
+    verbs:
+      - cash-sweep.configure
+      - cash-sweep.link-resource
+      - cash-sweep.list
+      - cash-sweep.update-threshold
+      - cash-sweep.update-timing
+      - cash-sweep.change-vehicle
+      - cash-sweep.suspend
+      - cash-sweep.reactivate
+      - cash-sweep.remove
+
+  - id: service_resource
+    constellation: trading.streetside
+    stateless: false
+    state_machine:
+      id: service_resource_lifecycle
+      source_entity: '"ob-poc".service_resource_types'
+      state_column: (derived from is_active + provisioning_strategy)
+      description: |
+        SRDEF lifecycle (Adam Q9b: 4 states confirmed).  This is the
+        typed-resource definition layer; per-CBU instances live in
+        cbu_resource_instances (a separate table, provisioned by
+        Stage 5 of the product-service pipeline per pass 6).
+      states:
+        - id: provisioned
+          entry: true
+          description: "Resource definition authored and available."
+        - id: activated
+          description: "Resource instance created and running for at least one CBU."
+        - id: suspended
+          description: "Resource paused — existing instances remain but no new provisioning."
+        - id: decommissioned
+          description: "Terminal — resource retired from catalogue."
+      transitions:
+        - from: provisioned
+          to: activated
+          via: service-resource.activate
+        - from: activated
+          to: suspended
+          via: service-resource.suspend
+        - from: suspended
+          to: activated
+          via: service-resource.reactivate         # NEW verb — P.3
+        - from: activated
+          to: decommissioned
+          via: service-resource.decommission
+        - from: suspended
+          to: decommissioned
+          via: service-resource.decommission
+      terminal_states: [decommissioned]
+
+  - id: service_intent
+    constellation: trading.streetside
+    stateless: false
+    state_machine:
+      id: service_intent_lifecycle
+      source_entity: '"ob-poc".service_intents'
+      state_column: status
+      scope: per_intent
+      description: |
+        Per-CBU service intent — declares which (product, service)
+        combinations the CBU has enrolled in, with options JSONB
+        carrying service-specific parameters (markets, currencies,
+        instrument classes, counterparties). This table IS the
+        CBU's 'lifecycle services profile' per pass 6.
+      states:
+        - id: active
+          entry: true
+          description: "Intent is in force; drives Discovery Engine expansion."
+        - id: suspended
+          description: "Temporarily paused — existing resources retained."
+        - id: cancelled
+          description: "Terminal — intent withdrawn."
+      transitions:
+        - from: active
+          to: suspended
+          via: service-intent.suspend            # NEW verb — P.3
+        - from: suspended
+          to: active
+          via: service-intent.resume             # NEW verb — P.3
+        - from: active
+          to: cancelled
+          via: service-intent.cancel             # NEW verb — P.3
+        - from: suspended
+          to: cancelled
+          via: service-intent.cancel
+      terminal_states: [cancelled]
+      additional_operations:
+        - service-intent.supersede  # replaces intent with new row (immutable log-like)
+
+  - id: booking_location
+    constellation: trading.streetside
+    stateless: true
+    rationale: "Reference data — jurisdictional booking perimeter. No lifecycle; only timestamps."
+    source_entity: '"ob-poc".booking_location'
+    verbs:
+      - booking-location.create
+      - booking-location.update
+      - booking-location.list
+
+  - id: legal_entity
+    constellation: trading.streetside
+    stateless: true
+    rationale: |
+      Binary active/inactive per Adam Q4. KYC workspace owns granular
+      lifecycle (incorporated/active/dormant/dissolved/struck-off); IM
+      references read-only.
+    source_entity: '"ob-poc".legal_entity'
+    verbs:
+      - legal-entity.create
+      - legal-entity.list
+      - legal-entity.read
+
+  - id: product
+    constellation: trading.streetside
+    stateless: true
+    rationale: |
+      Product lifecycle is inherited from the parent trading profile
+      (Adam Q5). The `products` table IS the commercial catalogue but
+      from a DAG-slot perspective, the CBU's product enrolment lives
+      in service_intents (pass 6) and changes in product scope are
+      mandate amendments (trading_profile new-version lifecycle).
+    source_entity: '"ob-poc".products (catalogue) + service_intents (CBU-scoped)'
+    verbs:
+      - product.read
+      - product.list
+
+  - id: delivery
+    constellation: trading.streetside
+    stateless: false
+    state_machine:
+      id: delivery_lifecycle
+      source_entity: '"ob-poc".service_delivery_map'
+      state_column: delivery_status
+      description: |
+        Service delivery tracking. 5 states per schema CHECK constraint.
+        NOTE: this is borderline operational under the what-vs-how rule
+        (pass 3 addendum §9.4). Kept as-is per A-1 v3 because schema is
+        authoritative — flag for potential future refactor out of IM.
+      states:
+        - id: PENDING
+          entry: true
+          description: "Delivery requested; not yet started."
+        - id: IN_PROGRESS
+          description: "Delivery under way."
+        - id: DELIVERED
+          description: "Delivery complete."
+        - id: FAILED
+          description: "Delivery failed."
+        - id: CANCELLED
+          description: "Delivery cancelled before completion."
+      transitions:
+        - from: PENDING
+          to: IN_PROGRESS
+          via: delivery.start                    # NEW verb — P.3
+        - from: IN_PROGRESS
+          to: DELIVERED
+          via: delivery.complete
+        - from: IN_PROGRESS
+          to: FAILED
+          via: delivery.fail
+        - from: PENDING
+          to: CANCELLED
+          via: delivery.cancel                   # NEW verb — P.3
+        - from: IN_PROGRESS
+          to: CANCELLED
+          via: delivery.cancel
+      terminal_states: [DELIVERED, FAILED, CANCELLED]
+
+  # ---------------------------------------------------------------------------
+  # 2.4 NEW slots from passes 3 + 7 (3 slots)
+  # ---------------------------------------------------------------------------
+
+  - id: reconciliation
+    constellation: trading.streetside
+    added_in: pass_3_addendum
+    stateless: false
+    state_machine:
+      id: reconciliation_config_lifecycle
+      source_entity: "(new — P.2 schema work or reuse of existing recon table if present)"
+      state_column: (new)
+      description: |
+        Reconciliation CONFIG lifecycle — which SoR we reconcile against,
+        tolerances, escalation paths. The RUN events (scheduled /
+        running / matched / breaks) are operational runtime (layer 3)
+        and not in the DAG. (Adam Q-A: 'recon is part of a mandate.')
+      states:
+        - id: draft
+          entry: true
+          description: "Recon config authored but not yet active."
+        - id: active
+          description: "Recon config governing actual recon streams."
+        - id: suspended
+          description: "Recon temporarily paused."
+        - id: retired
+          description: "Recon config decommissioned."
+      transitions:
+        - from: draft
+          to: active
+          via: reconciliation.activate            # NEW verb — P.3
+        - from: active
+          to: suspended
+          via: reconciliation.suspend             # NEW verb — P.3
+        - from: suspended
+          to: active
+          via: reconciliation.reactivate          # NEW verb — P.3
+        - from: active
+          to: retired
+          via: reconciliation.retire              # NEW verb — P.3
+        - from: suspended
+          to: retired
+          via: reconciliation.retire
+      terminal_states: [retired]
+    product_gates:
+      # Per-stream recon applicability:
+      # - position recon: custody product (always — positions = custody data)
+      # - cash recon: cash_management or custody product
+      # - NAV recon: fund_accounting product
+      activated_by: [product.custody, product.fund_accounting, product.cash_management]
+
+  - id: corporate_action_event
+    constellation: trading.streetside
+    added_in: pass_7_addendum
+    stateless: false
+    state_machine:
+      id: corporate_action_event_lifecycle
+      source_entity: "(new — per-mandate CA event tracking)"
+      state_column: (new)
+      description: |
+        Per-mandate CA event decision-capture. Distinct from
+        corporate_action_policy (static config on trading profile).
+        This captures the mandate's ELECTION DECISION for a specific
+        CA event. Processing + settlement are operational (layer 3) —
+        tracked downstream in service profile, not in DAG (Adam Q-B +
+        pass-3 addendum narrowed to 3 states).
+      states:
+        - id: election_pending
+          entry: true
+          description: "CA event attached to mandate; election not yet made."
+        - id: elected
+          description: "Mandate actively elected a choice."
+        - id: default_applied
+          description: "Cutoff passed; default option from policy auto-applied."
+      transitions:
+        - from: election_pending
+          to: elected
+          via: corporate-action-event.elect       # NEW verb — P.3
+        - from: election_pending
+          to: default_applied
+          via: "(automatic trigger at cutoff)"
+      terminal_states: [elected, default_applied]
+    product_gates:
+      activated_by: [product.custody]  # CA processing is part of custody pipeline
+
+  - id: collateral_management
+    constellation: trading.streetside
+    added_in: pass_3_addendum
+    stateless: false
+    state_machine:
+      id: collateral_management_lifecycle
+      source_entity: "(new — per-mandate CSA/collateral config)"
+      state_column: (new)
+      description: |
+        Per-mandate collateral management config — which CSAs in play,
+        collateral schedule, thresholds, MTA. Does NOT model individual
+        margin call events (those are runtime — layer 3). Adam Q-C:
+        'derivatives 100% in scope, add collateral management as a
+        first-class branch.'
+      states:
+        - id: configured
+          entry: true
+          description: "CSA config authored; collateral schedule set."
+        - id: active
+          description: "Collateral management live for this mandate."
+        - id: suspended
+          description: "Collateral operations paused."
+        - id: terminated
+          description: "Terminal — collateral arrangement unwound."
+      transitions:
+        - from: configured
+          to: active
+          via: collateral-management.activate     # NEW verb — P.3
+        - from: active
+          to: suspended
+          via: collateral-management.suspend      # NEW verb — P.3
+        - from: suspended
+          to: active
+          via: collateral-management.reactivate   # NEW verb — P.3
+        - from: active
+          to: terminated
+          via: collateral-management.terminate    # NEW verb — P.3
+        - from: suspended
+          to: terminated
+          via: collateral-management.terminate
+      terminal_states: [terminated]
+    product_gates:
+      activated_by: [product.derivatives, product.collateral_mgmt]
+
+# =============================================================================
+# 3. CROSS-SLOT STATE CONSTRAINTS
+# =============================================================================
+# Rules that constrain combinations of slot states across the mandate.
+# Checked by the catalogue validator and by per-CBU go-live readiness gates.
+# =============================================================================
+
+cross_slot_constraints:
+
+  - id: mandate_requires_validated_cbu
+    description: |
+      trading_profile cannot progress past DRAFT unless cbu is VALIDATED.
+    rule: |
+      trading_profile.status NOT IN [DRAFT]
+        → cbu.status = VALIDATED
+    severity: error
+
+  - id: mandate_active_requires_live_settlement
+    description: |
+      A trading_profile cannot go ACTIVE without at least one LIVE
+      settlement_pattern chain.
+    rule: |
+      trading_profile.status = ACTIVE
+        → COUNT(settlement_pattern WHERE state = live) >= 1
+    severity: error
+
+  - id: archived_mandate_cascades_dependents
+    description: |
+      When trading_profile becomes ARCHIVED, dependent slots
+      (settlement_pattern live chains, trade_gateway active gateways,
+      cash_sweep active configs, service_intent active rows) must
+      transition to terminal or suspended.
+    rule: |
+      trading_profile.status = ARCHIVED
+        → (for each settlement_pattern: state IN [deactivated] OR WARNING)
+        AND (for each trade_gateway: state IN [retired] OR WARNING)
+        AND (for each service_intent: status IN [cancelled] OR WARNING)
+    severity: warning  # upstream ops may handle cascades manually
+
+  - id: cbu_suspended_implies_mandate_suspended
+    description: |
+      When cbu is SUSPENDED, any active trading_profile should be
+      in SUSPENDED state (operational consistency).
+    rule: |
+      cbu.status = SUSPENDED AND EXISTS(trading_profile WHERE cbu_id=this.cbu_id AND status = ACTIVE)
+        → WARNING "Active mandate on suspended CBU"
+    severity: warning
+
+  - id: cbu_archived_requires_mandate_archived
+    description: |
+      CBU cannot be archived while any trading_profile is not archived.
+    rule: |
+      cbu.status = ARCHIVED
+        → all trading_profile.status IN [ARCHIVED, SUPERSEDED]
+    severity: error
+
+  - id: retired_gateway_prunes_routing_rules
+    description: |
+      Retiring a trade_gateway must prune any routing rules that
+      reference it on an active trading_profile.
+    rule: |
+      trade_gateway.state = retired
+        → trading_profile.routing_rules does NOT reference this gateway
+    severity: error
+
+  - id: deactivated_chain_requires_universe_recheck
+    description: |
+      Deactivating a settlement_pattern chain leaves some universe
+      un-settleable. Re-validate go-live readiness.
+    rule: |
+      settlement_pattern.state = deactivated
+        → trading-profile.validate-go-live-ready must be re-run for the profile
+    severity: warning
+
+  - id: decommissioned_resource_cascades_intent
+    description: |
+      service_resource decommissioned → any service_intent referencing
+      this resource must be cancelled (otherwise the intent is stranded).
+    rule: |
+      service_resource.state = decommissioned
+        → service_intent.status = cancelled for intents referencing this resource
+    severity: error
+
+  - id: isda_coverage_required_for_derivative_trading
+    description: |
+      trading_profile active with derivative instruments in scope
+      requires at least one ISDA coverage for each OTC counterparty.
+    rule: |
+      trading_profile.status = ACTIVE
+        AND EXISTS(components WHERE instrument_class IN derivatives)
+        → EXISTS(isda_framework coverage for each OTC counterparty)
+    severity: error
+
+  - id: collateral_management_active_requires_isda
+    description: |
+      collateral_management can only be ACTIVE if ISDA coverage exists.
+    rule: |
+      collateral_management.state = active
+        → isda_framework.is_active = true
+    severity: error
+
+# =============================================================================
+# 4. PRODUCT-MODULE ACTIVATION GATES (pass 4)
+# =============================================================================
+# Declares which product each slot activates for. Per-CBU reachability is
+# computed as: slot is reachable iff slot.product_gates.activated_by ∩
+# CBU.service_intents.products is non-empty (or slot has no gates).
+#
+# During pilot rollout, these are INFORMATIONAL ONLY — the catalogue-load
+# gate does not yet filter by product. Runtime filtering is Tranche-3
+# (Catalogue workspace per P.8).
+# =============================================================================
+
+product_module_gates:
+
+  # Slots with explicit product gates (3 new slots from pass 3/7)
+  # See slots[].product_gates above for full declarations.
+
+  # Other slots are always-on under the current pack surface. Future
+  # refinement (v1.1 candidate) would add product gates per the §6
+  # product-module map in
+  # docs/todo/instrument-matrix-dag-workspace-diagram-2026-04-23.md.
+
+  always_on:
+    - workspace_root
+    - group
+    - trading_profile_template
+    - trading_profile
+    - cbu
+    - service_resource
+    - service_intent
+    - booking_location
+    - legal_entity
+    - product
+    - delivery
+
+  conditionally_on:
+    - slot: custody
+      activated_by: [product.custody]
+    - slot: settlement_pattern_template
+      activated_by: [product.custody]
+    - slot: corporate_action_policy
+      activated_by: [product.custody]
+    - slot: trade_gateway
+      activated_by: [product.middle_office, product.markets_fx]
+    - slot: booking_principal
+      activated_by: [product.middle_office]
+    - slot: cash_sweep
+      activated_by: [product.custody]  # cash mgmt is a sub-service of custody today
+    - slot: isda_framework
+      activated_by: [product.derivatives]
+    - slot: reconciliation
+      activated_by: [product.custody, product.fund_accounting, product.cash_management]
+    - slot: corporate_action_event
+      activated_by: [product.custody]
+    - slot: collateral_management
+      activated_by: [product.derivatives, product.collateral_mgmt]
+
+# =============================================================================
+# 5. OUT-OF-SCOPE
+# =============================================================================
+# Explicit list of concerns that are NOT modeled in this DAG, per the
+# what-vs-how architectural rule (pass 3 addendum §9).
+# =============================================================================
+
+out_of_scope:
+
+  # Layer 3 (operations) — not in DAG
+  - "Reconciliation RUN events (scheduled / running / matched / breaks) — layer 3 runtime"
+  - "Corporate action event PROCESSING + SETTLEMENT — layer 3 runtime (DAG stops at election decision)"
+  - "Margin call events (VM, IM, MTA flows) — layer 3 runtime"
+  - "Exception / break handling (settlement fails, unmatched trades, CA misses) — layer 3 service-profile territory"
+  - "Partial settlement mechanics — layer 3 operational detail"
+  - "FIX session UAT / certification progression — layer 2 service-resource setup"
+  - "SLA performance tracking — layer 3"
+
+  # Scope-bounded to other workspaces
+  - "Counterparty approval lifecycle — lives in KYC / credit workspace; IM references read-only"
+  - "Investment guidelines / benchmarks / risk limits — CBU-level attributes (Adam G-2)"
+  - "Trade execution lifecycle (order → execution → allocation) — separate workspace"
+  - "Fund subscription / redemption matching — separate workspace (TA runtime)"
+  - "Valuation / NAV calculation — separate workspace (FA runtime)"
+
+  # Product-gated — future scope
+  - "Transfer Agency share class definitions — add when TA product declared a first-class DAG extension"
+  - "Prime brokerage relationship lifecycle — add when PB product activated"

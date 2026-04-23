@@ -1,0 +1,454 @@
+# Instrument Template Maintenance Macros (Pilot P.2 — 2026-04-23)
+#
+# Macros for maintaining GROUP-LEVEL instrument-matrix templates.
+# Templates are the vanilla matrices that get cloned to CBU instances
+# on onboarding. Changes to templates are forward-only: existing
+# CBU clones are unaffected by template changes (the instance has its
+# own copy).
+#
+# Authoring governance: template maintenance operations are typically
+# gated behind compliance review because a template change means the
+# "vanilla starting point" for future clones changes. All macros here
+# baseline to requires_confirmation at minimum (P.3 tier review).
+#
+# Companion docs:
+#   - docs/todo/instrument-matrix-dag-workspace-diagram-2026-04-23.md
+#   - docs/todo/instrument-matrix-dag-im-sanity-review-pass7-2026-04-23.md
+#   - rust/config/sem_os_seeds/dag_taxonomies/instrument_matrix_dag.yaml
+#
+# Existing companion macros:
+#   - config/verb_schemas/macros/instrument.yaml (7 asset-family setup
+#     macros + 5 lifecycle macros; operate on CBU instances, not templates)
+
+# =============================================================================
+# TEMPLATE LIFECYCLE
+# =============================================================================
+
+instrument-template.create:
+  kind: macro
+  ui:
+    label: "Create New Instrument-Matrix Template"
+    description: >
+      Initialize a new group-level instrument-matrix template (vanilla
+      matrix that can be cloned to CBUs). Template starts in `available`
+      state per trading_profile_template_lifecycle (2-state).
+    target-label: "Template"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: group-ref
+    produces: trading-profile-template
+  args:
+    style: keyworded
+    required:
+      group:
+        type: ref
+        ref-kind: group
+        ui-label: "Parent Group"
+      template-name:
+        type: str
+        ui-label: "Template Name"
+      base-currency:
+        type: str
+        ui-label: "Base Currency"
+        description: "Default base currency for CBUs cloned from this template (e.g., USD, EUR)."
+    optional:
+      clone-from:
+        type: ref
+        ref-kind: trading-profile-template
+        ui-label: "Clone From Existing Template"
+        description: "Optional — copy structure from an existing template as a starting point."
+  expands-to:
+    - verb: trading-profile.create-draft
+      args: { group: "${group}", name: "${template-name}", base-currency: "${base-currency}", scope: "template" }
+    - verb: trading-profile.set-base-currency
+      args: { currency: "${base-currency}" }
+      when: filled
+
+instrument-template.retire:
+  kind: macro
+  ui:
+    label: "Retire Instrument-Matrix Template"
+    description: >
+      Retire a template — removes it from the available-for-cloning set.
+      Existing CBU clones are unaffected. Forward-only; retired templates
+      cannot be un-retired (create a new template instead).
+    target-label: "Template"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+        ui-label: "Template to Retire"
+    optional:
+      reason:
+        type: str
+        ui-label: "Retirement Reason"
+  expands-to:
+    - verb: trading-profile.retire-template
+      args: { template: "${template}", reason: "${reason}" }
+
+# =============================================================================
+# TEMPLATE CONTENT MAINTENANCE — INSTRUMENT CLASSES
+# =============================================================================
+
+instrument-template.add-instrument-class:
+  kind: macro
+  ui:
+    label: "Add Instrument Class to Template"
+    description: >
+      Extend a template by adding a new instrument class (e.g. ADR, GDR,
+      CFD, convertible bond). Requires the class to exist in the
+      reference-data catalogue. Change is forward-only — future CBU
+      clones will inherit, existing clones are unaffected.
+    target-label: "Instrument Class on Template"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+        ui-label: "Target Template"
+      instrument-class:
+        type: str
+        ui-label: "Instrument Class"
+        description: "Must exist in instrument_class reference catalogue."
+    optional:
+      market:
+        type: str
+        ui-label: "Primary Market"
+        description: "MIC code if instrument-class is market-specific."
+      requires-isda:
+        type: bool
+        ui-label: "Requires ISDA Coverage"
+        default: false
+  expands-to:
+    - verb: instrument-class.ensure
+      args: { class: "${instrument-class}" }
+      when: [empty, filled]
+    - verb: trading-profile.add-instrument-class
+      args: { template: "${template}", class: "${instrument-class}", market: "${market}" }
+    - verb: trading-profile.validate-universe-coverage
+      args: { template: "${template}" }
+
+instrument-template.remove-instrument-class:
+  kind: macro
+  ui:
+    label: "Remove Instrument Class from Template"
+    description: >
+      Deprecate an instrument class from a template. Existing CBU clones
+      retain their copy of the class; only future clones will lack it.
+    target-label: "Instrument Class on Template"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+        ui-label: "Target Template"
+      instrument-class:
+        type: str
+        ui-label: "Instrument Class to Remove"
+  expands-to:
+    - verb: trading-profile.remove-instrument-class
+      args: { template: "${template}", class: "${instrument-class}" }
+
+# =============================================================================
+# TEMPLATE CONTENT MAINTENANCE — MARKETS
+# =============================================================================
+
+instrument-template.add-market:
+  kind: macro
+  ui:
+    label: "Add Market to Template"
+    description: >
+      Add a new trading market (MIC code) to a template — enables CBUs
+      cloned from it to trade on that market by default. Requires
+      corresponding settlement-chain setup to be completable per
+      market; macro validates chain feasibility before committing.
+    target-label: "Market on Template"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+        ui-label: "Target Template"
+      market:
+        type: str
+        ui-label: "Market MIC"
+        description: "ISO 10383 MIC (e.g., XNYS, XLON, XPAR)."
+    optional:
+      settlement-currency:
+        type: str
+        ui-label: "Settlement Currency"
+      subcustodian-hint:
+        type: str
+        ui-label: "Preferred Subcustodian"
+  expands-to:
+    - verb: trading-profile.add-market
+      args: { template: "${template}", market: "${market}" }
+    - verb: settlement-chain.define-location
+      args: { template: "${template}", market: "${market}", currency: "${settlement-currency}" }
+      when: filled
+    - verb: trading-profile.validate-universe-coverage
+      args: { template: "${template}" }
+
+instrument-template.remove-market:
+  kind: macro
+  ui:
+    label: "Remove Market from Template"
+    description: >
+      Deprecate a market from a template. Cascades to settlement-chain
+      locations if they reference only this market.
+    target-label: "Market on Template"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+      market:
+        type: str
+        ui-label: "Market MIC to Remove"
+  expands-to:
+    - verb: trading-profile.remove-market
+      args: { template: "${template}", market: "${market}" }
+
+# =============================================================================
+# TEMPLATE CONTENT MAINTENANCE — COUNTERPARTY / SETTLEMENT FAMILIES
+# =============================================================================
+
+instrument-template.add-counterparty-type:
+  kind: macro
+  ui:
+    label: "Add Counterparty Type to Template"
+    description: >
+      Add a new counterparty family to a template (broker category,
+      prime broker, CCP membership, etc.) with associated default
+      routing. Does NOT add specific counterparty IDs — those are
+      CBU-level attachments.
+    target-label: "Counterparty Type on Template"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+      counterparty-type:
+        type: str
+        ui-label: "Counterparty Type"
+        description: "E.g., prime_broker, executing_broker, ccp_clearer."
+  expands-to:
+    - verb: trading-profile.add-counterparty-type
+      args: { template: "${template}", type: "${counterparty-type}" }
+
+instrument-template.add-settlement-pattern:
+  kind: macro
+  ui:
+    label: "Add Settlement Pattern to Template"
+    description: >
+      Define a new settlement pattern on a template (e.g. DVP T+2 via
+      CSD, DVP T+1 via ICSD). Includes default subcustodian network.
+    target-label: "Settlement Pattern on Template"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+      pattern-name:
+        type: str
+        ui-label: "Pattern Name"
+      settlement-cycle:
+        type: str
+        ui-label: "Settlement Cycle"
+        description: "T+0, T+1, T+2 etc."
+      market:
+        type: str
+        ui-label: "Primary Market"
+  expands-to:
+    - verb: settlement-chain.create-chain
+      args: { template: "${template}", name: "${pattern-name}", cycle: "${settlement-cycle}", market: "${market}" }
+
+# =============================================================================
+# TEMPLATE CONTENT MAINTENANCE — CORPORATE ACTIONS
+# =============================================================================
+
+instrument-template.add-ca-event-type:
+  kind: macro
+  ui:
+    label: "Enable Corporate Action Event Type on Template"
+    description: >
+      Enable a new CA event type (cash dividend, stock dividend,
+      tender offer, merger, split, spinoff) on a template. CBUs
+      cloned after this change inherit the enabled set.
+    target-label: "CA Event Type on Template"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+      event-type:
+        type: str
+        ui-label: "Event Type"
+        description: "Must exist in corporate_action_event_type catalogue."
+    optional:
+      default-election:
+        type: str
+        ui-label: "Default Election"
+  expands-to:
+    - verb: corporate-action.define-event-type
+      args: { type: "${event-type}" }
+      when: [empty, filled]
+    - verb: trading-profile.ca.enable-event-types
+      args: { template: "${template}", types: ["${event-type}"] }
+    - verb: trading-profile.ca.set-default-option
+      args: { template: "${template}", event-type: "${event-type}", option: "${default-election}" }
+      when: filled
+
+# =============================================================================
+# TEMPLATE VERSIONING + PUBLICATION
+# =============================================================================
+
+instrument-template.create-version:
+  kind: macro
+  ui:
+    label: "Create New Template Version"
+    description: >
+      Start a new version of a template (e.g. "Lux-UCITS-Equity v2" from
+      v1). New version is in draft state; existing clones and the prior
+      version are unaffected until publish.
+    target-label: "Template Version"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: trading-profile-template
+  args:
+    style: keyworded
+    required:
+      parent-template:
+        type: ref
+        ref-kind: trading-profile-template
+      version-note:
+        type: str
+        ui-label: "Version Note"
+        description: "Short description of what changes this version introduces."
+  expands-to:
+    - verb: trading-profile.create-new-version
+      args: { parent: "${parent-template}", note: "${version-note}" }
+
+instrument-template.publish-version:
+  kind: macro
+  ui:
+    label: "Publish Template Version"
+    description: >
+      Publish a template version — makes it the new default for
+      cloning. Prior version remains available for clones already
+      made; new clones start from the published version.
+    target-label: "Template Version"
+  routing:
+    mode-tags: [structure, governance]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template-version:
+        type: ref
+        ref-kind: trading-profile-template
+  expands-to:
+    - verb: trading-profile.publish-template-version
+      args: { version: "${template-version}" }
+
+# =============================================================================
+# FULL-TEMPLATE AUDIT / REVIEW (read-only — no state change)
+# =============================================================================
+
+instrument-template.review-coverage:
+  kind: macro
+  ui:
+    label: "Review Template Coverage"
+    description: >
+      Read-only audit of a template — what instrument classes, markets,
+      settlement patterns, ISDA coverage, CA event types, trade gateways
+      are declared. Useful before proposing amendments.
+    target-label: "Template"
+  routing:
+    mode-tags: [review, read-only]
+    operator-domain: instrument-template
+  target:
+    operates-on: trading-profile-template-ref
+    produces: null
+  args:
+    style: keyworded
+    required:
+      template:
+        type: ref
+        ref-kind: trading-profile-template
+  expands-to:
+    - verb: trading-profile.list-components
+      args: { template: "${template}" }
+    - verb: trading-profile.validate-universe-coverage
+      args: { template: "${template}" }
+    - verb: settlement-chain.list-chains
+      args: { template: "${template}" }
+    - verb: trade-gateway.list-gateways
+      args: { template: "${template}" }
+    - verb: isda.list
+      args: { template: "${template}" }
