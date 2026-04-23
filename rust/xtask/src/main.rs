@@ -26,6 +26,7 @@ mod harness;
 mod instrument_harness;
 mod lexicon;
 mod onboarding_harness;
+mod reconcile;
 mod replay_tuner;
 mod seed_allianz;
 mod sem_reg;
@@ -342,6 +343,12 @@ enum Command {
     Verbs {
         #[command(subcommand)]
         action: VerbsAction,
+    },
+
+    /// Catalogue reconciliation commands (Pilot P.7 — validate / status / batch)
+    Reconcile {
+        #[command(subcommand)]
+        action: reconcile::ReconcileAction,
     },
 
     /// Lexicon service commands (compile, lint, bench)
@@ -1371,6 +1378,11 @@ fn main() -> Result<()> {
                 dry_run,
                 verbose,
             ))?;
+            Ok(())
+        }
+        Command::Reconcile { action } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(reconcile::run(action))?;
             Ok(())
         }
         Command::Verbs { action } => {
