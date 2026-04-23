@@ -1264,6 +1264,11 @@ domains:
           fields:
           - name: enabled_count
             type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.disable-event-types:
         description: Disable CA event types for this trading profile
@@ -1298,6 +1303,11 @@ domains:
           description: "Event codes to disable"
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.set-notification-policy:
         description: Configure CA notification settings
@@ -1341,6 +1351,11 @@ domains:
           description: Email or contact for escalations
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.set-election-policy:
         description: Configure who makes CA elections and requirements
@@ -1391,6 +1406,11 @@ domains:
           description: Value threshold below which auto-instruct applies
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.set-default-option:
         description: Set default election for specific event type
@@ -1435,6 +1455,11 @@ domains:
           description: Default election option for this event type
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.remove-default-option:
         description: Remove default election for specific event type
@@ -1468,6 +1493,11 @@ domains:
           required: true
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       ca.add-cutoff-rule:
         description: Add deadline cutoff rule for market/depository
@@ -1524,6 +1554,11 @@ domains:
           description: Days before cutoff to escalate
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.remove-cutoff-rule:
         description: Remove cutoff rule by market/depository
@@ -1560,6 +1595,11 @@ domains:
           required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       ca.link-proceeds-ssi:
         description: Map CA proceeds to settlement instruction
@@ -1605,6 +1645,11 @@ domains:
           description: SSI name from standing instructions section
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ca.remove-proceeds-ssi:
         description: Remove CA proceeds SSI mapping
@@ -1644,6 +1689,11 @@ domains:
           required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       ca.get-policy:
         description: Get current CA policy configuration from trading profile
@@ -1675,17 +1725,17 @@ domains:
         returns:
           type: record
           description: "{ enabled_event_types: [...], notification_policy: {...}, election_policy: {...}, default_options: [...], cutoff_rules: [...], proceeds_ssi_mappings: [...] }"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # P.3 ADDITIONS (2026-04-23) — TRADING-PROFILE LIFECYCLE TRANSITIONS
       # Adds missing transitions + parallel_run + supersede per
       # instrument_matrix_dag.yaml trading_profile_lifecycle (9 states).
       # =========================================================================
-        three_axis:
-          state_effect: preserving
-          external_effects: [emitting]
-          consequence:
-            baseline: requires_confirmation
 
       enter-parallel-run:
         description: "Enter parallel_run state (approved → parallel_run)"

@@ -43,6 +43,11 @@ domains:
           maps_to: resource_code
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list:
         description: List service resource types with optional filters
@@ -95,6 +100,11 @@ domains:
           type: record_set
 
       # === Taxonomy lookups (read-only - taxonomy managed separately) ===
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       list-by-service:
         description: List service resource types for a service
         metadata:
@@ -135,6 +145,11 @@ domains:
           type: record_set
 
       # === Attribute lookups (read-only - attribute requirements managed separately) ===
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       list-attributes:
         description: List attribute requirements for a service resource type
         metadata:
@@ -179,6 +194,11 @@ domains:
           type: record_set
 
       # === Instance Operations (provisioning and lifecycle) ===
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       provision:
         description: Provision a service resource instance for a CBU
         metadata:
@@ -276,6 +296,11 @@ domains:
           type: uuid
           name: instance_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       set-attr:
         description: Set an attribute value on a service resource instance
@@ -324,6 +349,11 @@ domains:
         - name: source
           type: json
           required: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       activate:
         description: Activate a service resource instance
@@ -349,6 +379,11 @@ domains:
         - name: instance-id
           type: uuid
           required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       suspend:
         description: Suspend a service resource instance
@@ -383,6 +418,11 @@ domains:
         - name: reason
           type: string
           required: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       decommission:
         description: Decommission a service resource instance
@@ -417,6 +457,11 @@ domains:
         - name: reason
           type: string
           required: false
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       validate-attrs:
         description: Validate that all required attributes are set for a resource instance
@@ -455,6 +500,11 @@ domains:
           name: validation_result
 
       # === Lifecycle taxonomy and provisioning (merged from lifecycle) ===
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       read-lifecycle:
         description: Read a lifecycle by ID or code
         metadata:
@@ -485,6 +535,11 @@ domains:
           maps_to: code
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-lifecycles:
         description: List lifecycles with optional filters
@@ -519,6 +574,11 @@ domains:
           maps_to: is_active
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-lifecycles-by-instrument:
         description: List lifecycles for an instrument class
@@ -556,6 +616,11 @@ domains:
           required: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       read-lifecycle-resource-type:
         description: Read a lifecycle resource type
@@ -585,6 +650,11 @@ domains:
           maps_to: code
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-lifecycle-resource-types:
         description: List lifecycle resource types
@@ -614,6 +684,11 @@ domains:
           maps_to: owner
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-resources-for-lifecycle:
         description: List resource types required by a lifecycle
@@ -651,6 +726,11 @@ domains:
           required: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       provision-lifecycle:
         description: Provision a lifecycle resource instance for a CBU
@@ -733,6 +813,11 @@ domains:
           type: uuid
           name: instance_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       activate-lifecycle:
         description: Activate a lifecycle resource instance
@@ -763,6 +848,11 @@ domains:
           maps_to: instance_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       suspend-lifecycle:
         description: Suspend a lifecycle resource instance
@@ -796,6 +886,11 @@ domains:
           required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       decommission-lifecycle:
         description: Decommission a lifecycle resource instance
@@ -829,6 +924,11 @@ domains:
           required: false
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-lifecycle-instances:
         description: List lifecycle resource instances for a CBU
@@ -869,6 +969,11 @@ domains:
           maps_to: status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       analyze-lifecycle-gaps:
         description: Analyze lifecycle provisioning gaps for a CBU
@@ -902,6 +1007,11 @@ domains:
           default: ALL
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       check-lifecycle-readiness:
         description: Check if CBU is ready to trade an instrument
@@ -958,6 +1068,11 @@ domains:
             primary_key: entity_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       generate-lifecycle-plan:
         description: Generate DSL provisioning plan for lifecycle gaps
@@ -990,6 +1105,11 @@ domains:
           required: false
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       execute-lifecycle-plan:
         description: Execute a provisioning plan
@@ -1026,6 +1146,11 @@ domains:
           default: false
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       discover-lifecycles:
         description: Discover all lifecycles and resources for an instrument
@@ -1061,6 +1186,11 @@ domains:
           type: record
 
       # === SemOS Gap Discovery ===
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       check-attribute-gaps:
         description: Cross-reference SRDEF attribute requirements against SemOS active AttributeDefs
         metadata:
@@ -1087,6 +1217,11 @@ domains:
         returns:
           type: record_set
           description: List of {srdef_id, attribute_fqn, status} where status is missing/ungoverned/ok
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       sync-definitions:
         description: Re-sync service resource definitions from YAML config to database
@@ -1113,6 +1248,11 @@ domains:
       # =========================================================================
       # P.3 ADDITIONS (2026-04-23) — SERVICE-RESOURCE LIFECYCLE TRANSITIONS
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       reactivate:
         description: "Reactivate suspended service resource (suspended → activated)"

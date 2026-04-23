@@ -69,6 +69,11 @@ domains:
           type: uuid
           name: intent_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list:
         description: "List all service intents for a CBU"
@@ -102,6 +107,11 @@ domains:
         returns:
           type: record_set
           name: intents
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       supersede:
         description: "Supersede an existing service intent with new options"
@@ -139,6 +149,11 @@ domains:
       # Adds transition verbs for the 3-state service_intent_lifecycle per
       # instrument_matrix_dag.yaml (active / suspended / cancelled).
       # =========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       suspend:
         description: "Suspend an active service intent (temporary hold)"
@@ -275,6 +290,11 @@ domains:
         returns:
           type: record
           name: discovery_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       explain:
         description: "Explain why specific SRDEFs were discovered"
@@ -308,6 +328,11 @@ domains:
         returns:
           type: record_set
           name: explanations
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
   attributes:
     description: "Attribute requirement and value management"
@@ -345,6 +370,11 @@ domains:
         returns:
           type: record
           name: rollup_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       populate:
         description: "Auto-populate attribute values from available sources"
@@ -382,6 +412,11 @@ domains:
         returns:
           type: record
           name: population_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       gaps:
         description: "Show attribute gaps - required values that are missing"
@@ -419,6 +454,11 @@ domains:
         returns:
           type: record_set
           name: gaps
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       set:
         description: "Set an attribute value manually"
@@ -462,6 +502,11 @@ domains:
         returns:
           type: affected
           name: rows
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
   provisioning:
     description: "Resource provisioning operations"
@@ -503,6 +548,11 @@ domains:
         returns:
           type: record
           name: provisioning_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       status:
         description: "Check provisioning request status"
@@ -531,6 +581,11 @@ domains:
         returns:
           type: record
           name: request_status
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
   readiness:
     description: "Service readiness operations"
@@ -572,6 +627,11 @@ domains:
         returns:
           type: record
           name: readiness_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       explain:
         description: "Explain blocking reasons for a service"
@@ -614,6 +674,11 @@ domains:
         returns:
           type: record_set
           name: blocking_reasons
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
   pipeline:
     description: "Full pipeline orchestration"
@@ -656,3 +721,8 @@ domains:
         returns:
           type: record
           name: pipeline_result
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
