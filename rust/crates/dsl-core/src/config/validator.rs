@@ -1,0 +1,748 @@
+//! Three-axis declaration validator (v1.1 §6.2 — pilot P.1.c / P.1.d).
+//!
+//! Pure function library: takes a `VerbsConfig` (or a single `VerbConfig`)
+//! and returns a list of errors and warnings. No DB access (P3). No
+//! ordering assumptions — callers may aggregate across the whole catalogue.
+//!
+//! v1.1 §6.2 defines three error classes:
+//!
+//! - **Structural errors** — the declaration is internally inconsistent at
+//!   the mechanical level (e.g. `state_effect: transition` without a
+//!   `transitions` block).
+//! - **Well-formedness errors** — the declaration references names that
+//!   don't exist in the rest of the verb (e.g. an escalation predicate
+//!   names an arg that isn't in the verb's `args:` list).
+//! - **Policy-sanity warnings** — conservative, narrow, raised ONLY for
+//!   combinations that are mechanically internally inconsistent. P10's
+//!   orthogonality means MOST "unusual" combinations are legitimate
+//!   (state-preserving + `requires_explicit_authorisation`, state-transition
+//!   + `external_effects: []` + `requires_explicit_authorisation`) and the
+//!   validator stays silent. Warnings are for the narrow mechanically-broken
+//!   set — not opinion.
+//!
+//! P.1.c implements structural + well-formedness. P.1.d adds the policy-
+//! sanity warnings.
+
+use crate::config::types::{
+    ConsequenceDeclaration, ConsequenceTier, EscalationPredicate, ExternalEffect, StateEffect,
+    ThreeAxisDeclaration, VerbConfig, VerbsConfig,
+};
+use std::collections::HashSet;
+
+// ---------------------------------------------------------------------------
+// Error + warning taxonomy
+// ---------------------------------------------------------------------------
+
+/// Location of a finding — verb-scoped where known, catalogue-wide otherwise.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Location {
+    /// `domain.verb` FQN if known, else some other identifier.
+    pub fqn: String,
+    /// Optional path fragment within the verb's declaration for UX.
+    pub path: Option<String>,
+}
+
+impl Location {
+    pub fn verb(fqn: impl Into<String>) -> Self {
+        Self {
+            fqn: fqn.into(),
+            path: None,
+        }
+    }
+    pub fn verb_path(fqn: impl Into<String>, path: impl Into<String>) -> Self {
+        Self {
+            fqn: fqn.into(),
+            path: Some(path.into()),
+        }
+    }
+}
+
+impl std::fmt::Display for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.path {
+            Some(p) => write!(f, "{}::{}", self.fqn, p),
+            None => f.write_str(&self.fqn),
+        }
+    }
+}
+
+/// Structural errors — the declaration is mechanically inconsistent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StructuralError {
+    /// `state_effect: transition` declared without a `transitions:` block
+    /// OR with an empty `transitions.edges` list.
+    TransitionWithoutEdges(Location),
+    /// `state_effect: preserving` declared together with a non-empty
+    /// `transitions:` block. P10's orthogonality holds but the transitions
+    /// block is only meaningful for transition-effect verbs.
+    PreservingWithTransitions(Location),
+}
+
+impl std::fmt::Display for StructuralError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TransitionWithoutEdges(loc) => write!(
+                f,
+                "{loc}: state_effect=transition requires a non-empty transitions.edges list"
+            ),
+            Self::PreservingWithTransitions(loc) => write!(
+                f,
+                "{loc}: state_effect=preserving must not declare a transitions block"
+            ),
+        }
+    }
+}
+
+/// Well-formedness errors — the declaration references names that don't
+/// exist in the rest of the verb.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WellFormednessError {
+    /// Escalation rule's predicate references an argument name that is not
+    /// declared in the verb's `args:` list. Rule index + predicate rendered
+    /// for operator UX.
+    EscalationArgNotDeclared {
+        location: Location,
+        rule_name: String,
+        arg: String,
+    },
+    /// Escalation rule's tier is strictly below the declared baseline.
+    /// P11 says rules can only raise tier — a rule whose tier is `< baseline`
+    /// is dead code at best, a bug at worst.
+    EscalationTierBelowBaseline {
+        location: Location,
+        rule_name: String,
+        rule_tier: ConsequenceTier,
+        baseline: ConsequenceTier,
+    },
+    /// Declaration is missing on a verb that should carry one. The
+    /// `expected` flag is set by callers who know the workspace has been
+    /// migrated; during rollout, callers may run with `require_declaration:
+    /// false` so missing declarations are tolerated.
+    DeclarationIncomplete { location: Location },
+    /// Transitions block declares a `dag:` name that doesn't match any
+    /// known DAG taxonomy. Checked only when the caller passes a known-DAG
+    /// set; otherwise skipped (P.2 produces the taxonomy; P.1.c alone
+    /// can't cross-check).
+    UnknownDagReference {
+        location: Location,
+        dag: String,
+    },
+}
+
+impl std::fmt::Display for WellFormednessError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EscalationArgNotDeclared {
+                location,
+                rule_name,
+                arg,
+            } => write!(
+                f,
+                "{location}: escalation rule '{rule_name}' references arg '{arg}' which is not \
+                 declared in the verb's args list"
+            ),
+            Self::EscalationTierBelowBaseline {
+                location,
+                rule_name,
+                rule_tier,
+                baseline,
+            } => write!(
+                f,
+                "{location}: escalation rule '{rule_name}' tier ({rule_tier:?}) is below \
+                 baseline ({baseline:?}); rules can only raise tier per v1.1 P11"
+            ),
+            Self::DeclarationIncomplete { location } => {
+                write!(f, "{location}: missing three_axis declaration (v1.1 P1)")
+            }
+            Self::UnknownDagReference { location, dag } => {
+                write!(
+                    f,
+                    "{location}: transitions.dag='{dag}' does not match any known DAG taxonomy"
+                )
+            }
+        }
+    }
+}
+
+/// Conservative policy-sanity warnings (P.1.d will populate this).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PolicyWarning {
+    /// The escalation predicate is definitionally unreachable (e.g. a
+    /// predicate whose tier equals the baseline — always dominated).
+    /// Populated by P.1.d.
+    UnreachableEscalation {
+        location: Location,
+        rule_name: String,
+    },
+}
+
+impl std::fmt::Display for PolicyWarning {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnreachableEscalation {
+                location,
+                rule_name,
+            } => write!(
+                f,
+                "{location}: escalation rule '{rule_name}' tier equals baseline — rule is a \
+                 no-op (warning only, not a bug)"
+            ),
+        }
+    }
+}
+
+/// Validator output.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ValidationReport {
+    pub structural: Vec<StructuralError>,
+    pub well_formedness: Vec<WellFormednessError>,
+    pub warnings: Vec<PolicyWarning>,
+}
+
+impl ValidationReport {
+    pub fn is_clean(&self) -> bool {
+        self.structural.is_empty() && self.well_formedness.is_empty()
+    }
+    pub fn error_count(&self) -> usize {
+        self.structural.len() + self.well_formedness.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Validator entry points
+// ---------------------------------------------------------------------------
+
+/// Optional cross-reference information. If provided, the validator
+/// additionally checks `transitions.dag` references against known DAGs.
+#[derive(Debug, Clone, Default)]
+pub struct ValidationContext {
+    /// Set of DAG taxonomy names the catalogue knows about. If empty, DAG
+    /// cross-checks are skipped.
+    pub known_dags: HashSet<String>,
+    /// Whether verbs MUST carry a declaration. During rollout, set false so
+    /// missing declarations don't error (but are reported via
+    /// `DeclarationIncomplete` if caller opts in).
+    pub require_declaration: bool,
+}
+
+/// Validate a single verb. Returns a report — callers aggregate across the
+/// catalogue.
+pub fn validate_verb(
+    fqn: &str,
+    verb: &VerbConfig,
+    ctx: &ValidationContext,
+) -> ValidationReport {
+    let mut report = ValidationReport::default();
+
+    match &verb.three_axis {
+        None => {
+            if ctx.require_declaration {
+                report
+                    .well_formedness
+                    .push(WellFormednessError::DeclarationIncomplete {
+                        location: Location::verb(fqn),
+                    });
+            }
+        }
+        Some(decl) => validate_declaration(fqn, verb, decl, ctx, &mut report),
+    }
+
+    report
+}
+
+fn validate_declaration(
+    fqn: &str,
+    verb: &VerbConfig,
+    decl: &ThreeAxisDeclaration,
+    ctx: &ValidationContext,
+    report: &mut ValidationReport,
+) {
+    // Structural: transition ↔ non-empty transitions.
+    match (decl.state_effect, &decl.transitions) {
+        (StateEffect::Transition, Some(t)) if !t.edges.is_empty() => {
+            // OK. Optional: cross-check DAG reference if the context has one.
+            if !ctx.known_dags.is_empty() && !ctx.known_dags.contains(&t.dag) {
+                report
+                    .well_formedness
+                    .push(WellFormednessError::UnknownDagReference {
+                        location: Location::verb_path(fqn, "transitions.dag"),
+                        dag: t.dag.clone(),
+                    });
+            }
+        }
+        (StateEffect::Transition, _) => {
+            report
+                .structural
+                .push(StructuralError::TransitionWithoutEdges(Location::verb(fqn)));
+        }
+        (StateEffect::Preserving, Some(t)) if !t.edges.is_empty() => {
+            report
+                .structural
+                .push(StructuralError::PreservingWithTransitions(Location::verb(
+                    fqn,
+                )));
+        }
+        (StateEffect::Preserving, _) => { /* OK */ }
+    }
+
+    // Well-formedness: escalation predicates reference declared args.
+    let declared_args: HashSet<String> =
+        verb.args.iter().map(|a| a.name.clone()).collect();
+    validate_consequence(
+        fqn,
+        &decl.consequence,
+        &declared_args,
+        report,
+    );
+
+    // P10 sanity note: state-preserving + any consequence tier is legal.
+    // State-transition + empty external_effects + RequiresExplicitAuthorisation
+    // is legal (sanctions transitions, settlement-readiness advances). No
+    // warnings raised here — see P.1.d for the narrow warning set.
+    let _ = (&decl.external_effects,); // explicitly noted: no check fires here
+}
+
+fn validate_consequence(
+    fqn: &str,
+    conseq: &ConsequenceDeclaration,
+    declared_args: &HashSet<String>,
+    report: &mut ValidationReport,
+) {
+    for rule in &conseq.escalation {
+        // Tier monotonicity (P11): a rule's tier must be >= baseline, else
+        // it's dead code. We treat this as a well-formedness error (it
+        // breaks the invariant of the effective-tier fold).
+        if rule.tier < conseq.baseline {
+            report
+                .well_formedness
+                .push(WellFormednessError::EscalationTierBelowBaseline {
+                    location: Location::verb_path(fqn, "consequence.escalation"),
+                    rule_name: rule.name.clone(),
+                    rule_tier: rule.tier,
+                    baseline: conseq.baseline,
+                });
+        }
+        // Arg references.
+        let mut missing_args: HashSet<String> = HashSet::new();
+        collect_predicate_arg_refs(&rule.when, &mut missing_args);
+        for arg in missing_args {
+            if !declared_args.contains(&arg) {
+                report
+                    .well_formedness
+                    .push(WellFormednessError::EscalationArgNotDeclared {
+                        location: Location::verb_path(fqn, "consequence.escalation"),
+                        rule_name: rule.name.clone(),
+                        arg,
+                    });
+            }
+        }
+    }
+}
+
+/// Collect every `arg` name referenced by a predicate (transitively through
+/// and / or / not).
+fn collect_predicate_arg_refs(pred: &EscalationPredicate, acc: &mut HashSet<String>) {
+    match pred {
+        EscalationPredicate::ArgEq { arg, .. }
+        | EscalationPredicate::ArgIn { arg, .. }
+        | EscalationPredicate::ArgGt { arg, .. }
+        | EscalationPredicate::ArgGte { arg, .. }
+        | EscalationPredicate::ArgLt { arg, .. }
+        | EscalationPredicate::ArgLte { arg, .. } => {
+            acc.insert(arg.clone());
+        }
+        EscalationPredicate::EntityAttrEq { .. }
+        | EscalationPredicate::EntityAttrIn { .. }
+        | EscalationPredicate::ContextFlag { .. } => { /* not arg refs */ }
+        EscalationPredicate::And { preds } | EscalationPredicate::Or { preds } => {
+            for p in preds {
+                collect_predicate_arg_refs(p, acc);
+            }
+        }
+        EscalationPredicate::Not { pred } => collect_predicate_arg_refs(pred, acc),
+    }
+}
+
+/// Validate every verb in a `VerbsConfig`. Returns one aggregated report.
+pub fn validate_verbs_config(
+    config: &VerbsConfig,
+    ctx: &ValidationContext,
+) -> ValidationReport {
+    let mut report = ValidationReport::default();
+    for (domain_name, domain) in &config.domains {
+        for (verb_name, verb) in &domain.verbs {
+            let fqn = format!("{domain_name}.{verb_name}");
+            let per = validate_verb(&fqn, verb, ctx);
+            report.structural.extend(per.structural);
+            report.well_formedness.extend(per.well_formedness);
+            report.warnings.extend(per.warnings);
+        }
+    }
+    report
+}
+
+// Silence `unused` warnings for fields / variants reserved for P.1.d.
+#[allow(dead_code)]
+fn _reserved_for_p1_d(_: &ExternalEffect) {}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::types::{
+        ArgConfig, ArgType, ConsequenceDeclaration, ConsequenceTier, EscalationPredicate,
+        EscalationRule, StateEffect, ThreeAxisDeclaration, TransitionEdge, VerbBehavior,
+        VerbConfig, VerbTransitions,
+    };
+    use serde_json::json;
+
+    fn bare_verb_config() -> VerbConfig {
+        VerbConfig {
+            description: "test verb".into(),
+            behavior: VerbBehavior::Plugin,
+            crud: None,
+            handler: None,
+            graph_query: None,
+            durable: None,
+            args: vec![],
+            returns: None,
+            produces: None,
+            consumes: vec![],
+            lifecycle: None,
+            metadata: None,
+            invocation_phrases: vec![],
+            policy: None,
+            sentences: None,
+            confirm_policy: None,
+            outputs: vec![],
+            three_axis: None,
+        }
+    }
+
+    fn arg(name: &str) -> ArgConfig {
+        ArgConfig {
+            name: name.into(),
+            arg_type: ArgType::String,
+            required: true,
+            lookup: None,
+            valid_values: None,
+            default: None,
+            description: None,
+            validation: None,
+            fuzzy_check: None,
+            slot_type: None,
+            preferred_roles: vec![],
+            maps_to: None,
+        }
+    }
+
+    #[test]
+    fn declaration_absent_with_require_declaration_is_incomplete() {
+        let vc = bare_verb_config();
+        let ctx = ValidationContext {
+            require_declaration: true,
+            ..ValidationContext::default()
+        };
+        let r = validate_verb("test.verb", &vc, &ctx);
+        assert_eq!(r.well_formedness.len(), 1);
+        assert!(matches!(
+            r.well_formedness[0],
+            WellFormednessError::DeclarationIncomplete { .. }
+        ));
+    }
+
+    #[test]
+    fn declaration_absent_with_rollout_mode_is_silent() {
+        let vc = bare_verb_config();
+        let ctx = ValidationContext::default(); // require_declaration=false
+        let r = validate_verb("test.verb", &vc, &ctx);
+        assert!(r.is_clean());
+    }
+
+    #[test]
+    fn transition_without_edges_is_structural_error() {
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![],
+            },
+            transitions: None,
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert_eq!(r.structural.len(), 1);
+        assert!(matches!(
+            r.structural[0],
+            StructuralError::TransitionWithoutEdges(_)
+        ));
+    }
+
+    #[test]
+    fn transition_with_empty_edges_also_structural() {
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![],
+            },
+            transitions: Some(VerbTransitions {
+                dag: "some_dag".into(),
+                edges: vec![],
+            }),
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert_eq!(r.structural.len(), 1);
+    }
+
+    #[test]
+    fn preserving_with_transitions_is_structural_error() {
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![],
+            },
+            transitions: Some(VerbTransitions {
+                dag: "d".into(),
+                edges: vec![TransitionEdge {
+                    from: "a".into(),
+                    to: "b".into(),
+                }],
+            }),
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert_eq!(r.structural.len(), 1);
+        assert!(matches!(
+            r.structural[0],
+            StructuralError::PreservingWithTransitions(_)
+        ));
+    }
+
+    #[test]
+    fn valid_transition_declaration_passes() {
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Reviewable,
+                escalation: vec![],
+            },
+            transitions: Some(VerbTransitions {
+                dag: "some_dag".into(),
+                edges: vec![TransitionEdge {
+                    from: "draft".into(),
+                    to: "submitted".into(),
+                }],
+            }),
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert!(r.is_clean());
+    }
+
+    #[test]
+    fn p10_state_preserving_plus_requires_explicit_authorisation_is_legal() {
+        // v1.1 §6.2 explicitly: state-preserving verbs with
+        // requires_explicit_authorisation (exports, attestations,
+        // disclosures) pass silently. No warning fires.
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![ExternalEffect::Emitting],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::RequiresExplicitAuthorisation,
+                escalation: vec![],
+            },
+            transitions: None,
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert!(r.is_clean(), "P10 orthogonality — legal combination");
+    }
+
+    #[test]
+    fn p10_state_transition_plus_no_external_plus_high_tier_is_legal() {
+        // v1.1 §6.2 explicitly: state-transition + external_effects: [] +
+        // requires_explicit_authorisation (sanctions-state transitions,
+        // settlement-readiness advances, approval-state changes) passes.
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::RequiresExplicitAuthorisation,
+                escalation: vec![],
+            },
+            transitions: Some(VerbTransitions {
+                dag: "d".into(),
+                edges: vec![TransitionEdge {
+                    from: "pending".into(),
+                    to: "sanctioned".into(),
+                }],
+            }),
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert!(r.is_clean());
+    }
+
+    #[test]
+    fn escalation_rule_arg_not_declared_is_well_formedness_error() {
+        let mut vc = bare_verb_config();
+        vc.args = vec![arg("count")]; // declares `count` only
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![EscalationRule {
+                    name: "phantom_arg".into(),
+                    when: EscalationPredicate::ArgEq {
+                        arg: "undeclared_arg".into(), // not in args list
+                        value: json!(true),
+                    },
+                    tier: ConsequenceTier::Reviewable,
+                    reason: None,
+                }],
+            },
+            transitions: None,
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert_eq!(r.well_formedness.len(), 1);
+        assert!(matches!(
+            r.well_formedness[0],
+            WellFormednessError::EscalationArgNotDeclared { .. }
+        ));
+    }
+
+    #[test]
+    fn escalation_tier_below_baseline_is_well_formedness_error() {
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::RequiresConfirmation,
+                escalation: vec![EscalationRule {
+                    name: "demote".into(),
+                    when: EscalationPredicate::ContextFlag {
+                        flag: "f".into(),
+                    },
+                    tier: ConsequenceTier::Benign, // strictly < baseline
+                    reason: None,
+                }],
+            },
+            transitions: None,
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert_eq!(r.well_formedness.len(), 1);
+        assert!(matches!(
+            r.well_formedness[0],
+            WellFormednessError::EscalationTierBelowBaseline { .. }
+        ));
+    }
+
+    #[test]
+    fn escalation_arg_refs_through_boolean_combinators() {
+        let mut vc = bare_verb_config();
+        vc.args = vec![arg("known_arg")];
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![EscalationRule {
+                    name: "compound".into(),
+                    when: EscalationPredicate::And {
+                        preds: vec![
+                            EscalationPredicate::ArgEq {
+                                arg: "known_arg".into(),
+                                value: json!(1),
+                            },
+                            EscalationPredicate::Not {
+                                pred: Box::new(EscalationPredicate::ArgGt {
+                                    arg: "phantom".into(), // unknown
+                                    value: 0.0,
+                                }),
+                            },
+                        ],
+                    },
+                    tier: ConsequenceTier::Reviewable,
+                    reason: None,
+                }],
+            },
+            transitions: None,
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert_eq!(r.well_formedness.len(), 1);
+        let WellFormednessError::EscalationArgNotDeclared { arg, .. } =
+            &r.well_formedness[0]
+        else {
+            panic!("expected EscalationArgNotDeclared");
+        };
+        assert_eq!(arg, "phantom");
+    }
+
+    #[test]
+    fn unknown_dag_reference_is_well_formedness_error_when_known_dags_given() {
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Reviewable,
+                escalation: vec![],
+            },
+            transitions: Some(VerbTransitions {
+                dag: "typo_dag".into(),
+                edges: vec![TransitionEdge {
+                    from: "a".into(),
+                    to: "b".into(),
+                }],
+            }),
+        });
+        let mut known = HashSet::new();
+        known.insert("real_dag".to_string());
+        let ctx = ValidationContext {
+            known_dags: known,
+            require_declaration: false,
+        };
+        let r = validate_verb("test.verb", &vc, &ctx);
+        assert_eq!(r.well_formedness.len(), 1);
+        assert!(matches!(
+            r.well_formedness[0],
+            WellFormednessError::UnknownDagReference { .. }
+        ));
+    }
+
+    #[test]
+    fn unknown_dag_reference_skipped_when_known_dags_empty() {
+        // P.1.c runs without the P.2 DAG taxonomy; the cross-check only
+        // fires when the caller provides known-DAG info.
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Reviewable,
+                escalation: vec![],
+            },
+            transitions: Some(VerbTransitions {
+                dag: "anything".into(),
+                edges: vec![TransitionEdge {
+                    from: "a".into(),
+                    to: "b".into(),
+                }],
+            }),
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert!(r.is_clean());
+    }
+}

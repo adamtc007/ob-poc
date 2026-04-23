@@ -24,10 +24,15 @@ pub mod escalation;
 pub mod loader;
 pub mod phrase_gen;
 pub mod types;
+pub mod validator;
 
 pub use escalation::{
     compute_effective_tier, compute_effective_tier_with_trace, evaluate_predicate,
     EvaluationContext,
+};
+pub use validator::{
+    validate_verb, validate_verbs_config, Location, PolicyWarning, StructuralError,
+    ValidationContext, ValidationReport, WellFormednessError,
 };
 pub use loader::ConfigLoader;
 pub use phrase_gen::generate_phrases;
