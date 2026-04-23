@@ -43,6 +43,11 @@ domains:
             type: integer
           - name: memberships_created
             type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       group.list:
         description: |
@@ -82,6 +87,11 @@ domains:
           description: Minimum number of CBUs in group
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       group.cbus:
         description: |
@@ -114,6 +124,11 @@ domains:
             primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       group.for-cbu:
         description: |
@@ -146,6 +161,11 @@ domains:
             primary_key: cbu_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ========================================================================
       # Primary Governance Controller
@@ -200,6 +220,11 @@ domains:
             type: decimal
           - name: has_control
             type: boolean
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ========================================================================
       # Control Chain Traversal
@@ -240,6 +265,11 @@ domains:
           description: Maximum chain depth to traverse
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ========================================================================
       # Group Management
@@ -315,6 +345,11 @@ domains:
         returns:
           type: uuid
           name: group_id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       group.add-member:
         description: Add a CBU to a governance controller group
@@ -367,6 +402,11 @@ domains:
         returns:
           type: uuid
           name: membership_id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       group.remove-member:
         description: Remove a CBU from a governance controller group (sets effective_to)
@@ -404,6 +444,11 @@ domains:
             primary_key: cbu_id
         returns:
           type: void
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       # ========================================================================
       # Composite Queries
@@ -446,6 +491,11 @@ domains:
             type: record_set
           - name: control_chain
             type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
   ownership:
     description: Ownership control link operations
@@ -490,6 +540,11 @@ domains:
         returns:
           type: affected
           description: Number of control links created
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       control-links.list:
         description: |
@@ -546,6 +601,11 @@ domains:
           description: As-of date filter
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ========================================================================
       # Governance Bridges (data source → governance signals)
@@ -579,6 +639,11 @@ domains:
             type: integer
           - name: rights_updated
             type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       bridge.gleif-fund-managers:
         description: |
@@ -609,6 +674,11 @@ domains:
             type: integer
           - name: rights_updated
             type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       bridge.bods-ownership:
         description: |
@@ -641,6 +711,11 @@ domains:
             type: integer
           - name: entities_linked
             type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       # ========================================================================
       # MASTER MACRO: Full governance refresh pipeline
@@ -691,6 +766,11 @@ domains:
             type: integer
           - name: groups
             type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
 # Aliases for convenience
 aliases:

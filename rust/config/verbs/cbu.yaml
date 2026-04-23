@@ -127,6 +127,11 @@ domains:
             type: uuid
             entity_kind: cbu
             description: ID of the newly created CBU
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       read:
         description: Read a CBU by ID
         invocation_phrases:
@@ -167,6 +172,11 @@ domains:
               resolution_mode: entity # growing table - search modal
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       rename:
         description: Rename a CBU
         invocation_phrases:
@@ -210,6 +220,11 @@ domains:
             maps_to: name
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update:
         description: Update ad hoc CBU attributes
@@ -249,6 +264,11 @@ domains:
             maps_to: redemption_notice_days
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       set-jurisdiction:
         description: Set CBU jurisdiction
@@ -297,6 +317,11 @@ domains:
               primary_key: jurisdiction_code
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       set-client-type:
         description: Set CBU client type
@@ -338,6 +363,11 @@ domains:
             maps_to: client_type
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       set-commercial-client:
         description: Set commercial client entity for a CBU
@@ -384,6 +414,11 @@ domains:
               primary_key: entity_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       delete:
         description: Delete a CBU (fails if has dependencies - use delete-cascade for full cleanup)
         invocation_phrases:
@@ -424,6 +459,11 @@ domains:
               primary_key: cbu_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       delete-cascade:
         description: Delete a CBU and all related data (entities, roles, documents, etc.)
@@ -472,6 +512,11 @@ domains:
         returns:
           type: record
           description: Summary of deleted records by table
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
       list:
         description: List CBUs with optional filters
         invocation_phrases:
@@ -532,6 +577,11 @@ domains:
             default: 0
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       ensure:
         description: Create or update a CBU by natural key
         invocation_phrases:
@@ -606,6 +656,11 @@ domains:
           type: uuid
           name: cbu_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       submit-for-validation:
         description: Move a CBU into validation review
         invocation_phrases:
@@ -651,6 +706,11 @@ domains:
               primary_key: cbu_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
       assign-role:
         description: Assign a role to an entity within a CBU
         invocation_phrases:
@@ -743,6 +803,11 @@ domains:
           type: uuid
           name: cbu_entity_role_id
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       link-structure:
         description: Persist a parent-child structure link between two CBUs
         invocation_phrases:
@@ -801,6 +866,11 @@ domains:
           type: uuid
           name: child_cbu_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list-structure-links:
         description: List persisted structure links for a parent or child CBU
         invocation_phrases:
@@ -857,6 +927,11 @@ domains:
             description: "Interpret :cbu-id as parent or child"
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       unlink-structure:
         description: Terminate an active parent-child structure link between two CBUs
         invocation_phrases:
@@ -883,6 +958,11 @@ domains:
             required: true
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
       remove-role:
         description: Remove a specific role from an entity within a CBU
         invocation_phrases:
@@ -940,6 +1020,11 @@ domains:
               id_column: role_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
       parties:
         description: List all parties (entities with their roles) for a CBU
         invocation_phrases:
@@ -983,6 +1068,11 @@ domains:
             description: Point-in-time date for temporal query (defaults to today)
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       set-category:
         description: Set CBU relationship category (FUND_MANDATE, CORPORATE_GROUP, etc.)
         invocation_phrases:
@@ -1036,6 +1126,11 @@ domains:
                 - CORRESPONDENT_BANK
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       inspect:
         description: Inspect full CBU structure including entities, roles, documents, screenings
         invocation_phrases:
@@ -1083,6 +1178,11 @@ domains:
         returns:
           type: record
           description: Full CBU structure with nested entities, roles, documents, screenings
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       add-product:
         description: Add a product to a CBU (creates service_delivery_map entries for all services)
@@ -1141,6 +1241,11 @@ domains:
         returns:
           type: affected
           description: Number of service delivery entries created
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       remove-product:
         description: Remove a product from a CBU (deletes service_delivery_map entries)
@@ -1193,6 +1298,11 @@ domains:
         returns:
           type: affected
           description: Number of service delivery entries removed
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       list-subscriptions:
         description: List products currently subscribed on a CBU.
@@ -1231,6 +1341,11 @@ domains:
             maps_to: product_code
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       decide:
         description: Record KYC/AML decision for CBU collective state (entities, UBOs, documents)
@@ -1315,6 +1430,11 @@ domains:
         returns:
           type: record
           description: Decision record with outcome and resulting CBU status
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
       request-proof-update:
         description: Mark a validated CBU as requiring updated proof
         invocation_phrases:
@@ -1358,6 +1478,11 @@ domains:
               primary_key: cbu_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
       reopen-validation:
         description: Reopen validation for a CBU that previously failed
         invocation_phrases:
@@ -1401,6 +1526,11 @@ domains:
               primary_key: cbu_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
       attach-evidence:
         description: Attach evidence (document or attestation) to CBU
         invocation_phrases:
@@ -1479,6 +1609,11 @@ domains:
           type: uuid
           name: evidence_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       verify-evidence:
         description: Mark evidence as verified or rejected
         invocation_phrases:
@@ -1530,6 +1665,11 @@ domains:
             maps_to: verification_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: requires_confirmation
       list-evidence:
         description: List evidence for a CBU
         invocation_phrases:
@@ -1577,6 +1717,11 @@ domains:
             maps_to: verification_status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # BULK CBU CREATION FROM CLIENT GROUP (DSL GENERATOR / MACRO)
       create-from-client-group:
@@ -1668,3 +1813,8 @@ domains:
             - combined_dsl
             - message
             - gleif_category
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

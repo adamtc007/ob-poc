@@ -67,6 +67,11 @@ domains:
           type: uuid
           name: holding_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       create-for-investor:
         description: Create holding linked to an investor record (for TA KYC-as-a-Service)
@@ -165,6 +170,11 @@ domains:
           type: uuid
           name: holding_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ensure:
         description: Ensure investor holding exists (upsert)
@@ -269,6 +279,11 @@ domains:
           type: uuid
           name: holding_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-units:
         description: Update holding units (for position adjustments)
@@ -315,6 +330,11 @@ domains:
           maps_to: cost_basis
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-status:
         description: Update holding status
@@ -365,6 +385,11 @@ domains:
             - CLOSED
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       read:
         description: Read a holding by ID
@@ -402,6 +427,11 @@ domains:
             primary_key: id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-share-class:
         description: List holdings for a share class
@@ -447,6 +477,11 @@ domains:
           maps_to: usage_type
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-investor:
         description: List holdings for an investor across all share classes
@@ -484,6 +519,11 @@ domains:
             primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-investor-record:
         description: List holdings for an investor record (TA workflow)
@@ -521,6 +561,11 @@ domains:
             primary_key: investor_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       close:
         description: Close a holding (mark as inactive)
@@ -562,3 +607,8 @@ domains:
             primary_key: id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation

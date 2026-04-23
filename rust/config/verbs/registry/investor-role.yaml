@@ -234,6 +234,11 @@ domains:
           type: uuid
           name: id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       read:
         description: |
@@ -285,6 +290,11 @@ domains:
             primary_key: entity_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       read-as-of:
         description: |
@@ -340,6 +350,11 @@ domains:
           description: "Point-in-time date for the query. Returns the role profile that was effective on this date."
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-issuer:
         description: |
@@ -394,6 +409,11 @@ domains:
           description: "Filter by UBO eligibility"
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-holder:
         description: |
@@ -434,6 +454,11 @@ domains:
             primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       history:
         description: |
@@ -486,6 +511,11 @@ domains:
             primary_key: entity_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Convenience verbs for common patterns
@@ -554,6 +584,11 @@ domains:
           type: uuid
           name: id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       mark-as-fof:
         description: |
@@ -623,6 +658,11 @@ domains:
           type: uuid
           name: id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       mark-as-master-pool:
         description: |
@@ -696,6 +736,11 @@ domains:
           type: uuid
           name: id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       mark-as-end-investor:
         description: |
@@ -772,3 +817,8 @@ domains:
           type: uuid
           name: id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable

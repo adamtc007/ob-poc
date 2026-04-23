@@ -148,6 +148,11 @@ domains:
           type: uuid
           name: share_class_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       ensure:
         description: Create or update share class by ISIN
         behavior: crud
@@ -293,6 +298,11 @@ domains:
           type: uuid
           name: share_class_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       update-nav:
         description: Update NAV for a share class
         behavior: crud
@@ -339,6 +349,11 @@ domains:
           maps_to: nav_date
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       read:
         description: Read a share class by ID
         behavior: crud
@@ -376,6 +391,11 @@ domains:
             primary_key: id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       list:
         description: List share classes for a fund
         behavior: crud
@@ -417,6 +437,11 @@ domains:
           maps_to: status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       close:
         description: Close a share class to new subscriptions
         behavior: crud
@@ -457,3 +482,8 @@ domains:
             primary_key: id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation

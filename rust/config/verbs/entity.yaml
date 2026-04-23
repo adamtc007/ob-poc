@@ -229,6 +229,11 @@ domains:
             type: uuid
             entity_kind: entity
             description: ID of the newly created entity
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       ensure:
         description: Create or update an entity of the requested entity type
@@ -323,6 +328,11 @@ domains:
           type: uuid
           name: entity_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       read:
         description: Read an entity by ID
@@ -368,6 +378,11 @@ domains:
               primary_key: entity_id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       update:
         description: Update an entity's base fields
         invocation_phrases:
@@ -425,6 +440,11 @@ domains:
             maps_to: jurisdiction
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       delete:
         description: Delete an entity (cascades to type extension)
         invocation_phrases:
@@ -465,6 +485,11 @@ domains:
               primary_key: entity_id
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
       list:
         description: List entities with optional filters
         invocation_phrases:
@@ -523,6 +548,11 @@ domains:
             default: 0
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       query:
         description: Query entities for batch template iteration (returns entity refs, not records)
@@ -575,6 +605,11 @@ domains:
           type: entity_query_result
           description: List of (entity_id, name) tuples for batch iteration
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # GHOST ENTITY VERBS - Progressive refinement workflow
@@ -634,6 +669,11 @@ domains:
             type: uuid
             entity_kind: entity
             description: ID of the newly created ghost entity
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       identify:
         description: Add identifying attributes to a ghost entity (transitions to IDENTIFIED state)
@@ -698,6 +738,11 @@ domains:
         returns:
           type: uuid
           name: entity_id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       verify:
         description: Mark an identified entity as verified (transitions to VERIFIED state)
@@ -743,6 +788,11 @@ domains:
             description: Notes about how verification was completed
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-ghosts:
         description: List ghost entities requiring identification
@@ -787,6 +837,11 @@ domains:
             default: 0
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # =========================================================================
       # PLACEHOLDER ENTITY VERBS - Deferred resolution for macro expansion
@@ -868,6 +923,11 @@ domains:
               type: boolean
               description: True if a placeholder was created
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       resolve-placeholder:
         description: Resolve a placeholder entity to a real entity
@@ -933,6 +993,11 @@ domains:
               type: string
             - name: roles_transferred
               type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-placeholders:
         description: List pending placeholder entities for a CBU
@@ -979,6 +1044,11 @@ domains:
               primary_key: cbu_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       placeholder-summary:
         description: Get placeholder summary statistics for a CBU
@@ -1023,3 +1093,8 @@ domains:
               type: integer
             - name: by_kind
               type: array
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

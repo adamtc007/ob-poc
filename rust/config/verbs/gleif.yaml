@@ -66,6 +66,11 @@ domains:
           type: uuid
           name: entity_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       search:
         description: Search GLEIF for entities by name, jurisdiction, or category
         invocation_phrases:
@@ -129,6 +134,11 @@ domains:
           description: Maximum results to return (max 100)
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       import-tree:
         description: Import corporate tree (parents and/or children) from GLEIF
         invocation_phrases:
@@ -190,6 +200,11 @@ domains:
           description: Link to research decision that initiated this import (for audit trail)
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       import-managed-funds:
         description: Import funds managed by an investment manager with full CBU structure
         invocation_phrases:
@@ -244,6 +259,11 @@ domains:
           description: Link to research decision that initiated this import (for audit trail)
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       refresh:
         description: Refresh stale GLEIF data for entities
         metadata:
@@ -295,6 +315,11 @@ domains:
           description: Maximum entities to refresh in one call
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       trace-ownership:
         description: Trace ownership chain from entity to UBO terminus via GLEIF parent relationships
         invocation_phrases:
@@ -342,6 +367,11 @@ domains:
           type: record
           name: funds
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       resolve-successor:
         description: Resolve a merged or inactive LEI to its current successor entity
         metadata:
@@ -380,6 +410,11 @@ domains:
           type: record
           name: successor
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       lookup:
         description: 'Consolidated GLEIF lookup — fetch relationship data by target-type. Replaces 8 individual get-* verbs
           with a single entry point. target-type: record | parent | children | manager | managed-funds | master-fund | umbrella
@@ -464,6 +499,11 @@ domains:
           description: Also fetch umbrella structure (for managed-funds)
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
       import-to-client-group:
         description: Import GLEIF tree and populate client_group tables with role tagging. Optionally includes managed funds
           (IM relationships).
@@ -542,3 +582,8 @@ domains:
           - fund_metadata_populated
           - client_group_roles_assigned
           - client_group_relationships_created
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

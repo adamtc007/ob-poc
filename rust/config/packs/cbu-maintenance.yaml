@@ -115,10 +115,9 @@ templates:
   - template_id: add-entity-and-role
     when_to_use: "Add an entity to a CBU with a role"
     steps:
-      - verb: entity.link
+      - verb: entity.ensure
         args:
-          cbu_ref: "$prev"
-          entity_ref: "{answers.entity_name}"
+          name: "{answers.entity_name}"
       - verb: cbu.assign-role
         args:
           cbu_ref: "$prev"
