@@ -44,6 +44,11 @@ domains:
           maps_to: service_code
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list:
         description: List services with optional filters
@@ -90,6 +95,11 @@ domains:
           default: 0
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-product:
         description: List services for a product
@@ -136,3 +146,8 @@ domains:
           required: false
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
