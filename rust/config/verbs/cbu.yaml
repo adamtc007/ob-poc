@@ -1818,3 +1818,357 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+
+      suspend:
+        description: "Suspend CBU operational lifecycle (operational hold — regulatory, dispute, client distress)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "suspend this CBU"
+          - "suspend CBU"
+          - "put CBU on hold"
+          - "pause CBU operations"
+          - "operationally suspend this entity"
+          - "halt this CBU"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      reinstate:
+        description: "Reinstate suspended CBU back to operationally active"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reinstate CBU"
+          - "resume CBU operations"
+          - "lift CBU suspension"
+          - "unsuspend this CBU"
+          - "reactivate CBU"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      restrict:
+        description: "Apply partial trading restriction to CBU (specific markets / instruments pulled)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "restrict CBU trading"
+          - "pull markets from CBU"
+          - "partial restriction on CBU"
+          - "limit CBU scope"
+          - "narrow the CBU mandate"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: scope
+            type: string
+            required: true
+            maps_to: restriction_scope
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      unrestrict:
+        description: "Lift trading restriction from CBU (restore full mandate scope)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "unrestrict CBU"
+          - "lift CBU restriction"
+          - "restore CBU full scope"
+          - "remove CBU partial hold"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: reviewable
+
+      begin-winding-down:
+        description: "Begin CBU winding-down — exit intent, no new activity, unwind positions"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "wind down CBU"
+          - "begin CBU exit"
+          - "start CBU offboarding"
+          - "unwind this CBU"
+          - "retire CBU"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      complete-offboard:
+        description: "Complete CBU offboarding — terminal-positive transition to offboarded state"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "offboard CBU"
+          - "complete CBU exit"
+          - "finalize CBU offboarding"
+          - "mark CBU as retired"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      soft-delete:
+        description: "Soft-delete CBU (disposition: sets deleted_at; restorable)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "soft-delete this CBU"
+          - "mark CBU as deleted"
+          - "remove CBU from active view"
+          - "archive this CBU record"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+
+      restore:
+        description: "Restore soft-deleted CBU back to active disposition"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "restore CBU"
+          - "undelete CBU"
+          - "bring back this CBU"
+          - "reactivate soft-deleted CBU"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
+
+      hard-delete:
+        description: "Permanently remove CBU row (terminal; regulatory retention window required)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: irreversible
+        invocation_phrases:
+          - "hard-delete CBU"
+          - "permanently remove CBU"
+          - "purge this CBU"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      flag-for-remediation:
+        description: "Flag CBU for post-breach remediation / enhanced monitoring"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "flag CBU for remediation"
+          - "put CBU under remediation"
+          - "mark CBU for enhanced monitoring"
+          - "start CBU remediation"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      clear-remediation:
+        description: "Clear remediation flag from CBU (remediation conditions satisfied)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: cbu
+          subject_kinds: [cbu]
+          phase_tags: [cbu]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "clear CBU remediation"
+          - "lift CBU remediation flag"
+          - "complete CBU remediation"
+          - "remove CBU enhanced monitoring"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation

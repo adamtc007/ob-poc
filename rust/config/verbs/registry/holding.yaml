@@ -612,3 +612,130 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+
+      restrict:
+        description: "Apply legal restriction to holding (court order / dispute freeze)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: holding
+          subject_kinds: [holding]
+          phase_tags: [holding]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "restrict holding"
+          - "lock holding"
+          - "freeze holding"
+          - "apply holding restriction"
+          - "holding legal lock"
+        args:
+          - name: holding-id
+            type: uuid
+            required: true
+            maps_to: holding_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      lift-restriction:
+        description: "Lift legal restriction from holding"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: holding
+          subject_kinds: [holding]
+          phase_tags: [holding]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "unlock holding"
+          - "lift holding restriction"
+          - "release holding lock"
+        args:
+          - name: holding-id
+            type: uuid
+            required: true
+            maps_to: holding_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      pledge:
+        description: "Pledge holding as collateral against a loan / derivative exposure"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: holding
+          subject_kinds: [holding]
+          phase_tags: [holding]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "pledge holding as collateral"
+          - "collateralize holding"
+          - "mark holding as pledged"
+          - "pledge these units"
+        args:
+          - name: holding-id
+            type: uuid
+            required: true
+            maps_to: holding_id
+          - name: collateral-ref
+            type: string
+            required: true
+            maps_to: collateral_ref
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      release-pledge:
+        description: "Release pledge on holding (collateral no longer required)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: holding
+          subject_kinds: [holding]
+          phase_tags: [holding]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "release pledge"
+          - "unpledge holding"
+          - "remove holding collateral"
+        args:
+          - name: holding-id
+            type: uuid
+            required: true
+            maps_to: holding_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation

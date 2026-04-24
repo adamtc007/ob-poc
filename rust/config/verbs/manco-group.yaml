@@ -497,6 +497,248 @@ domains:
           consequence:
             baseline: benign
 
+      approve:
+        description: "Approve manco for managing mandates (new-manco onboarding)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: manco
+          subject_kinds: [manco]
+          phase_tags: [manco]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "approve manco"
+          - "clear manco for mandates"
+          - "approve management company"
+        args:
+          - name: manco-entity-id
+            type: uuid
+            required: true
+            maps_to: manco_entity_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      reject:
+        description: "Reject manco onboarding (terminal-negative)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: manco
+          subject_kinds: [manco]
+          phase_tags: [manco]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reject manco"
+          - "decline manco onboarding"
+        args:
+          - name: manco-entity-id
+            type: uuid
+            required: true
+            maps_to: manco_entity_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      flag-regulatory:
+        description: "Flag manco for regulatory investigation (transitions APPROVED → UNDER_INVESTIGATION)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: manco
+          subject_kinds: [manco]
+          phase_tags: [manco]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "flag manco for investigation"
+          - "regulatory flag manco"
+          - "escalate manco to regulatory review"
+        args:
+          - name: manco-entity-id
+            type: uuid
+            required: true
+            maps_to: manco_entity_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      clear-regulatory:
+        description: "Clear manco from regulatory investigation (back to APPROVED)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: manco
+          subject_kinds: [manco]
+          phase_tags: [manco]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "clear manco regulatory"
+          - "regulatory all-clear for manco"
+          - "resolve manco investigation"
+        args:
+          - name: manco-entity-id
+            type: uuid
+            required: true
+            maps_to: manco_entity_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      suspend:
+        description: "Fully suspend manco — cascades SUSPENDED to all managed CBUs"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: manco
+          subject_kinds: [manco]
+          phase_tags: [manco]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "suspend manco"
+          - "full suspend on manco"
+          - "freeze manco operations"
+        args:
+          - name: manco-entity-id
+            type: uuid
+            required: true
+            maps_to: manco_entity_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      partial-reinstate:
+        description: "Partially reinstate suspended manco (returns to UNDER_INVESTIGATION)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: manco
+          subject_kinds: [manco]
+          phase_tags: [manco]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "partially reinstate manco"
+          - "lift manco full suspension"
+          - "manco partial resume"
+        args:
+          - name: manco-entity-id
+            type: uuid
+            required: true
+            maps_to: manco_entity_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      begin-sunset:
+        description: "Begin manco sunset (no new mandates; existing run to exit)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: manco
+          subject_kinds: [manco]
+          phase_tags: [manco]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "sunset manco"
+          - "begin manco wind-down"
+          - "retire manco from new mandates"
+        args:
+          - name: manco-entity-id
+            type: uuid
+            required: true
+            maps_to: manco_entity_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      terminate:
+        description: "Terminate manco (all mandates transferred or wound down)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: manco
+          subject_kinds: [manco]
+          phase_tags: [manco]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "terminate manco"
+          - "retire manco"
+          - "close manco entity"
+        args:
+          - name: manco-entity-id
+            type: uuid
+            required: true
+            maps_to: manco_entity_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
   ownership:
     description: Ownership control link operations
     invocation_hints:

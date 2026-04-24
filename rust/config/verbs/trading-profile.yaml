@@ -2394,3 +2394,66 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_confirmation
+
+      restrict:
+        description: "Apply partial trading restriction to mandate (pull specific markets / instruments)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: trading-profile
+          subject_kinds: [trading-profile]
+          phase_tags: [trading-profile]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "restrict mandate"
+          - "pull markets from mandate"
+          - "narrow trading profile"
+          - "limit mandate scope"
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            maps_to: profile_id
+          - name: scope
+            type: string
+            required: true
+            maps_to: restriction_scope
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      lift-restriction:
+        description: "Lift trading-profile restriction (restore full mandate scope)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: trading-profile
+          subject_kinds: [trading-profile]
+          phase_tags: [trading-profile]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "lift mandate restriction"
+          - "unrestrict mandate"
+          - "restore full trading scope"
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            maps_to: profile_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: reviewable

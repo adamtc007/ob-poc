@@ -1,0 +1,188 @@
+# Service-consumption verbs — Tranche 2+3 DAG alignment (2026-04-24)
+# 
+# Generated as part of the verb-declaration batch that backfills
+# verbs implied by DAG state machines but not previously declared.
+
+domains:
+  service-consumption:
+    description: Per-(CBU, service_kind) service provisioning lifecycle
+    invocation_hints: []
+    verbs:
+      provision:
+        description: "Provision a service for a CBU (proposed → provisioned; accounts opened, routings set)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: service-consumption
+          subject_kinds: [service-consumption]
+          phase_tags: [service-consumption]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "provision service"
+          - "set up service for CBU"
+          - "open accounts for service"
+          - "provision service consumption"
+        args:
+          - name: consumption-id
+            type: uuid
+            required: true
+            maps_to: consumption_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      activate:
+        description: "Activate service for operational use (provisioned → active)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: service-consumption
+          subject_kinds: [service-consumption]
+          phase_tags: [service-consumption]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "activate service"
+          - "turn on service for CBU"
+          - "go live with service"
+        args:
+          - name: consumption-id
+            type: uuid
+            required: true
+            maps_to: consumption_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      suspend:
+        description: "Suspend service for CBU (service pause; restorable)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: service-consumption
+          subject_kinds: [service-consumption]
+          phase_tags: [service-consumption]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "suspend service"
+          - "pause CBU service"
+          - "halt service consumption"
+        args:
+          - name: consumption-id
+            type: uuid
+            required: true
+            maps_to: consumption_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      reinstate:
+        description: "Reinstate suspended service back to active"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: service-consumption
+          subject_kinds: [service-consumption]
+          phase_tags: [service-consumption]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reinstate service"
+          - "resume service"
+          - "unsuspend service consumption"
+        args:
+          - name: consumption-id
+            type: uuid
+            required: true
+            maps_to: consumption_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      begin-winddown:
+        description: "Begin service wind-down for CBU (exit intent)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: service-consumption
+          subject_kinds: [service-consumption]
+          phase_tags: [service-consumption]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "wind down service"
+          - "retire service for CBU"
+          - "begin service exit"
+        args:
+          - name: consumption-id
+            type: uuid
+            required: true
+            maps_to: consumption_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      retire:
+        description: "Retire service consumption (terminal-positive after winddown)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: service-consumption
+          subject_kinds: [service-consumption]
+          phase_tags: [service-consumption]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "retire service"
+          - "finalize service retirement"
+          - "complete service decommission"
+        args:
+          - name: consumption-id
+            type: uuid
+            required: true
+            maps_to: consumption_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation

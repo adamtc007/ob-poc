@@ -487,3 +487,183 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+
+      launch:
+        description: "Launch share class from DRAFT to OPEN (accepting subscriptions)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: share-class
+          subject_kinds: [share-class]
+          phase_tags: [share-class]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "launch share class"
+          - "open share class for subscriptions"
+          - "go live with share class"
+          - "activate class for subs"
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      soft-close:
+        description: "Soft-close share class (no new subscriptions; existing holders transact)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: share-class
+          subject_kinds: [share-class]
+          phase_tags: [share-class]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "soft-close share class"
+          - "stop new subs"
+          - "close share class to new subscribers"
+          - "limit share class to existing holders"
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      reopen:
+        description: "Reopen soft-closed share class back to accepting subscriptions"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: share-class
+          subject_kinds: [share-class]
+          phase_tags: [share-class]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reopen share class"
+          - "resume subscriptions"
+          - "unlock share class"
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      hard-close:
+        description: "Hard-close share class (no subscriptions AND no redemptions — regulatory / wind-down)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: share-class
+          subject_kinds: [share-class]
+          phase_tags: [share-class]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "hard-close share class"
+          - "freeze share class"
+          - "full hold on share class"
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      lift-hard-close:
+        description: "Lift hard-close on share class back to soft-closed"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: share-class
+          subject_kinds: [share-class]
+          phase_tags: [share-class]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "lift hard close"
+          - "unfreeze share class"
+          - "partial reopen share class"
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      begin-winddown:
+        description: "Begin share-class wind-down (pre-liquidation)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: share-class
+          subject_kinds: [share-class]
+          phase_tags: [share-class]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "wind down share class"
+          - "begin share class unwind"
+          - "start share class liquidation"
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation

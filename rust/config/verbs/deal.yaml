@@ -2089,3 +2089,472 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
+
+      submit-for-bac:
+        description: "Submit deal to Business Acceptance Committee for internal commercial approval"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "submit to BAC"
+          - "send for business acceptance"
+          - "submit for BAC approval"
+          - "kick off BAC review"
+          - "escalate deal to BAC"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      bac-approve:
+        description: "BAC approval decision — advances deal past internal commercial gate"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "BAC approve"
+          - "approve BAC review"
+          - "pass BAC decision"
+          - "clear BAC for this deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      bac-reject:
+        description: "BAC rejection — terminal-negative decision; deal moves to REJECTED"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "BAC reject"
+          - "reject BAC review"
+          - "BAC decline"
+          - "fail BAC for this deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      submit-for-pricing-approval:
+        description: "Submit rate card to pricing committee for internal approval (bespoke / discount threshold / new jurisdiction)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "submit rate card for pricing approval"
+          - "send rate card to pricing committee"
+          - "request pricing approval"
+          - "escalate rate card for internal approval"
+        args:
+          - name: rate-card-id
+            type: uuid
+            required: true
+            maps_to: rate_card_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: reviewable
+
+      pricing-approve:
+        description: "Pricing committee approval of rate card — advances to ready-to-propose"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "approve rate card pricing"
+          - "pricing committee approve"
+          - "internal approve rate card"
+        args:
+          - name: rate-card-id
+            type: uuid
+            required: true
+            maps_to: rate_card_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      pricing-reject:
+        description: "Pricing committee rejection — rate card returns to DRAFT for revision"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reject rate card pricing"
+          - "pricing committee reject"
+          - "send rate card back for pricing revision"
+        args:
+          - name: rate-card-id
+            type: uuid
+            required: true
+            maps_to: rate_card_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      mark-lost:
+        description: "Mark deal as lost (competitor won)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "mark deal as lost"
+          - "we lost this deal"
+          - "competitor won"
+          - "mark deal lost to competitor"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      mark-withdrawn:
+        description: "Mark deal as withdrawn (client walked away)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "client withdrew from deal"
+          - "mark deal as withdrawn"
+          - "client walked away"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      reject:
+        description: "Reject deal (terminal-negative; internal decision)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reject this deal"
+          - "decline deal"
+          - "we reject this commercial engagement"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      suspend:
+        description: "Suspend active deal (operational hold; restorable)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "suspend deal"
+          - "put deal on hold"
+          - "pause this deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      reinstate:
+        description: "Reinstate suspended deal back to active"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "reinstate deal"
+          - "resume deal"
+          - "lift deal suspension"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      begin-winding-down:
+        description: "Begin deal winding down — exit intent from active servicing"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "wind down this deal"
+          - "begin deal exit"
+          - "start deal offboarding"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
+
+      start-sla-remediation:
+        description: "Begin remediation of a breached SLA (transition BREACHED → IN_REMEDIATION)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "start SLA remediation"
+          - "remediate SLA breach"
+          - "begin SLA recovery"
+        args:
+          - name: sla-id
+            type: uuid
+            required: true
+            maps_to: sla_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: reviewable
+
+      resolve-sla-breach:
+        description: "Resolve SLA breach (remediation complete; transition to RESOLVED)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "resolve SLA breach"
+          - "SLA remediation complete"
+          - "mark SLA breach as resolved"
+        args:
+          - name: sla-id
+            type: uuid
+            required: true
+            maps_to: sla_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_confirmation
+
+      waive-sla-breach:
+        description: "Waive SLA breach (client concession; breach not pursued)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+          subject_kinds: [deal]
+          phase_tags: [deal]
+          side_effects: state_write
+          harm_class: reversible
+        invocation_phrases:
+          - "waive SLA breach"
+          - "client waived SLA"
+          - "concede SLA breach"
+        args:
+          - name: sla-id
+            type: uuid
+            required: true
+            maps_to: sla_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting] 
+          consequence:
+            baseline: requires_explicit_authorisation
