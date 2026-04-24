@@ -117,6 +117,11 @@ domains:
         returns:
           type: uuid
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       define-derived:
         description: "Define a derived attribute with its governed computation recipe"
@@ -220,6 +225,11 @@ domains:
         returns:
           type: uuid
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       define-internal:
         description: "Define an internal/system attribute with lightweight governance"
@@ -285,6 +295,11 @@ domains:
         returns:
           type: uuid
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       update-internal:
         description: "Update metadata on an internal/system attribute (lightweight, no changeset)"
@@ -336,6 +351,11 @@ domains:
             description: "Logical grouping identifier"
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       classify:
         description: "Assign or reassign taxonomy category for an attribute"
@@ -389,6 +409,11 @@ domains:
                 partnership,
               ]
             maps_to: category
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       set-evidence-grade:
         description: "Set or change the evidence grade sensitivity classification for an attribute"
@@ -419,6 +444,11 @@ domains:
             required: true
             valid_values:
               [none, prohibited, allowed_with_constraints, regulatory_evidence]
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       deprecate:
         description: "Mark an attribute as deprecated without deleting operational references"
@@ -451,6 +481,11 @@ domains:
             type: string
             required: false
             description: "FQN of replacement attribute, if any"
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: requires_confirmation
 
       inspect:
         description: "Show full attribute definition including governance state, evidence grade, derivation recipe, and observation statistics"
@@ -477,6 +512,11 @@ domains:
             type: string
             required: true
             description: "Attribute semantic ID, FQN, or UUID"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       update:
         description: "Update an existing attribute"
@@ -520,6 +560,11 @@ domains:
             type: json
             required: false
             maps_to: applicability
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       read:
         description: "Read an attribute by semantic ID"
         metadata:
@@ -550,6 +595,11 @@ domains:
             type: string
             required: true
             maps_to: id
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list:
         description: "List attributes, optionally filtered by category or domain"
@@ -584,6 +634,11 @@ domains:
             type: string
             required: false
             maps_to: domain
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       map-to-document:
         description: "Map attribute to document type (source or sink relationship)"
@@ -668,6 +723,11 @@ domains:
             required: false
             description: "Default confidence score for extractions (0.0-1.0)"
             maps_to: extraction_confidence_default
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       unmap-from-document:
         description: "Remove attribute mapping from document type"
@@ -714,6 +774,11 @@ domains:
               search_key: id
               primary_key: uuid
             maps_to: attribute_id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       list-sources:
         description: "List all document types that provide (source) a given attribute"
@@ -741,6 +806,11 @@ domains:
             type: string
             required: true
             description: "Attribute semantic ID"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-sinks:
         description: "List all document types that require (sink) a given attribute"
@@ -768,6 +838,11 @@ domains:
             type: string
             required: true
             description: "Attribute semantic ID"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       trace-lineage:
         description: "Show complete lineage for an attribute - sources, sinks, and resources that require it"
@@ -795,6 +870,11 @@ domains:
             type: string
             required: true
             description: "Attribute semantic ID"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-by-document:
         description: "List all attributes linked to a document type"
@@ -827,6 +907,11 @@ domains:
             required: false
             valid_values: [SOURCE, SINK, BOTH]
             description: "Filter by direction"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       check-coverage:
         description: "Check attribute coverage for a document type - what's mapped vs what's required"
@@ -854,6 +939,11 @@ domains:
             type: string
             required: true
             description: "Document type code"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       bridge-to-semos:
         description: Publish SemOS AttributeDef snapshots for store attributes that lack governance
@@ -882,3 +972,8 @@ domains:
         returns:
           type: record
           description: Bridge result with counts (bridged, already_governed, failed)
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable

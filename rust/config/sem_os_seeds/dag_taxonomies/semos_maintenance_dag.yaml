@@ -1,0 +1,712 @@
+# SemOsMaintenance Workspace — DAG Taxonomy (Tranche 3 — 2026-04-24)
+#
+# ============================================================================
+# WORKSPACE PURPOSE:
+#
+# SemOsMaintenance is the GOVERNANCE workspace. It governs how the OTHER
+# workspaces (CBU, IM, KYC, Deal) use the SemOS registry — what attributes
+# exist, what derivation specs compute what, what service resources are
+# defined, what phrase surfaces the agent uses.
+#
+# Scope:
+#   - Changeset authoring + review + publish
+#   - Attribute definition (external governed + internal operational)
+#   - Derivation specs (derived-attribute formulas with staleness)
+#   - Service resource definitions (SRDEFs with attribute coverage)
+#   - Phrase authoring (governed phrase proposals with AI + human review)
+#   - Publish pipeline (gatekeeping, dry-run, rollback)
+#   - Cross-workspace artefact: shared_atom registry + remediation events
+#
+# CBU CONSTRUCT RELATIONSHIP:
+# SemOsMaintenance doesn't touch CBU money-making apparatus directly — it
+# governs the DEFINITIONS that other workspaces use. When an attribute is
+# retired here, downstream CBU / IM / Deal / KYC workspaces are impacted.
+# V1.3-13 (cross_workspace_aggregate) candidate: "registry_consistency"
+# could aggregate all workspaces' use of current attribute versions, but
+# this workspace does not HOST that aggregate — downstream workspaces do.
+#
+# ============================================================================
+# V1.3 AMENDMENTS APPLIED:
+#
+#   V1.3-1  cross_workspace_constraints: (potentially) registry publish
+#           gates on downstream workspace readiness — TBD per observed
+#           operational needs
+#   V1.3-4  expected_lifetime: long_lived on all governed-authoring slots
+#           (changeset + attribute_def + derivation_spec + phrase +
+#           service_resource_def), with governance-tier suspension via
+#           changeset.reject rather than a generic SUSPENDED state
+#   V1.3-5  dual_lifecycle: attribute_def has a duality between External
+#           governed path (full ceremony) and Internal operational path
+#           (auto-approved). Modelled via dual_lifecycle on attribute_def.
+#   V1.3-5  owner: governance + stewardship roles
+#   V1.3-6  periodic_review_cadence on governed attributes (annual review
+#           to catch staleness)
+#
+# This workspace uses v1.3 conventions from day one (D-5 interleave —
+# Tranche 3 workspaces adopt v1.3 as they author).
+#
+# ============================================================================
+# WORKSPACE SHAPE (differs from Tranche 2):
+#
+#   - Infrastructure ScopeGate fork — SemOsMaintenance bypasses client
+#     group selection (no CBU scope; governance is estate-wide).
+#   - AgentMode gating — only authorised actors may progress governance
+#     transitions (publish, retire, approve).
+#   - Cross-product + cross-workspace — governance applies to everything
+#     downstream; no category gating here.
+#
+# PARENT DOCS:
+#   - docs/todo/catalogue-platform-refinement-v1_3.md (spec)
+#   - CLAUDE.md §SemOS Maintenance workspace
+#   - docs/annex-sem-os.md (authoring + stewardship + ProposeValidate
+#     SignOffPublish pattern)
+
+version: "1.0"
+workspace: semos_maintenance
+dag_id: semos_maintenance_dag
+
+# =============================================================================
+# 1. OVERALL REGISTRY-STEWARDSHIP LIFECYCLE (per governance-item, derived)
+# =============================================================================
+# Governance-item scope rather than per-CBU. A "governance item" is any
+# artefact in the registry (attribute, derivation spec, service resource
+# def, phrase). All share the ProposeValidateSignOffPublish ceremony.
+
+overall_lifecycle:
+  id: semos_maintenance_overall_lifecycle
+  scope: per_governance_item
+  derived: true
+  description: >
+    ProposeValidateSignOffPublish ceremony applied across all governance
+    items. 6 phases aggregating item-level state-machine states into a
+    common ceremonial view. Derived from the item's primary state
+    machine (changeset_lifecycle / attribute_def_lifecycle / etc.).
+
+  phases:
+
+    - name: proposed
+      description: |
+        Item authored — changeset composing, attribute_def draft, phrase
+        proposed, etc. Pre-validation. Authoring is happening.
+      derivation:
+        any_of:
+          - "changeset.status = 'composing'"
+          - "attribute_def.lifecycle_status = 'draft'"
+          - "derivation_spec.lifecycle_status = 'draft'"
+          - "phrase.authoring_status = 'proposed'"
+      progression_verbs:
+        - changeset.compose
+        - attribute.define
+        - derivation.define
+        - phrase.propose
+      next_phase: validating
+
+    - name: validating
+      description: |
+        Automatic validation running (changeset.validate-edit, phrase
+        collision / quality checks, attribute.dry-run). No human sign-off
+        yet; system is checking item for correctness.
+      derivation:
+        any_of:
+          - "changeset.status = 'submitted'"
+          - "phrase.authoring_status IN ('collision_checked', 'quality_checked')"
+          - "attribute_def.dry_run_in_progress = true"
+      progression_verbs:
+        - changeset.validate-edit
+        - changeset.dry-run
+        - phrase.check-collision
+        - phrase.check-quality
+      next_phase: under_review
+
+    - name: under_review
+      description: |
+        Human review — stewards / governance approvers examining the
+        proposed change. Tier-gated by governance risk band.
+      derivation:
+        any_of:
+          - "changeset.status = 'reviewing'"
+          - "phrase.authoring_status = 'reviewed'"
+      progression_verbs:
+        - governance.review
+        - changeset.approve
+        - changeset.reject
+        - phrase.approve-proposal
+        - phrase.reject-proposal
+      next_phase: "(approved | rejected)"
+
+    - name: approved
+      description: |
+        Sign-off received. Item ready for publish but not yet live.
+        Publish requires an additional step (changeset.publish /
+        attribute.publish / etc.) so that authorisers retain control
+        over effective-date.
+      derivation:
+        any_of:
+          - "changeset.status = 'approved'"
+          - "phrase.authoring_status = 'approved'"
+      progression_verbs:
+        - changeset.publish
+        - attribute.publish
+        - phrase.publish
+        - governance.publish
+      next_phase: published
+
+    - name: published
+      description: |
+        Item live — downstream workspaces can use it. Registry snapshot
+        has been updated. Consumers (CBU / IM / Deal / KYC workspaces)
+        have visibility of the new version.
+      derivation:
+        any_of:
+          - "changeset.status = 'published'"
+          - "attribute_def.lifecycle_status = 'active'"
+          - "derivation_spec.lifecycle_status = 'active'"
+          - "service_resource_def.lifecycle_status IN ('synced','complete')"
+          - "phrase.authoring_status = 'published'"
+      progression_verbs:
+        - attribute.deprecate
+        - derivation.retire
+        - phrase.deprecate
+        - governance.rollback
+      next_phase: "(deprecated | rolled_back | retired)"
+
+    - name: rejected
+      description: |
+        Terminal-negative at review — author must revise and re-propose
+        (new changeset / new draft attribute_def). The rejected item is
+        retained for audit.
+      derivation:
+        any_of:
+          - "changeset.status = 'rejected'"
+          - "phrase.authoring_status = 'rejected'"
+      progression_verbs: []
+      next_phase: "(none — must re-propose)"
+
+    - name: deprecated
+      description: |
+        Previously published; replaced by newer version OR no longer
+        recommended. Still in use but consumers should migrate.
+      derivation:
+        any_of:
+          - "attribute_def.lifecycle_status = 'deprecated'"
+          - "derivation_spec.lifecycle_status = 'stale'"
+          - "phrase.authoring_status = 'deprecated'"
+      progression_verbs:
+        - attribute.retire
+        - derivation.retire
+        - phrase.retire
+      next_phase: retired
+
+    - name: retired
+      description: |
+        Terminal. No longer referenced by any downstream workspace.
+        Retained for audit retention; no new uses.
+      derivation:
+        any_of:
+          - "attribute_def.lifecycle_status = 'retired'"
+          - "phrase.authoring_status = 'retired'"
+      progression_verbs: []
+      next_phase: "(none)"
+
+# =============================================================================
+# 2. PER-SLOT STATE MACHINES
+# =============================================================================
+
+slots:
+
+  # ---------------------------------------------------------------------------
+  # 2.1 Changeset — authoring + review + publish
+  # ---------------------------------------------------------------------------
+
+  - id: changeset
+    stateless: false
+    state_machine:
+      id: changeset_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"sem_reg".changesets'
+      state_column: status
+      scope: per_changeset
+      description: |
+        Changeset authoring + review + publish lifecycle. 6 states
+        (reconcile-existing from state_machines/changeset_lifecycle.yaml).
+        The canonical governance ceremony: compose → submit → review →
+        approve/reject → publish.
+      states:
+        - id: composing
+          entry: true
+          description: "Author adding/editing items; not yet submitted."
+        - id: submitted
+          description: "Submitted for review; automatic validation in progress."
+        - id: reviewing
+          description: "Human stewards reviewing the proposed changes."
+        - id: approved
+          description: "Stewards approved; awaiting publish trigger."
+        - id: published
+          description: "Published to registry; consumers see the change."
+        - id: rejected
+          description: |
+            Stewards rejected. Terminal for this changeset — author must
+            create a new changeset to retry. Rejected changeset retained
+            for audit.
+      transitions:
+        - from: composing
+          to: submitted
+          via: changeset.submit
+        - from: submitted
+          to: reviewing
+          via: changeset.enter-review
+        - from: reviewing
+          to: approved
+          via: changeset.approve
+        - from: reviewing
+          to: rejected
+          via: changeset.reject
+        - from: approved
+          to: published
+          via: changeset.publish
+      terminal_states: [published, rejected]
+    # V1.3-4: changeset is long-lived in the sense of "active governance
+    # work" but rejection acts as SUSPENDED/terminal. No separate SUSPENDED
+    # state — the workflow uses rejection + re-propose.
+    suspended_state_exempt: true
+
+  # ---------------------------------------------------------------------------
+  # 2.2 AttributeDef — dual lifecycle (External governed vs Internal
+  #     operational). Foundational V1.3-5 example.
+  # ---------------------------------------------------------------------------
+
+  - id: attribute_def
+    stateless: false
+    # V1.3-6: governed attributes need annual review — stale definitions
+    # propagate errors across consumers.
+    periodic_review_cadence:
+      base_window: "P1Y"
+      risk_tiered_overrides:
+        - risk_tier: HIGH
+          window: "P6M"
+      review_scope: full
+    state_machine:
+      id: attribute_def_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"sem_reg".attribute_defs'
+      state_column: lifecycle_status
+      scope: per_attribute_def
+      description: |
+        Attribute-definition lifecycle. 5 states (reconcile-existing
+        from state_machines/attribute_def_lifecycle.yaml). The primary
+        (default) path is the EXTERNAL governed path — full
+        ProposeValidateSignOffPublish ceremony. The INTERNAL operational
+        path (dual_lifecycle) auto-approves without ceremony — used for
+        internal/system attributes where governance is noise.
+      states:
+        - id: ungoverned
+          entry: true
+          description: "Pre-governance; attribute exists but is not formally defined."
+        - id: draft
+          description: "Attribute being authored within a changeset."
+        - id: active
+          description: "Published; consumers reference this version."
+        - id: deprecated
+          description: "Replaced by a newer version; migrate consumers."
+        - id: retired
+          description: "Terminal; no longer in use."
+      transitions:
+        - from: ungoverned
+          to: draft
+          via: attribute.define
+        - from: draft
+          to: active
+          via: "(backend: changeset.publish includes this attribute)"
+        - from: active
+          to: draft
+          via: attribute.propose-revision  # V1.3-6 periodic-review re-entry
+        - from: active
+          to: deprecated
+          via: attribute.deprecate
+        - from: deprecated
+          to: retired
+          via: attribute.retire
+      terminal_states: [retired]
+    # V1.3-4: governance equivalents of SUSPENDED are deprecated +
+    # rollback. No generic SUSPENDED.
+    suspended_state_exempt: true
+
+    # V1.3-5 dual_lifecycle: Internal attributes skip ceremony.
+    # AttributeVisibility::Internal (operational) auto-approves without
+    # changeset.
+    dual_lifecycle:
+      - id: attribute_def_internal_lifecycle
+        description: |
+          Internal / operational attribute lifecycle. Auto-approved; no
+          changeset ceremony. Used for system-level attributes where
+          governance overhead would be noise (derivation intermediates,
+          telemetry, internal diagnostics).
+        owner: "system"
+        junction_state_from_primary: ungoverned  # starts at primary entry
+        states:
+          - id: auto_active
+            entry: true
+            description: "Attribute auto-approved upon attribute.define-internal call."
+          - id: auto_updated
+            description: "Attribute metadata lightly updated via attribute.update-internal."
+          - id: auto_retired
+            description: "System-retired; attribute no longer referenced."
+        transitions:
+          - from: auto_active
+            to: auto_updated
+            via: attribute.update-internal
+          - from: auto_updated
+            to: auto_active
+            via: "(backend: update applied)"
+          - from: [auto_active, auto_updated]
+            to: auto_retired
+            via: "(backend: internal cleanup; no verb — infrastructure)"
+        terminal_states: [auto_retired]
+
+  # ---------------------------------------------------------------------------
+  # 2.3 DerivationSpec — derived-attribute formulas
+  # ---------------------------------------------------------------------------
+
+  - id: derivation_spec
+    stateless: false
+    state_machine:
+      id: derivation_spec_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"sem_reg".derivation_specs'
+      state_column: lifecycle_status
+      scope: per_derivation_spec
+      description: |
+        Derivation-spec lifecycle. 3 states (reconcile-existing from
+        state_machines/derivation_spec_lifecycle.yaml). Derivation specs
+        compute derived attributes from base attributes; STALE flags
+        that an upstream attribute has changed and the derivation must
+        be recomputed.
+      states:
+        - id: draft
+          entry: true
+          description: "Derivation spec being authored."
+        - id: active
+          description: "Published; runtime uses this derivation for derived values."
+        - id: stale
+          description: |
+            Upstream attribute changed; cached derived values are
+            invalidated. Runtime must recompute on next access.
+      transitions:
+        - from: draft
+          to: active
+          via: derivation.activate
+        - from: active
+          to: stale
+          via: "(backend: upstream attribute version bump)"
+        - from: stale
+          to: active
+          via: derivation.recompute-stale
+      terminal_states: []
+    suspended_state_exempt: true
+
+  # ---------------------------------------------------------------------------
+  # 2.4 ServiceResourceDef — SRDEF metadata + attribute coverage
+  # ---------------------------------------------------------------------------
+
+  - id: service_resource_def
+    stateless: false
+    state_machine:
+      id: service_resource_def_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"sem_reg".service_resource_defs'
+      state_column: lifecycle_status
+      scope: per_srdef
+      description: |
+        Service-resource-definition lifecycle. 4 states (reconcile-
+        existing from state_machines/service_resource_def_lifecycle.yaml).
+        SRDEFs define service-resource metadata; gaps_found means the
+        SRDEF references attributes not declared in the registry.
+      states:
+        - id: unsynced
+          entry: true
+          description: "SRDEF authored but not yet cross-checked with registry."
+        - id: synced
+          description: "Cross-checked; all referenced attributes declared."
+        - id: gaps_found
+          description: "One or more referenced attributes missing — must define."
+        - id: complete
+          description: "All gaps filled; SRDEF ready for downstream consumption."
+      transitions:
+        - from: unsynced
+          to: synced
+          via: service-resource.sync-definitions
+        - from: synced
+          to: gaps_found
+          via: service-resource.check-attribute-gaps
+        - from: gaps_found
+          to: synced
+          via: service-resource.sync-definitions     # re-sync after filling gaps
+        - from: synced
+          to: complete
+          via: service-resource.mark-complete
+        - from: gaps_found
+          to: complete
+          via: service-resource.mark-complete        # force-complete (steward override)
+      terminal_states: [complete]
+    suspended_state_exempt: true
+
+  # ---------------------------------------------------------------------------
+  # 2.5 Phrase Authoring — governed phrase lifecycle
+  # ---------------------------------------------------------------------------
+
+  - id: phrase_authoring
+    stateless: false
+    state_machine:
+      id: phrase_authoring_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"sem_reg".phrase_authoring'
+      state_column: authoring_status
+      scope: per_phrase
+      description: |
+        Governed phrase authoring lifecycle. 8 states (reconcile-existing
+        from state_machines/phrase_authoring_lifecycle.yaml). Covers
+        AI-proposed phrase mappings through collision/quality checks,
+        human review, and publish. Deferred state for backlog mgmt.
+      states:
+        - id: proposed
+          entry: true
+          description: "AI proposal received; not yet checked."
+        - id: collision_checked
+          description: "Checked for collisions against existing phrases."
+        - id: quality_checked
+          description: "Quality heuristics applied; confidence scored."
+        - id: reviewed
+          description: "Human steward reviewed."
+        - id: published
+          description: "Live in phrase bank; agent will use."
+        - id: rejected
+          description: "Rejected; terminal-negative."
+        - id: refined
+          description: "Back-to-proposal with revisions required."
+        - id: deferred
+          description: "Backlog parking; low priority or awaiting context."
+      transitions:
+        - from: proposed
+          to: collision_checked
+          via: phrase.check-collision
+        - from: collision_checked
+          to: quality_checked
+          via: phrase.check-quality
+        - from: quality_checked
+          to: reviewed
+          via: phrase.submit-for-review
+        - from: reviewed
+          to: published
+          via: phrase.approve-proposal
+        - from: reviewed
+          to: rejected
+          via: phrase.reject-proposal
+        - from: reviewed
+          to: refined
+          via: phrase.request-refinement
+        - from: reviewed
+          to: deferred
+          via: phrase.defer
+        - from: refined
+          to: proposed
+          via: phrase.propose         # re-submit after refinement
+        - from: deferred
+          to: proposed
+          via: phrase.reactivate
+      terminal_states: [published, rejected]
+    suspended_state_exempt: true
+
+  # ---------------------------------------------------------------------------
+  # 2.6 Cross-workspace artefacts (reference — existing from cross-workspace-
+  #     state-consistency work, governed here)
+  # ---------------------------------------------------------------------------
+
+  - id: shared_atom
+    stateless: false
+    state_machine: "(reconcile-existing — shared_atom_registry lifecycle: Draft → Active → Deprecated → Retired — lives in docs/architecture/cross-workspace-state-consistency-v0.4.md)"
+
+  - id: remediation_event
+    stateless: false
+    state_machine: "(reconcile-existing — remediation_events lifecycle: Detected → Replaying → Resolved | Escalated → Resolved | Deferred — lives in cross_workspace module)"
+
+  # ---------------------------------------------------------------------------
+  # 2.7 Stateless (compositional / reference / aggregation-only)
+  # ---------------------------------------------------------------------------
+
+  - id: workspace_root
+    stateless: true
+    rationale: "Aggregation root over SemOsMaintenance domains."
+
+  - id: governance
+    stateless: true
+    rationale: |
+      Governance is the verb surface, not a stateful entity. Verbs like
+      governance.publish, governance.rollback, governance.review are
+      composed into changeset / attribute / phrase flows. No independent
+      lifecycle.
+
+  - id: registry
+    stateless: true
+    rationale: |
+      Registry aggregation root. CRUD over registry objects (attribute_
+      def, derivation_spec, service_resource_def, phrase). Stateless at
+      the slot level; the individual objects have their own lifecycles
+      (see above).
+
+  - id: typed_attribute
+    stateless: true
+    rationale: |
+      Per-entity typed attribute VALUES (vs the attribute DEFINITION
+      governed by attribute_def). Values are transactional data — record /
+      get / list-for-entity — no independent lifecycle. The definition
+      lifecycle governs whether the attribute is USE-ABLE at all.
+
+# =============================================================================
+# 3. CROSS-SLOT CONSTRAINTS
+# =============================================================================
+
+cross_slot_constraints:
+
+  - id: published_changeset_propagates_items
+    description: |
+      When changeset transitions to published, every attribute_def /
+      derivation_spec / service_resource_def it contains must transition
+      to active (or appropriate published state) atomically.
+    rule: |
+      changeset.status = 'published'
+        → ALL referenced attribute_def.lifecycle_status ∈ ('active','deprecated')
+        AND ALL referenced derivation_spec.lifecycle_status ∈ ('active','stale')
+        AND ALL referenced service_resource_def.lifecycle_status IN ('synced','complete')
+    severity: error
+
+  - id: srdef_complete_requires_no_gaps
+    description: "service_resource_def.complete requires no referenced attribute_def in gaps_found or missing."
+    rule: |
+      service_resource_def.lifecycle_status = 'complete'
+        → NO referenced attributes in lifecycle_status = 'ungoverned' or missing from registry
+    severity: error
+
+  - id: derivation_active_requires_active_upstream
+    description: |
+      derivation_spec.active requires all upstream attribute_defs
+      to be in active or deprecated state (not draft / retired).
+    rule: |
+      derivation_spec.lifecycle_status = 'active'
+        → ALL upstream attribute_defs.lifecycle_status IN ('active','deprecated')
+    severity: error
+
+  - id: retired_attribute_blocks_active_derivations
+    description: |
+      An attribute_def cannot transition to retired while any active
+      derivation_spec references it.
+    rule: |
+      attribute_def.lifecycle_status = 'retired'
+        → NO derivation_spec.lifecycle_status = 'active' references this attribute
+    severity: error
+
+  - id: published_phrase_requires_collision_clean
+    description: "phrase cannot be published if a collision was found."
+    rule: |
+      phrase.authoring_status = 'published'
+        → phrase collision check passed
+    severity: error
+
+# =============================================================================
+# 4. CROSS-WORKSPACE CONSTRAINTS (V1.3-1 — Mode A blocking)
+# =============================================================================
+# Governance publish flows affect downstream workspaces. In practice
+# most of these are advisory rather than blocking (downstream workspaces
+# pick up new versions lazily). For v1.3 we declare none here — the
+# intent-vs-fact is that governance changes propagate asynchronously.
+# Future: formal propagation-staleness constraints could live here.
+
+cross_workspace_constraints: []
+
+# =============================================================================
+# 5. DERIVED CROSS-WORKSPACE STATE (V1.3-2 — Mode B aggregation)
+# =============================================================================
+# SemOsMaintenance does NOT host an aggregate — the workspace's purpose
+# is to DEFINE things for others to use, not to aggregate their states.
+# Downstream workspaces may aggregate governance state ("is my required
+# attribute set all in active?") but the aggregate lives there.
+
+derived_cross_workspace_state: []
+
+# =============================================================================
+# 6. PRODUCT-MODULE GATES
+# =============================================================================
+# Governance is cross-product and cross-workspace — every downstream
+# workspace uses the registry regardless of product bundle.
+
+product_module_gates:
+
+  always_on:
+    - workspace_root
+    - changeset
+    - attribute_def
+    - derivation_spec
+    - service_resource_def
+    - phrase_authoring
+    - governance
+    - registry
+    - typed_attribute
+    - shared_atom
+    - remediation_event
+
+  conditionally_on: []
+
+# =============================================================================
+# 7. OUT OF SCOPE (P16 three-layer + cross-workspace)
+# =============================================================================
+
+out_of_scope:
+
+  # Layer 3 operational runtime
+  - "Actual derivation computation runs — layer 3 (ob-poc runtime; DerivedAttributeEngine)"
+  - "Registry snapshot materialisation — layer 2 (sem_reg.snapshots trigger)"
+  - "Phrase-bank indexing for agent consumption — layer 2 (semantic matcher)"
+  - "AI proposal pipeline for phrase authoring — layer 3 (external LLM integration)"
+
+  # Cross-workspace (governed HERE, consumed THERE)
+  - "Downstream workspaces' use of published attributes — each workspace DAG declares its own consumption"
+  - "Downstream workspaces' aggregate of governance-consistency — hosted on downstream workspace (CAND-13 pattern)"
+
+# =============================================================================
+# 8. PRUNE SEMANTICS
+# =============================================================================
+# Governance prune is narrow: you don't "delete" a published attribute —
+# you retire it. Prune only applies to unpublished / draft items:
+# abandoned changesets, rejected phrases being cleaned up.
+
+prune_cascade_rules:
+
+  - id: abandoned_changeset_cleanup
+    when: "cleanup of changeset in composing state older than retention window"
+    cascades_to:
+      - target: changeset
+        rule: "changesets in composing for > 90 days → archive or delete (retention policy)"
+
+  - id: retired_attribute_cascade
+    when: "attribute_def.retire on attribute A"
+    cascades_to:
+      - target: derivation_spec
+        rule: "derivation_specs referencing A must be retired or re-authored first (pre-validation)"
+      - target: service_resource_def
+        rule: "SRDEFs referencing A must be re-validated; if gap, automatic gaps_found"
+      - target: phrase_authoring
+        rule: "phrases referencing A as keyword may need refinement"
+
+prune_pre_validation:
+  required_verbs:
+    - governance.impact-analysis       # downstream consumer impact preview
+    - changeset.cross-reference        # which changesets reference the target
+    - attribute.list-usage             # who uses this attribute today
+  abort_conditions:
+    - "attribute.retire when active derivation_spec references this attribute"
+    - "changeset.delete-composing when any item has been approved (must reject instead)"
+    - "service_resource_def.retire when any active CBU references this SRDEF"

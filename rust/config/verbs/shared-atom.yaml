@@ -49,6 +49,11 @@ domains:
         - create shared atom
         - add shared attribute
         - define cross-workspace attribute
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       activate:
         description: Promote a shared atom from Draft to Active. Propagation enforcement begins.
@@ -78,6 +83,11 @@ domains:
         - enable shared atom
         - promote shared atom to active
         - turn on shared atom enforcement
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       deprecate:
         description: Mark a shared atom as deprecated. Still enforced but no new consumers allowed.
@@ -106,6 +116,11 @@ domains:
         - deprecate shared atom
         - mark shared atom deprecated
         - sunset shared atom
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       retire:
         description: Remove a shared atom from active enforcement. Historical records retained.
@@ -134,6 +149,11 @@ domains:
         - retire shared atom
         - remove shared atom
         - deregister shared atom
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       list:
         description: List all shared atoms, optionally filtered by lifecycle status
@@ -165,6 +185,11 @@ domains:
         - what shared atoms exist
         - shared atom registry
         - show cross-workspace attributes
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list-consumers:
         description: Show discovered consumers of a shared atom from verb footprint analysis
@@ -196,6 +221,11 @@ domains:
         - show consumers of shared atom
         - shared atom dependencies
         - cross-workspace consumers
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       replay-constellation:
         description: Replay a consuming constellation from the top after a shared fact supersession
@@ -235,6 +265,11 @@ domains:
         - rebuild stale constellation
         - replay after shared fact change
         - fix stale workspace state
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       acknowledge-shared-update:
         description: Acknowledge a shared fact supersession for an in-flight entity, advancing the consumer ref to current
@@ -269,3 +304,8 @@ domains:
         - accept shared fact change
         - acknowledge stale fact
         - pick up latest shared value
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable

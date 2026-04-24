@@ -29,6 +29,11 @@ domains:
         returns:
           type: record
           description: Pattern summary with miss count, wrong-match count, top patterns
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       coverage-report:
         description: Per-workspace phrase coverage and gap analysis
@@ -51,6 +56,11 @@ domains:
         returns:
           type: record_set
           description: Per-workspace coverage with verb count, phrase count, avg phrases per verb
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
 
       check-collisions:
         description: Check a candidate phrase for collisions against the phrase bank
@@ -85,6 +95,11 @@ domains:
         returns:
           type: record
           description: Collision report with exact conflicts, semantic near-misses, cross-workspace conflicts
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       propose:
         description: Generate a governed phrase proposal with evidence and collision report
@@ -118,6 +133,11 @@ domains:
         returns:
           type: record
           description: Proposal with confidence score, risk tier, collision report
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       batch-propose:
         description: Generate bulk proposals from aggregated miss analysis (max 50)
@@ -143,6 +163,11 @@ domains:
         returns:
           type: record_set
           description: Batch of proposals ordered by risk tier then confidence
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: reviewable
 
       review-proposals:
         description: List pending phrase proposals grouped by risk tier
@@ -164,6 +189,11 @@ domains:
         returns:
           type: record_set
           description: Pending proposals with evidence, collision reports, risk tiers
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       approve:
         description: Approve a phrase proposal and publish through SemOS governance
@@ -191,6 +221,11 @@ domains:
         returns:
           type: record
           description: Published phrase with phrase_bank entry ID
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
 
       reject:
         description: Reject a phrase proposal with reason code
@@ -217,6 +252,11 @@ domains:
         returns:
           type: record
           description: Rejection confirmation with reason
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
 
       defer:
         description: Park a phrase proposal for later review
@@ -243,3 +283,8 @@ domains:
         returns:
           type: record
           description: Deferred confirmation
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
