@@ -1,0 +1,155 @@
+# Session-Bootstrap Workspace — DAG Taxonomy (Tranche 3 — 2026-04-24)
+#
+# ============================================================================
+# WORKSPACE PURPOSE:
+#
+# Session-Bootstrap is the PRE-WORKSPACE-SELECTION pack that resolves
+# the client-group scope at the start of every session. Per
+# Invariant I-7 ("Bootstrap is a pack — not a special state"), the
+# ScopeGate handler delegates to this pack's routing logic. The only
+# real operation is session.load-cluster, which resolves a client-
+# group name to a group id and loads associated CBUs into the
+# session's working set.
+#
+# ============================================================================
+# WORKSPACE SHAPE — smallest workspace in the estate
+#
+# 2 allowed verbs:
+#   - session.load-cluster (primary — resolves client group)
+#   - session.load-galaxy (alternate — loads a broader entity group)
+#
+# No entity aggregates, no state machines, no cross-workspace gates.
+# This workspace exists to establish context for downstream workspaces;
+# its only transitional state is "scope not yet resolved" → "scope
+# resolved". Session lifecycle itself is governed by the REPL V2
+# ContextStack (out of DAG scope per P16 Layer 3).
+#
+# ============================================================================
+# CBU CONSTRUCT RELATIONSHIP:
+#
+# Session-Bootstrap is how the UI / REPL answers "which client are
+# we working with?" — it turns a typed client name into a loaded
+# set of CBUs (the money-making apparatuses owned by that client).
+# It does not manipulate CBU state; it only LOADS them into the
+# session's viewport.
+#
+# ============================================================================
+# V1.3 adopted conventions: minimal (workspace is transitional).
+#
+# PARENT DOCS:
+#   - docs/todo/catalogue-platform-refinement-v1_3.md
+#   - rust/config/packs/session-bootstrap.yaml
+
+version: "1.0"
+workspace: session_bootstrap
+dag_id: session_bootstrap_dag
+
+# =============================================================================
+# 1. OVERALL LIFECYCLE — scope-resolution journey
+# =============================================================================
+
+overall_lifecycle:
+  id: session_bootstrap_overall_lifecycle
+  scope: per_session
+  derived: true
+  description: >
+    2-phase lifecycle: unresolved → resolved. Represents whether a
+    session has a client-group in scope. Derived from the session's
+    entity_scope.cbu_ids emptiness + the session's client_group_id.
+  phases:
+    - name: unresolved
+      description: "Session started; no client group in scope yet."
+      derivation:
+        all_of:
+          - "session.client_group_id IS NULL"
+      progression_verbs:
+        - session.load-cluster
+        - session.load-galaxy
+      next_phase: resolved
+    - name: resolved
+      description: |
+        Client group loaded into the session. CBUs available to
+        downstream workspaces. Session can now transition to a
+        workspace-selection pack (cbu / kyc / deal / etc.).
+      derivation:
+        all_of:
+          - "session.client_group_id IS NOT NULL"
+          - "COUNT session.entity_scope.cbu_ids >= 0"
+      progression_verbs: []  # handoff to workspace-selection pack
+      next_phase: "(handoff)"
+
+# =============================================================================
+# 2. SLOTS — minimal; one stateless root + verb surface
+# =============================================================================
+
+slots:
+
+  - id: workspace_root
+    stateless: true
+    rationale: |
+      Aggregation root for session-bootstrap. Session state itself is
+      governed by REPL V2 ContextStack (Layer 3, out of DAG scope);
+      this workspace contributes the scope-resolution verbs.
+
+  - id: session_scope
+    stateless: true
+    rationale: |
+      The session's scope (client_group_id + cbu_ids set). Transient
+      session data held in ReplSessionV2.entity_scope, not in a
+      persistent table. No lifecycle beyond unresolved → resolved.
+      session.undo / redo restore prior scope states via REPL V2
+      history, not a DAG-modelled state machine.
+
+  - id: client_group
+    stateless: false
+    state_machine: "(reference — see instrument_matrix_dag.yaml group.discovery_status_lifecycle; session-bootstrap READS this state when loading)"
+
+# =============================================================================
+# 3. CROSS-SLOT / CROSS-WORKSPACE CONSTRAINTS
+# =============================================================================
+# None — this workspace's only job is to load scope. No gating.
+
+cross_slot_constraints: []
+cross_workspace_constraints: []
+derived_cross_workspace_state: []
+
+# =============================================================================
+# 4. PRODUCT-MODULE GATES
+# =============================================================================
+# Always-on. This is the bootstrap pack — always available at session
+# start regardless of product bundle.
+
+product_module_gates:
+  always_on:
+    - workspace_root
+    - session_scope
+    - client_group
+  conditionally_on: []
+
+# =============================================================================
+# 5. OUT OF SCOPE
+# =============================================================================
+
+out_of_scope:
+  - "Session lifecycle (start / end / timeout) — Layer 3 REPL V2 ContextStack"
+  - "Undo / redo history — Layer 3 REPL V2 session history"
+  - "Client group resolution algorithm — Layer 2 client-group-resolver"
+  - "CBU loading into viewport — governed by CBU workspace's session interaction"
+
+# =============================================================================
+# 6. PRUNE SEMANTICS
+# =============================================================================
+# session.clear is the prune analog — clears session scope back to
+# unresolved. No persistent state to cascade; this is a session-scoped
+# operation only.
+
+prune_cascade_rules:
+  - id: session_clear_resets_scope
+    when: "session.clear called"
+    cascades_to:
+      - target: session_scope
+        rule: "client_group_id → NULL, cbu_ids → []"
+
+prune_pre_validation:
+  required_verbs: []
+  abort_conditions: []

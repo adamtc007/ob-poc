@@ -65,6 +65,11 @@ domains:
         returns:
           type: record
           fields: [session_id, mode, client_group_name, workspace]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Load CBUs into session (mutates state, pushes history)
@@ -108,6 +113,11 @@ domains:
         returns:
           type: record
           fields: [count_added, total_loaded]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       load-galaxy:
         description: Load all CBUs in a region/jurisdiction (Galaxy = regional)
@@ -151,6 +161,11 @@ domains:
         returns:
           type: record
           fields: [jurisdiction, count_added, total_loaded]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       load-cluster:
         description: Load all CBUs under a GROUP entity (apex of ownership hierarchy)
@@ -258,6 +273,11 @@ domains:
         returns:
           type: record
           fields: [apex_name, jurisdiction, count_added, total_loaded]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       load-system:
         description: Load a single CBU (Solar System = CBU container)
@@ -297,6 +317,11 @@ domains:
         returns:
           type: record
           fields: [cbu_id, name, jurisdiction, total_loaded]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Filter/Narrow scope (removes CBUs not matching filter)
@@ -333,6 +358,11 @@ domains:
         returns:
           type: record
           fields: [jurisdiction, count_kept, count_removed, total_loaded]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Unload CBUs from session
@@ -374,6 +404,11 @@ domains:
         returns:
           type: record
           fields: [cbu_id, name, total_loaded, was_present]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: reviewable
 
       clear:
         description: Remove all CBUs from session
@@ -402,6 +437,11 @@ domains:
         returns:
           type: record
           fields: [count_removed]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # History navigation
@@ -434,6 +474,11 @@ domains:
         returns:
           type: record
           fields: [success, total_loaded, history_depth]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: reviewable
 
       redo:
         description: Re-apply undone state change
@@ -462,6 +507,11 @@ domains:
         returns:
           type: record
           fields: [success, total_loaded, future_depth]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: reviewable
 
       # ============================================
       # Query (read-only)
@@ -494,6 +544,11 @@ domains:
         returns:
           type: record
           fields: [total_cbus, jurisdictions, galaxies, history_depth, future_depth]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       list:
         description: List loaded CBUs
@@ -530,6 +585,11 @@ domains:
         returns:
           type: record_set
           fields: [cbu_id, name, jurisdiction, apex_entity]
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Client Context (entity resolution scope)
@@ -584,6 +644,11 @@ domains:
         - "If exact match: sets client_group_id immediately"
         - "If ambiguous (score gap < 0.10): returns top 3 candidates for user selection"
         - "If no match above threshold: returns empty with suggestions"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       set-persona:
         description: "Set persona context for tag filtering"
@@ -621,6 +686,11 @@ domains:
         returns:
           type: affected
           description: "1 if persona was set"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Macro Expansion Targets (set-structure, set-case, set-mandate)
@@ -673,6 +743,11 @@ domains:
         - "Sets session.current_structure"
         - "Sets session.structure_type if provided"
         - "Sets dag_state flag 'structure.selected' = true"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       set-case:
         description: "Set current KYC case context for subsequent operations"
@@ -713,6 +788,11 @@ domains:
         effects:
         - "Sets session.current_case"
         - "Sets dag_state flag 'case.selected' = true"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       set-mandate:
         description: "Set current mandate (trading profile) context for subsequent operations"
@@ -754,6 +834,11 @@ domains:
         effects:
         - "Sets session.current_mandate"
         - "Sets dag_state flag 'mandate.selected' = true"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       # ============================================
       # Deal Taxonomy Navigation
@@ -806,6 +891,11 @@ domains:
         - "Sets session.context.deal_id"
         - "Sets session.context.deal_name"
         - "UI shows deal taxonomy panel"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
 
       unload-deal:
         description: "Clear deal context from session"
@@ -838,3 +928,8 @@ domains:
         - "Clears session.context.deal_id"
         - "Clears session.context.deal_name"
         - "UI hides deal taxonomy panel"
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: reviewable
