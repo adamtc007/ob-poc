@@ -384,7 +384,7 @@ slots:
         - from: SUSPENDED
           to: ACTIVE
           via: investor.reinstate
-        - from: (ACTIVE, SUSPENDED)
+        - from: "(ACTIVE, SUSPENDED)"
           to: OFFBOARDED
           via: investor.offboard
       terminal_states: [OFFBOARDED]
@@ -430,7 +430,7 @@ slots:
         - from: APPROVED
           to: REFRESH_REQUIRED
           via: investor.request-documents
-        - from: (EXPIRED, REFRESH_REQUIRED)
+        - from: "(EXPIRED, REFRESH_REQUIRED)"
           to: IN_PROGRESS
           via: investor.start-kyc
       terminal_states: [REJECTED]
@@ -474,7 +474,7 @@ slots:
           to: ACTIVE
           via: holding.update-status
           args: { status: ACTIVE }
-        - from: (ACTIVE, SUSPENDED, PENDING)
+        - from: "(ACTIVE, SUSPENDED, PENDING)"
           to: CLOSED
           via: holding.close
       terminal_states: [CLOSED]
@@ -511,7 +511,7 @@ slots:
         - from: pending
           to: rejected
           via: "(backend: client-group researcher review)"
-        - from: (confirmed, rejected)
+        - from: "(confirmed, rejected)"
           to: needs_update
           via: "(backend: source data change trigger)"
         - from: needs_update

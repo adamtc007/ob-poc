@@ -17,9 +17,9 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use dsl_core::config::{
-    collect_declared_fqns, flatten_pack_entries, load_packs_from_dir,
-    validate_pack_fqns, validate_verbs_config, ConfigLoader, ValidationContext,
-    VerbsConfig,
+    collect_declared_fqns, flatten_pack_entries, load_dags_from_dir, load_packs_from_dir,
+    validate_dags, validate_pack_fqns, validate_verbs_config, ConfigLoader,
+    ValidationContext, VerbsConfig,
 };
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -136,18 +136,37 @@ async fn validate(strict_warnings: bool) -> Result<()> {
         Vec::new()
     };
 
+    // V1.3 — DAG taxonomy cross-DAG validation (R-2b).
+    let dags_dir = PathBuf::from("config/sem_os_seeds/dag_taxonomies");
+    let dag_report = if dags_dir.exists() {
+        let loaded = load_dags_from_dir(&dags_dir)
+            .context("loading config/sem_os_seeds/dag_taxonomies/ for v1.3 checks")?;
+        println!(
+            "Loaded {} DAG taxonomies from config/sem_os_seeds/dag_taxonomies/",
+            loaded.len()
+        );
+        validate_dags(&loaded)
+    } else {
+        dsl_core::config::DagValidationReport::default()
+    };
+
     let struct_n = report.structural.len();
-    let wf_n = report.well_formedness.len() + pack_errors.len();
-    let warn_n = report.warnings.len();
+    let wf_n = report.well_formedness.len() + pack_errors.len() + dag_report.errors.len();
+    let warn_n = report.warnings.len() + dag_report.warnings.len();
 
     println!();
     println!("Structural errors:           {struct_n}");
     println!(
-        "Well-formedness errors:      {wf_n}  ({} three-axis + {} pack-hygiene)",
+        "Well-formedness errors:      {wf_n}  ({} three-axis + {} pack-hygiene + {} cross-DAG)",
         report.well_formedness.len(),
-        pack_errors.len()
+        pack_errors.len(),
+        dag_report.errors.len()
     );
-    println!("Policy-sanity warnings:      {warn_n}");
+    println!(
+        "Policy-sanity warnings:      {warn_n}  ({} three-axis + {} DAG lint)",
+        report.warnings.len(),
+        dag_report.warnings.len()
+    );
 
     if struct_n > 0 {
         println!("\nStructural errors:");
@@ -167,9 +186,18 @@ async fn validate(strict_warnings: bool) -> Result<()> {
             println!("  ✗ {e}");
         }
     }
+    if !dag_report.errors.is_empty() {
+        println!("\nWell-formedness errors (cross-DAG — v1.3):");
+        for e in &dag_report.errors {
+            println!("  ✗ {e}");
+        }
+    }
     if warn_n > 0 {
         println!("\nPolicy-sanity warnings:");
         for w in &report.warnings {
+            println!("  ~ {w}");
+        }
+        for w in &dag_report.warnings {
             println!("  ~ {w}");
         }
     }

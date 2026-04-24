@@ -261,7 +261,7 @@ slots:
         - from: WINDING_DOWN
           to: OFFBOARDED
           via: deal.update-status
-        - from: (PROSPECT, QUALIFYING, NEGOTIATING, KYC_CLEARANCE, CONTRACTED, ONBOARDING)
+        - from: "(PROSPECT, QUALIFYING, NEGOTIATING, KYC_CLEARANCE, CONTRACTED, ONBOARDING)"
           to: CANCELLED
           via: deal.cancel
       terminal_states: [OFFBOARDED, CANCELLED]
@@ -298,10 +298,10 @@ slots:
         - from: NEGOTIATING
           to: AGREED
           via: [deal.update-product-status, deal.agree-rate-card]
-        - from: (PROPOSED, NEGOTIATING)
+        - from: "(PROPOSED, NEGOTIATING)"
           to: DECLINED
           via: deal.update-product-status
-        - from: (PROPOSED, NEGOTIATING, AGREED)
+        - from: "(PROPOSED, NEGOTIATING, AGREED)"
           to: REMOVED
           via: deal.remove-product
       terminal_states: [AGREED, DECLINED, REMOVED]
@@ -343,13 +343,13 @@ slots:
         - from: COUNTER_PROPOSED
           to: PROPOSED
           via: deal.propose-rate-card  # re-propose after counter
-        - from: (PROPOSED, COUNTER_PROPOSED)
+        - from: "(PROPOSED, COUNTER_PROPOSED)"
           to: AGREED
           via: deal.agree-rate-card
         - from: AGREED
           to: SUPERSEDED
           via: "(backend: new AGREED for same (deal, contract, product))"
-        - from: (DRAFT, PROPOSED, COUNTER_PROPOSED)
+        - from: "(DRAFT, PROPOSED, COUNTER_PROPOSED)"
           to: CANCELLED
           via: "(implicit: rate card removed or deal cancelled)"
       terminal_states: [SUPERSEDED, CANCELLED]
@@ -381,13 +381,13 @@ slots:
         - from: IN_PROGRESS
           to: COMPLETED
           via: deal.update-onboarding-status
-        - from: (PENDING, IN_PROGRESS)
+        - from: "(PENDING, IN_PROGRESS)"
           to: BLOCKED
           via: deal.update-onboarding-status
         - from: BLOCKED
           to: IN_PROGRESS
           via: deal.update-onboarding-status
-        - from: (PENDING, IN_PROGRESS, BLOCKED)
+        - from: "(PENDING, IN_PROGRESS, BLOCKED)"
           to: CANCELLED
           via: deal.update-onboarding-status
       terminal_states: [COMPLETED, CANCELLED]
@@ -426,10 +426,10 @@ slots:
         - from: SIGNED
           to: EXECUTED
           via: deal.update-document-status
-        - from: (EXECUTED, SIGNED)
+        - from: "(EXECUTED, SIGNED)"
           to: SUPERSEDED
           via: deal.update-document-status
-        - from: (EXECUTED, SUPERSEDED)
+        - from: "(EXECUTED, SUPERSEDED)"
           to: ARCHIVED
           via: deal.update-document-status
       terminal_states: [EXECUTED, SUPERSEDED, ARCHIVED]
@@ -463,10 +463,10 @@ slots:
         - from: IN_PROGRESS
           to: COMPLETED
           via: deal.update-ubo-assessment
-        - from: (IN_PROGRESS, COMPLETED)
+        - from: "(IN_PROGRESS, COMPLETED)"
           to: REQUIRES_EDD
           via: deal.update-ubo-assessment
-        - from: (IN_PROGRESS, REQUIRES_EDD)
+        - from: "(IN_PROGRESS, REQUIRES_EDD)"
           to: BLOCKED
           via: deal.update-ubo-assessment
       terminal_states: [COMPLETED, BLOCKED]
@@ -502,7 +502,7 @@ slots:
         - from: SUSPENDED
           to: ACTIVE
           via: billing.activate-profile
-        - from: (DRAFT, ACTIVE, SUSPENDED)
+        - from: "(DRAFT, ACTIVE, SUSPENDED)"
           to: CLOSED
           via: billing.close-profile
       terminal_states: [CLOSED]
@@ -547,7 +547,7 @@ slots:
         - from: APPROVED
           to: INVOICED
           via: billing.generate-invoice
-        - from: (CALCULATED, REVIEWED, APPROVED, INVOICED)
+        - from: "(CALCULATED, REVIEWED, APPROVED, INVOICED)"
           to: DISPUTED
           via: billing.dispute-period
       terminal_states: [INVOICED, DISPUTED]

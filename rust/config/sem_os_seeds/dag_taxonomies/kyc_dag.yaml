@@ -208,16 +208,16 @@ slots:
         - from: REVIEW
           to: REJECTED
           via: case.reject
-        - from: (any non-terminal)
+        - from: "(any non-terminal)"
           to: BLOCKED
           via: kyc-case.escalate
-        - from: (any non-terminal)
+        - from: "(any non-terminal)"
           to: WITHDRAWN
           via: kyc-case.close
-        - from: (any non-terminal)
+        - from: "(any non-terminal)"
           to: DO_NOT_ONBOARD
           via: case.reject (with do-not-onboard flag)
-        - from: (any non-terminal)
+        - from: "(any non-terminal)"
           to: REFER_TO_REGULATOR
           via: kyc-case.escalate
         - from: APPROVED
@@ -325,20 +325,20 @@ slots:
           via: screening-ops.full
         - from: SCREEN
           to: ASSESS
-          via: (backend: screenings cleared)
+          via: "(backend: screenings cleared)"
         - from: ASSESS
           to: COMPLETE
           via: entity-workstream.close
-        - from: (any non-terminal)
+        - from: "(any non-terminal)"
           to: BLOCKED
           via: entity-workstream.update-status
-        - from: (any non-terminal)
+        - from: "(any non-terminal)"
           to: ENHANCED_DD
           via: red-flag.escalate
-        - from: (any non-terminal)
+        - from: "(any non-terminal)"
           to: REFERRED
           via: kyc-case.escalate
-        - from: (any non-terminal)
+        - from: "(any non-terminal)"
           to: PROHIBITED
           via: case.reject (cascading)
       terminal_states: [COMPLETE, PROHIBITED]
@@ -377,7 +377,7 @@ slots:
           via: screening-ops.start
         - from: RUNNING
           to: CLEAR
-          via: (backend: no hits)
+          via: "(backend: no hits)"
         - from: RUNNING
           to: HIT_PENDING_REVIEW
           via: screening.record-hit
@@ -389,13 +389,13 @@ slots:
           via: screening.dismiss
         - from: RUNNING
           to: ERROR
-          via: (backend: provider error)
+          via: "(backend: provider error)"
         - from: ERROR
           to: PENDING
           via: screening-ops.retry
-        - from: (CLEAR, HIT_DISMISSED)
+        - from: "(CLEAR, HIT_DISMISSED)"
           to: EXPIRED
-          via: (time-decay trigger)
+          via: "(time-decay trigger)"
         - from: EXPIRED
           to: PENDING
           via: screening-ops.refresh
@@ -423,7 +423,7 @@ slots:
           via: evidence.reject
         - from: VERIFIED
           to: EXPIRED
-          via: (time-decay)
+          via: "(time-decay)"
         - from: EXPIRED
           to: PENDING
           via: evidence.require  # re-collection
@@ -470,19 +470,19 @@ slots:
           via: evidence.verify
         - from: PROVED
           to: REVIEWED
-          via: (compliance review)
+          via: "(compliance review)"
         - from: REVIEWED
           to: APPROVED
           via: ubo-registry.approve
         - from: REVIEWED
           to: WAIVED
-          via: (compliance waiver)
+          via: "(compliance waiver)"
         - from: REVIEWED
           to: REJECTED
           via: ubo-registry.reject
         - from: APPROVED
           to: EXPIRED
-          via: (time-decay)
+          via: "(time-decay)"
         - from: EXPIRED
           to: CANDIDATE
           via: ubo-registry.expire + ubo-registry.discover
@@ -517,12 +517,12 @@ slots:
         - from: RECEIVED
           to: REJECTED
           via: evidence.reject
-        - from: (any non-terminal)
+        - from: "(any non-terminal)"
           to: WAIVED
           via: evidence.waive
         - from: VERIFIED
           to: EXPIRED
-          via: (time-decay)
+          via: "(time-decay)"
       terminal_states: [REJECTED, WAIVED]
 
   - id: red_flag
@@ -559,9 +559,9 @@ slots:
         - from: UNDER_REVIEW
           to: BLOCKING
           via: red-flag.update-rating
-        - from: (MITIGATED, WAIVED)
+        - from: "(MITIGATED, WAIVED)"
           to: CLOSED
-          via: (case progression)
+          via: "(case progression)"
         - from: BLOCKING
           to: MITIGATED
           via: red-flag.resolve
@@ -597,19 +597,19 @@ slots:
           via: doc-request.verify
         - from: RECEIVED
           to: UNDER_REVIEW
-          via: (compliance review)
+          via: "(compliance review)"
         - from: UNDER_REVIEW
           to: VERIFIED
           via: evidence.verify
         - from: UNDER_REVIEW
           to: REJECTED
           via: evidence.reject
-        - from: (any non-terminal)
+        - from: "(any non-terminal)"
           to: WAIVED
           via: evidence.waive
-        - from: (VERIFIED, REJECTED)
+        - from: "(VERIFIED, REJECTED)"
           to: EXPIRED
-          via: (time-decay)
+          via: "(time-decay)"
       terminal_states: [REJECTED, WAIVED]
 
   - id: outreach_request
@@ -638,15 +638,15 @@ slots:
         - from: SENT
           to: REMINDED
           via: request.remind
-        - from: (SENT, REMINDED)
+        - from: "(SENT, REMINDED)"
           to: RESPONDED
           via: request.record-response
-        - from: (RESPONDED, REMINDED)
+        - from: "(RESPONDED, REMINDED)"
           to: CLOSED
           via: request.close
-        - from: (SENT, REMINDED)
+        - from: "(SENT, REMINDED)"
           to: EXPIRED
-          via: (cutoff passed)
+          via: "(cutoff passed)"
       terminal_states: [CLOSED, EXPIRED]
 
   - id: kyc_decision
@@ -699,7 +699,7 @@ slots:
         - from: SUSPENDED
           to: ACTIVE
           via: kyc-agreement.update (status=ACTIVE)
-        - from: (ACTIVE, SUSPENDED)
+        - from: "(ACTIVE, SUSPENDED)"
           to: TERMINATED
           via: kyc-agreement.delete
       terminal_states: [TERMINATED]

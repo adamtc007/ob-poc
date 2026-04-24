@@ -20,6 +20,8 @@
 //! let csg_rules = loader.load_csg_rules()?;
 //! ```
 
+pub mod dag;
+pub mod dag_validator;
 pub mod escalation;
 pub mod loader;
 pub mod pack_loader;
@@ -28,6 +30,8 @@ pub mod runbook_composition;
 pub mod types;
 pub mod validator;
 
+pub use dag::{load_dags_from_dir, Dag, LoadedDag};
+pub use dag_validator::{validate_dags, DagError, DagValidationReport, DagWarning};
 pub use pack_loader::{flatten_pack_entries, load_packs_from_dir, LoadedPack};
 
 pub use escalation::{
