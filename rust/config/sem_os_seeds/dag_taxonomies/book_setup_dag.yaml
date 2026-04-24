@@ -1,0 +1,467 @@
+# Book-Setup Workspace — DAG Taxonomy (Tranche 3 — 2026-04-24)
+#
+# ============================================================================
+# WORKSPACE PURPOSE:
+#
+# Book-Setup is the JOURNEY workspace that sequences the operations
+# needed to set up a client BOOK — the grouping of CBUs (Adam's
+# money-making apparatus) under one commercial client / apex legal
+# entity, together with the structural roles (manco, depositary, fund
+# admin, trustee, service providers) needed for each.
+#
+# Book-Setup is macro-heavy: 42 of 49 pack entries are macros (18
+# jurisdiction-specific struct.* templates + mandate.* + party.* +
+# structure.* sequences). The 7 direct verbs are cross-workspace
+# (cbu.create / add-product / etc., entity.create, session.load-galaxy).
+#
+# This workspace does NOT own entity state — CBUs live in CBU workspace,
+# entities in CBU (via entity slots), trading profiles in IM. Book-Setup
+# orchestrates multi-step operations across those workspaces and
+# tracks the progress of the book-setup journey via a dedicated `book`
+# slot.
+#
+# ============================================================================
+# CBU CONSTRUCT RELATIONSHIP:
+#
+# A BOOK is a collection of CBUs belonging to one commercial client
+# (Allianz's book = Allianz Global Investors Lux SICAV + Allianz UK
+# OEIC + Allianz US 40-Act, etc.). Each CBU is a separate money-making
+# apparatus; the book is the organisational container at client-group
+# scope.
+#
+# Book-Setup's purpose: get from "we agreed to onboard this client"
+# (Deal.KYC_CLEARANCE) to "their CBUs are trade-permissioned"
+# (CBU.trade_permissioned state in operational lifecycle). Downstream
+# of Deal, upstream of CBU operationally_active.
+#
+# ============================================================================
+# V1.3 AMENDMENTS APPLIED:
+#
+#   V1.3-1  cross_workspace_constraints: book advancement gated by
+#           Deal.CONTRACTED and KYC.APPROVED
+#   V1.3-4  expected_lifetime: long_lived on book slot (with
+#           SUSPENDED analog via abandoned state)
+#   V1.3-5  owner: "onboarding_ops" on book lifecycle
+#
+# Uses v1.3 conventions from day one per D-5.
+#
+# PARENT DOCS:
+#   - docs/todo/catalogue-platform-refinement-v1_3.md (spec)
+#   - docs/todo/tranche-3-semos-maintenance-findings-2026-04-24.md
+#     (first Tranche 3 workspace, pattern reference)
+
+version: "1.0"
+workspace: book_setup
+dag_id: book_setup_dag
+
+# =============================================================================
+# 1. OVERALL BOOK-SETUP LIFECYCLE (per book, derived)
+# =============================================================================
+# Journey workspace. Phases describe the book's setup progress through
+# the jurisdiction-specific structure templates. Each phase composes
+# verbs + macros from adjacent workspaces.
+
+overall_lifecycle:
+  id: book_setup_overall_lifecycle
+  scope: per_book
+  derived: true
+  description: >
+    Aggregate lifecycle of a client-book setup journey. 7 phases from
+    proposed through structure-chosen, entities provisioned, CBUs
+    scaffolded, parties assigned, mandates defined, to ready-for-deal.
+    Derived from the book slot's state_machine plus the completion of
+    referenced cross-workspace slots (cbu, entity, trading_profile).
+
+  phases:
+
+    - name: proposed
+      description: |
+        Book identified (client_group_id set, jurisdiction hinted).
+        No CBUs yet; no legal entities in play beyond the apex client.
+      derivation:
+        all_of:
+          - "book.status = 'proposed'"
+      progression_verbs:
+        - session.load-galaxy   # load client group context
+        - mandate.create        # outline the structural intent
+      next_phase: structure_chosen
+
+    - name: structure_chosen
+      description: |
+        Jurisdiction + fund template selected. Structure macro
+        (struct.lux.ucits.sicav / struct.uk.authorised.oeic / etc.)
+        identified but not yet invoked.
+      derivation:
+        all_of:
+          - "book.status = 'structure_chosen'"
+          - "book.structure_template IS NOT NULL"
+      progression_verbs: []   # structure macro invocation starts entities_provisioned
+      next_phase: entities_provisioned
+
+    - name: entities_provisioned
+      description: |
+        Legal entities created — apex entity, management company,
+        depositary, fund admin, trustee as required by structure.
+        entity.create calls have been run; entities exist in CBU
+        workspace but not yet linked into CBU roles.
+      derivation:
+        all_of:
+          - "book.status = 'entities_provisioned'"
+          - "COUNT entities created via this book journey >= structure.min_entities"
+      progression_verbs:
+        - entity.create
+        - party.add-company
+        - party.add-person
+      next_phase: cbus_scaffolded
+
+    - name: cbus_scaffolded
+      description: |
+        CBUs created under the book (cbu.create per fund vehicle).
+        CBUs in DISCOVERED state; structural roles not yet assigned.
+      derivation:
+        all_of:
+          - "book.status = 'cbus_scaffolded'"
+          - "COUNT cbus WHERE book_id = this.book_id AND cbu_category IS NOT NULL >= 1"
+      progression_verbs:
+        - cbu.create
+        - cbu.set-category
+      next_phase: parties_assigned
+
+    - name: parties_assigned
+      description: |
+        Entity roles assigned: manco → management_company, depositary,
+        fund_admin, trustee. cbu_entity_roles populated. CBU structure
+        is now described (who plays what role).
+      derivation:
+        all_of:
+          - "book.status = 'parties_assigned'"
+          - "ALL cbus WHERE book_id = this.book_id HAVE required roles assigned"
+      progression_verbs:
+        - cbu.assign-role
+        - structure.assign-role
+        - party.assign-identifier
+      next_phase: mandates_defined
+
+    - name: mandates_defined
+      description: |
+        Trading mandates created (mandate.create) with instrument scope
+        + permitted markets. This is the bridge into the IM workspace —
+        mandate.* macros invoke IM trading_profile authoring. Book is
+        ready to hand off for deal.CONTRACTED.
+      derivation:
+        all_of:
+          - "book.status = 'mandates_defined'"
+          - "ALL cbus HAVE at least one trading_profile in DRAFT+"
+      progression_verbs:
+        - mandate.add-product
+        - mandate.set-instruments
+        - mandate.set-markets
+      next_phase: ready_for_deal
+
+    - name: ready_for_deal
+      description: |
+        Book structure complete. All CBUs + entities + roles +
+        mandates in place. The commercial agreement (Deal workspace)
+        can now progress to CONTRACTED, which will trigger operational
+        onboarding. From book-setup perspective this is terminal-positive.
+      derivation:
+        all_of:
+          - "book.status = 'ready_for_deal'"
+      progression_verbs: []   # handoff is a different workspace
+      next_phase: "(handoff to Deal workspace)"
+
+    - name: abandoned
+      description: |
+        Book-setup abandoned. Client withdrew, structure reclassified,
+        or pre-contract issue. CBUs scaffolded during this book may be
+        retained (if subsequently used in a different book) or
+        soft-deleted (if created in error).
+      derivation:
+        all_of:
+          - "book.status = 'abandoned'"
+      progression_verbs: []
+      next_phase: "(terminal)"
+
+# =============================================================================
+# 2. PER-SLOT STATE MACHINES
+# =============================================================================
+
+slots:
+
+  # ---------------------------------------------------------------------------
+  # 2.1 Book — the journey-workspace-primary entity (NEW)
+  # ---------------------------------------------------------------------------
+
+  - id: book
+    stateless: false
+    # V1.3-4: no SUSPENDED state — abandoned covers the workflow-halt
+    # semantics. Book-setup is a journey, not an ongoing operational
+    # entity.
+    suspended_state_exempt: true
+    state_machine:
+      id: book_lifecycle
+      owner: "onboarding_ops"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".client_books'  # DAG-first per D-2; Tranche 3 migration adds table
+      state_column: status
+      scope: per_book
+      description: |
+        Client book setup-journey lifecycle. 7-state sequence tracking
+        progress from proposed through ready-for-deal. Book is a
+        conceptual container over CBUs; the table is introduced as
+        part of this workspace (Tranche 3 migration adds client_books
+        with (book_id, client_group_id, name, status, jurisdiction_hint,
+        structure_template)).
+      states:
+        - id: proposed
+          entry: true
+          description: "Book identified; client_group set."
+        - id: structure_chosen
+          description: "Jurisdiction + structure template selected."
+        - id: entities_provisioned
+          description: "Legal entities created for the book structure."
+        - id: cbus_scaffolded
+          description: "CBUs created per fund vehicle; categories set."
+        - id: parties_assigned
+          description: "Structural roles assigned (manco, depositary, etc.)."
+        - id: mandates_defined
+          description: "Trading mandates authored and linked to CBUs."
+        - id: ready_for_deal
+          description: "Book structure complete; ready for deal.CONTRACTED handoff."
+        - id: abandoned
+          description: "Book-setup abandoned pre-handoff."
+      transitions:
+        - from: proposed
+          to: structure_chosen
+          via: book.select-structure
+        - from: structure_chosen
+          to: entities_provisioned
+          via: "(macro: structure.* invokes entity.create series)"
+        - from: entities_provisioned
+          to: cbus_scaffolded
+          via: cbu.create   # iterated per fund vehicle
+        - from: cbus_scaffolded
+          to: parties_assigned
+          via: cbu.assign-role   # iterated per role per CBU
+        - from: parties_assigned
+          to: mandates_defined
+          via: mandate.create   # iterated per mandate
+        - from: mandates_defined
+          to: ready_for_deal
+          via: book.mark-ready
+        - from: [proposed, structure_chosen, entities_provisioned, cbus_scaffolded, parties_assigned, mandates_defined]
+          to: abandoned
+          via: book.abandon
+      terminal_states: [ready_for_deal, abandoned]
+
+  # ---------------------------------------------------------------------------
+  # 2.2 Cross-workspace references (reconcile-existing)
+  # ---------------------------------------------------------------------------
+
+  - id: cbu
+    stateless: false
+    state_machine: "(reconcile-existing — see cbu_dag.yaml §2.1; CBU workspace owns the cbu state machine. book-setup orchestrates cbu.create / cbu.assign-role / cbu.add-product via pack verbs, but does not author CBU state transitions.)"
+
+  - id: entity
+    stateless: false
+    state_machine: "(reconcile-existing — see cbu_dag.yaml §2.2 entity_proper_person + entity_limited_company_ubo; CBU workspace owns entity lifecycles. book-setup orchestrates entity.create via party.add-company / party.add-person macros.)"
+
+  - id: trading_profile
+    stateless: false
+    state_machine: "(reference — see instrument_matrix_dag.yaml trading_profile slot; IM workspace owns the trading profile lifecycle. book-setup's mandate_defined phase is satisfied when trading_profile reaches DRAFT+, not ACTIVE — that's an IM-workspace concern downstream.)"
+
+  - id: kyc_case
+    stateless: false
+    state_machine: "(reference — see kyc_dag.yaml §2.1 kyc_case_lifecycle; KYC workspace owns case state. book-setup reads KYC case status as a cross-workspace constraint — book cannot advance without KYC in a specific state.)"
+
+  - id: client_group
+    stateless: false
+    state_machine: "(reference — see instrument_matrix_dag.yaml group.discovery_status_lifecycle; shared across workspaces.)"
+
+  # ---------------------------------------------------------------------------
+  # 2.3 Stateless (compositional / reference)
+  # ---------------------------------------------------------------------------
+
+  - id: workspace_root
+    stateless: true
+    rationale: "Aggregation root over book-setup domain."
+
+  - id: structure_template
+    stateless: true
+    rationale: |
+      Jurisdiction + fund-type structure templates (struct.lux.ucits.sicav,
+      struct.uk.authorised.oeic, etc.). Reference data per jurisdiction;
+      macros compose the create-sequences. No per-template lifecycle;
+      a template is selected once per book at structure_chosen phase.
+
+  - id: book_participant
+    stateless: true
+    rationale: |
+      Book-level participants (sponsor on our side, client contact on
+      their side). Reference data; added via party.* macros. Book-
+      participant role lifecycle is categorical, not stateful.
+
+  - id: mandate_outline
+    stateless: true
+    rationale: |
+      Pre-IM-workspace mandate outline — captures client intent about
+      permitted instruments + markets before the trading_profile is
+      formally authored in IM workspace. Stateless (transitional
+      authoring scratchpad). mandate.* macros populate this and then
+      invoke IM's trading-profile.create-draft.
+
+# =============================================================================
+# 3. CROSS-SLOT CONSTRAINTS
+# =============================================================================
+
+cross_slot_constraints:
+
+  - id: book_entities_provisioned_requires_structure_chosen
+    description: "book → entities_provisioned requires structure_template selected."
+    rule: |
+      book.status = 'entities_provisioned'
+        → book.structure_template IS NOT NULL
+    severity: error
+
+  - id: book_cbus_scaffolded_requires_entities
+    description: "book → cbus_scaffolded requires at least one entity created for this book."
+    rule: |
+      book.status = 'cbus_scaffolded'
+        → EXISTS entity_created_during_this_book_journey
+    severity: error
+
+  - id: book_parties_assigned_requires_all_cbus_have_required_roles
+    description: "book → parties_assigned requires every CBU in the book to have all required roles per its structure template."
+    rule: |
+      book.status = 'parties_assigned'
+        → ALL cbus WHERE book_id = this.book_id
+            HAVE complete cbu_entity_roles per structure template
+    severity: error
+
+  - id: book_mandates_defined_requires_trading_profiles
+    description: "book → mandates_defined requires each CBU to have at least one trading_profile in DRAFT or beyond."
+    rule: |
+      book.status = 'mandates_defined'
+        → ALL cbus WHERE book_id = this.book_id
+            HAVE EXISTS trading_profile WHERE cbu_id = this.cbu_id
+              AND status IN ('DRAFT', 'SUBMITTED', 'APPROVED', 'PARALLEL_RUN', 'ACTIVE')
+    severity: error
+
+  - id: book_ready_requires_all_cbus_validated
+    description: "book → ready_for_deal requires every CBU to have cbus.status = VALIDATED."
+    rule: |
+      book.status = 'ready_for_deal'
+        → ALL cbus WHERE book_id = this.book_id
+            HAVE cbus.status = 'VALIDATED'
+    severity: error
+
+# =============================================================================
+# 4. CROSS-WORKSPACE CONSTRAINTS (V1.3-1 — Mode A blocking)
+# =============================================================================
+# Book advancement depends on KYC + Deal state from adjacent workspaces.
+
+cross_workspace_constraints:
+
+  - id: book_cbus_scaffolded_requires_kyc_case_in_progress
+    description: |
+      book → cbus_scaffolded requires the client-group KYC case to be
+      at least in DISCOVERY (can't create CBUs without KYC under way).
+    source_workspace: kyc
+    source_slot: kyc_case
+    source_state: [DISCOVERY, ASSESSMENT, REVIEW, APPROVED]
+    source_predicate: "cases.client_group_id = this_book.client_group_id"
+    target_workspace: book_setup
+    target_slot: book
+    target_transition: "entities_provisioned -> cbus_scaffolded"
+    severity: error
+
+  - id: book_ready_requires_deal_contracted_gate
+    description: |
+      book → ready_for_deal is advisory — the Deal workspace is the
+      gate for commercial progression. Informational constraint flags
+      when book is ready_for_deal but no Deal exists / Deal not yet
+      at KYC_CLEARANCE.
+    source_workspace: deal
+    source_slot: deal
+    source_state: [KYC_CLEARANCE, CONTRACTED, ONBOARDING, ACTIVE]
+    source_predicate: "deals.primary_client_group_id = this_book.client_group_id"
+    target_workspace: book_setup
+    target_slot: book
+    target_transition: "mandates_defined -> ready_for_deal"
+    severity: warning
+
+# =============================================================================
+# 5. DERIVED CROSS-WORKSPACE STATE (V1.3-2)
+# =============================================================================
+# Book-Setup does not host a cross-workspace aggregate. The book.status
+# state machine is fully CBU-book-local. Downstream workspaces may
+# aggregate "all CBUs in this book are operationally_active" but that
+# belongs on CBU workspace, not here.
+
+derived_cross_workspace_state: []
+
+# =============================================================================
+# 6. PRODUCT-MODULE GATES
+# =============================================================================
+# Book-Setup applies across all client engagement types. No
+# conditional slots based on product bundle (product selection happens
+# downstream at CBU workspace via add-product verbs). Jurisdictions
+# are not gates but structural template selectors.
+
+product_module_gates:
+
+  always_on:
+    - workspace_root
+    - book
+    - structure_template
+    - book_participant
+    - mandate_outline
+    - cbu
+    - entity
+    - trading_profile
+    - kyc_case
+    - client_group
+
+  conditionally_on: []
+
+# =============================================================================
+# 7. OUT OF SCOPE (P16 three-layer + cross-workspace)
+# =============================================================================
+
+out_of_scope:
+
+  # Cross-workspace (orchestrated here, owned elsewhere)
+  - "CBU state machine — owned by CBU workspace; book-setup invokes cbu.create / cbu.assign-role but does not transition CBU state itself"
+  - "Entity KYC lifecycle — owned by KYC workspace; book-setup observes but does not progress"
+  - "Trading profile lifecycle — owned by IM workspace; mandate.* macros invoke IM authoring verbs"
+  - "Deal commercial lifecycle — owned by Deal workspace; book_setup hands off at ready_for_deal"
+
+  # Layer 3 operational
+  - "Actual account opening at custody banks — Layer 2 operational (downstream of book-setup)"
+  - "BIC / SWIFT / DTC account provisioning — Layer 2 (triggered by CBU add-product + IM trading_profile.activate)"
+  - "Structure-template macro expansion orchestration — MacroIndex Tier -2B at runtime, not DAG-modelled"
+
+# =============================================================================
+# 8. PRUNE SEMANTICS
+# =============================================================================
+# Book-Setup prune: abandoning a book mid-journey.
+
+prune_cascade_rules:
+
+  - id: book_abandon_cascade
+    when: "book.abandon on book B (pre-ready-for-deal)"
+    cascades_to:
+      - target: cbu
+        rule: "cbus created for this book AND in DISCOVERED/VALIDATION_PENDING → candidates for soft-delete (administrator review)"
+      - target: entity
+        rule: "entities created for this book → candidates for retention review (may be reused in a future book)"
+      - target: mandate_outline
+        rule: "mandate outlines not yet promoted to IM trading_profiles → discarded"
+
+prune_pre_validation:
+  required_verbs:
+    - cbu.list                       # list CBUs created for this book
+    - cbu.list-structure-links       # structural impact preview
+  abort_conditions:
+    - "book.abandon when ANY CBU in the book has VALIDATED status (fully validated CBUs belong to the client independent of book lifecycle)"
+    - "book.abandon when ANY CBU has an active deal contract referencing it"
