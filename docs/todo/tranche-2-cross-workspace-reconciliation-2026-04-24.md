@@ -521,11 +521,92 @@ Tranche 2 is considered **fully closed** when:
 - [x] All 4 findings docs published including business-reality
       reviews (done 2026-04-23)
 - [x] Cross-workspace reconciliation pass document (this document)
-- [ ] Adam has reviewed and adjudicated D-1 through D-5
-- [ ] v1.3 spec drafting owner assigned (D-4)
-- [ ] Execution plan for R-1 through R-7 approved
+- [x] Adam has reviewed and adjudicated D-1 through D-5
+      (done 2026-04-24 — see §8)
+- [x] v1.3 spec drafting owner assigned (D-4 — Claude, next session)
+- [x] Execution plan for R-1 through R-7 approved (D-5 interleave)
 
-At the D-1..D-5 decisions point, Tranche 2 formally CLOSES and
-execution of the reconciliation remediation begins.
+**TRANCHE 2 FORMALLY CLOSED (2026-04-24).** Execution of the
+reconciliation remediation begins next session with R-1 v1.3 spec
+drafting.
 
-**Reconciliation pass end.**
+---
+
+## 8. Adjudicated decisions (Adam, 2026-04-24)
+
+**D-1 — v1.3 scope: P0 AND P1 (Option B).**
+
+v1.3 ships **7 candidates**:
+- **P0** (3-workspace evidence): CAND-2/5
+  `cross_workspace_constraints`, CAND-10 `SUSPENDED universal`,
+  CAND-11 `parent-child state dependency`, CAND-13 `cross-workspace
+  aggregate state`
+- **P1** (2-workspace evidence): CAND-7/9 `dual lifecycle
+  composition`, CAND-3/12 `periodic review cadence`, CAND-8
+  `commercial-commitment tier convention`
+
+Spec authoring accordingly covers schema + convention additions
+for all 7.
+
+**D-2 — CBU schema expansion: deferred to Tranche 3 migrations
+(Option B).**
+
+The CBU re-centring (R-3) will model new operational states
+(ACTIVE, SUSPENDED, WINDING_DOWN, OFFBOARDED, ARCHIVED) in the
+DAG **ahead of** the schema. `chk_cbu_status` CHECK constraint
+remains at 5 states until the Tranche 3 migration window. DAG ↔
+DSL alignment break is **accepted temporarily** and flagged in the
+CBU DAG §2.1 note.
+
+Same pattern likely applies to Deal G-3 (terminal granularity
+split) and G-7 (SLA lifecycle promotion) — schema migrations
+deferred to Tranche 3; DAG leads.
+
+**D-3 — CAND-13 implementation: on-the-fly derived (Option A).**
+
+Aggregate state computed by validator/runtime at query time. No
+storage, no trigger, no materialised column. Small compute cost
+per query is acceptable. Runtime implementation hooks into the
+existing constellation projection pipeline. No separate
+staleness-tracking infrastructure needed.
+
+**D-4 — v1.3 spec drafting owner: Claude, next session, for peer
+review.**
+
+I draft R-1 in a dedicated next session. The draft is to be
+peer-review-ready (not exploratory) — structure, rationale,
+schema, migration guide, validator impact, all complete. Adam
+reviews post-draft.
+
+**D-5 — Sequencing: interleave (Option C).**
+
+"Dependencies exist both ways." Interleave Tranche 3 authoring
+with v1.3-driven fixes to primary workspaces:
+- Tranche 3 new workspaces (book-setup, onboarding-request,
+  product-service-taxonomy, semos-maintenance,
+  session-bootstrap) adopt v1.3 conventions as they land.
+- R-3 (CBU re-centre) + R-5 (Deal targeted fixes) + R-6 (CBU
+  targeted gaps) proceed in parallel with Tranche 3 authoring
+  once R-2 (validator support) lands.
+- R-4 (IM phase-axis re-anchor) sequenced after R-3 (it
+  projects trading_activity into CBU aggregate).
+
+Revised sequence summary:
+
+```
+R-1 (spec)  →  R-2 (validator+schema)  →  ┌ R-3 (CBU re-centre) ─┐
+                                          ├ R-5 (Deal fixes)     ├→ R-4 (IM re-anchor)  →  …
+                                          ├ Tranche 3 authoring  │
+                                          └ R-6 (CBU gaps, small)┘
+```
+
+Both-way dependencies to watch:
+- CBU re-centre depends on v1.3-CAND-13 validator support.
+- IM re-anchor depends on CBU operational-states being expressed.
+- Deal fixes independent of CBU/IM — safe to parallelise.
+- Tranche 3 new workspaces: each should project into CAND-13
+  aggregate where applicable; defer aggregate-wire-up to R-3's
+  completion.
+- R-7 (fixture cleanup) non-blocking; schedule opportunistically.
+
+**Reconciliation pass end — Tranche 2 formally closed.**
