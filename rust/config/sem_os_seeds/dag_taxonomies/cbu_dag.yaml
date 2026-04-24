@@ -783,6 +783,148 @@ slots:
       terminal_states: [retired]
 
   # ---------------------------------------------------------------------------
+  # 2.5c CBU-level corporate-action event (R-6 G-9)
+  #
+  # CBU-level CA events: rename, redomiciliation, merger with another
+  # CBU, conversion between fund types. These are material events
+  # distinct from instrument-level CAs (which live in IM workspace as
+  # corporate_action_event slot per-mandate). CBU-level CAs affect
+  # the CBU itself, not positions it holds.
+  #
+  # Schema migration: new cbu_corporate_action_events table deferred
+  # to Tranche 3 per D-2.
+  # ---------------------------------------------------------------------------
+
+  - id: cbu_corporate_action
+    stateless: false
+    # V1.3-4: CA events are short-lived per-event workflows, not
+    # long-lived continuous entities. SUSPENDED doesn't apply.
+    # Flag for a follow-up: expected_lifetime should probably be
+    # ephemeral, but individual CAs can span weeks. Compromise:
+    # keep long_lived + exempt for now.
+    suspended_state_exempt: true
+    state_machine:
+      id: cbu_corporate_action_lifecycle
+      owner: compliance
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".cbu_corporate_action_events'
+      state_column: ca_status
+      scope: per_cbu_ca_event
+      description: |
+        Per-event lifecycle for CBU-level corporate actions. Types:
+        rename, redomiciliation (change of jurisdiction), merger (with
+        another CBU), conversion (fund type change), restructuring
+        (master-feeder reorg). Each event has an effective_date;
+        state machine governs pre-effective approval + post-effective
+        implementation.
+      states:
+        - id: proposed
+          entry: true
+          description: "CA event proposed; pending internal + external review."
+        - id: under_review
+          description: "Board / legal / compliance review in progress."
+        - id: approved
+          description: "Approved for execution on effective_date."
+        - id: effective
+          description: "Effective_date reached; CA is now live. Transitional."
+        - id: implemented
+          description: "Post-effective implementation complete. Terminal-positive."
+        - id: rejected
+          description: "CA rejected at review. Terminal-negative."
+        - id: withdrawn
+          description: "Proposer withdrew before decision. Terminal-negative."
+      transitions:
+        - from: proposed
+          to: under_review
+          via: cbu-ca.submit-for-review
+        - from: under_review
+          to: approved
+          via: cbu-ca.approve
+        - from: under_review
+          to: rejected
+          via: cbu-ca.reject
+        - from: [proposed, under_review]
+          to: withdrawn
+          via: cbu-ca.withdraw
+        - from: approved
+          to: effective
+          via: "(backend: effective_date reached)"
+        - from: effective
+          to: implemented
+          via: cbu-ca.mark-implemented
+      terminal_states: [implemented, rejected, withdrawn]
+
+  # ---------------------------------------------------------------------------
+  # 2.5d CBU disposition — soft-delete vs hard-delete + remediation (R-6 G-11 + G-13)
+  #
+  # Distinguishes administrative soft-delete (cbus.deleted_at) from
+  # hard-delete (row removal) from "under remediation" (post-breach
+  # enhanced monitoring). All three are material distinctions the
+  # pre-R-6 DAG collapsed.
+  # ---------------------------------------------------------------------------
+
+  - id: cbu_disposition
+    stateless: false
+    # V1.3-4: disposition states ARE the administrative hold analog —
+    # under_remediation + soft_deleted are the pause equivalents.
+    # Generic SUSPENDED not applicable.
+    suspended_state_exempt: true
+    state_machine:
+      id: cbu_disposition_lifecycle
+      owner: compliance
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".cbus'  # uses deleted_at + a new disposition_status column (Tranche 3)
+      state_column: disposition_status
+      scope: per_cbu
+      description: |
+        CBU administrative-disposition state, orthogonal to operational
+        lifecycle. Covers:
+          - active (normal)
+          - under_remediation — post-breach enhanced monitoring
+            (distinct from operational_lifecycle.suspended which is
+            OPERATIONAL pause; this is COMPLIANCE / AUDIT state)
+          - soft_deleted (cbus.deleted_at IS NOT NULL; restorable)
+          - hard_deleted — terminal, row purged for regulatory
+            retention limits (not usually reached; most soft-deletes
+            are retained indefinitely)
+      states:
+        - id: active
+          entry: true
+          description: "Normal disposition. No administrative flag."
+        - id: under_remediation
+          description: |
+            Post-breach cleanup / enhanced monitoring. Specific evidence
+            refresh required. Board-level attestation may be required
+            depending on breach severity. Exits when remediation
+            conditions satisfied.
+        - id: soft_deleted
+          description: |
+            Marked deleted but row retained (cbus.deleted_at IS NOT
+            NULL). Restorable via cbu.restore. Used for duplicates,
+            test data, records created in error.
+        - id: hard_deleted
+          description: |
+            Row physically removed. Terminal. Requires regulatory
+            retention window to have elapsed.
+      transitions:
+        - from: active
+          to: under_remediation
+          via: cbu.flag-for-remediation
+        - from: under_remediation
+          to: active
+          via: cbu.clear-remediation
+        - from: active
+          to: soft_deleted
+          via: cbu.soft-delete
+        - from: soft_deleted
+          to: active
+          via: cbu.restore
+        - from: soft_deleted
+          to: hard_deleted
+          via: cbu.hard-delete     # requires explicit authorisation + retention-window check
+      terminal_states: [hard_deleted]
+
+  # ---------------------------------------------------------------------------
   # 2.6 Client-group entity review (new state machine)
   # ---------------------------------------------------------------------------
 
@@ -862,31 +1004,131 @@ slots:
       Categorical link data; no lifecycle per edge. Links are added /
       removed as the structure evolves.
 
-  # R-3: CBU findings G-7 flagged share_class as not-really-stateless.
-  # Kept stateless for R-3 (minor state machine deferred to R-6); gated
-  # on FUND_MANDATE so it doesn't activate for non-fund CBUs.
+  # R-6 G-7: share_class promoted to stateful. Full subscription-
+  # availability lifecycle. Schema migration (share_classes.lifecycle_
+  # status column + CHECK) deferred to Tranche 3 per D-2.
   - id: share_class
-    stateless: true
+    stateless: false
+    # V1.3-4: HARD_CLOSED + WINDING_DOWN cover the pause/hold semantics
+    # for share classes — generic SUSPENDED doesn't apply.
+    suspended_state_exempt: true
     category_gated:
       category_column: cbu_category
       category_source: cbus
       activated_by: [FUND_MANDATE]
-    rationale: |
-      Share classes are reference data per CBU (name, currency, unit
-      type, fee schedule, minimum subscription). CRUD operations
-      (create / ensure / update / close). share_class_supply is a
-      projection, not a lifecycle. CBU G-7 flagged a richer lifecycle
-      (DRAFT → OPEN → SOFT_CLOSED → HARD_CLOSED → WINDING_DOWN →
-      CLOSED/LIQUIDATED) — scheduled for R-6.
+    state_machine:
+      id: share_class_lifecycle
+      owner: "ops+fund-admin"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".share_classes'
+      state_column: lifecycle_status     # DAG-first; column added Tranche 3
+      scope: per_share_class
+      description: |
+        Share-class subscription-availability lifecycle. 6 states
+        capturing DRAFT (pre-launch) through to liquidation. A class
+        typically lives in OPEN or SOFT_CLOSED for most of its life;
+        HARD_CLOSED blocks redemptions too (rare — regulatory or
+        wind-down).
+      states:
+        - id: DRAFT
+          entry: true
+          description: "Class authored but not yet launched. No supply."
+        - id: OPEN
+          description: "Accepting new subscriptions; existing holders transact freely."
+        - id: SOFT_CLOSED
+          description: "No new subscribers; existing holders still transact."
+        - id: HARD_CLOSED
+          description: "No subs AND no redemptions (regulatory hold or wind-down)."
+        - id: WINDING_DOWN
+          description: "Redemptions being processed; no new activity. Pre-liquidation."
+        - id: LIQUIDATED
+          description: "Terminal. All holders redeemed; class retired."
+      transitions:
+        - from: DRAFT
+          to: OPEN
+          via: share-class.launch
+        - from: OPEN
+          to: SOFT_CLOSED
+          via: share-class.soft-close
+        - from: SOFT_CLOSED
+          to: OPEN
+          via: share-class.reopen
+        - from: [OPEN, SOFT_CLOSED]
+          to: HARD_CLOSED
+          via: share-class.hard-close
+        - from: HARD_CLOSED
+          to: SOFT_CLOSED
+          via: share-class.lift-hard-close
+        - from: [OPEN, SOFT_CLOSED, HARD_CLOSED]
+          to: WINDING_DOWN
+          via: share-class.begin-winddown
+        - from: WINDING_DOWN
+          to: LIQUIDATED
+          via: share-class.close     # existing verb
+      terminal_states: [LIQUIDATED]
 
+  # R-6 G-3: manco promoted to stateful. Regulatory-action cascade
+  # applies to ALL CBUs managed by this manco (cross-slot constraint
+  # hooks to be added in follow-up once schema column lands).
   - id: manco
-    stateless: true
-    rationale: |
-      Management company reference data (manco-group table).
-      Categorical links (advisory, sub-advisory, sub-investment-manager,
-      distribution). No per-manco lifecycle beyond active/inactive
-      flag on the entity itself. CBU G-3 flagged manco state-machine
-      with regulatory-action cascade — scheduled for R-6.
+    stateless: false
+    state_machine:
+      id: manco_lifecycle
+      owner: compliance
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".manco_groups'
+      state_column: regulatory_status    # DAG-first; column added Tranche 3
+      scope: per_manco
+      description: |
+        Per-manco regulatory + operational state. A manco under
+        regulatory action cascades SUSPENDED to all CBUs it manages
+        (cross-slot constraint hooked via cbu_entity_roles where role
+        = fund_manager / sub_manager). Reference-data-like in v1.2;
+        R-6 promotes to stateful because regulatory-action cascade
+        is real commercial risk (Credit Suisse 2022, FTX, etc.).
+      states:
+        - id: UNDER_REVIEW
+          entry: true
+          description: "New manco being onboarded; not yet approved to manage mandates."
+        - id: APPROVED
+          description: "Manco cleared to manage new mandates."
+        - id: UNDER_INVESTIGATION
+          description: |
+            Regulatory action or internal investigation; new mandates
+            blocked; existing mandates under heightened scrutiny.
+            Propagates SUSPENDED to all managed CBUs (cascade).
+        - id: SUSPENDED
+          description: "Full operational hold — managed CBUs all SUSPENDED."
+        - id: SUNSET
+          description: "No new mandates; existing ones run to exit. Wind-down in progress."
+        - id: TERMINATED
+          description: "Terminal. All mandates transferred or wound down; manco retired."
+      transitions:
+        - from: UNDER_REVIEW
+          to: APPROVED
+          via: manco.approve
+        - from: UNDER_REVIEW
+          to: TERMINATED
+          via: manco.reject
+        - from: APPROVED
+          to: UNDER_INVESTIGATION
+          via: manco.flag-regulatory
+        - from: UNDER_INVESTIGATION
+          to: APPROVED
+          via: manco.clear-regulatory
+        - from: UNDER_INVESTIGATION
+          to: SUSPENDED
+          via: manco.suspend
+        - from: SUSPENDED
+          to: UNDER_INVESTIGATION
+          via: manco.partial-reinstate   # out of full suspension but still flagged
+        - from: [APPROVED, UNDER_INVESTIGATION, SUSPENDED]
+          to: SUNSET
+          via: manco.begin-sunset
+        - from: SUNSET
+          to: TERMINATED
+          via: manco.terminate
+      terminal_states: [TERMINATED]
 
   - id: investor_role
     stateless: true
