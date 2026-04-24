@@ -1,43 +1,86 @@
-# Instrument Matrix — DAG Taxonomy (Pilot P.2 — 2026-04-23)
+# Instrument Matrix — DAG Taxonomy (R-4 phase-axis re-anchor, v1.3 — 2026-04-24)
 #
-# Declarative lifecycle + semantic layer over the existing
-# products/services/SRDEFs/service_intents pipeline. Pilot P.2
-# authoring deliverable per the Instrument Matrix pilot plan.
+# ============================================================================
+# R-4 RE-ANCHOR (2026-04-24):
 #
-# ARCHITECTURE (passes 1-7 of sanity review — see docs/todo/):
+# Pre-R-4: the overall_lifecycle was centred on the DATA lifecycle
+# (matrix_scoped → im_configured → preferences_set → parallel_run →
+#  active) — technically correct but commercially under-weighted.
 #
-#   Layer 1 (THIS DAG)    — ref data + standing config + config lifecycle
+# Post-R-4: the overall_lifecycle is centred on CBU-trading-enablement
+# (dormant → configuring → trade_permissioned → actively_trading →
+#  restricted / suspended / winding_down → retired). The IM
+# workspace's purpose is not to have correct reference data — its
+# purpose is to make a CBU trading-capable on specific instruments
+# and markets. The data lifecycle becomes a sub-process.
+#
+# ============================================================================
+# FOUNDATIONAL FRAMING (v1.3 spec §5.2 + CBU construct):
+#
+# The CBU is the money-making apparatus a client has set up on the
+# market. The IM workspace is the configuration layer that makes the
+# CBU trading-capable — trading profile, instrument universe, SSI
+# routings, CA policy, settlement chain.
+#
+# IM projects signals INTO the CBU tollgate:
+#   - trading_profile.status = ACTIVE → cbu.operationally_active eligible
+#   - trading_activity.first_trade_at IS NOT NULL → cbu moves past
+#     trade_permissioned into actively_trading
+#
+# ============================================================================
+# ARCHITECTURE (from passes 1-7 of pilot sanity review + v1.3):
+#
+#   Layer 1 (THIS DAG)    — ref data + standing config + enablement lifecycle
 #   Layer 2 (downstream)  — service resources (accounts, SWIFT/FIX/BIC)
 #   Layer 3 (ops runtime) — event processing, exceptions, partials (not in DAG)
 #
-# Three orthogonal axes govern the DAG's content:
-#
+# Axes:
 #   1. Vertical (what vs how): config states + transitions only; runtime
-#      events are out of scope.
-#   2. Horizontal (product-modular): slot/verb reachability is gated by
-#      the CBU's service_intents set (e.g. pricing_preference only when
-#      product.fund_accounting is enrolled).
-#   3. Temporal (onboarding lifecycle): per-CBU overall state threads
-#      through six phases: onboarding_requested → matrix_scoped →
-#      im_configured → preferences_set → parallel_run → active.
+#      events out of scope.
+#   2. Horizontal (product-modular): slot/verb reachability gated by the
+#      CBU's service_intents set (pricing_preference only when
+#      product.fund_accounting enrolled) — V1.2-3 requires_products:.
+#   3. Temporal (CBU trading enablement): 8 phases from dormant to retired,
+#      with the DATA lifecycle (DRAFT → SUBMITTED → APPROVED → PARALLEL_RUN →
+#      ACTIVE) as a sub-process within `configuring → trade_permissioned`.
+#
+# V1.3 amendments applied:
+#   V1.3-1  cross_workspace_constraints: im.trading_profile.ACTIVE
+#           requires cbu.VALIDATED (promoted from cross_slot_constraints)
+#   V1.3-2  IM does not host a derived_cross_workspace_state; instead,
+#           projects its trading_profile.status + trading_activity into
+#           CBU's cbu.operationally_active aggregate.
+#   V1.3-4  expected_lifetime: long_lived on trading_profile (with
+#           SUSPENDED in its state machine)
+#   V1.3-6  periodic_review_cadence on mandate-amending (annual review
+#           of trading profile scope)
+#
+# New slot:
+#   trading_activity — per-CBU signal slot tracking first_trade_at,
+#   last_trade_at, dormancy detection. Feeds CBU tollgate.
 #
 # CONSUMPTION:
-#
 #   - catalogue-load validator (P.1.c) uses this to check structural
 #     consistency before DB pool init (P3 invariant).
 #   - verb-level three_axis declarations (P.3) cross-reference slot
 #     states declared here.
 #   - Observatory / agent surface derives the overall lifecycle state
 #     per CBU using the derivation rules below.
+#   - CBU workspace's operationally_active tollgate (V1.3-2) reads
+#     im.trading_profile.status and im.trading_activity.
 #
 # MAINTENANCE:
-#
 #   Changes to this file belong in the SemOsMaintenance workspace
 #   under governance. The existing constellation maps
 #   (instrument_template.yaml + trading_streetside.yaml) are runtime
 #   navigation maps and remain authoritative for REPL / agent
 #   positioning; this file is authoritative for state-machine
 #   semantics.
+#
+# PARENT DOCS:
+#   - docs/todo/catalogue-platform-refinement-v1_3.md (spec)
+#   - docs/todo/instrument-matrix-pilot-findings-2026-04-23.md §10 (addendum)
+#   - docs/todo/tranche-2-cross-workspace-reconciliation-2026-04-24.md §4.2
 
 version: "1.0"
 workspace: instrument_matrix
@@ -46,9 +89,11 @@ dag_id: instrument_matrix_dag
 # =============================================================================
 # 1. OVERALL INSTRUMENT-MATRIX LIFECYCLE (per CBU, derived)
 # =============================================================================
-# Aggregates per-slot states + CBU state + service readiness into a single
-# six-phase onboarding progression.  Per-CBU derivation — no stored column.
-# (Adam pass-7 Q-CB: derived, not stored.)
+# Re-anchored on CBU-trading-enablement (R-4, 2026-04-24). Phase axis is
+# "what is the CBU's trading capability right now" rather than "what state
+# is the IM data in". Data lifecycle (DRAFT → SUBMITTED → APPROVED →
+# PARALLEL_RUN → ACTIVE) becomes a sub-process within `configuring` and
+# `trade_permissioned`.
 # =============================================================================
 
 overall_lifecycle:
@@ -56,140 +101,150 @@ overall_lifecycle:
   scope: per_cbu
   derived: true
   description: >
-    Aggregate lifecycle of the CBU's instrument-matrix instance.
-    Phase is derived from the underlying slot states + cbus.status +
-    cbu_service_readiness.  Not persisted — computed on read.
+    Aggregate CBU trading-enablement lifecycle — whether the CBU can
+    transact on the street and what scope/restrictions apply. 8 phases
+    from dormant to retired. Per-CBU derivation — no stored column.
+    (Adam pass-7 Q-CB: derived, not stored.)
 
   phases:
 
-    - name: onboarding_requested
+    - name: dormant
       description: |
-        CBU has been requested for onboarding. service_intents rows exist.
-        CBU record exists but is not yet validated. No matrix scoped yet.
+        CBU exists (VALIDATED) but no trading profile yet. No mandate
+        configured; no instrument universe scoped. The CBU cannot
+        transact on the street. This is the "ready to be configured"
+        starting phase for the IM workspace.
       derivation:
         all_of:
-          - "cbus.status IN [DISCOVERED, VALIDATION_PENDING]"
-          - "EXISTS service_intents WHERE cbu_id = this.cbu_id"
-      progression_verbs:
-        - cbu.submit-for-validation  # upstream — advances CBU status
-      next_phase: matrix_scoped
-
-    - name: matrix_scoped
-      description: |
-        Vanilla instrument matrix cloned from template. Instrument scope
-        captured: what the fund is trading (exchange-traded, OTC
-        derivatives, cash options, CA options, FX options, special
-        settlement instructions). IM identity and BNY routings not yet
-        configured.
-      derivation:
-        all_of:
-          - "cbus.status = VALIDATED"
+          - "cbus.status = 'VALIDATED'"
+        any_of:
+          - "NOT EXISTS cbu_trading_profiles WHERE cbu_id = this.cbu_id"
           - "cbu_trading_profiles.status = 'DRAFT'"
-          - "EXISTS cbu_trading_profile_components WHERE profile_id = this.profile_id"
+      progression_verbs:
+        - trading-profile.create
+        - trading-profile.submit
+      next_phase: configuring
+
+    - name: configuring
+      description: |
+        Trading profile being built. Instrument scope is being captured
+        (what the fund trades — exchange-traded, OTC derivatives, cash
+        options, CA options, FX options). Booking principals, trade
+        gateways, settlement chains, custody SSIs being defined.
+        Product-conditional preferences being applied (FA → pricing
+        preferences per asset class; derivatives → collateral mgmt;
+        etc.). Data lifecycle: DRAFT → SUBMITTED → APPROVED sub-process.
+      derivation:
+        all_of:
+          - "cbus.status = 'VALIDATED'"
+          - "cbu_trading_profiles.status IN ['DRAFT', 'SUBMITTED', 'APPROVED']"
       progression_verbs:
         - trading-profile.submit
-      next_phase: im_configured
-
-    - name: im_configured
-      description: |
-        IM identity and BNY-side instruction framework configured.
-        Booking principals, trade gateways, settlement chains, custody
-        SSIs all defined and submitted. "Who is the IM and how are
-        they instructing BNY."
-      derivation:
-        all_of:
-          - "cbu_trading_profiles.status = 'SUBMITTED'"
-          - "COUNT booking_principal WHERE cbu_id = this.cbu_id AND status = 'active' >= 1"
-          - "COUNT cbu_settlement_chains WHERE cbu_id = this.cbu_id AND is_active = true >= 1"
-          - "at_least_one_trade_gateway_enabled"
-      progression_verbs:
         - trading-profile.approve
-      next_phase: preferences_set
-
-    - name: preferences_set
-      description: |
-        Product-conditional lifecycle-service preferences applied.
-        Which slots must be populated depends on the CBU's
-        service_intents — custody-only needs fewer; full-service
-        (custody + FA + TA + derivatives) needs all.
-        Examples: FA → pricing preferences per instrument class;
-        derivatives → collateral management active; recon → streams
-        configured; CA policy → default elections set.
-      derivation:
-        all_of:
-          - "cbu_trading_profiles.status = 'APPROVED'"
-          - "all_product_conditional_slots_active"  # see product_module_gates below
-      progression_verbs:
         - trading-profile.enter-parallel-run
-      next_phase: parallel_run
+      next_phase: trade_permissioned
 
-    - name: parallel_run
+    - name: trade_permissioned
       description: |
-        Matrix in shadow mode. Resources provisioned. Real settlement
-        feeds running alongside existing config (for amendments) or
-        against empty book (for new onboardings). 1-2 cycles typical
-        before go-live.
+        Trading profile approved and parallel-run validated. CBU is
+        permitted to transact in the mandate's scope but no trade has
+        yet been executed. Matrix + routings + gateways live; awaiting
+        first real trade. Data lifecycle: PARALLEL_RUN → ACTIVE.
       derivation:
         all_of:
-          - "cbu_trading_profiles.status = 'PARALLEL_RUN'"
+          - "cbu_trading_profiles.status IN ['PARALLEL_RUN', 'ACTIVE']"
+          - "NOT EXISTS trading_activity WHERE cbu_id = this.cbu_id AND first_trade_at IS NOT NULL"
       progression_verbs:
         - trading-profile.go-live
-        - trading-profile.abort-parallel-run  # rollback to approved
-      next_phase: active
+      next_phase: actively_trading
 
-    - name: active
+    - name: actively_trading
       description: |
-        Mandate live. Trading flowing. All service resources active,
-        readiness green across all active service_intents.
+        CBU is transacting with BNY on the street — making money on
+        the market. trading_activity.first_trade_at is set;
+        last_trade_at updates per trade. This is the purpose-fulfilled
+        state — the money-making apparatus is working.
       derivation:
         all_of:
           - "cbu_trading_profiles.status = 'ACTIVE'"
-          - "cbu_service_readiness.all_green_for_active_intents"
+          - "EXISTS trading_activity WHERE cbu_id = this.cbu_id AND first_trade_at IS NOT NULL"
+          - "NOT trading_activity.dormant"
       progression_verbs:
         - trading-profile.suspend
-        - trading-profile.archive
         - trading-profile.create-new-version  # enters amending
-      next_phase: (stable — terminal on archive, branching on amend/suspend)
+        - trading-profile.restrict              # partial pullback
+        - trading-profile.archive               # direct exit
+      next_phase: "(restricted | suspended | winding_down | amending)"
+
+    - name: restricted
+      description: |
+        CBU trading with partial restrictions — specific markets,
+        instruments, or asset classes pulled. Remainder of the mandate
+        still live. Typical cause: sanctions exposure on a market;
+        client request to pause an asset class; regulatory curtailment
+        (e.g. crypto jurisdictional).
+      derivation:
+        all_of:
+          - "cbu_trading_profiles.status = 'ACTIVE'"
+          - "EXISTS restriction WHERE cbu_id = this.cbu_id AND active = true"
+      progression_verbs:
+        - trading-profile.lift-restriction
+        - trading-profile.suspend
+      next_phase: "(actively_trading | suspended)"
 
     - name: amending
       description: |
-        New version of trading profile in progress. Full six-phase
-        replay: any amendment re-traverses onboarding_requested
-        through parallel_run for the new version. Active version
-        continues running until new version goes live. Minor / material
-        / urgent branching is NOT modeled (Adam Q-CD: full lifecycle
-        rework).
+        New version of trading profile in progress. Amendment re-traverses
+        configuring → trade_permissioned → actively_trading for the new
+        version. Existing version continues trading until new goes live.
+        Minor / material / urgent branching NOT modelled (pass-7 Q-CD:
+        full-lifecycle rework).
       derivation:
         all_of:
           - "cbu_trading_profiles.status = 'ACTIVE'"
-          - "EXISTS newer_version WHERE parent_profile_id = this.profile_id AND newer_version.status IN [DRAFT, SUBMITTED, APPROVED, PARALLEL_RUN]"
-      progression_verbs:
-        - (operations on the newer version, which itself progresses through the six phases)
-      next_phase: active (when newer version goes live, old is superseded)
+          - "EXISTS newer_version WHERE parent_profile_id = this.profile_id AND newer_version.status IN ['DRAFT', 'SUBMITTED', 'APPROVED', 'PARALLEL_RUN']"
+      progression_verbs: []  # (operations on the newer version)
+      next_phase: actively_trading
 
     - name: suspended
       description: |
-        Operational hold — mandate paused, not terminated. Rare
-        (typically regulatory investigation or counterparty concern).
+        Full trading pause — regulatory investigation, counterparty
+        concern, operational incident, client dispute. Mandate paused
+        but not retired. Distinct from restricted (partial) and
+        winding_down (exit intent).
       derivation:
         any_of:
           - "cbu_trading_profiles.status = 'SUSPENDED'"
-          - "cbus.status = 'SUSPENDED'"
+          - "cbus.operational_status = 'SUSPENDED'"
       progression_verbs:
         - trading-profile.reactivate
-        - trading-profile.archive  # terminate without reactivating
-      next_phase: active or archived
+        - trading-profile.archive   # terminate without reactivating
+      next_phase: "(actively_trading | winding_down)"
 
-    - name: archived
+    - name: winding_down
       description: |
-        Terminal. Mandate terminated (fund wound down, client departed,
-        service contract expired). No return path.
+        Mandate exit in progress — unwinding positions, settling final
+        trades, no new activity. Shared exit intent with CBU
+        winding_down state; typically both workspaces co-progress.
+      derivation:
+        any_of:
+          - "cbu_trading_profiles.status = 'WINDING_DOWN'"
+          - "cbus.operational_status = 'WINDING_DOWN'"
+      progression_verbs:
+        - trading-profile.archive
+      next_phase: retired
+
+    - name: retired
+      description: |
+        Terminal. Mandate ended — fund wound down, client departed,
+        service contract expired. No return path. Records retained for
+        regulatory retention.
       derivation:
         any_of:
           - "cbu_trading_profiles.status = 'ARCHIVED'"
-          - "cbus.status = 'ARCHIVED'"
+          - "cbus.operational_status IN ['OFFBOARDED', 'ARCHIVED']"
       progression_verbs: []  # terminal
-      next_phase: (none)
+      next_phase: "(none)"
 
 # =============================================================================
 # 2. PER-SLOT STATE MACHINES (21 slots)
@@ -465,82 +520,37 @@ slots:
   - id: cbu
     constellation: trading.streetside
     stateless: false
-    state_machine:
-      id: cbu_lifecycle
-      source_entity: '"ob-poc".cbus'
-      state_column: status
-      scope: per_cbu
-      description: |
-        CBU validation + operational lifecycle. Extended to 7 states
-        per Adam Q7 (adds SUSPENDED + ARCHIVED — migration in
-        rust/migrations/20260423_extend_cbu_status_check.sql).
-        ACTIVELY_TRADING is a derived attribute, not a state
-        (Adam pass-3 R-4).
-      states:
-        - id: DISCOVERED
-          entry: true
-          description: "CBU identified via research; data incomplete."
-        - id: VALIDATION_PENDING
-          description: "Submitted for data validation."
-        - id: VALIDATED
-          description: "Data validated; CBU can have trading profiles."
-        - id: UPDATE_PENDING_PROOF
-          description: "Proposed data update awaiting evidence."
-        - id: VALIDATION_FAILED
-          description: "Validation rejected; needs correction."
-        - id: SUSPENDED
-          description: "Operational hold — CBU temporarily inactive (Q7)."
-        - id: ARCHIVED
-          description: "Terminal — CBU closed (Q7)."
-      transitions:
-        - from: DISCOVERED
-          to: VALIDATION_PENDING
-          via: cbu.submit-for-validation
-        - from: VALIDATION_PENDING
-          to: VALIDATED
-          via: "(backend validation pass)"
-        - from: VALIDATION_PENDING
-          to: VALIDATION_FAILED
-          via: "(backend validation fail)"
-        - from: VALIDATION_FAILED
-          to: VALIDATION_PENDING
-          via: cbu.resubmit
-        - from: VALIDATED
-          to: UPDATE_PENDING_PROOF
-          via: cbu.propose-update
-        - from: UPDATE_PENDING_PROOF
-          to: VALIDATED
-          via: cbu.accept-update
-        - from: UPDATE_PENDING_PROOF
-          to: VALIDATION_FAILED
-          via: cbu.reject-update
-        - from: VALIDATED
-          to: SUSPENDED
-          via: cbu.suspend
-        - from: SUSPENDED
-          to: VALIDATED
-          via: cbu.reactivate
-        - from: VALIDATED
-          to: ARCHIVED
-          via: cbu.archive
-        - from: SUSPENDED
-          to: ARCHIVED
-          via: cbu.archive
-      terminal_states: [ARCHIVED]
+    # R-4: CBU canonical state machine lives in cbu_dag.yaml (dual
+    # lifecycle: discovery + operational). IM workspace REFERENCES it
+    # read-only for scope resolution + constraints, but does not own
+    # the state. The pre-R-3 IM-local re-declaration has been removed.
+    state_machine: "(reconcile-existing — see cbu_dag.yaml §2.1 cbu slot; primary state_machine = cbu_discovery_lifecycle, plus dual_lifecycle = cbu_operational_lifecycle)"
 
   - id: trading_profile
     constellation: trading.streetside
     stateless: false
+    # V1.3-6: periodic annual review of mandate scope (risk-tiered).
+    periodic_review_cadence:
+      base_window: "P1Y"
+      risk_tiered_overrides:
+        - risk_tier: HIGH
+          window: "P6M"
+        - risk_tier: LOW
+          window: "P2Y"
+      review_scope: full
     state_machine:
       id: trading_profile_lifecycle
+      owner: "trading+ops"            # V1.3-5 governance artefact
+      expected_lifetime: long_lived   # V1.3-4 (SUSPENDED present)
       source_entity: '"ob-poc".cbu_trading_profiles'
       state_column: status
       scope: per_profile  # row WHERE cbu_id IS NOT NULL (streetside instances)
       description: |
         The mandate itself — streetside instance cloned from template.
-        Extended to 9 states per passes 3+7: parallel_run between
-        approved and active, plus superseded terminal state for
-        version-replacement audit.
+        9 states (passes 3+7): parallel_run between approved and
+        active, plus superseded terminal state for version-replacement
+        audit. ACTIVE state projects into CBU tollgate (§5 cross-
+        workspace aggregate).
       states:
         - id: DRAFT
           entry: true
@@ -601,6 +611,67 @@ slots:
           to: ARCHIVED
           via: trading-profile.archive
       terminal_states: [ARCHIVED, SUPERSEDED]
+
+  # R-4 NEW: trading_activity — per-CBU signal slot tracking first-trade
+  # event + dormancy detection. Projects INTO CBU tollgate aggregate
+  # (cbu.operationally_active). Not a stored table in current schema;
+  # Tranche 3 migration will add cbu_trading_activity keyed by cbu_id.
+  - id: trading_activity
+    constellation: trading.streetside
+    stateless: false
+    state_machine:
+      id: trading_activity_lifecycle
+      owner: "trading+ops"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".cbu_trading_activity'  # DAG-first; schema follows in Tranche 3
+      state_column: activity_state
+      scope: per_cbu
+      description: |
+        Per-CBU trading-activity state derived from trade events. Governs
+        the distinction between trade_permissioned (mandate live, never
+        traded) and actively_trading (has traded and is currently
+        active) in the overall_lifecycle. Also flags dormancy for
+        commercial / regulatory review. Signal slot: the state is the
+        input, not a thing the UI edits directly.
+      states:
+        - id: never_traded
+          entry: true
+          description: |
+            trading_profile is ACTIVE but first_trade_at IS NULL. CBU is
+            permissioned but not yet executing.
+        - id: trading
+          description: |
+            first_trade_at IS NOT NULL AND last_trade_at within activity
+            window (e.g. last 90 days). Actively making money.
+        - id: dormant
+          description: |
+            first_trade_at IS NOT NULL but last_trade_at older than
+            dormancy threshold. Trading-capable but not currently
+            executing — flags review (is this CBU still operationally
+            relevant?).
+        - id: suspended
+          description: |
+            Trading activity paused alongside trading_profile.SUSPENDED
+            (mirror state).
+      transitions:
+        - from: never_traded
+          to: trading
+          via: "(backend: first trade posted — event from settlement pipeline)"
+        - from: trading
+          to: dormant
+          via: "(backend: last_trade_at + dormancy_window < now)"
+        - from: dormant
+          to: trading
+          via: "(backend: new trade posted)"
+        - from: [never_traded, trading, dormant]
+          to: suspended
+          via: "(backend: trading_profile.SUSPENDED triggers mirror)"
+        - from: suspended
+          to: trading
+          via: "(backend: trading_profile.reactivate triggers mirror)"
+      # No terminal states — when trading_profile archives, this slot
+      # is effectively inert but retained for historical reporting.
+      terminal_states: []
 
   - id: custody
     constellation: trading.streetside
@@ -1047,6 +1118,26 @@ cross_slot_constraints:
     rule: |
       collateral_management.state = active
         → isda_framework.is_active = true
+    severity: error
+
+# =============================================================================
+# 3b. CROSS-WORKSPACE CONSTRAINTS (V1.3-1 — Mode A blocking)
+# =============================================================================
+# IM workspace blocking gates that depend on CBU workspace state.
+# Promoted from cross_slot_constraints as part of R-4 re-anchor —
+# these are cross-DAG constraints, not intra-DAG.
+
+cross_workspace_constraints:
+
+  # trading_profile cannot progress past DRAFT unless cbu is VALIDATED.
+  - id: mandate_requires_validated_cbu
+    description: "Trading profile cannot leave DRAFT unless the CBU is VALIDATED in the CBU workspace's discovery lifecycle."
+    source_workspace: cbu
+    source_slot: cbu
+    source_state: VALIDATED
+    target_workspace: instrument_matrix
+    target_slot: trading_profile
+    target_transition: "DRAFT -> SUBMITTED"
     severity: error
 
 # =============================================================================
