@@ -35,6 +35,7 @@
 | V1.3-5 | **`dual_lifecycle:` on slots** — linked lifecycles with junction state (CAND-7/9) | Schema extension | 2 workspaces | P1 |
 | V1.3-6 | **`periodic_review_cadence:` + `validity_window:`** — regulatory refresh cadence (CAND-3/12) | Schema extension | 2 workspaces | P1 |
 | V1.3-7 | **Commercial-commitment tier-apply convention** (CAND-8) | Convention | 1 workspace | P1 |
+| V1.3-8 | **`category_gated:` on slots** — entity-category gates slot activation + lifecycle variance (NEW, added 2026-04-24 via OQ-5) | Schema extension | 1 workspace (CBU) | P0 |
 
 Plus one new principle:
 
@@ -131,10 +132,31 @@ certain states.
 > - Is there a parent/child relationship where state flows from
 >   parent to child?
 >   → **Mode C cascade** (V1.3-3 parent_slot + state_dependency)
->
-> Same workspaces may use multiple modes — Deal.CONTRACTED is
-> blocked by KYC (Mode A) AND cbu.operationally_active aggregates
-> from KYC/Deal/IM (Mode B). They are orthogonal concerns.
+
+### 1.5 Mode composition (OQ-1 resolved 2026-04-24)
+
+Modes are orthogonal AND composable — a single cross-workspace
+relationship pair MAY use multiple modes simultaneously.
+
+**Example — KYC↔CBU uses both Mode A and Mode B:**
+
+- **Mode A (blocking):** `cbu.VALIDATED` requires `kyc_case.APPROVED`
+  — expressed as a `cross_workspace_constraints:` entry. Validator
+  blocks the transition if KYC isn't APPROVED.
+- **Mode B (aggregation):** `cbu.operationally_active` derives from
+  `kyc_case.APPROVED` (plus Deal + IM + evidence) — expressed as a
+  `derived_cross_workspace_state:` entry. CBU reflects KYC status
+  as part of its compound operational readiness.
+
+Both are legitimate; neither replaces the other. The blocking
+constraint prevents CBU from transitioning into VALIDATED without
+KYC; the aggregate exposes the consolidated operational readiness
+to UI and dependent systems. Authors declare both where needed.
+
+**Validator guidance:** no restriction on co-declaring modes on
+the same source/target pair. Spec recommends including a
+comment-level rationale when composing modes so future readers
+understand why both are needed.
 
 **Relationship to P16:** P16 established layer stratification
 (DAG → service resources → operations). P17 operates at Layer 1
@@ -242,13 +264,27 @@ derived_cross_workspace_state:
 - `cacheable: true` allows the runtime to memoise within a
   request scope; `false` forces recomputation.
 
-**Runtime implementation (per D-3 — on-the-fly):**
+**Runtime implementation (per D-3 on-the-fly + OQ-2 resolved
+2026-04-24 session cadence):**
 - No materialised column, no trigger.
 - Computed inside the constellation projection pipeline when a
   `host_slot` is hydrated.
-- Cache scope = single request/session turn (cacheable true).
-- Invalidation: automatic per-request; no cross-request
-  invalidation complexity.
+- **Cache scope = workspace-context / session** (not per-request).
+  Rationale: the workspace context is the unit of coherent
+  reasoning; repeated verb turns within a session read the same
+  aggregate state. Per-request re-derivation would thrash.
+- **Invalidation triggers:**
+  - Any verb whose execution touches a slot referenced in the
+    derivation clause invalidates the cached aggregate for that
+    session.
+  - Explicit invalidation hook available for cross-workspace verb
+    executions that affect multiple sessions (e.g. KYC
+    approval-decided should invalidate CBU aggregates that
+    reference the approved case).
+  - Session expiry / closure invalidates naturally.
+- **Staleness window tolerance:** within a session, aggregates are
+  assumed consistent for the duration of the workspace context
+  unless invalidated. No automatic TTL refresh.
 
 **Worked example — CBU operationally_active:**
 
@@ -616,6 +652,89 @@ evidence_types:
 requirements omit the field. Layer-3 scheduler wiring is a separate
 engineering task outside v1.3 spec scope.
 
+### 2.7 V1.3-8 — `category_gated:` field on slots (OQ-5 resolved)
+
+**Status:** added 2026-04-24 after OQ-5 disposition — "lifecycle gate".
+
+Distinct from V1.2-3 `requires_products:` (which gates by product
+bundle). `category_gated:` gates slot activation + lifecycle
+variance by an entity's category classification. The canonical use
+case is `cbus.cbu_category` gating operational capabilities:
+FUND_MANDATE CBUs have investors, share-classes, holdings;
+CORPORATE_GROUP CBUs don't.
+
+**Schema:**
+
+```yaml
+slots:
+  - id: <slot_id>
+    stateless: false
+    state_machine: { ... }
+    category_gated:
+      category_column: <column_name>        # e.g. cbu_category
+      category_source: <table>               # e.g. cbus
+      activated_by: [<category_value>, ...]  # slot present for these categories
+      deactivated_by: [<category_value>, ...]  # slot absent for these
+      lifecycle_variant_map:                  # optional — per-category state variants
+        FUND_MANDATE: <state_machine_variant_id>
+        CORPORATE_GROUP: <state_machine_variant_id>
+```
+
+**Semantics:**
+- Slot is ACTIVE for CBU instances whose category is in
+  `activated_by`. Validator ignores the slot for other categories.
+- `deactivated_by` is a deny-list alternative; mutually exclusive
+  with `activated_by`.
+- `lifecycle_variant_map:` lets the same slot have different
+  state-machine shapes for different categories. Rare; most slots
+  use simple activate/deactivate.
+- Interacts with V1.2-3 `requires_products:` — both gates can
+  apply; slot is effective only if BOTH gates pass.
+
+**Worked example — CBU investor register gated by FUND_MANDATE:**
+
+```yaml
+# In cbu_dag.yaml (post-R-3)
+slots:
+  - id: investor
+    stateless: false
+    state_machine:
+      id: investor_lifecycle
+      # ... states ...
+    category_gated:
+      category_column: cbu_category
+      category_source: cbus
+      activated_by: [FUND_MANDATE]
+      # Investors don't exist for CORPORATE_GROUP, INSTITUTIONAL_ACCOUNT,
+      # RETAIL_CLIENT, FAMILY_TRUST, CORRESPONDENT_BANK, INTERNAL_TEST
+```
+
+**Comparison with V1.2-3 (why a new field, not reuse):**
+
+| Aspect | `requires_products:` (V1.2-3) | `category_gated:` (V1.3-8) |
+|---|---|---|
+| Gate source | Product bundle configured on CBU | Category classification on CBU |
+| Gate cardinality | CBU has many products | CBU has one category |
+| Semantic | "Feature is turned on" | "Entity is of a kind" |
+| Example | Derivatives product → collateral_management slot | FUND_MANDATE category → investor slot |
+
+Products are **add-on features** the client subscribes to.
+Categories are **fundamental nature** of the money-making
+apparatus. Different gating axis; distinct field.
+
+**Migration:** existing `product_module_gates:` section on CBU DAG
+captures some of this informally. R-3 re-centring migrates to the
+new `category_gated:` field on each slot + retires the
+conditionally_on structure under `product_module_gates:`.
+
+**Validator checks:**
+- `CategoryGatedUnresolvedColumn` — category_column doesn't exist
+  in category_source table (error).
+- `CategoryGatedMutuallyExclusiveGates` — both activated_by and
+  deactivated_by declared (error).
+- `CategoryGatedVariantUnresolved` — lifecycle_variant_map
+  references an unknown variant id (error).
+
 ---
 
 ## 3. VALIDATOR EXTENSIONS
@@ -889,48 +1008,270 @@ v1.3 leaves the following unchanged from v1.2:
 
 ---
 
-## 10. OPEN QUESTIONS FOR PEER REVIEW
+## 10. PEER REVIEW DISPOSITION (Round 1: 2026-04-24)
 
-Items where Adam's direction would disambiguate before R-2
-implementation begins.
+Items flagged in R-1 draft; dispositions from Adam's 2026-04-24
+review captured. OQ-3 and OQ-6 were re-framed with more concrete
+detail for Round 2 review.
 
-**OQ-1 — P17 mode orthogonality.** The three P17 modes (blocking /
-aggregation / cascade) are presented as orthogonal. Is there a
-scenario where a single relationship genuinely needs two modes
-simultaneously? If yes, should v1.3 support composition of modes
-on the same pair of slots, or should authors pick one?
+### OQ-1 — P17 mode orthogonality ✅ RESOLVED
 
-**OQ-2 — Derived-state freshness semantics.** D-3 says on-the-fly
-derivation with per-request caching. Is per-request cache scope
-correct, or should derived state be recomputed on a session-level
-cadence (e.g. every 30 seconds)? This matters for long-lived
-chat sessions.
+**Disposition:** "yes I think so" — modes can compose on the same
+source/target pair.
 
-**OQ-3 — Dual-lifecycle ownership enforcement.** V1.3-5
-introduces `owner:` labels on state machines. Should these be
-documentation-only (v1.3) or enforceable via verb-authorization
-rules (v1.4)? Deferring to v1.4 is simpler; enforcing in v1.3
-tightens governance.
+**Applied:** §1.5 added documenting mode composition with KYC↔CBU
+worked example (both Mode A blocking and Mode B aggregation
+simultaneously). Validator imposes no restriction on co-declaring
+modes; spec recommends comment-level rationale for future readers.
 
-**OQ-4 — SUSPENDED universality strictness.** V1.3-4 flags
-long-lived slots missing SUSPENDED as a warning. Should this be
-an error for new slots authored post-v1.3? KYC case and evidence
-are legitimate exemptions — should the exempt marker require a
-governance reason code?
+### OQ-2 — Derived-state freshness semantics ✅ RESOLVED
 
-**OQ-5 — cbu_category as lifecycle gate.** The CBU reframe (§5.1)
-calls for `cbu_category` to gate operational capabilities. Does
-v1.3 formalise this via a new `category_gated:` field on slots
-(analog to `requires_products:` from V1.2-3), or is the existing
-V1.2-3 `requires_products:` field sufficient (treating category
-as a "meta-product")?
+**Disposition:** "session cadence — that's the workspace context."
+Cache scope is session / workspace-context, not per-request.
 
-**OQ-6 — Market-facing identity ownership.** CBU reframe §5 calls
-for LEI/BIC/depo-account references to be first-class on CBU. In
-current schema these are scattered across entity tables,
-trading_profiles, SSIs. Does v1.3 introduce a dedicated
-`market_identity:` slot type, or is this handled via a projection
-pattern in R-3?
+**Applied:** §2.2 runtime implementation updated. Caching rules:
+- Scope = workspace-context for session lifetime
+- Invalidation via affected-slot verb executions
+- Explicit cross-session invalidation hook for cross-workspace
+  verb executions
+- No TTL / auto-refresh
+
+### OQ-3 — Dual-lifecycle ownership enforcement ⏳ RE-FRAMED (Round 2)
+
+**R-1 ambiguity (Adam's response: "explain more?"):** The original
+question was too abstract. Re-framing with a concrete worked
+example below.
+
+**What the question is really asking:**
+
+V1.3-5 lets a slot declare multiple linked lifecycles with
+different owners. For example, Deal declares:
+- **Commercial lifecycle** — states PROSPECT → QUALIFYING →
+  NEGOTIATING → BAC_APPROVAL → CONTRACTED. `owner: "sales+BAC"`.
+- **Operational lifecycle** — states ONBOARDING → ACTIVE →
+  SUSPENDED → WINDING_DOWN → OFFBOARDED. `owner: "ops"`.
+
+Each lifecycle has its own verbs that trigger transitions. The
+question: **what does the `owner:` label DO at runtime?**
+
+**Option A — Documentation-only (v1.3 ships, v1.4 may enforce).**
+
+`owner:` is metadata. Anyone with the verb permission can invoke
+any transition. The label appears in docs, UI tooltips, and audit
+logs ("this transition is owned by `ops`") but does NOT gate
+execution.
+
+- **Concrete example:** A sales-role user calls `deal.update-status`
+  to move deal from ONBOARDING to ACTIVE (an ops-owned transition).
+  The runtime permits it. Audit log records "sales-role actor
+  triggered ops-owned transition."
+- **Pro:** Ships v1.3 without new auth infrastructure. Matches how
+  we handle tier authorisation today (advisory, not gate).
+- **Con:** Segregation-of-duties is advisory only. Relies on
+  process discipline, not system enforcement.
+
+**Option B — Enforced in v1.3 via verb-role gate.**
+
+`owner:` values map to actor roles. Runtime checks actor role
+against lifecycle owner before permitting verbs that transition
+within that lifecycle.
+
+- **Concrete example:** Sales-role user calls `deal.update-status`
+  to move deal into ACTIVE. Runtime rejects with
+  `InsufficientRole { actor_role: "sales+BAC", required: "ops" }`.
+- **Pro:** Strong segregation of duties. Matches regulatory
+  expectations (commercial decisions by commercial, operational by
+  ops).
+- **Con:** Requires actor-role infrastructure wired into verb
+  dispatch. Adds complexity to v1.3. Also needs role-mapping
+  configuration (who is "sales+BAC"? who is "ops"?) — non-trivial.
+
+**Option C — Hook in v1.3, enforce in v1.4 (recommended default).**
+
+Declare `owner:` in v1.3 schema. Runtime logs owner vs actor-role
+mismatches but does NOT block. v1.4 turns on enforcement once
+actor-role infrastructure is available.
+
+- **Concrete example:** Same as Option A at runtime (advisory
+  only), but the declarative intent is already captured in DAG
+  YAML, so v1.4 enforcement is a switch-on, not a new authoring
+  effort.
+- **Pro:** Lets v1.3 ship lean; captures the intent declaratively;
+  deferred enforcement is cheap to add in v1.4.
+- **Con:** If v1.4 is delayed indefinitely, enforcement never
+  arrives; `owner:` remains forever advisory.
+
+**Decision ask:** A, B, or C? If C, is there a concrete v1.4
+milestone (e.g. "enforce once SemOS actor-role registry lands") to
+attach the switch-on to?
+
+### OQ-4 — SUSPENDED universality strictness ✅ RESOLVED
+
+**Disposition:** "warning" — confirmed as implemented in V1.3-4.
+
+**Applied:** §2.4 already specified warning severity. No spec
+change needed; treating as resolved.
+
+Lint check: `LongLivedSlotMissingSuspended`. Workspaces can
+override via `suspended_state_exempt: true` on the slot
+(documentation comment encouraged; no governance-code enforcement
+in v1.3).
+
+### OQ-5 — cbu_category as lifecycle gate ✅ RESOLVED
+
+**Disposition:** "lifecycle gate" — requires a new first-class
+field, not reuse of `requires_products:`.
+
+**Applied:** V1.3-8 added (see §2.7). New `category_gated:` field
+on slots — distinct from V1.2-3 `requires_products:` because
+category represents fundamental nature of the apparatus, not
+add-on features.
+
+Validator checks added:
+- `CategoryGatedUnresolvedColumn`
+- `CategoryGatedMutuallyExclusiveGates`
+- `CategoryGatedVariantUnresolved`
+
+### OQ-6 — Market-facing identity ownership ⏳ RE-FRAMED (Round 2)
+
+**R-1 ambiguity (Adam's response: "explain"):** The original
+question was too abstract. Re-framing with concrete detail and
+three options below.
+
+**What the question is really asking:**
+
+CBU reframe §5.1 says the CBU conceptually OWNS its market-facing
+identifiers — the addresses through which the CBU exists on the
+street. Today these are **scattered across adjacent workspaces**:
+
+| Identifier | Currently lives in | Owning workspace |
+|---|---|---|
+| LEI (Legal Entity Identifier) | `legal_entities.lei` via CBU.commercial_client_entity_id | CBU (indirect) |
+| SWIFT/BIC routing | `ssi.bic` + `trading_profile.ssi_refs` | IM |
+| DTC / Euroclear / Clearstream account refs | `custody_settlement_chains.depository_account` | IM (custody slots) |
+| Sub-account numbers at custodians | `custody_accounts.sub_account_ref` | CBU (custody sub-slot) |
+| Tax identifiers (TIN, FATCA, CRS refs) | `tax_config.reporting_refs` | Deal |
+
+**The question:** How does v1.3 express "these identifiers belong
+to the CBU as its street-facing identity" without migrating the
+data out of its current homes?
+
+**Option A — Dedicated `market_identity:` slot type on CBU.**
+
+Introduce a new first-class slot type that aggregates identifiers
+via explicit projection declarations:
+
+```yaml
+slots:
+  - id: market_identity
+    slot_type: market_identity_aggregation
+    stateless: true
+    identifier_kinds:
+      - kind: lei
+        source:
+          workspace: cbu
+          via: "legal_entities JOIN cbus ON commercial_client_entity_id"
+          column: lei
+        primary: true        # CBU has at most one primary LEI
+        historical: true      # but tracks historical LEIs
+      - kind: swift_bic
+        source:
+          workspace: im
+          slot: ssi
+          column: bic
+        primary: false
+      - kind: dtc_account
+        source:
+          workspace: im
+          slot: settlement_chain
+          column: depository_account
+      # ... etc
+```
+
+- **Pro:** Explicit; UI renders a "CBU street-facing identity card";
+  queryable as a CBU-centric view.
+- **Pro:** Metadata per identifier (primary vs historical, regulatory
+  reporting obligations).
+- **Con:** New slot-type concept; requires validator + runtime
+  support for "aggregation slots" as a new shape.
+- **Con:** Structurally different from other slot types; risks
+  becoming a special case.
+
+**Option B — Projection via V1.3-2 `derived_cross_workspace_state:`.**
+
+Reuse the Mode B aggregation mechanism (V1.3-2) but for reference
+data (values) rather than categorical state:
+
+```yaml
+derived_cross_workspace_state:
+  - id: cbu_market_identity
+    host_workspace: cbu
+    host_slot: cbu
+    host_state: market_identity   # virtual; not categorical
+    exposure:
+      visible_as: annotation       # side-label, not first-class state
+      cacheable: true
+    derivation:
+      projections:                 # NEW sub-key under derivation
+        - { key: lei, from: "legal_entities WHERE entity_id = this.commercial_client_entity_id", column: lei }
+        - { key: swift_bics, from: "im.ssi WHERE cbu_id = this.cbu_id", column: bic, cardinality: many }
+        - { key: dtc_accounts, from: "im.settlement_chain WHERE cbu_id = this.cbu_id", column: depository_account, cardinality: many }
+```
+
+- **Pro:** Reuses V1.3-2 mechanism; smaller spec surface.
+- **Pro:** Cacheable within workspace-context (OQ-2 resolution
+  applies).
+- **Con:** V1.3-2 was designed for STATE projection (what state is
+  this slot in?). Adding `projections:` sub-key for reference
+  data (what values does this slot expose?) stretches the model.
+- **Con:** No per-identifier metadata (primary vs historical,
+  regulatory obligations).
+
+**Option C — Hybrid: dedicated slot type USING V1.3-2 under the
+hood.**
+
+Introduce `market_identity_aggregation` as a slot-type whose
+implementation is a specialisation of V1.3-2. Runtime treats it
+like any other derived-cross-workspace-state entry, but
+author-facing surface gives richer metadata.
+
+```yaml
+slots:
+  - id: market_identity
+    slot_type: market_identity_aggregation
+    stateless: true
+    # Underneath, the runtime treats this as a V1.3-2 entry with
+    # projections: + identifier metadata
+    identifier_kinds:
+      - { kind: lei, primary: true, source_ref: "cbu_lei_projection" }
+      - { kind: swift_bic, source_ref: "cbu_bic_projection" }
+      # etc
+
+derived_cross_workspace_state:
+  - id: cbu_lei_projection
+    host_workspace: cbu
+    host_slot: cbu
+    host_state: lei_value
+    derivation:
+      projections:
+        - { key: lei, from: "legal_entities WHERE ...", column: lei }
+  # ...
+```
+
+- **Pro:** Combines explicit metadata (primary, historical,
+  obligations) with V1.3-2 runtime reuse.
+- **Pro:** Lets the spec evolve: start with the richer façade, can
+  collapse to pure V1.3-2 if metadata turns out unused.
+- **Con:** Most complex of the three options.
+
+**Decision ask:** A, B, or C?
+
+Secondary question for whichever option is chosen: should
+market-facing identity be **materialised** (pre-computed into a
+cbu-centric column) or **on-the-fly** (computed at query time like
+OQ-2 resolution)? Same trade-off as D-3 on CAND-13 but for
+reference data. Recommendation if unspecified: on-the-fly, session-
+cached, consistent with OQ-2.
 
 ---
 
