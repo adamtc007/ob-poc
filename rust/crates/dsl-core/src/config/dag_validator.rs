@@ -56,11 +56,6 @@ pub enum DagError {
         location: DagLocation,
         constraint_id: String,
     },
-    CrossWorkspaceConstraintStatePredicateBoth {
-        location: DagLocation,
-        constraint_id: String,
-    },
-
     // V1.3-2 derived_cross_workspace_state
     DerivedCrossWorkspaceStateUnresolved {
         location: DagLocation,
@@ -121,14 +116,6 @@ impl std::fmt::Display for DagError {
                 "{location}: cross_workspace_constraint '{constraint_id}' has \
                  source_workspace == target_workspace — use intra-DAG \
                  cross_slot_constraints instead"
-            ),
-            Self::CrossWorkspaceConstraintStatePredicateBoth {
-                location,
-                constraint_id,
-            } => write!(
-                f,
-                "{location}: cross_workspace_constraint '{constraint_id}' declares both \
-                 source_state and source_predicate — pick one"
             ),
             Self::DerivedCrossWorkspaceStateUnresolved {
                 location,
@@ -319,6 +306,13 @@ impl SlotIndex {
                         }
                     }
                 }
+                // V1.3-5: dual_lifecycle states belong to the same slot
+                // conceptually — index them too.
+                for dual in &slot.dual_lifecycle {
+                    for st in &dual.states {
+                        summary.states.insert(st.id.clone());
+                    }
+                }
                 summary.suspended_state_exempt = slot.suspended_state_exempt;
                 ws_slots.insert(slot.id.clone(), summary);
             }
@@ -370,15 +364,9 @@ fn validate_cross_workspace_constraints(
                 });
         }
 
-        // state + predicate exclusivity
-        if c.source_state.is_some() && c.source_predicate.is_some() {
-            report
-                .errors
-                .push(DagError::CrossWorkspaceConstraintStatePredicateBoth {
-                    location: loc.clone(),
-                    constraint_id: c.id.clone(),
-                });
-        }
+        // state + predicate may be declared together — they compose
+        // with AND semantics (state narrows WHICH state, predicate
+        // narrows WHICH row).
 
         // Source workspace exists?
         if !index.workspace_exists(&c.source_workspace) {
@@ -627,11 +615,19 @@ fn validate_long_lived_suspended_convention(
         if sm.expected_lifetime != Some(ExpectedLifetime::LongLived) {
             continue;
         }
-        let has_suspended = sm
+        // V1.3-4: SUSPENDED may live in the primary SM OR in any
+        // dual_lifecycle chain — dual-lifecycle is the canonical home
+        // for operational states like suspended.
+        let has_suspended_primary = sm
             .states
             .iter()
             .any(|s| s.id.eq_ignore_ascii_case("SUSPENDED"));
-        if !has_suspended {
+        let has_suspended_dual = slot.dual_lifecycle.iter().any(|dl| {
+            dl.states
+                .iter()
+                .any(|s| s.id.eq_ignore_ascii_case("SUSPENDED"))
+        });
+        if !has_suspended_primary && !has_suspended_dual {
             report.warnings.push(DagWarning::LongLivedSlotMissingSuspended {
                 location: DagLocation {
                     workspace: workspace.to_string(),
@@ -655,20 +651,37 @@ fn validate_periodic_review_cadence(
         let Some(SlotStateMachine::Structured(sm)) = &slot.state_machine else {
             continue;
         };
-        // Heuristic: the SM should have at least one transition where the
-        // destination is an earlier review/collect/verify-style state.
-        // Without richer state-role metadata we detect "terminal → earlier"
-        // transitions as a proxy.
-        let terminal_set: HashSet<&str> =
-            sm.terminal_states.iter().map(|s| s.as_str()).collect();
-        let re_review = sm.transitions.iter().any(|t| {
-            let from_str = match &t.from {
-                serde_yaml::Value::String(s) => s.as_str(),
-                _ => "",
-            };
-            terminal_set.contains(from_str)
-        });
-        if !re_review {
+
+        // Build: set of states that are reached (appear as `to` in some
+        // transition). A re-review transition is any transition whose
+        // `to` state ALSO appears as an earlier `to` OR as an entry
+        // state — i.e. we can revisit a "review phase" state.
+        //
+        // Equivalently: the state graph has at least one back-edge /
+        // cycle. Simpler heuristic that correctly handles:
+        //   APPROVED → EXPIRED → IN_PROGRESS → APPROVED (cycle through
+        //   IN_PROGRESS which is re-reviewable).
+        //
+        // Detect: any state appears as `to` in 2+ transitions (reached
+        // from multiple sources — implies revisit) OR the entry state
+        // appears as a `to` (direct back-edge).
+        let mut to_counts: std::collections::HashMap<&str, usize> =
+            std::collections::HashMap::new();
+        for t in &sm.transitions {
+            to_counts.entry(t.to.as_str()).and_modify(|v| *v += 1).or_insert(1);
+        }
+        let has_back_edge = to_counts.values().any(|&c| c >= 2);
+
+        let entry_state_id: Option<&str> = sm
+            .states
+            .iter()
+            .find(|s| s.entry)
+            .map(|s| s.id.as_str());
+        let entry_reached = entry_state_id
+            .map(|eid| sm.transitions.iter().any(|t| t.to == eid))
+            .unwrap_or(false);
+
+        if !has_back_edge && !entry_reached {
             report.warnings.push(
                 DagWarning::PeriodicReviewCadenceWithoutRereviewTransition {
                     location: DagLocation {
