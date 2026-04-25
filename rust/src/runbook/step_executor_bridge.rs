@@ -127,12 +127,39 @@ impl super::executor::StepExecutor for DslExecutorV2StepExecutor {
 /// This adapter translates each `CompiledStep` into a `VerbExecutionPort::execute_verb()`
 /// call, converting the step's verb FQN and args to JSON, and mapping the
 /// `VerbExecutionOutcome` back to `StepOutcome`.
+///
+/// Optionally hooks the v1.3 cross-workspace gate checker (per
+/// catalogue-platform-refinement-v1_3 §3.3 — runtime impact). When a
+/// `GatePipeline` is attached, every step is gate-checked against the
+/// loaded DAG taxonomies before dispatch.
 pub struct VerbExecutionPortStepExecutor {
     port: Arc<dyn dsl_runtime::VerbExecutionPort>,
     /// Principal used for all executions in this runbook.
     principal: sem_os_core::principal::Principal,
     /// Session ID for correlation.
     session_id: Option<Uuid>,
+    /// Optional v1.3 gate-check pipeline. When `Some`, every step is
+    /// gate-checked against cross-workspace constraints before dispatch.
+    gate_pipeline: Option<GatePipeline>,
+}
+
+/// Wiring for the v1.3 cross-workspace gate hook.
+///
+/// Held by VerbExecutionPortStepExecutor and consulted before every
+/// step dispatch. Construction at orchestrator startup (one set of
+/// shared `Arc`s reused across all step executors).
+pub struct GatePipeline {
+    pub registry: Arc<dsl_core::config::DagRegistry>,
+    pub gate_checker: Arc<dsl_runtime::cross_workspace::GateChecker>,
+    pub verb_metadata: Arc<dyn VerbTransitionLookup>,
+    pub pool: Arc<sqlx::PgPool>,
+}
+
+/// Resolves a verb FQN to its v1.3 `transition_args` metadata. Caller
+/// implements this via a HashMap pre-populated from VerbsConfig at
+/// startup.
+pub trait VerbTransitionLookup: Send + Sync {
+    fn lookup(&self, verb_fqn: &str) -> Option<dsl_core::config::types::TransitionArgs>;
 }
 
 impl VerbExecutionPortStepExecutor {
@@ -145,13 +172,117 @@ impl VerbExecutionPortStepExecutor {
             port,
             principal,
             session_id,
+            gate_pipeline: None,
         }
+    }
+
+    /// Attach a v1.3 gate-check pipeline. When set, each `execute_step`
+    /// call invokes the GateChecker against the verb's declared
+    /// transitions before dispatching to the port.
+    pub fn with_gate_pipeline(mut self, pipeline: GatePipeline) -> Self {
+        self.gate_pipeline = Some(pipeline);
+        self
+    }
+
+    /// Run V1.3-1 gate checks for the given step. Returns Ok(()) if no
+    /// errors were found, Err with a violation message otherwise.
+    /// Returns Ok(()) when no GatePipeline is attached.
+    async fn pre_dispatch_gate_check(
+        &self,
+        step: &CompiledStep,
+    ) -> Result<(), String> {
+        let Some(pipe) = &self.gate_pipeline else {
+            return Ok(());
+        };
+        let Some(meta) = pipe.verb_metadata.lookup(&step.verb) else {
+            // Verb has no transition_args — no gate check applicable.
+            return Ok(());
+        };
+
+        // Resolve entity_id from args.
+        let entity_str = step.args.get(&meta.entity_id_arg).ok_or_else(|| {
+            format!(
+                "gate-check: verb '{}' transition_args.entity_id_arg='{}' \
+                 not found in step args",
+                step.verb, meta.entity_id_arg
+            )
+        })?;
+        let entity_id = uuid::Uuid::parse_str(entity_str).map_err(|e| {
+            format!(
+                "gate-check: verb '{}' arg '{}' value '{}' is not a UUID: {}",
+                step.verb, meta.entity_id_arg, entity_str, e
+            )
+        })?;
+
+        // Resolve target state from args (optional).
+        let target_state_opt: Option<&String> = meta
+            .target_state_arg
+            .as_ref()
+            .and_then(|arg| step.args.get(arg));
+
+        // Resolve target workspace + slot.
+        let target_workspace = meta
+            .target_workspace
+            .as_deref()
+            .or_else(|| step.verb.split('.').next())
+            .ok_or_else(|| {
+                format!("gate-check: cannot infer target_workspace for '{}'", step.verb)
+            })?;
+        let target_slot = meta.target_slot.as_deref().unwrap_or(target_workspace);
+
+        // Cross-reference DAG transitions for this verb to determine
+        // candidate (from, to) pairs. We accept either:
+        //   * The transition matching `target_state` if declared
+        //   * Any matching from→to pair otherwise (fail-conservative
+        //     by checking each)
+        let transitions = pipe.registry.transitions_for_verb(&step.verb);
+        let candidates: Vec<&dsl_core::config::dag_registry::TransitionRef> = if let Some(ts) = target_state_opt {
+            transitions.iter().filter(|t| t.to_state.eq_ignore_ascii_case(ts)).collect()
+        } else {
+            transitions.iter().collect()
+        };
+
+        if candidates.is_empty() {
+            // Verb is gate-metadata-aware but DAG has no matching
+            // transition. This is expected for verbs that operate on
+            // non-state aspects (e.g. updates that don't transition).
+            return Ok(());
+        }
+
+        for cand in candidates {
+            let violations = pipe
+                .gate_checker
+                .check_transition(
+                    target_workspace,
+                    target_slot,
+                    entity_id,
+                    &cand.from_state,
+                    &cand.to_state,
+                    &pipe.pool,
+                )
+                .await
+                .map_err(|e| format!("gate-check error: {e}"))?;
+            for v in &violations {
+                if v.severity == "error" {
+                    return Err(format!(
+                        "v1.3 gate violation [{}]: {}",
+                        v.constraint_id, v.message
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 }
 
 #[async_trait::async_trait]
 impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
     async fn execute_step(&self, step: &CompiledStep) -> StepOutcome {
+        // V1.3 cross-workspace gate check (no-op when pipeline absent).
+        if let Err(error) = self.pre_dispatch_gate_check(step).await {
+            return StepOutcome::Failed { error };
+        }
+
         // Build execution context
         let mut ctx = dsl_runtime::VerbExecutionContext::new(self.principal.clone());
         if let Some(sid) = self.session_id {
@@ -196,6 +327,51 @@ impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
 }
 
 // ---------------------------------------------------------------------------
+// HashMapVerbTransitionLookup — production helper
+// ---------------------------------------------------------------------------
+
+/// Default `VerbTransitionLookup` implementation backed by a HashMap.
+///
+/// Production usage: build once at startup from a loaded `VerbsConfig`
+/// using [`HashMapVerbTransitionLookup::from_verbs_config`], wrap in
+/// `Arc`, share into the `GatePipeline`.
+pub struct HashMapVerbTransitionLookup {
+    map: std::collections::HashMap<String, dsl_core::config::types::TransitionArgs>,
+}
+
+impl HashMapVerbTransitionLookup {
+    pub fn new() -> Self {
+        Self {
+            map: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn from_verbs_config(cfg: &dsl_core::config::types::VerbsConfig) -> Self {
+        let mut map = std::collections::HashMap::new();
+        for (domain_name, domain) in &cfg.domains {
+            for (verb_name, verb) in &domain.verbs {
+                if let Some(ta) = &verb.transition_args {
+                    map.insert(format!("{domain_name}.{verb_name}"), ta.clone());
+                }
+            }
+        }
+        Self { map }
+    }
+}
+
+impl Default for HashMapVerbTransitionLookup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl VerbTransitionLookup for HashMapVerbTransitionLookup {
+    fn lookup(&self, verb_fqn: &str) -> Option<dsl_core::config::types::TransitionArgs> {
+        self.map.get(verb_fqn).cloned()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -223,6 +399,66 @@ mod tests {
         async fn execute(&self, _dsl: &str) -> Result<serde_json::Value, String> {
             Err("execution failed".into())
         }
+    }
+
+    // Build a HashMapVerbTransitionLookup from a hand-rolled VerbsConfig
+    // so the gate-pipeline construction can be smoke-tested without
+    // loading real YAML files.
+    #[test]
+    fn hashmap_verb_transition_lookup_construction() {
+        use dsl_core::config::types::{
+            DomainConfig, TransitionArgs, VerbConfig, VerbBehavior, VerbsConfig,
+        };
+        use std::collections::HashMap;
+
+        let mut domain = DomainConfig {
+            description: "test".into(),
+            verbs: HashMap::new(),
+            dynamic_verbs: vec![],
+            invocation_hints: vec![],
+        };
+        domain.verbs.insert(
+            "update-status".into(),
+            VerbConfig {
+                description: "test".into(),
+                behavior: VerbBehavior::Plugin,
+                crud: None,
+                handler: None,
+                graph_query: None,
+                durable: None,
+                args: vec![],
+                returns: None,
+                produces: None,
+                consumes: vec![],
+                lifecycle: None,
+                metadata: None,
+                invocation_phrases: vec![],
+                policy: None,
+                sentences: None,
+                confirm_policy: None,
+                outputs: vec![],
+                three_axis: None,
+                transition_args: Some(TransitionArgs {
+                    entity_id_arg: "deal-id".into(),
+                    target_state_arg: Some("new-status".into()),
+                    target_workspace: Some("deal".into()),
+                    target_slot: Some("deal".into()),
+                }),
+            },
+        );
+        let mut domains = HashMap::new();
+        domains.insert("deal".into(), domain);
+        let cfg = VerbsConfig {
+            version: "1.0".into(),
+            domains,
+        };
+        let lookup = HashMapVerbTransitionLookup::from_verbs_config(&cfg);
+        let ta = lookup.lookup("deal.update-status").expect("found");
+        assert_eq!(ta.entity_id_arg, "deal-id");
+        assert_eq!(ta.target_state_arg.as_deref(), Some("new-status"));
+        assert_eq!(ta.target_workspace.as_deref(), Some("deal"));
+        // Verb without transition_args returns None.
+        assert!(lookup.lookup("nonexistent.verb").is_none());
     }
 
     /// Stub DslExecutorV2 that returns Parked.

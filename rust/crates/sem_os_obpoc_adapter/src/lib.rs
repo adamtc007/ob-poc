@@ -202,6 +202,7 @@ mod tests {
                             sentences: None,
                             confirm_policy: None,
                             outputs: vec![], three_axis: None,
+            transition_args: None,
                         },
                     );
                     v

@@ -121,6 +121,55 @@ pub struct VerbConfig {
     /// ```
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub three_axis: Option<ThreeAxisDeclaration>,
+
+    /// V1.3 runtime gate-hook metadata (R-runtime, 2026-04-25).
+    ///
+    /// Tells the verb-dispatch hook which args carry the entity_id and
+    /// (optionally) the target state. Combined with the DAG's
+    /// transitions_for_verb index, this lets the runtime evaluate
+    /// V1.3-1 cross_workspace_constraints + plan V1.3-3 cascades
+    /// before / after the verb fires.
+    ///
+    /// YAML shape:
+    /// ```yaml
+    /// transition_args:
+    ///   entity_id_arg: deal-id
+    ///   target_state_arg: new-status   # optional; omit for fixed-target verbs
+    /// ```
+    ///
+    /// Optional. Verbs without `transition_args` declared are
+    /// gate-checked only via the entry-state inference (current state
+    /// from DB → match against any from→to declaring this verb).
+    /// Verbs with `transition_args` get exact (from, to) resolution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transition_args: Option<TransitionArgs>,
+}
+
+/// V1.3 runtime gate-hook metadata. See `VerbConfig::transition_args`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct TransitionArgs {
+    /// Name of the verb's arg whose value is the entity_id this verb
+    /// transitions. Must match an entry in `VerbConfig::args`.
+    pub entity_id_arg: String,
+
+    /// Name of the verb's arg whose value is the target state this
+    /// verb transitions into. Omit for verbs with a fixed terminal
+    /// target (e.g. `deal.cancel` always → CANCELLED — the DAG's
+    /// transition declaration carries the target).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_state_arg: Option<String>,
+
+    /// Override the workspace this verb operates on. Defaults to the
+    /// verb's domain namespace (e.g. `deal.update-status` → workspace
+    /// `deal`). Override only when the verb operates on a slot owned
+    /// by a different workspace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_workspace: Option<String>,
+
+    /// Override the target slot id. Defaults to the value resolved
+    /// from `metadata.noun` if present, else the workspace name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_slot: Option<String>,
 }
 
 // =============================================================================

@@ -379,6 +379,11 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: deal-id
+          target_state_arg: new-status
+          target_workspace: deal
+          target_slot: deal
 
       cancel:
         description: "Cancel a deal (soft delete - sets status to CANCELLED)"

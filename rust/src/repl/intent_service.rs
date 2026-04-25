@@ -488,6 +488,7 @@ mod tests {
                 policy: None,
                 confirm_policy: None,
                 outputs: vec![], three_axis: None,
+            transition_args: None,
             },
         );
 
@@ -524,6 +525,7 @@ mod tests {
                     policy: None,
                     confirm_policy: None,
                     outputs: vec![], three_axis: None,
+            transition_args: None,
                 },
             );
         }
