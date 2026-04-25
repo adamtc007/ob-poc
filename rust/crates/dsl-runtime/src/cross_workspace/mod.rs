@@ -20,4 +20,7 @@ pub mod providers;
 pub mod remediation;
 pub mod replay;
 pub mod repository;
+pub mod slot_state;
 pub mod types;
+
+pub use slot_state::{PostgresSlotStateProvider, SlotStateProvider};

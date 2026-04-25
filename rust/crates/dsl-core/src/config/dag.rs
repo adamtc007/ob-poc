@@ -146,7 +146,7 @@ pub struct StructuredDerivationCondition {
 }
 
 /// State selector — a single state ID or a set of allowable states.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum StateSelector {
     Single(String),

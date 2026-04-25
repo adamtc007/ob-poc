@@ -21,6 +21,7 @@
 //! ```
 
 pub mod dag;
+pub mod dag_registry;
 pub mod dag_validator;
 pub mod escalation;
 pub mod loader;
@@ -31,6 +32,7 @@ pub mod types;
 pub mod validator;
 
 pub use dag::{load_dags_from_dir, Dag, LoadedDag};
+pub use dag_registry::{DagRegistry, SlotKey, TransitionKey};
 pub use dag_validator::{validate_dags, DagError, DagValidationReport, DagWarning};
 pub use pack_loader::{flatten_pack_entries, load_packs_from_dir, LoadedPack};
 
