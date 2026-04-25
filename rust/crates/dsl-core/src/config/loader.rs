@@ -255,6 +255,37 @@ impl ConfigLoader {
     }
 
     /// Load CSG rules configuration
+    /// Load the DAG taxonomy registry from `{config_dir}/sem_os_seeds/dag_taxonomies/`.
+    ///
+    /// Returns a `DagRegistry` with all DAGs pre-indexed for V1.3
+    /// runtime lookups (cross_workspace_constraints,
+    /// derived_cross_workspace_state, parent_slot). Intended to be
+    /// called once at runtime startup and shared via `Arc`.
+    ///
+    /// Returns an empty registry (logged warning) if the
+    /// dag_taxonomies directory is missing — keeps startup tolerant
+    /// for environments where DAGs aren't yet authored.
+    pub fn load_dag_registry(&self) -> Result<super::dag_registry::DagRegistry> {
+        let path = std::path::Path::new(&self.config_dir)
+            .join("sem_os_seeds")
+            .join("dag_taxonomies");
+        if !path.exists() {
+            tracing::warn!(
+                "DAG taxonomies directory not found at {:?} — \
+                 runtime cross-workspace lookups will return empty",
+                path
+            );
+            return Ok(super::dag_registry::DagRegistry::default());
+        }
+        let registry = super::dag_registry::DagRegistry::from_dir(&path)
+            .with_context(|| format!("loading DAG taxonomies from {path:?}"))?;
+        tracing::info!(
+            "Loaded {} DAG taxonomies into runtime registry",
+            registry.len()
+        );
+        Ok(registry)
+    }
+
     pub fn load_csg_rules(&self) -> Result<CsgRulesConfig> {
         let path = Path::new(&self.config_dir).join("csg_rules.yaml");
         info!("Loading CSG rules from {}", path.display());

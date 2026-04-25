@@ -14,6 +14,7 @@
 pub mod compensation;
 pub mod fact_refs;
 pub mod fact_versions;
+pub mod gate_checker;
 pub mod idempotency;
 pub mod platform_dag;
 pub mod providers;
@@ -23,4 +24,5 @@ pub mod repository;
 pub mod slot_state;
 pub mod types;
 
+pub use gate_checker::{GateChecker, GateViolation, PredicateResolver, SameEntityResolver};
 pub use slot_state::{PostgresSlotStateProvider, SlotStateProvider};
