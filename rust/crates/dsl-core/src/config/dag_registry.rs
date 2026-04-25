@@ -85,6 +85,34 @@ pub struct DagRegistry {
     /// parent_slot_by_child[SlotKey of child] → (parent SlotKey,
     /// the workspace+slot index where the child slot is declared).
     parent_slot_by_child: HashMap<SlotKey, ParentSlotLocator>,
+
+    /// transitions_by_verb_fqn[verb_fqn] → list of transitions that
+    /// declare this verb in their `via:` field. Used by runtime to
+    /// answer "what transitions could this verb cause?" — the
+    /// foundation for hooking GateChecker into verb dispatch.
+    transitions_by_verb_fqn: HashMap<String, Vec<TransitionRef>>,
+
+    /// children_by_parent[parent SlotKey] → list of child SlotKeys
+    /// (slots whose parent_slot points back to the parent). Reverse
+    /// of parent_slot_by_child; used by V1.3-3 cascade planning to
+    /// answer "given a parent transition, which child slots need to
+    /// react?".
+    children_by_parent: HashMap<SlotKey, Vec<SlotKey>>,
+}
+
+/// A reference to a single declared transition, materialised for
+/// verb-fqn lookup. `from` may be a comma-list / parenthesised group
+/// in the source YAML (e.g. `(PROSPECT, QUALIFYING) -> CANCELLED`);
+/// the parser flattens this into one TransitionRef per source state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransitionRef {
+    pub workspace: String,
+    pub slot: String,
+    pub from_state: String,
+    pub to_state: String,
+    /// Whether this transition lives in a `dual_lifecycle:` chain
+    /// (rather than the slot's primary `state_machine`).
+    pub from_dual_lifecycle: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -269,6 +297,50 @@ impl DagRegistry {
     }
 
     // -----------------------------------------------------------------------
+    // Verb → transitions lookup (foundation for verb-dispatch gate hook)
+    // -----------------------------------------------------------------------
+
+    /// Find all transitions a verb participates in (across all DAGs,
+    /// all slots, both primary state machines and dual_lifecycle chains).
+    ///
+    /// Returns a slice of `TransitionRef` — borrowed from the registry's
+    /// internal index, valid for the lifetime of the registry.
+    ///
+    /// Used by the runtime to answer "what transitions could this verb
+    /// cause?" — the input to deciding which gate checks apply.
+    pub fn transitions_for_verb(&self, verb_fqn: &str) -> &[TransitionRef] {
+        self.transitions_by_verb_fqn
+            .get(verb_fqn)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Find all child slots whose parent_slot points to (workspace,
+    /// slot). Used by V1.3-3 cascade planning to answer "given a
+    /// parent transitioned to state X, which children need to react?"
+    pub fn children_of(&self, parent_workspace: &str, parent_slot: &str) -> &[SlotKey] {
+        self.children_by_parent
+            .get(&SlotKey::new(parent_workspace, parent_slot))
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Look up a child slot's `state_dependency` block, if declared.
+    /// Returns the cascade rules that govern how the child reacts to
+    /// parent state changes.
+    pub fn state_dependency_for(
+        &self,
+        workspace: &str,
+        slot: &str,
+    ) -> Option<&StateDependency> {
+        let dag = self.dags.get(workspace)?;
+        dag.slots
+            .iter()
+            .find(|s| s.id == slot)
+            .and_then(|s| s.state_dependency.as_ref())
+    }
+
+    // -----------------------------------------------------------------------
     // Index construction
     // -----------------------------------------------------------------------
 
@@ -276,8 +348,40 @@ impl DagRegistry {
         self.constraints_by_target.clear();
         self.derived_states_by_host.clear();
         self.parent_slot_by_child.clear();
+        self.transitions_by_verb_fqn.clear();
+        self.children_by_parent.clear();
 
         for (ws, dag) in &self.dags {
+            // Verb → transition index: walk every slot's primary +
+            // dual lifecycle transitions, extract verb FQNs from `via:`,
+            // and record one TransitionRef per (from_state, to_state)
+            // pair the verb is declared on.
+            for slot in &dag.slots {
+                if let Some(SlotStateMachine::Structured(sm)) = &slot.state_machine {
+                    for t in &sm.transitions {
+                        index_transition(
+                            ws,
+                            &slot.id,
+                            t,
+                            false,
+                            &mut self.transitions_by_verb_fqn,
+                        );
+                    }
+                }
+                for dl in &slot.dual_lifecycle {
+                    for t in &dl.transitions {
+                        index_transition(
+                            ws,
+                            &slot.id,
+                            t,
+                            true,
+                            &mut self.transitions_by_verb_fqn,
+                        );
+                    }
+                }
+            }
+
+
             // V1.3-1 cross_workspace_constraints — index by target
             // transition.
             for (idx, c) in dag.cross_workspace_constraints.iter().enumerate() {
@@ -309,7 +413,7 @@ impl DagRegistry {
                     });
             }
 
-            // V1.3-3 parent_slot — index by child.
+            // V1.3-3 parent_slot — index by child + reverse index by parent.
             for (slot_idx, slot) in dag.slots.iter().enumerate() {
                 if let Some(parent) = &slot.parent_slot {
                     let parent_ws = parent
@@ -319,17 +423,121 @@ impl DagRegistry {
                     let child_key = SlotKey::new(ws, &slot.id);
                     let parent_key = SlotKey::new(&parent_ws, &parent.slot);
                     self.parent_slot_by_child.insert(
-                        child_key,
+                        child_key.clone(),
                         ParentSlotLocator {
-                            parent: parent_key,
+                            parent: parent_key.clone(),
                             declaring_workspace: ws.clone(),
                             declaring_slot_index: slot_idx,
                         },
                     );
+                    self.children_by_parent
+                        .entry(parent_key)
+                        .or_default()
+                        .push(child_key);
                 }
             }
         }
     }
+}
+
+/// Index a single TransitionDef into the verb→transition map.
+fn index_transition(
+    workspace: &str,
+    slot: &str,
+    t: &TransitionDef,
+    from_dual: bool,
+    out: &mut HashMap<String, Vec<TransitionRef>>,
+) {
+    let verbs = extract_verbs_from_via(&t.via);
+    if verbs.is_empty() {
+        return;
+    }
+    let froms = extract_from_states(&t.from);
+    for verb_fqn in verbs {
+        for from_state in &froms {
+            // Skip transitions whose `from` we couldn't parse as a
+            // state id (e.g. `"(any non-terminal)"` free-text escape) —
+            // those are documentation, not enforceable transitions.
+            if !is_valid_state_id(from_state) {
+                continue;
+            }
+            out.entry(verb_fqn.clone()).or_default().push(TransitionRef {
+                workspace: workspace.to_string(),
+                slot: slot.to_string(),
+                from_state: from_state.clone(),
+                to_state: t.to.clone(),
+                from_dual_lifecycle: from_dual,
+            });
+        }
+    }
+}
+
+/// Pull verb FQNs from a `via:` field that may be a string, a list,
+/// or a backend-marker string like `"(backend: ...)"` (in which case
+/// no verbs are returned — backend transitions aren't verb-driven).
+fn extract_verbs_from_via(via: &Option<serde_yaml::Value>) -> Vec<String> {
+    let Some(v) = via else { return Vec::new() };
+    match v {
+        serde_yaml::Value::String(s) => {
+            // "(backend: ...)" / "(time-decay)" / "(implicit: ...)" etc
+            // are documentation strings, not verb FQNs.
+            if s.trim().starts_with('(') {
+                return Vec::new();
+            }
+            vec![s.clone()]
+        }
+        serde_yaml::Value::Sequence(seq) => seq
+            .iter()
+            .filter_map(|item| match item {
+                serde_yaml::Value::String(s) if !s.trim().starts_with('(') => Some(s.clone()),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Pull from-state ids from a `from:` field.
+///
+/// The `from:` field can be:
+///   - A bare state id: `"PROSPECT"` or `PROSPECT` (string)
+///   - A list (YAML sequence): `[PROSPECT, QUALIFYING]`
+///   - A quoted parenthesised group: `"(PROSPECT, QUALIFYING)"` —
+///     parsed by splitting on commas inside the parens.
+///   - A free-text descriptor: `"(any non-terminal)"` — unparseable;
+///     returned as-is for caller filtering.
+fn extract_from_states(from: &serde_yaml::Value) -> Vec<String> {
+    match from {
+        serde_yaml::Value::String(s) => {
+            let trimmed = s.trim();
+            if trimmed.starts_with('(') && trimmed.ends_with(')') {
+                let inner = &trimmed[1..trimmed.len() - 1];
+                inner
+                    .split(',')
+                    .map(|p| p.trim().to_string())
+                    .filter(|p| !p.is_empty())
+                    .collect()
+            } else {
+                vec![trimmed.to_string()]
+            }
+        }
+        serde_yaml::Value::Sequence(seq) => seq
+            .iter()
+            .filter_map(|item| match item {
+                serde_yaml::Value::String(s) => Some(s.trim().to_string()),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Heuristic: a state id is a single token of letters / digits /
+/// underscores. Excludes free-text escapes like "any non-terminal".
+fn is_valid_state_id(s: &str) -> bool {
+    !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 /// Parse a `"FROM -> TO"` or `"* -> TO"` string into (Option<from>, to).
@@ -602,6 +810,174 @@ slots:
     }
 
     #[test]
+    fn verb_to_transition_index_single_via() {
+        let r = registry_from(&[(
+            "deal",
+            r#"
+workspace: deal
+dag_id: deal_dag
+slots:
+  - id: deal
+    stateless: false
+    state_machine:
+      id: dl
+      states: [{ id: PROSPECT, entry: true }, { id: QUALIFYING }]
+      transitions:
+        - from: PROSPECT
+          to: QUALIFYING
+          via: deal.update-status
+"#,
+        )]);
+        let hits = r.transitions_for_verb("deal.update-status");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].workspace, "deal");
+        assert_eq!(hits[0].slot, "deal");
+        assert_eq!(hits[0].from_state, "PROSPECT");
+        assert_eq!(hits[0].to_state, "QUALIFYING");
+        assert!(!hits[0].from_dual_lifecycle);
+    }
+
+    #[test]
+    fn verb_to_transition_index_via_list() {
+        let r = registry_from(&[(
+            "deal",
+            r#"
+workspace: deal
+dag_id: deal_dag
+slots:
+  - id: deal
+    stateless: false
+    state_machine:
+      id: dl
+      states: [{ id: PROSPECT, entry: true }, { id: QUALIFYING }]
+      transitions:
+        - from: PROSPECT
+          to: QUALIFYING
+          via: [deal.create, deal.update-status]
+"#,
+        )]);
+        // Both verbs should index the same transition.
+        let create_hits = r.transitions_for_verb("deal.create");
+        let update_hits = r.transitions_for_verb("deal.update-status");
+        assert_eq!(create_hits.len(), 1);
+        assert_eq!(update_hits.len(), 1);
+        assert_eq!(create_hits[0].to_state, "QUALIFYING");
+        assert_eq!(update_hits[0].to_state, "QUALIFYING");
+    }
+
+    #[test]
+    fn verb_to_transition_index_parenthesised_from() {
+        let r = registry_from(&[(
+            "deal",
+            r#"
+workspace: deal
+dag_id: deal_dag
+slots:
+  - id: deal
+    stateless: false
+    state_machine:
+      id: dl
+      states:
+        - { id: PROSPECT, entry: true }
+        - { id: QUALIFYING }
+        - { id: NEGOTIATING }
+        - { id: CANCELLED }
+      transitions:
+        - from: "(PROSPECT, QUALIFYING, NEGOTIATING)"
+          to: CANCELLED
+          via: deal.cancel
+"#,
+        )]);
+        let hits = r.transitions_for_verb("deal.cancel");
+        assert_eq!(hits.len(), 3);
+        let froms: Vec<&str> = hits.iter().map(|h| h.from_state.as_str()).collect();
+        assert!(froms.contains(&"PROSPECT"));
+        assert!(froms.contains(&"QUALIFYING"));
+        assert!(froms.contains(&"NEGOTIATING"));
+        assert!(hits.iter().all(|h| h.to_state == "CANCELLED"));
+    }
+
+    #[test]
+    fn verb_to_transition_index_dual_lifecycle_marked() {
+        let r = registry_from(&[(
+            "deal",
+            r#"
+workspace: deal
+dag_id: deal_dag
+slots:
+  - id: deal
+    stateless: false
+    state_machine:
+      id: primary
+      states: [{ id: CONTRACTED, entry: true }]
+      transitions: []
+    dual_lifecycle:
+      - id: ops
+        junction_state_from_primary: CONTRACTED
+        states: [{ id: ONBOARDING }, { id: ACTIVE }]
+        transitions:
+          - from: ONBOARDING
+            to: ACTIVE
+            via: deal.update-status
+"#,
+        )]);
+        let hits = r.transitions_for_verb("deal.update-status");
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].from_dual_lifecycle);
+        assert_eq!(hits[0].from_state, "ONBOARDING");
+        assert_eq!(hits[0].to_state, "ACTIVE");
+    }
+
+    #[test]
+    fn verb_to_transition_index_skips_backend_via() {
+        let r = registry_from(&[(
+            "im",
+            r#"
+workspace: im
+dag_id: im_dag
+slots:
+  - id: trading_activity
+    stateless: false
+    state_machine:
+      id: ta
+      states: [{ id: never_traded, entry: true }, { id: trading }]
+      transitions:
+        - from: never_traded
+          to: trading
+          via: "(backend: first trade posted)"
+"#,
+        )]);
+        // No verbs declared; backend-marker via doesn't get indexed.
+        // Only check that no real verb FQN got accidentally indexed.
+        assert!(r.transitions_for_verb("backend").is_empty());
+        assert!(r.transitions_for_verb("(backend: first trade posted)").is_empty());
+    }
+
+    #[test]
+    fn verb_to_transition_index_skips_unparseable_from() {
+        let r = registry_from(&[(
+            "kyc",
+            r#"
+workspace: kyc
+dag_id: kyc_dag
+slots:
+  - id: kyc_case
+    stateless: false
+    state_machine:
+      id: kc
+      states: [{ id: BLOCKED }]
+      transitions:
+        - from: "(any non-terminal)"
+          to: BLOCKED
+          via: kyc-case.escalate
+"#,
+        )]);
+        // The free-text from is not a state id; index drops it.
+        let hits = r.transitions_for_verb("kyc-case.escalate");
+        assert!(hits.is_empty());
+    }
+
+    #[test]
     fn loads_real_dags_from_disk() {
         // Live integration: registry should pick up all 9 DAGs cleanly
         // from the repo's actual dag_taxonomies/ directory.
@@ -637,5 +1013,28 @@ slots:
                 .any(|c| c.id == "deal_contracted_requires_kyc_approved"),
             "expected deal contract gate to be indexed"
         );
+
+        // deal.cancel should be indexed across many from-states.
+        let cancel_hits = r.transitions_for_verb("deal.cancel");
+        assert!(
+            cancel_hits.len() >= 4,
+            "expected deal.cancel to participate in multiple transitions; got {}",
+            cancel_hits.len()
+        );
+        assert!(
+            cancel_hits.iter().all(|h| h.workspace == "deal" && h.slot == "deal"),
+            "all deal.cancel transitions should target the deal slot"
+        );
+        assert!(
+            cancel_hits.iter().any(|h| h.to_state == "CANCELLED"),
+            "deal.cancel should have a transition into CANCELLED"
+        );
+
+        // deal.bac-approve (added in R-5) should index a single
+        // BAC_APPROVAL → KYC_CLEARANCE transition.
+        let bac_hits = r.transitions_for_verb("deal.bac-approve");
+        assert_eq!(bac_hits.len(), 1, "expected deal.bac-approve once: {bac_hits:?}");
+        assert_eq!(bac_hits[0].from_state, "BAC_APPROVAL");
+        assert_eq!(bac_hits[0].to_state, "KYC_CLEARANCE");
     }
 }

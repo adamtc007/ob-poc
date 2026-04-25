@@ -64,7 +64,7 @@ impl SlotStateProvider for PostgresSlotStateProvider {
         entity_id: Uuid,
         pool: &PgPool,
     ) -> Result<Option<String>> {
-        let (table, column, pk_column) = resolve_slot(workspace, slot)?;
+        let (table, column, pk_column) = resolve_slot_table(workspace, slot)?;
         let sql = format!(
             r#"SELECT {col}::text AS state FROM "ob-poc".{tbl} WHERE {pk} = $1"#,
             col = column,
@@ -86,7 +86,11 @@ impl SlotStateProvider for PostgresSlotStateProvider {
 ///
 /// Returned tuple is `(table_name, state_column, primary_key_column)`.
 /// All names are unquoted-identifier-safe (alphanumeric + underscores).
-fn resolve_slot(
+///
+/// Public so other modules in `cross_workspace::*` (e.g. the SQL
+/// predicate resolver) can resolve the same mapping when constructing
+/// predicate-driven queries.
+pub fn resolve_slot_table(
     workspace: &str,
     slot: &str,
 ) -> Result<(&'static str, &'static str, &'static str)> {
@@ -157,14 +161,14 @@ mod tests {
             ),
         ];
         for ((ws, slot), expected) in cases {
-            let got = resolve_slot(ws, slot).expect(&format!("({ws}, {slot}) should resolve"));
+            let got = resolve_slot_table(ws, slot).expect(&format!("({ws}, {slot}) should resolve"));
             assert_eq!(got, expected, "mismatch for ({ws}, {slot})");
         }
     }
 
     #[test]
     fn resolve_slot_unknown_pair_errors() {
-        let err = resolve_slot("cbu", "nonexistent").unwrap_err();
+        let err = resolve_slot_table("cbu", "nonexistent").unwrap_err();
         assert!(
             err.to_string().contains("no SlotStateProvider mapping"),
             "got: {err}"
@@ -173,7 +177,7 @@ mod tests {
 
     #[test]
     fn resolve_slot_unknown_workspace_errors() {
-        let err = resolve_slot("notaworkspace", "cbu").unwrap_err();
+        let err = resolve_slot_table("notaworkspace", "cbu").unwrap_err();
         assert!(err.to_string().contains("no SlotStateProvider mapping"));
     }
 }
