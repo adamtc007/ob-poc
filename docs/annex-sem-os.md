@@ -991,3 +991,236 @@ When a shared fact (LEI, jurisdiction, fund structure type) is mutated in its ow
 - INV-4: Replay routes through existing runbook execution gate
 - INV-5: Replay is controlled re-evaluation, not mechanical rerun
 - INV-6: If shared, always enforced (no soft constraints)
+
+---
+
+## Catalogue Platform v1.3 — Cross-Workspace Runtime Stack (2026-04-25)
+
+> **Spec:** `docs/todo/catalogue-platform-refinement-v1_3.md`
+> **Status:** CODE COMPLETE — opt-in via `ReplOrchestratorV2::with_gate_pipeline`
+
+The v1.3 stack adds runtime enforcement of cross-workspace semantics
+declared in DAG taxonomies (`rust/config/sem_os_seeds/dag_taxonomies/*.yaml`).
+Three modes:
+
+- **Mode A (V1.3-1) blocking gate** — `cross_workspace_constraints:` —
+  pre-transition check; verb dispatch rejected if source workspace's
+  state doesn't match required.
+- **Mode B (V1.3-2) aggregate / tollgate** — `derived_cross_workspace_state:` —
+  derived states computed by AND-ing other workspaces' states (e.g.
+  `cbu.operationally_active` = KYC.APPROVED AND Deal.CONTRACTED AND
+  IM.trading_profile.ACTIVE AND evidence.verified).
+- **Mode C (V1.3-3) hierarchy cascade** — `parent_slot:` + `state_dependency:` —
+  parent transition propagates to child slots (e.g. parent CBU SUSPENDED →
+  all child CBUs SUSPENDED).
+
+### DAG inventory (9 workspaces)
+
+| Workspace | DAG file | Slots | Notes |
+|---|---|---|---|
+| Instrument Matrix | `instrument_matrix_dag.yaml` | 22 | R-4 phase-axis re-anchored on CBU-trading-enablement |
+| KYC | `kyc_dag.yaml` | 32 | Validation lifecycle |
+| Deal | `deal_dag.yaml` | 22 | R-5: BAC gate + pricing approval + terminal granularity + SLA + dual_lifecycle |
+| CBU | `cbu_dag.yaml` | 24 | R-3: re-centred on money-making apparatus; tollgate hosted here |
+| SemOS Maintenance | `semos_maintenance_dag.yaml` | 14 | Governance — 5 stateful + 9 stateless slots |
+| Book-Setup | `book_setup_dag.yaml` | 11 | Journey workspace — book-setup lifecycle (8 phases) |
+| Session-Bootstrap | `session_bootstrap_dag.yaml` | 3 | Smallest DAG; transitional scope-resolution pack |
+| Onboarding-Request | `onboarding_request_dag.yaml` | 5 | Deal→Ops handoff journey |
+| Product-Service-Taxonomy | `product_service_taxonomy_dag.yaml` | 5 | Read-only catalog browsing |
+
+### Runtime modules (dsl-core + dsl-runtime)
+
+#### `dsl-core::config::dag_registry::DagRegistry`
+
+Build-time index over loaded DAGs. Five lookup methods:
+
+```rust
+pub fn dag(&self, workspace: &str) -> Option<&Dag>;
+pub fn constraints_for_transition(&self, ws, slot, from, to) -> Vec<&CrossWorkspaceConstraint>;
+pub fn derived_states_for_slot(&self, ws, slot) -> Vec<&DerivedCrossWorkspaceState>;
+pub fn parent_slot_for(&self, ws, slot) -> Option<&ParentSlot>;
+pub fn children_of(&self, parent_ws, parent_slot) -> &[SlotKey];
+pub fn transitions_for_verb(&self, verb_fqn: &str) -> &[TransitionRef];
+```
+
+Construct once at startup via `ConfigLoader::from_env().load_dag_registry()`.
+Share as `Arc<DagRegistry>` across the runtime.
+
+#### `dsl-runtime::cross_workspace::SlotStateProvider`
+
+Trait abstracting cross-workspace slot-state lookups:
+
+```rust
+async fn read_slot_state(&self, ws, slot, entity_id, pool) -> Option<String>;
+```
+
+Implementation: `PostgresSlotStateProvider` with a 24-row dispatch
+table mapping (workspace, slot) → (table, state_column, pk_column).
+Add new mappings in `slot_state.rs::resolve_slot_table`.
+
+#### `dsl-runtime::cross_workspace::SqlPredicateResolver`
+
+Production `PredicateResolver` for the canonical FK-equality predicate
+shape: `{src_table}.{src_col} = this_X.{tgt_col}`. Two-stage SQL
+(read target column off target row, then SELECT source pk by matched
+column). Identifier hygiene enforced. Unparseable predicates return
+`Ok(None)` (gate checker treats as constraint violation).
+
+#### `dsl-runtime::cross_workspace::GateChecker` (Mode A)
+
+```rust
+pub async fn check_transition(
+    &self,
+    target_ws, target_slot, target_entity_id,
+    from_state, to_state, pool,
+) -> Vec<GateViolation>;
+```
+
+`GateViolation` carries `severity` (error/warning/informational);
+caller decides reject vs warn vs log.
+
+#### `dsl-runtime::cross_workspace::DerivedStateEvaluator` + `DerivedStateProjector` (Mode B)
+
+`DerivedStateEvaluator` evaluates one `DerivedCrossWorkspaceState`
+against the live system. `DerivedStateProjector` composes registry
++ evaluator into a multi-host projection method:
+
+```rust
+pub async fn project_for(&self, host_ws, host_slot, host_entity_id, pool)
+    -> Vec<DerivedStateProjection>;
+pub async fn project_batch(&self, targets, pool) -> Vec<DerivedStateProjection>;
+```
+
+Per OQ-2: callers wrap in session-scope cache; the evaluator itself
+is stateless.
+
+#### `dsl-runtime::cross_workspace::CascadePlanner` + `PostgresChildEntityResolver` (Mode C)
+
+`CascadePlanner.plan_cascade(parent_ws, parent_slot, parent_id, parent_new_state, pool)`
+returns `Vec<CascadeAction>` — one action per child entity that needs
+to react to the parent transition. Action carries
+`(child_workspace, child_slot, child_entity_id, target_state)`.
+
+`PostgresChildEntityResolver` consults the DAG's `parent_slot.join`
+declaration (via, parent_fk, child_fk) and runs `SELECT child_fk FROM
+{via} WHERE {parent_fk} = $1`.
+
+### TransitionArgs metadata (per-verb opt-in)
+
+Verbs that drive state-machine transitions declare `transition_args:`
+in their YAML so the dispatch hook can extract entity_id + target
+state from runtime args:
+
+```yaml
+update-status:
+  description: ...
+  behavior: plugin
+  transition_args:
+    entity_id_arg: deal-id
+    target_state_arg: new-status        # optional — omit for fixed-target verbs
+    target_workspace: deal               # optional — defaults to verb namespace
+    target_slot: deal                    # optional — defaults to workspace
+  # ... rest of verb declaration
+```
+
+87 verbs declare `transition_args` as of 2026-04-25 (CBU operational +
+Deal BAC/SLA + holding encumbrance + share-class lifecycle + manco +
+trading-profile + book + cbu-ca + service-consumption + investor +
+governance/attribute/phrase publication).
+
+### GatePipeline + Orchestrator hook
+
+```rust
+pub struct GatePipeline {
+    pub registry: Arc<DagRegistry>,
+    pub gate_checker: Arc<GateChecker>,
+    pub verb_metadata: Arc<dyn VerbTransitionLookup>,  // HashMapVerbTransitionLookup default
+    pub pool: Arc<PgPool>,
+    pub cascade_planner: Option<Arc<CascadePlanner>>,
+}
+
+ReplOrchestratorV2::new(router, executor)
+    .with_verb_execution_port(port)
+    .with_gate_pipeline(pipeline);  // ← opt-in
+```
+
+When attached, `VerbExecutionPortStepExecutor::execute_step`:
+
+1. **Pre-dispatch**: `pre_dispatch_gate_check()` runs Mode A. Skipped
+   when verb has no `transition_args`. On error severity → step fails
+   with v1.3 violation message.
+2. **Dispatch**: existing `port.execute_verb(...)` call.
+3. **Post-dispatch (success only)**: `post_dispatch_cascade()` runs
+   Mode C. Plans cascades + applies single-level state writes via
+   `SlotStateProvider`'s table mapping. Logs each fired action via
+   `tracing::info!`.
+
+Mode B (DerivedStateProjector) is consumer-side: callers (chat
+response builders, observatory, narration) invoke it on the read
+path to surface aggregate states like `cbu.operationally_active`.
+
+### Production startup (one block)
+
+```rust
+let cfg      = ConfigLoader::from_env().load_verbs()?;
+let registry = Arc::new(loader.load_dag_registry()?);
+let provider = Arc::new(PostgresSlotStateProvider);
+let resolver = Arc::new(SqlPredicateResolver);
+let gate     = Arc::new(GateChecker::new(registry.clone(), provider.clone(), resolver.clone()));
+let evaluator= Arc::new(DerivedStateEvaluator::new(provider, resolver));
+let child    = Arc::new(PostgresChildEntityResolver::new(registry.clone()));
+let cascade  = Arc::new(CascadePlanner::new(registry.clone(), child));
+let lookup   = Arc::new(HashMapVerbTransitionLookup::from_verbs_config(&cfg));
+let pipeline = GatePipeline {
+    registry: registry.clone(),
+    gate_checker: gate,
+    verb_metadata: lookup,
+    pool: Arc::new(pool),
+    cascade_planner: Some(cascade),
+};
+let orch = ReplOrchestratorV2::new(router, executor)
+    .with_verb_execution_port(port)
+    .with_gate_pipeline(pipeline);
+
+// Read-path projection
+let projector = Arc::new(DerivedStateProjector::new(registry, evaluator));
+```
+
+### Schema migrations
+
+- `rust/migrations/20260424_tranche_2_3_dag_alignment.sql` — CBU
+  operational + disposition columns; cbu_service_consumption +
+  cbu_trading_activity + cbu_corporate_action_events tables;
+  share_classes lifecycle; deals BAC + SLA + accountability +
+  parent_deal_id; client_books + cbus.book_id.
+- `rust/migrations/20260425_manco_regulatory_status.sql` — manco
+  state-machine carrier table.
+
+### Limits / follow-ups
+
+- **Recursive cascades**: current cascade execution is single-level
+  direct state writes. Multi-level cascade-of-cascades (each level
+  re-entering verb dispatch with its own gate checks) is a follow-up.
+- **Session-scope derived-state cache**: per OQ-2 should cache
+  aggregates within a session, invalidating on touched-slot writes.
+  Cache infrastructure not yet wired (each `project_for` is a fresh
+  round-trip).
+- **ob-poc-web wiring**: `with_gate_pipeline(...)` currently isn't
+  called in `main.rs` — orchestrator defaults to no enforcement
+  until ops turns it on.
+
+### Key files
+
+- `rust/crates/dsl-core/src/config/dag.rs` — DAG taxonomy YAML types
+- `rust/crates/dsl-core/src/config/dag_registry.rs` — runtime index
+- `rust/crates/dsl-core/src/config/dag_validator.rs` — build-time validation
+- `rust/crates/dsl-runtime/src/cross_workspace/slot_state.rs` — provider
+- `rust/crates/dsl-runtime/src/cross_workspace/sql_predicate_resolver.rs`
+- `rust/crates/dsl-runtime/src/cross_workspace/gate_checker.rs`
+- `rust/crates/dsl-runtime/src/cross_workspace/derived_state.rs`
+- `rust/crates/dsl-runtime/src/cross_workspace/derived_state_projector.rs`
+- `rust/crates/dsl-runtime/src/cross_workspace/hierarchy_cascade.rs`
+- `rust/crates/dsl-runtime/src/cross_workspace/postgres_child_resolver.rs`
+- `rust/src/runbook/step_executor_bridge.rs` — `GatePipeline` + dispatch hook
+- `rust/src/sequencer.rs` — `ReplOrchestratorV2::with_gate_pipeline`
+- `rust/config/sem_os_seeds/dag_taxonomies/*.yaml` — 9 DAG taxonomies
