@@ -41,6 +41,10 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: client-group-id
+          target_workspace: book_setup
+          target_slot: book
 
       select-structure:
         description: "Select jurisdiction-specific structure template for the book (e.g. struct.lux.ucits.sicav)"
@@ -75,6 +79,10 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: book-id
+          target_workspace: book_setup
+          target_slot: book
 
       mark-ready:
         description: "Mark book as ready-for-deal (terminal-positive in book-setup journey)"
@@ -105,6 +113,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: book-id
+          target_workspace: book_setup
+          target_slot: book
 
       abandon:
         description: "Abandon book-setup journey (pre-contract)"
@@ -139,3 +151,7 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: book-id
+          target_workspace: book_setup
+          target_slot: book

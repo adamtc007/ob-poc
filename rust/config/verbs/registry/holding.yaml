@@ -390,6 +390,11 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: holding-id
+          target_state_arg: status
+          target_workspace: cbu
+          target_slot: holding
 
       read:
         description: Read a holding by ID
@@ -612,6 +617,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: holding-id
+          target_workspace: cbu
+          target_slot: holding
 
       restrict:
         description: "Apply legal restriction to holding (court order / dispute freeze)"
@@ -647,6 +656,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: holding-id
+          target_workspace: cbu
+          target_slot: holding
 
       lift-restriction:
         description: "Lift legal restriction from holding"
@@ -676,6 +689,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: holding-id
+          target_workspace: cbu
+          target_slot: holding
 
       pledge:
         description: "Pledge holding as collateral against a loan / derivative exposure"
@@ -710,6 +727,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: holding-id
+          target_workspace: cbu
+          target_slot: holding
 
       release-pledge:
         description: "Release pledge on holding (collateral no longer required)"
@@ -739,3 +760,7 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: holding-id
+          target_workspace: cbu
+          target_slot: holding

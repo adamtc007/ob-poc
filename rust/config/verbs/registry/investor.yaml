@@ -424,6 +424,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor_kyc
 
       approve-kyc:
         description: Transition from KYC_IN_PROGRESS to KYC_APPROVED
@@ -482,6 +486,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor_kyc
 
       reject-kyc:
         description: Transition from KYC_IN_PROGRESS to KYC_REJECTED
@@ -529,6 +537,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor_kyc
 
       mark-eligible:
         description: Transition from KYC_APPROVED to ELIGIBLE_TO_SUBSCRIBE
@@ -574,6 +586,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
 
       record-subscription:
         description: Transition from ELIGIBLE_TO_SUBSCRIBE to SUBSCRIBED
@@ -667,6 +683,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
 
       start-redemption:
         description: Transition from ACTIVE_HOLDER to REDEEMING
@@ -812,6 +832,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
 
       suspend:
         description: Suspend investor (can be done from most states)
@@ -866,6 +890,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
 
       reinstate:
         description: Reinstate suspended investor to previous state
@@ -922,6 +950,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
 
       # ============================================
       # Periodic review verbs

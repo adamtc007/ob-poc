@@ -2428,6 +2428,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
 
       lift-restriction:
         description: "Lift trading-profile restriction (restore full mandate scope)"
@@ -2457,3 +2461,7 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile

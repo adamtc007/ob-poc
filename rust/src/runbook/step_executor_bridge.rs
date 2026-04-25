@@ -145,14 +145,26 @@ pub struct VerbExecutionPortStepExecutor {
 
 /// Wiring for the v1.3 cross-workspace gate hook.
 ///
-/// Held by VerbExecutionPortStepExecutor and consulted before every
+/// Held by VerbExecutionPortStepExecutor and consulted around every
 /// step dispatch. Construction at orchestrator startup (one set of
 /// shared `Arc`s reused across all step executors).
+///
+/// Components:
+///   - `gate_checker` runs V1.3-1 blocking constraint checks BEFORE
+///     dispatch.
+///   - `cascade_planner` plans V1.3-3 hierarchy cascades AFTER
+///     successful dispatch. Optional: if absent, no cascades are
+///     planned.
+#[derive(Clone)]
 pub struct GatePipeline {
     pub registry: Arc<dsl_core::config::DagRegistry>,
     pub gate_checker: Arc<dsl_runtime::cross_workspace::GateChecker>,
     pub verb_metadata: Arc<dyn VerbTransitionLookup>,
     pub pool: Arc<sqlx::PgPool>,
+    /// V1.3-3 cascade planner. Optional — when set, post-dispatch
+    /// hook plans + executes single-level cascades (e.g. parent CBU
+    /// suspended → all child CBUs suspended).
+    pub cascade_planner: Option<Arc<dsl_runtime::cross_workspace::CascadePlanner>>,
 }
 
 /// Resolves a verb FQN to its v1.3 `transition_args` metadata. Caller
@@ -273,6 +285,150 @@ impl VerbExecutionPortStepExecutor {
         }
         Ok(())
     }
+
+    /// Run V1.3-3 hierarchy cascade planning + execution after a
+    /// successful step. Returns the count of cascade actions executed
+    /// (informational; surfaced via tracing).
+    ///
+    /// Single-level execution: applies state writes directly via
+    /// SlotStateProvider's table mapping. Does NOT recursively go
+    /// through verb dispatch — full recursive cascade with gate-checks
+    /// per level is a follow-up. The current impl handles the common
+    /// case (parent CBU suspended → child CBUs suspended) and logs
+    /// any cascade-of-cascades for ops follow-up.
+    async fn post_dispatch_cascade(&self, step: &CompiledStep) {
+        let Some(pipe) = &self.gate_pipeline else {
+            return;
+        };
+        let Some(planner) = &pipe.cascade_planner else {
+            return;
+        };
+        let Some(meta) = pipe.verb_metadata.lookup(&step.verb) else {
+            return;
+        };
+        let Some(entity_str) = step.args.get(&meta.entity_id_arg) else {
+            return;
+        };
+        let Ok(entity_id) = uuid::Uuid::parse_str(entity_str) else {
+            return;
+        };
+        let Some(target_workspace) = meta
+            .target_workspace
+            .as_deref()
+            .or_else(|| step.verb.split('.').next())
+        else {
+            return;
+        };
+        let target_slot = meta.target_slot.as_deref().unwrap_or(target_workspace);
+
+        // The transition has just succeeded. We need to know what
+        // state the parent moved INTO, then plan cascades for that
+        // parent_new_state. Resolve via the DAG: pick the transition
+        // matching this verb whose `to_state` matches the
+        // target_state arg (if declared) or the unique to_state
+        // (otherwise).
+        let target_state = meta
+            .target_state_arg
+            .as_ref()
+            .and_then(|arg| step.args.get(arg).cloned());
+        let transitions = pipe.registry.transitions_for_verb(&step.verb);
+        let to_state = match target_state {
+            Some(ts) => ts,
+            None => {
+                // No target_state arg — the verb's transitions in the
+                // registry should agree on a single to_state.
+                let tos: std::collections::HashSet<&str> =
+                    transitions.iter().map(|t| t.to_state.as_str()).collect();
+                if tos.len() != 1 {
+                    return; // ambiguous; skip cascade for safety
+                }
+                tos.into_iter().next().unwrap().to_string()
+            }
+        };
+
+        let actions = match planner
+            .plan_cascade(target_workspace, target_slot, entity_id, &to_state, &pipe.pool)
+            .await
+        {
+            Ok(a) => a,
+            Err(e) => {
+                tracing::warn!(
+                    verb = %step.verb,
+                    parent_id = %entity_id,
+                    "v1.3 cascade planning failed: {e}"
+                );
+                return;
+            }
+        };
+
+        if actions.is_empty() {
+            return;
+        }
+
+        tracing::info!(
+            verb = %step.verb,
+            parent_id = %entity_id,
+            parent_new_state = %to_state,
+            cascade_count = actions.len(),
+            "v1.3 cascade fired"
+        );
+
+        // Single-level execution via direct state-column write.
+        // Resolve table + state column via the SlotStateProvider's
+        // dispatch table (re-using the same mapping).
+        for action in &actions {
+            if let Err(e) = apply_cascade_state_write(action, &pipe.pool).await {
+                tracing::warn!(
+                    constraint = %action.constraint_id_or_unspecified(),
+                    child_workspace = %action.child_workspace,
+                    child_slot = %action.child_slot,
+                    child_entity_id = %action.child_entity_id,
+                    target_state = %action.target_state,
+                    "v1.3 cascade write failed: {e}"
+                );
+            }
+        }
+    }
+}
+
+/// Apply a single cascade action by writing the target state directly
+/// to the child entity's state column.
+///
+/// Bypasses the verb dispatch path — no recursive gate check, no
+/// further cascades. This is a deliberate scope limit; full recursive
+/// dispatch is a follow-up.
+async fn apply_cascade_state_write(
+    action: &dsl_runtime::cross_workspace::CascadeAction,
+    pool: &sqlx::PgPool,
+) -> anyhow::Result<()> {
+    use dsl_runtime::cross_workspace::slot_state::resolve_slot_table;
+    let (table, col, pk) = resolve_slot_table(&action.child_workspace, &action.child_slot)?;
+    let sql = format!(
+        r#"UPDATE "ob-poc".{tbl} SET {col} = $1 WHERE {pk} = $2"#,
+        tbl = table,
+        col = col,
+        pk = pk,
+    );
+    sqlx::query(&sql)
+        .bind(&action.target_state)
+        .bind(action.child_entity_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Convenience trait extension — CascadeAction doesn't carry the
+/// constraint id, but we surface useful identification in logs.
+trait CascadeActionExt {
+    fn constraint_id_or_unspecified(&self) -> &str;
+}
+
+impl CascadeActionExt for dsl_runtime::cross_workspace::CascadeAction {
+    fn constraint_id_or_unspecified(&self) -> &str {
+        // CascadeAction carries rule_parent_state which uniquely keys
+        // the rule; surface it as a constraint identifier proxy.
+        self.rule_parent_state.as_str()
+    }
 }
 
 #[async_trait::async_trait]
@@ -298,7 +454,7 @@ impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
             .into();
 
         // Execute through the SemOS port
-        match self.port.execute_verb(&step.verb, args, &mut ctx).await {
+        let outcome = match self.port.execute_verb(&step.verb, args, &mut ctx).await {
             Ok(result) => {
                 let json = match &result.outcome {
                     dsl_runtime::VerbExecutionOutcome::Uuid(id) => {
@@ -322,7 +478,15 @@ impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
             Err(e) => StepOutcome::Failed {
                 error: e.to_string(),
             },
+        };
+
+        // V1.3-3 cascade hook (post-success only). No-op when no
+        // pipeline / no cascade_planner / verb has no transition_args.
+        if matches!(outcome, StepOutcome::Completed { .. }) {
+            self.post_dispatch_cascade(step).await;
         }
+
+        outcome
     }
 }
 

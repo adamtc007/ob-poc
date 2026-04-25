@@ -36,6 +36,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: cbu
+          target_slot: cbu_corporate_action
 
       approve:
         description: "Approve CBU-level CA event (board / legal / compliance sign-off)"
@@ -65,6 +69,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: cbu
+          target_slot: cbu_corporate_action
 
       reject:
         description: "Reject CBU-level CA event (terminal-negative)"
@@ -97,6 +105,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: cbu
+          target_slot: cbu_corporate_action
 
       withdraw:
         description: "Withdraw CBU-level CA event before decision (proposer retracts)"
@@ -126,6 +138,10 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: cbu
+          target_slot: cbu_corporate_action
 
       mark-implemented:
         description: "Mark CBU-level CA event as implemented (post-effective; terminal-positive)"
@@ -155,3 +171,7 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: cbu
+          target_slot: cbu_corporate_action

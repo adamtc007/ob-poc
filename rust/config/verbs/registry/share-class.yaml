@@ -487,6 +487,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: share-class-id
+          target_workspace: cbu
+          target_slot: share_class
 
       launch:
         description: "Launch share class from DRAFT to OPEN (accepting subscriptions)"
@@ -517,6 +521,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: share-class-id
+          target_workspace: cbu
+          target_slot: share_class
 
       soft-close:
         description: "Soft-close share class (no new subscriptions; existing holders transact)"
@@ -547,6 +555,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: share-class-id
+          target_workspace: cbu
+          target_slot: share_class
 
       reopen:
         description: "Reopen soft-closed share class back to accepting subscriptions"
@@ -576,6 +588,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: share-class-id
+          target_workspace: cbu
+          target_slot: share_class
 
       hard-close:
         description: "Hard-close share class (no subscriptions AND no redemptions — regulatory / wind-down)"
@@ -609,6 +625,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: share-class-id
+          target_workspace: cbu
+          target_slot: share_class
 
       lift-hard-close:
         description: "Lift hard-close on share class back to soft-closed"
@@ -638,6 +658,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: share-class-id
+          target_workspace: cbu
+          target_slot: share_class
 
       begin-winddown:
         description: "Begin share-class wind-down (pre-liquidation)"
@@ -667,3 +691,7 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: share-class-id
+          target_workspace: cbu
+          target_slot: share_class

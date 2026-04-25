@@ -423,6 +423,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
 
       # =========================================================================
       # DEAL PARTICIPANTS
@@ -1190,6 +1194,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: rate-card-id
+          target_workspace: deal
+          target_slot: deal_rate_card
 
       counter-rate-card:
         description: "Client counter-offer - creates new version via clone"
@@ -1231,6 +1239,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: rate-card-id
+          target_workspace: deal
+          target_slot: deal_rate_card
 
       agree-rate-card:
         description: "Finalise rate card - both parties agree. Lines become immutable."
@@ -1268,6 +1280,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: rate-card-id
+          target_workspace: deal
+          target_slot: deal_rate_card
 
       list-rate-cards:
         description: "List all rate cards for a deal with status"
@@ -2125,6 +2141,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
 
       bac-approve:
         description: "BAC approval decision — advances deal past internal commercial gate"
@@ -2155,6 +2175,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
 
       bac-reject:
         description: "BAC rejection — terminal-negative decision; deal moves to REJECTED"
@@ -2189,6 +2213,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
 
       submit-for-pricing-approval:
         description: "Submit rate card to pricing committee for internal approval (bespoke / discount threshold / new jurisdiction)"
@@ -2219,6 +2247,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: rate-card-id
+          target_workspace: deal
+          target_slot: deal_rate_card
 
       pricing-approve:
         description: "Pricing committee approval of rate card — advances to ready-to-propose"
@@ -2248,6 +2280,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: rate-card-id
+          target_workspace: deal
+          target_slot: deal_rate_card
 
       pricing-reject:
         description: "Pricing committee rejection — rate card returns to DRAFT for revision"
@@ -2281,6 +2317,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: rate-card-id
+          target_workspace: deal
+          target_slot: deal_rate_card
 
       mark-lost:
         description: "Mark deal as lost (competitor won)"
@@ -2315,6 +2355,10 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
 
       mark-withdrawn:
         description: "Mark deal as withdrawn (client walked away)"
@@ -2348,6 +2392,10 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
 
       reject:
         description: "Reject deal (terminal-negative; internal decision)"
@@ -2381,6 +2429,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
 
       suspend:
         description: "Suspend active deal (operational hold; restorable)"
@@ -2414,6 +2466,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
 
       reinstate:
         description: "Reinstate suspended deal back to active"
@@ -2443,6 +2499,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
 
       begin-winding-down:
         description: "Begin deal winding down — exit intent from active servicing"
@@ -2472,6 +2532,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
 
       start-sla-remediation:
         description: "Begin remediation of a breached SLA (transition BREACHED → IN_REMEDIATION)"
@@ -2501,6 +2565,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: sla-id
+          target_workspace: deal
+          target_slot: deal_sla
 
       resolve-sla-breach:
         description: "Resolve SLA breach (remediation complete; transition to RESOLVED)"
@@ -2530,6 +2598,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: sla-id
+          target_workspace: deal
+          target_slot: deal_sla
 
       waive-sla-breach:
         description: "Waive SLA breach (client concession; breach not pursued)"
@@ -2563,3 +2635,7 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: sla-id
+          target_workspace: deal
+          target_slot: deal_sla

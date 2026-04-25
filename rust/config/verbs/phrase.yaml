@@ -226,6 +226,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: phrase-id
+          target_workspace: semos_maintenance
+          target_slot: phrase_authoring
 
       reject:
         description: Reject a phrase proposal with reason code
@@ -257,6 +261,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: phrase-id
+          target_workspace: semos_maintenance
+          target_slot: phrase_authoring
 
       defer:
         description: Park a phrase proposal for later review

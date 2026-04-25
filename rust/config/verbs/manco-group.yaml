@@ -525,6 +525,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: manco-entity-id
+          target_workspace: cbu
+          target_slot: manco
 
       reject:
         description: "Reject manco onboarding (terminal-negative)"
@@ -557,6 +561,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: manco-entity-id
+          target_workspace: cbu
+          target_slot: manco
 
       flag-regulatory:
         description: "Flag manco for regulatory investigation (transitions APPROVED → UNDER_INVESTIGATION)"
@@ -590,6 +598,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: manco-entity-id
+          target_workspace: cbu
+          target_slot: manco
 
       clear-regulatory:
         description: "Clear manco from regulatory investigation (back to APPROVED)"
@@ -619,6 +631,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: manco-entity-id
+          target_workspace: cbu
+          target_slot: manco
 
       suspend:
         description: "Fully suspend manco — cascades SUSPENDED to all managed CBUs"
@@ -652,6 +668,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: manco-entity-id
+          target_workspace: cbu
+          target_slot: manco
 
       partial-reinstate:
         description: "Partially reinstate suspended manco (returns to UNDER_INVESTIGATION)"
@@ -681,6 +701,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: manco-entity-id
+          target_workspace: cbu
+          target_slot: manco
 
       begin-sunset:
         description: "Begin manco sunset (no new mandates; existing run to exit)"
@@ -710,6 +734,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: manco-entity-id
+          target_workspace: cbu
+          target_slot: manco
 
       terminate:
         description: "Terminate manco (all mandates transferred or wound down)"
@@ -739,6 +767,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: manco-entity-id
+          target_workspace: cbu
+          target_slot: manco
   ownership:
     description: Ownership control link operations
     invocation_hints:

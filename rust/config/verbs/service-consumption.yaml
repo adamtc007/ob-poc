@@ -37,6 +37,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: consumption-id
+          target_workspace: cbu
+          target_slot: service_consumption
 
       activate:
         description: "Activate service for operational use (provisioned → active)"
@@ -66,6 +70,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: consumption-id
+          target_workspace: cbu
+          target_slot: service_consumption
 
       suspend:
         description: "Suspend service for CBU (service pause; restorable)"
@@ -99,6 +107,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: consumption-id
+          target_workspace: cbu
+          target_slot: service_consumption
 
       reinstate:
         description: "Reinstate suspended service back to active"
@@ -128,6 +140,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: consumption-id
+          target_workspace: cbu
+          target_slot: service_consumption
 
       begin-winddown:
         description: "Begin service wind-down for CBU (exit intent)"
@@ -157,6 +173,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: consumption-id
+          target_workspace: cbu
+          target_slot: service_consumption
 
       retire:
         description: "Retire service consumption (terminal-positive after winddown)"
@@ -186,3 +206,7 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: consumption-id
+          target_workspace: cbu
+          target_slot: service_consumption

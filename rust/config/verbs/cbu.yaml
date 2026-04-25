@@ -711,6 +711,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
       assign-role:
         description: Assign a role to an entity within a CBU
         invocation_phrases:
@@ -1435,6 +1439,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
       request-proof-update:
         description: Mark a validated CBU as requiring updated proof
         invocation_phrases:
@@ -1483,6 +1491,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
       reopen-validation:
         description: Reopen validation for a CBU that previously failed
         invocation_phrases:
@@ -1531,6 +1543,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
       attach-evidence:
         description: Attach evidence (document or attestation) to CBU
         invocation_phrases:
@@ -1854,6 +1870,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
 
       reinstate:
         description: "Reinstate suspended CBU back to operationally active"
@@ -1885,6 +1905,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
 
       restrict:
         description: "Apply partial trading restriction to CBU (specific markets / instruments pulled)"
@@ -1920,6 +1944,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
 
       unrestrict:
         description: "Lift trading restriction from CBU (restore full mandate scope)"
@@ -1950,6 +1978,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
 
       begin-winding-down:
         description: "Begin CBU winding-down — exit intent, no new activity, unwind positions"
@@ -1985,6 +2017,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
 
       complete-offboard:
         description: "Complete CBU offboarding — terminal-positive transition to offboarded state"
@@ -2015,6 +2051,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu
 
       soft-delete:
         description: "Soft-delete CBU (disposition: sets deleted_at; restorable)"
@@ -2049,6 +2089,10 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_disposition
 
       restore:
         description: "Restore soft-deleted CBU back to active disposition"
@@ -2079,6 +2123,10 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_disposition
 
       hard-delete:
         description: "Permanently remove CBU row (terminal; regulatory retention window required)"
@@ -2108,6 +2156,10 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_disposition
 
       flag-for-remediation:
         description: "Flag CBU for post-breach remediation / enhanced monitoring"
@@ -2142,6 +2194,10 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_disposition
 
       clear-remediation:
         description: "Clear remediation flag from CBU (remediation conditions satisfied)"
@@ -2172,3 +2228,7 @@ domains:
           external_effects: [emitting] 
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: cbu-id
+          target_workspace: cbu
+          target_slot: cbu_disposition

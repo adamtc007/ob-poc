@@ -249,6 +249,11 @@ pub struct ReplOrchestratorV2 {
     /// Optional lookup service for trace-time entity recovery.
     lookup_service: Option<LookupService>,
     orchestrated_verbs: HashSet<String>,
+    /// V1.3 cross-workspace gate-check pipeline. When set, each verb
+    /// dispatched via VerbExecutionPort is gate-checked against the
+    /// loaded DAG taxonomies before execution. See
+    /// `docs/todo/catalogue-platform-refinement-v1_3.md` §3.3.
+    gate_pipeline: Option<crate::runbook::step_executor_bridge::GatePipeline>,
 }
 
 impl ReplOrchestratorV2 {
@@ -278,6 +283,7 @@ impl ReplOrchestratorV2 {
             verb_execution_port: None,
             lookup_service: None,
             orchestrated_verbs: HashSet::new(),
+            gate_pipeline: None,
         }
     }
 
@@ -380,6 +386,46 @@ impl ReplOrchestratorV2 {
         port: Arc<dyn dsl_runtime::VerbExecutionPort>,
     ) -> Self {
         self.verb_execution_port = Some(port);
+        self
+    }
+
+    /// Attach a v1.3 cross-workspace gate-check pipeline.
+    ///
+    /// When set, every verb dispatched via the VerbExecutionPort is
+    /// gate-checked against the loaded DAG taxonomies before execution.
+    /// Verbs declaring `transition_args:` in their YAML get their
+    /// pre-transition state validated against any cross_workspace_constraints.
+    ///
+    /// Construction at startup:
+    /// ```ignore
+    /// use std::sync::Arc;
+    /// use dsl_core::config::ConfigLoader;
+    /// use dsl_runtime::cross_workspace::{
+    ///     GateChecker, PostgresSlotStateProvider, SqlPredicateResolver,
+    /// };
+    /// use ob_poc::runbook::step_executor_bridge::{
+    ///     GatePipeline, HashMapVerbTransitionLookup,
+    /// };
+    ///
+    /// let cfg      = ConfigLoader::from_env().load_verbs()?;
+    /// let registry = Arc::new(loader.load_dag_registry()?);
+    /// let provider = Arc::new(PostgresSlotStateProvider);
+    /// let resolver = Arc::new(SqlPredicateResolver);
+    /// let gate     = Arc::new(GateChecker::new(registry.clone(), provider, resolver));
+    /// let lookup   = Arc::new(HashMapVerbTransitionLookup::from_verbs_config(&cfg));
+    /// let pipeline = GatePipeline {
+    ///     registry,
+    ///     gate_checker: gate,
+    ///     verb_metadata: lookup,
+    ///     pool: Arc::new(pool),
+    /// };
+    /// orchestrator.with_gate_pipeline(pipeline)
+    /// ```
+    pub fn with_gate_pipeline(
+        mut self,
+        pipeline: crate::runbook::step_executor_bridge::GatePipeline,
+    ) -> Self {
+        self.gate_pipeline = Some(pipeline);
         self
     }
 
@@ -6207,11 +6253,17 @@ impl ReplOrchestratorV2 {
             }
         } else if let Some(ref port) = self.verb_execution_port {
             // SemOS execution port — preferred path when available.
-            let bridge = VerbExecutionPortStepExecutor::new(
+            // V1.3 gate pipeline (when configured) is attached here so
+            // every step gets cross-workspace gate-checked before
+            // dispatch. See `with_gate_pipeline`.
+            let mut bridge = VerbExecutionPortStepExecutor::new(
                 Arc::clone(port),
                 sem_os_core::principal::Principal::system(),
                 Some(session_id),
             );
+            if let Some(pipeline) = self.gate_pipeline.clone() {
+                bridge = bridge.with_gate_pipeline(pipeline);
+            }
             match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
                 Ok(result) => extract_first_outcome(result),
                 Err(e) => StepOutcome::Failed {

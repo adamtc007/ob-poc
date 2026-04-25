@@ -486,6 +486,10 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: attribute-def-id
+          target_workspace: semos_maintenance
+          target_slot: attribute_def
 
       inspect:
         description: "Show full attribute definition including governance state, evidence grade, derivation recipe, and observation statistics"

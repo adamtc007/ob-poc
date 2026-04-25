@@ -127,12 +127,14 @@
 
 pub mod compensation;
 pub mod derived_state;
+pub mod derived_state_projector;
 pub mod fact_refs;
 pub mod fact_versions;
 pub mod gate_checker;
 pub mod hierarchy_cascade;
 pub mod idempotency;
 pub mod platform_dag;
+pub mod postgres_child_resolver;
 pub mod providers;
 pub mod remediation;
 pub mod replay;
@@ -144,9 +146,11 @@ pub mod types;
 pub use derived_state::{
     ClauseKind, ConditionResult, DerivedStateEvaluator, DerivedStateValue,
 };
+pub use derived_state_projector::{DerivedStateProjection, DerivedStateProjector};
 pub use gate_checker::{GateChecker, GateViolation, PredicateResolver, SameEntityResolver};
 pub use hierarchy_cascade::{
     CascadeAction, CascadePlanner, ChildEntityResolver, NoChildrenResolver,
 };
+pub use postgres_child_resolver::PostgresChildEntityResolver;
 pub use slot_state::{PostgresSlotStateProvider, SlotStateProvider};
 pub use sql_predicate_resolver::SqlPredicateResolver;
