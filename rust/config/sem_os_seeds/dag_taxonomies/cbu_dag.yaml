@@ -1068,16 +1068,17 @@ slots:
       terminal_states: [LIQUIDATED]
 
   # R-6 G-3: manco promoted to stateful. Regulatory-action cascade
-  # applies to ALL CBUs managed by this manco (cross-slot constraint
-  # hooks to be added in follow-up once schema column lands).
+  # applies to ALL CBUs managed by this manco. Schema landed in
+  # migration 20260425_manco_regulatory_status.sql — manco state
+  # carrier table is `manco_regulatory_status` keyed by manco_entity_id.
   - id: manco
     stateless: false
     state_machine:
       id: manco_lifecycle
       owner: compliance
       expected_lifetime: long_lived
-      source_entity: '"ob-poc".manco_groups'
-      state_column: regulatory_status    # DAG-first; column added Tranche 3
+      source_entity: '"ob-poc".manco_regulatory_status'
+      state_column: regulatory_status
       scope: per_manco
       description: |
         Per-manco regulatory + operational state. A manco under

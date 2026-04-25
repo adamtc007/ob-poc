@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uNSpKNBnwkHc0nn8ufgLdgQXQPb3FDxRw9itZCa14WulRaQpJSbHV8fj0cnBYyC
+\restrict ZDtDizeiKcyu75lZx2m5uVfOPjB1Z4dgpARAx5T1yK5HfGVU46Pkqt9NjOzdXGb
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -14307,6 +14307,39 @@ COMMENT ON TABLE "ob-poc".lifecycles IS 'Operational lifecycles/services that in
 
 
 --
+-- Name: manco_regulatory_status; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".manco_regulatory_status (
+    manco_entity_id uuid NOT NULL,
+    regulatory_status character varying(30) DEFAULT 'UNDER_REVIEW'::character varying NOT NULL,
+    flagged_reason text,
+    flagged_at timestamp with time zone,
+    cleared_at timestamp with time zone,
+    sunset_started_at timestamp with time zone,
+    terminated_at timestamp with time zone,
+    notes text,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    CONSTRAINT manco_regulatory_status_check CHECK (((regulatory_status)::text = ANY (ARRAY[('UNDER_REVIEW'::character varying)::text, ('APPROVED'::character varying)::text, ('UNDER_INVESTIGATION'::character varying)::text, ('SUSPENDED'::character varying)::text, ('SUNSET'::character varying)::text, ('TERMINATED'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE manco_regulatory_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".manco_regulatory_status IS 'Per-manco regulatory + operational state (R-6 G-3). Keyed by manco_entity_id (entities row with role = management-company). Lazy-create: row exists once manco is formally tracked. Cascade: UNDER_INVESTIGATION / SUSPENDED on a manco propagates SUSPENDED to all CBUs that reference it via cbu_entity_roles where role = management-company / sub-manager.';
+
+
+--
+-- Name: COLUMN manco_regulatory_status.regulatory_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".manco_regulatory_status.regulatory_status IS 'Manco lifecycle state: UNDER_REVIEW (onboarding) → APPROVED → UNDER_INVESTIGATION (regulatory flag) → SUSPENDED (full hold) → SUNSET (no new mandates; existing run to exit) → TERMINATED.';
+
+
+--
 -- Name: markets; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -20103,6 +20136,30 @@ COMMENT ON VIEW "ob-poc".v_manco_group_summary IS 'Summary of governance control
 
 
 --
+-- Name: v_manco_regulatory_status_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_manco_regulatory_status_summary AS
+ SELECT mrs.manco_entity_id,
+    e.name AS manco_name,
+    mrs.regulatory_status,
+    mrs.flagged_at,
+    mrs.flagged_reason,
+    ( SELECT count(*) AS count
+           FROM "ob-poc".fn_get_manco_group_cbus(mrs.manco_entity_id) fn_get_manco_group_cbus(cbu_id, cbu_name, cbu_category, jurisdiction, fund_entity_id, fund_entity_name, membership_source)) AS managed_cbu_count,
+    mrs.updated_at
+   FROM ("ob-poc".manco_regulatory_status mrs
+     JOIN "ob-poc".entities e ON ((e.entity_id = mrs.manco_entity_id)));
+
+
+--
+-- Name: VIEW v_manco_regulatory_status_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_manco_regulatory_status_summary IS 'Per-manco regulatory state + count of managed CBUs. Read-only convenience view for ops dashboards. Cascade target preview.';
+
+
+--
 -- Name: v_offerings_without_rules; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -24868,6 +24925,14 @@ ALTER TABLE ONLY "ob-poc".lifecycles
 
 ALTER TABLE ONLY "ob-poc".lifecycles
     ADD CONSTRAINT lifecycles_pkey PRIMARY KEY (lifecycle_id);
+
+
+--
+-- Name: manco_regulatory_status manco_regulatory_status_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".manco_regulatory_status
+    ADD CONSTRAINT manco_regulatory_status_pkey PRIMARY KEY (manco_entity_id);
 
 
 --
@@ -30293,6 +30358,13 @@ CREATE INDEX idx_limited_companies_reg_num ON "ob-poc".entity_limited_companies 
 --
 
 CREATE INDEX idx_limited_companies_ultimate_parent ON "ob-poc".entity_limited_companies USING btree (ultimate_parent_lei) WHERE (ultimate_parent_lei IS NOT NULL);
+
+
+--
+-- Name: idx_manco_regulatory_status_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_manco_regulatory_status_status ON "ob-poc".manco_regulatory_status USING btree (regulatory_status);
 
 
 --
@@ -36240,6 +36312,14 @@ ALTER TABLE ONLY "ob-poc".lifecycle_resource_capabilities
 
 
 --
+-- Name: manco_regulatory_status manco_regulatory_status_entity_fk; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".manco_regulatory_status
+    ADD CONSTRAINT manco_regulatory_status_entity_fk FOREIGN KEY (manco_entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
 -- Name: memberships memberships_team_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -37715,5 +37795,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uNSpKNBnwkHc0nn8ufgLdgQXQPb3FDxRw9itZCa14WulRaQpJSbHV8fj0cnBYyC
+\unrestrict ZDtDizeiKcyu75lZx2m5uVfOPjB1Z4dgpARAx5T1yK5HfGVU46Pkqt9NjOzdXGb
 
