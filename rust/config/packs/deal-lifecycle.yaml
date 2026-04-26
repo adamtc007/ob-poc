@@ -35,6 +35,16 @@ allowed_verbs:
   - deal.list-contracts
   - contract.create
   - billing.create-profile
+  # R3 (2026-04-26): Booking Principal clearance — third leg of deal tollgate
+  - booking-principal-clearance.create
+  - booking-principal-clearance.start-screening
+  - booking-principal-clearance.approve
+  - booking-principal-clearance.reject
+  - booking-principal-clearance.reopen
+  - booking-principal-clearance.activate
+  - booking-principal-clearance.suspend
+  - booking-principal-clearance.reinstate
+  - booking-principal-clearance.revoke
 
 forbidden_verbs: []
 
