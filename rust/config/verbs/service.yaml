@@ -1,7 +1,305 @@
 domains:
   service:
-    description: "Service catalog operations (read-only - services are reference data)"
+    description: "Service catalog operations — lifecycle governance (R2) plus read access."
     verbs:
+      define:
+        description: Promote an ungoverned service into the governed draft state
+        invocation_phrases:
+          - "define service"
+          - "govern service"
+          - "promote service to draft"
+          - "start governing service"
+          - "register service in catalogue"
+          - "begin service definition"
+          - "draft service"
+          - "create governed service"
+        behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service
+          tags: [lifecycle, write, governance]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        lifecycle:
+          entity_arg: service-id
+          requires_states:
+            - ungoverned
+          precondition_checks:
+            - "requires_scope:product"
+        crud:
+          operation: update
+          table: services
+          schema: ob-poc
+          key: service_id
+          set_values:
+            lifecycle_status: draft
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+            lookup:
+              table: services
+              entity_type: service
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: service-id
+          target_workspace: product_maintenance
+          target_slot: service
+
+      propose-revision:
+        description: Move an active service back to draft for revision
+        invocation_phrases:
+          - "propose service revision"
+          - "revise service"
+          - "edit active service"
+          - "amend service definition"
+          - "modify governed service"
+          - "revisit service"
+          - "open service for revision"
+        behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service
+          tags: [lifecycle, write, governance]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        lifecycle:
+          entity_arg: service-id
+          requires_states:
+            - active
+          precondition_checks:
+            - "requires_scope:product"
+        crud:
+          operation: update
+          table: services
+          schema: ob-poc
+          key: service_id
+          set_values:
+            lifecycle_status: draft
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+            lookup:
+              table: services
+              entity_type: service
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: service-id
+          target_workspace: product_maintenance
+          target_slot: service
+
+      deprecate:
+        description: Mark an active service as deprecated
+        invocation_phrases:
+          - "deprecate service"
+          - "mark service deprecated"
+          - "phase out service"
+          - "sunset service"
+          - "end-of-life service"
+          - "deprecate catalogue service"
+        behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service
+          tags: [lifecycle, write, governance]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        lifecycle:
+          entity_arg: service-id
+          requires_states:
+            - active
+          precondition_checks:
+            - "requires_scope:product"
+        crud:
+          operation: update
+          table: services
+          schema: ob-poc
+          key: service_id
+          set_values:
+            lifecycle_status: deprecated
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+            lookup:
+              table: services
+              entity_type: service
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: service-id
+          target_workspace: product_maintenance
+          target_slot: service
+
+      retire:
+        description: Retire a deprecated service (terminal)
+        invocation_phrases:
+          - "retire service"
+          - "remove service from catalogue"
+          - "fully retire service"
+          - "decommission service"
+          - "terminate service definition"
+        behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
+          noun: service
+          tags: [lifecycle, write, governance]
+          phase_tags: [stewardship]
+          side_effects: state_write
+        lifecycle:
+          entity_arg: service-id
+          requires_states:
+            - deprecated
+          precondition_checks:
+            - "requires_scope:product"
+        crud:
+          operation: update
+          table: services
+          schema: ob-poc
+          key: service_id
+          set_values:
+            lifecycle_status: retired
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+            lookup:
+              table: services
+              entity_type: service
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: service-id
+          target_workspace: product_maintenance
+          target_slot: service
+
+      list-versions:
+        description: List versions for a service
+        invocation_phrases:
+          - "list service versions"
+          - "show all service versions"
+          - "enumerate versions of service"
+          - "list versions for this service"
+          - "show service version history"
+          - "service version list"
+        behavior: crud
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
+          noun: service
+          phase_tags: [stewardship]
+          side_effects: facts_only
+        crud:
+          operation: select
+          table: service_versions
+          schema: ob-poc
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+            lookup:
+              table: services
+              entity_type: service
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
+        returns:
+          type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
+      show:
+        description: Show full service detail including lifecycle status
+        invocation_phrases:
+          - "show service"
+          - "describe service in full"
+          - "display full service detail"
+          - "show service with lifecycle"
+          - "inspect service"
+          - "service deep dive"
+        behavior: crud
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
+          noun: service
+          phase_tags: [stewardship]
+          side_effects: facts_only
+        crud:
+          operation: select
+          table: services
+          schema: ob-poc
+        args:
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+            lookup:
+              table: services
+              entity_type: service
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
+        returns:
+          type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign
+
       read:
         description: Read a service by ID or code
         metadata:

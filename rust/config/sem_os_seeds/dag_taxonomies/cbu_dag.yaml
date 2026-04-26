@@ -1278,6 +1278,26 @@ cross_workspace_constraints:
     target_transition: "VALIDATION_PENDING -> VALIDATED"
     severity: error
 
+  # R2 (2026-04-26): cbu.service_consumption.proposed → provisioned
+  # requires the underlying service in the catalogue to be active.
+  # Closes the gap where catalogue services were stateless and there
+  # was no way to express "you cannot provision a service that isn't
+  # published yet."
+  - id: service_consumption_requires_active_service
+    description: |
+      cbu.service_consumption cannot transition proposed → provisioned
+      unless the referenced product_maintenance.service has reached
+      lifecycle_status = active in the catalogue.
+    source_workspace: product_maintenance
+    source_slot: service
+    source_state: active
+    source_predicate: "services.service_id = this_consumption.service_id"
+    target_workspace: cbu
+    target_slot: service_consumption
+    target_transition: "proposed -> provisioned"
+    severity: error
+    message: "Cannot provision a service that isn't active in the catalogue"
+
 # =============================================================================
 # 5. DERIVED CROSS-WORKSPACE STATE (V1.3-2 — Mode B aggregation / tollgate)
 # =============================================================================

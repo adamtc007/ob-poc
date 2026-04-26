@@ -124,6 +124,9 @@ pub fn resolve_slot_table(
         (("semos_maintenance", "changeset"), ("changesets", "status", "changeset_id")),
         (("semos_maintenance", "attribute_def"), ("attribute_defs", "lifecycle_status", "attribute_def_id")),
         (("semos_maintenance", "manco"), ("manco_regulatory_status", "regulatory_status", "manco_entity_id")),
+        // Product-maintenance workspace (R2 — service catalogue lifecycle)
+        (("product_maintenance", "service"), ("services", "lifecycle_status", "service_id")),
+        (("product_maintenance", "service_version"), ("service_versions", "lifecycle_status", "id")),
     ];
     for ((ws, sl), value) in mapping {
         if *ws == workspace && *sl == slot {

@@ -114,11 +114,109 @@ slots:
       (via service_resource_def + attribute_def governed flows). This
       workspace only reads.
 
+  # R2 (2026-04-26): service slot promoted to stateful. Pattern after
+  # attribute_def_lifecycle in semos_maintenance_dag.yaml. Enables
+  # cbu.service_consumption.proposed → provisioned to gate on
+  # "service is published in catalogue" via cross-workspace constraint.
   - id: service
-    stateless: true
-    rationale: |
-      Service catalog entries. Each product has one or more services;
-      services consume service-resources. Read-only view.
+    stateless: false
+    state_machine:
+      id: service_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".services'
+      state_column: lifecycle_status
+      scope: per_service
+      description: |
+        Service-definition lifecycle. 5 states modelled after
+        attribute_def_lifecycle (ungoverned → draft → active →
+        deprecated → retired). Catalog services start ungoverned
+        (discovered but not yet defined); transition to draft via
+        service.define; reach active when included in a published
+        changeset; deprecated/retired follow attribute_def semantics.
+      states:
+        - id: ungoverned
+          entry: true
+          description: "Pre-governance; service exists but is not formally defined."
+        - id: draft
+          description: "Service being authored within a changeset."
+        - id: active
+          description: "Published; consumers reference this service."
+        - id: deprecated
+          description: "Replaced by newer version; migrate consumers."
+        - id: retired
+          description: "Terminal; no longer in use."
+      transitions:
+        - from: ungoverned
+          to: draft
+          via: service.define
+        - from: draft
+          to: active
+          via: "(backend: changeset.publish includes this service)"
+        - from: active
+          to: draft
+          via: service.propose-revision
+        - from: active
+          to: deprecated
+          via: service.deprecate
+        - from: deprecated
+          to: retired
+          via: service.retire
+      terminal_states: [retired]
+    suspended_state_exempt: true
+
+  # R2 (2026-04-26): service_version slot — per-version lifecycle keyed
+  # to a parent service. Service_version draft → reviewed → published →
+  # superseded → retired tracks the publication lifecycle of each
+  # version of a service definition.
+  - id: service_version
+    stateless: false
+    parent_slot:
+      workspace: product_maintenance
+      slot: service
+      join:
+        via: service_versions
+        parent_fk: service_id
+        child_fk: id
+    state_machine:
+      id: service_version_lifecycle
+      owner: stewards
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".service_versions'
+      state_column: lifecycle_status
+      scope: per_service_version
+      description: |
+        Service-version lifecycle. 5 states (drafted → reviewed →
+        published → superseded → retired). Each version of a service
+        definition flows through review and publication independently
+        of the parent service's overall lifecycle state.
+      states:
+        - id: drafted
+          entry: true
+          description: "Version drafted; under authoring."
+        - id: reviewed
+          description: "Submitted for and passed review."
+        - id: published
+          description: "Active version; consumers may reference."
+        - id: superseded
+          description: "Newer version published; this one no longer current."
+        - id: retired
+          description: "Terminal; removed from circulation."
+      transitions:
+        - from: drafted
+          to: reviewed
+          via: service-version.submit-for-review
+        - from: reviewed
+          to: published
+          via: service-version.publish
+        - from: published
+          to: superseded
+          via: "(backend: new published version of same service)"
+        - from: [published, superseded]
+          to: retired
+          via: service-version.retire
+      terminal_states: [retired]
+    suspended_state_exempt: true
 
   - id: service_resource
     stateless: true
@@ -157,6 +255,7 @@ product_module_gates:
     - workspace_root
     - product
     - service
+    - service_version
     - service_resource
     - attribute
   conditionally_on: []
