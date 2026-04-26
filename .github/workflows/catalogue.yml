@@ -1,9 +1,15 @@
 name: Catalogue Validation
 
 # v1.2 Tranche 1 DoD item 12 — CI gate enforces catalogue validation.
-# Runs `cargo x reconcile --validate` on every PR and on push to main.
-# Catches catalogue drift (missing transition_args, broken predicates,
-# escalation rule misuse, three-axis schema violations) before merge.
+# Runs catalogue validation + verb atlas lint + plugin verb coverage on
+# every PR and on push to main. Catches catalogue drift (missing
+# transition_args, broken predicates, escalation rule misuse, three-axis
+# schema violations) before merge.
+#
+# Note: invokes xtask via `cargo run --package xtask -- …` rather than
+# the local `cargo x` alias (defined in rust/.cargo/config.toml) — the
+# alias is not always picked up in CI environments depending on the
+# working-directory + cargo cache state.
 
 on:
   pull_request:
@@ -20,9 +26,9 @@ on:
 
 jobs:
   validate:
-    name: cargo x reconcile --validate
+    name: catalogue validate + lint + plugin coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,15 +45,15 @@ jobs:
 
       - name: Verb compile (sync invocation phrases)
         working-directory: rust
-        run: cargo x verbs compile
+        run: cargo run --package xtask -- verbs compile
 
       - name: Catalogue validate (v1.2 Tranche 1 gate)
         working-directory: rust
-        run: cargo x reconcile --validate
+        run: cargo run --package xtask -- reconcile validate
 
       - name: Verb atlas lint (zero ERROR threshold)
         working-directory: rust
-        run: cargo x verbs atlas --lint-only
+        run: cargo run --package xtask -- verbs atlas --lint-only
 
       - name: Plugin verb coverage (both directions)
         working-directory: rust
