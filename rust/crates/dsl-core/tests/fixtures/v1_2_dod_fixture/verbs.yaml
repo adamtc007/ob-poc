@@ -89,29 +89,10 @@ domains:
           target_workspace: deal
           target_slot: deal
 
-      # ── 4. Preserving with transition_args — MIGRATION WARNING shape.
-      # This pattern emerges from the live catalogue (~150 verbs hit it)
-      # and is the canonical case for the
-      # PreservingWithTransitionArgsMigration warning. R.4 fixes the YAML
-      # by promoting state_effect to transition.
-      v1-preserving-with-transition-args-warning:
-        description: "Preserving + transition_args — emits migration warning"
-        behavior: plugin
-        args:
-          - name: deal-id
-            type: uuid
-            required: true
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: benign
-        transition_args:
-          entity_id_arg: deal-id
-          target_workspace: deal
-          target_slot: deal
-
-      # ── 5. Pure preserving — no transition_args, clean.
+      # ── 4. Pure preserving — no transition_args, clean.
+      # (v1.2 §6.2 strict: preserving + transition_args is a structural
+      #  error; the migration-window warning was promoted after T2.A.1
+      #  fixed the 153 mislabeled verbs in the live catalogue.)
       v1-pure-preserving:
         description: "Preserving without transition_args — clean v1.2 shape"
         behavior: plugin

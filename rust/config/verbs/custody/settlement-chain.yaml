@@ -325,7 +325,7 @@ domains:
       # CHAIN HOPS (INTERMEDIARIES)
       # =========================================================================
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: requires_confirmation
@@ -430,7 +430,7 @@ domains:
           reads_tables:
             - custody.cbu_settlement_chains
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: reviewable

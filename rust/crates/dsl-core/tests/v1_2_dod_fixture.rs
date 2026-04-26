@@ -8,9 +8,7 @@
 //!
 //! Companion fixture: `tests/fixtures/v1_2_dod_fixture/verbs.yaml`.
 
-use dsl_core::config::{
-    validate_verbs_config, PolicyWarning, StructuralError, ValidationContext, VerbsConfig,
-};
+use dsl_core::config::{validate_verbs_config, StructuralError, ValidationContext, VerbsConfig};
 use std::fs;
 
 fn load_v1_2_fixture() -> VerbsConfig {
@@ -23,13 +21,17 @@ fn load_v1_2_fixture() -> VerbsConfig {
 }
 
 #[test]
-fn v1_2_fixture_parses_six_verbs() {
+fn v1_2_fixture_parses_five_verbs() {
     let cfg = load_v1_2_fixture();
     let domain = cfg
         .domains
         .get("v1_2_fixture")
         .expect("v1_2_fixture domain");
-    assert_eq!(domain.verbs.len(), 6, "v1.2 fixture should declare 6 verbs");
+    // Was 6 verbs (incl. preserving-with-transition_args migration case).
+    // After T2.A.1 promoted the warning to structural error, the
+    // migration case is removed from the fixture — it would now fail
+    // structurally, which is the correct v1.2 §6.2 behaviour.
+    assert_eq!(domain.verbs.len(), 5, "v1.2 fixture should declare 5 verbs");
 }
 
 #[test]
@@ -63,28 +65,40 @@ fn v1_2_target_state_arg_optional() {
 }
 
 #[test]
-fn v1_2_validator_emits_migration_warning_for_preserving_with_transition_args() {
-    let cfg = load_v1_2_fixture();
-    let ctx = ValidationContext::default();
-    let report = validate_verbs_config(&cfg, &ctx);
-
-    // The fixture's v1-preserving-with-transition-args-warning verb MUST
-    // emit a PreservingWithTransitionArgsMigration warning.
-    let migration_warnings = report
-        .warnings
-        .iter()
-        .filter(|w| {
-            matches!(
-                w,
-                PolicyWarning::PreservingWithTransitionArgsMigration { .. }
-            )
-        })
-        .count();
-    assert_eq!(
-        migration_warnings, 1,
-        "expected exactly 1 migration warning, got {}: {:?}",
-        migration_warnings, report.warnings
-    );
+fn v1_2_strict_preserving_with_transition_args_is_structural_error() {
+    // After T2.A.1 promoted the warning to a structural error, a verb
+    // declaring `state_effect: preserving` AND `transition_args:` fails
+    // validation. Parse a minimal YAML to construct the bad shape.
+    let yaml = r#"
+version: "1.0"
+domains:
+  test:
+    description: t
+    verbs:
+      bad:
+        description: "preserving with transition_args — rejected by v1.2 strict"
+        behavior: plugin
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: benign
+        transition_args:
+          entity_id_arg: deal-id
+          target_workspace: deal
+          target_slot: deal
+"#;
+    let cfg: VerbsConfig = serde_yaml::from_str(yaml).expect("parses");
+    let report = validate_verbs_config(&cfg, &ValidationContext::default());
+    assert_eq!(report.structural.len(), 1);
+    assert!(matches!(
+        report.structural[0],
+        StructuralError::PreservingWithTransitionArgs(_)
+    ));
 }
 
 #[test]

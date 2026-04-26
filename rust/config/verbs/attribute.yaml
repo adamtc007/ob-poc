@@ -49,47 +49,12 @@ domains:
           - name: category
             type: string
             required: true
-            valid_values:
-              [
-                identity,
-                financial,
-                compliance,
-                document,
-                risk,
-                contact,
-                address,
-                tax,
-                employment,
-                product,
-                entity,
-                ubo,
-                isda,
-                resource,
-                cbu,
-                trust,
-                fund,
-                partnership,
-              ]
+            valid_values: [identity, financial, compliance, document, risk, contact, address, tax, employment, product, entity, ubo, isda, resource, cbu, trust, fund, partnership]
             maps_to: category
           - name: value-type
             type: string
             required: true
-            valid_values:
-              [
-                string,
-                integer,
-                number,
-                boolean,
-                date,
-                datetime,
-                email,
-                phone,
-                address,
-                currency,
-                percentage,
-                tax_id,
-                json,
-              ]
+            valid_values: [string, integer, number, boolean, date, datetime, email, phone, address, currency, percentage, tax_id, json]
             maps_to: value_type
           - name: domain
             type: string
@@ -111,8 +76,7 @@ domains:
             type: string
             required: false
             default: none
-            valid_values:
-              [none, prohibited, allowed_with_constraints, regulatory_evidence]
+            valid_values: [none, prohibited, allowed_with_constraints, regulatory_evidence]
             description: "SemOS evidence sensitivity classification for the governed attribute definition"
         returns:
           type: uuid
@@ -155,46 +119,11 @@ domains:
           - name: category
             type: string
             required: true
-            valid_values:
-              [
-                identity,
-                financial,
-                compliance,
-                document,
-                risk,
-                contact,
-                address,
-                tax,
-                employment,
-                product,
-                entity,
-                ubo,
-                isda,
-                resource,
-                cbu,
-                trust,
-                fund,
-                partnership,
-              ]
+            valid_values: [identity, financial, compliance, document, risk, contact, address, tax, employment, product, entity, ubo, isda, resource, cbu, trust, fund, partnership]
           - name: value-type
             type: string
             required: true
-            valid_values:
-              [
-                string,
-                integer,
-                number,
-                boolean,
-                date,
-                datetime,
-                email,
-                phone,
-                address,
-                currency,
-                percentage,
-                tax_id,
-                json,
-              ]
+            valid_values: [string, integer, number, boolean, date, datetime, email, phone, address, currency, percentage, tax_id, json]
           - name: domain
             type: string
             required: true
@@ -204,8 +133,7 @@ domains:
           - name: evidence-grade
             type: string
             required: false
-            valid_values:
-              [none, prohibited, allowed_with_constraints, regulatory_evidence]
+            valid_values: [none, prohibited, allowed_with_constraints, regulatory_evidence]
             default: prohibited
           - name: derivation-function
             type: string
@@ -387,27 +315,7 @@ domains:
           - name: category
             type: string
             required: true
-            valid_values:
-              [
-                identity,
-                financial,
-                compliance,
-                document,
-                risk,
-                contact,
-                address,
-                tax,
-                employment,
-                product,
-                entity,
-                ubo,
-                isda,
-                resource,
-                cbu,
-                trust,
-                fund,
-                partnership,
-              ]
+            valid_values: [identity, financial, compliance, document, risk, contact, address, tax, employment, product, entity, ubo, isda, resource, cbu, trust, fund, partnership]
             maps_to: category
         three_axis:
           state_effect: preserving
@@ -442,8 +350,7 @@ domains:
           - name: evidence-grade
             type: string
             required: true
-            valid_values:
-              [none, prohibited, allowed_with_constraints, regulatory_evidence]
+            valid_values: [none, prohibited, allowed_with_constraints, regulatory_evidence]
         three_axis:
           state_effect: preserving
           external_effects: []
@@ -482,7 +389,7 @@ domains:
             required: false
             description: "FQN of replacement attribute, if any"
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: requires_confirmation
@@ -959,20 +866,20 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "bridge attributes to semos"
-        - "publish ungoverned attributes to semantic os"
-        - "create semos snapshots for store-only attributes"
-        - "govern existing attributes in semantic os"
-        - "reconcile attribute registry with semos"
-        - "bulk define attributes into semos"
+          - "bridge attributes to semos"
+          - "publish ungoverned attributes to semantic os"
+          - "create semos snapshots for store-only attributes"
+          - "govern existing attributes in semantic os"
+          - "reconcile attribute registry with semos"
+          - "bulk define attributes into semos"
         behavior: plugin
         handler: attribute_bridge_to_semos
         args:
-        - name: limit
-          type: integer
-          required: false
-          default: "100"
-          description: "Maximum number of attributes to bridge in one batch"
+          - name: limit
+            type: integer
+            required: false
+            default: "100"
+            description: "Maximum number of attributes to bridge in one batch"
         returns:
           type: record
           description: Bridge result with counts (bridged, already_governed, failed)

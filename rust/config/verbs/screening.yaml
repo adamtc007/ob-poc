@@ -294,7 +294,7 @@ domains:
           name: screening_id
           capture: true
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: reviewable
@@ -371,7 +371,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: reviewable
@@ -454,7 +454,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [observational]
           consequence:
             baseline: benign

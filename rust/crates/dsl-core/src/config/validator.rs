@@ -218,15 +218,6 @@ pub enum PolicyWarning {
         location: Location,
         rule_name: String,
     },
-    /// v1.2 P1 / §6.2 (migration-window soft warning): `state_effect:
-    /// preserving` declared together with `transition_args:`. v1.2 §6.2
-    /// frames this as a structural error, but the v1.1 → v1.2 migration
-    /// surfaces ~150 such verbs across the catalogue (verbs whose
-    /// state_effect is mislabeled `preserving` despite carrying a
-    /// transition_args pointer to a real slot transition). R.4 fixes the
-    /// YAML; until then this is a warning so the catalogue continues to
-    /// validate. After R.4, this can be promoted to a structural error.
-    PreservingWithTransitionArgsMigration { location: Location },
 }
 
 impl std::fmt::Display for PolicyWarning {
@@ -239,11 +230,6 @@ impl std::fmt::Display for PolicyWarning {
                 f,
                 "{location}: escalation rule '{rule_name}' tier equals baseline — rule is a \
                  no-op (warning only, not a bug)"
-            ),
-            Self::PreservingWithTransitionArgsMigration { location } => write!(
-                f,
-                "{location}: state_effect=preserving with transition_args present \
-                 (v1.2 §6.2 migration warning — fix in R.4)"
             ),
         }
     }
@@ -378,18 +364,16 @@ fn validate_declaration(
                 ));
         }
         (StateEffect::Preserving, true) => {
-            // v1.2 migration window: emit as warning, not structural error.
-            // ~150 verbs in the current catalogue hit this — they have
-            // state_effect: preserving but ALSO carry transition_args
-            // pointing at a real slot transition (the YAML state_effect is
-            // mislabeled). R.4 will fix the YAML; promoting to structural
-            // error before then would block the catalogue. Once R.4 lands,
-            // this can be promoted (see PolicyWarning::PreservingWithTransitionArgsMigration).
+            // v1.2 §6.2 strict — promoted from migration warning to
+            // structural error after T2.A.1 (2026-04-26) flipped the
+            // 153 mislabeled verbs. New verbs declaring this combination
+            // are an architecture-level mistake; the validator now blocks
+            // them at catalogue load.
             report
-                .warnings
-                .push(PolicyWarning::PreservingWithTransitionArgsMigration {
-                    location: Location::verb(fqn),
-                });
+                .structural
+                .push(StructuralError::PreservingWithTransitionArgs(
+                    Location::verb(fqn),
+                ));
         }
         (StateEffect::Preserving, false) => { /* OK */ }
     }
@@ -673,10 +657,11 @@ mod tests {
     }
 
     #[test]
-    fn preserving_with_transition_args_is_migration_warning() {
-        // v1.2 §6.2 migration-window soft warning. ~150 verbs in the
-        // current catalogue hit this; R.4 fixes the YAML. Until R.4 lands
-        // estate-wide, this is a warning, not a structural error.
+    fn preserving_with_transition_args_is_structural_error_v1_2_strict() {
+        // v1.2 §6.2 strict (post-T2.A.1, 2026-04-26): preserving +
+        // transition_args is a hard structural error. The migration
+        // warning was promoted after the 153 mislabeled verbs in the
+        // live catalogue were flipped to state_effect: transition.
         let mut vc = bare_verb_config();
         vc.three_axis = Some(ThreeAxisDeclaration {
             state_effect: StateEffect::Preserving,
@@ -694,11 +679,10 @@ mod tests {
             target_slot: None,
         });
         let r = validate_verb("test.verb", &vc, &ValidationContext::default());
-        assert!(r.is_clean(), "expected clean (warning, not error)");
-        assert_eq!(r.warnings.len(), 1);
+        assert_eq!(r.structural.len(), 1);
         assert!(matches!(
-            r.warnings[0],
-            PolicyWarning::PreservingWithTransitionArgsMigration { .. }
+            r.structural[0],
+            StructuralError::PreservingWithTransitionArgs(_)
         ));
     }
 

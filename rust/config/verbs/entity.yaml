@@ -706,8 +706,7 @@ domains:
             lookup:
               table: entity_proper_persons
               entity_type: proper_person
-              schema:
-                ob-poc
+              schema: ob-poc
                 # Composite search: name + nationality (usually captured first) + DOB (year approx or exact)
               search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
               primary_key: entity_id
@@ -739,7 +738,7 @@ domains:
           type: uuid
           name: entity_id
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: reviewable
@@ -781,8 +780,7 @@ domains:
             lookup:
               table: entity_proper_persons
               entity_type: proper_person
-              schema:
-                ob-poc
+              schema: ob-poc
                 # Composite search: name + nationality + DOB discriminators
               search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
               primary_key: entity_id
@@ -793,7 +791,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [observational]
           consequence:
             baseline: benign

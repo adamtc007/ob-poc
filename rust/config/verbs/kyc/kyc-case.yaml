@@ -187,7 +187,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: reviewable
@@ -253,7 +253,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
@@ -458,7 +458,7 @@ domains:
             and deal_gate_updated flag indicating whether a KYC_GATE_COMPLETED
             event was emitted to deal_events.
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
@@ -635,7 +635,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: reviewable

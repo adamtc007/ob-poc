@@ -99,7 +99,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
@@ -147,7 +147,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
@@ -195,7 +195,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation

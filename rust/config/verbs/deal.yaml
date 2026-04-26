@@ -210,19 +210,7 @@ domains:
             type: string
             required: false
             maps_to: deal_status
-            valid_values:
-              [
-                PROSPECT,
-                QUALIFYING,
-                NEGOTIATING,
-                KYC_CLEARANCE,
-                CONTRACTED,
-                ONBOARDING,
-                ACTIVE,
-                WINDING_DOWN,
-                OFFBOARDED,
-                CANCELLED,
-              ]
+            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, KYC_CLEARANCE, CONTRACTED, ONBOARDING, ACTIVE, WINDING_DOWN, OFFBOARDED, CANCELLED]
           - name: sales-owner
             type: string
             required: false
@@ -359,23 +347,11 @@ domains:
             type: string
             required: true
             maps_to: deal_status
-            valid_values:
-              [
-                PROSPECT,
-                QUALIFYING,
-                NEGOTIATING,
-                KYC_CLEARANCE,
-                CONTRACTED,
-                ONBOARDING,
-                ACTIVE,
-                WINDING_DOWN,
-                OFFBOARDED,
-                CANCELLED,
-              ]
+            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, KYC_CLEARANCE, CONTRACTED, ONBOARDING, ACTIVE, WINDING_DOWN, OFFBOARDED, CANCELLED]
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: reviewable
@@ -419,7 +395,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
@@ -469,14 +445,7 @@ domains:
             required: false
             maps_to: participant_role
             default: "CONTRACTING_PARTY"
-            valid_values:
-              [
-                CONTRACTING_PARTY,
-                GUARANTOR,
-                INTRODUCER,
-                INVESTMENT_MANAGER,
-                FUND_ADMIN,
-              ]
+            valid_values: [CONTRACTING_PARTY, GUARANTOR, INTRODUCER, INVESTMENT_MANAGER, FUND_ADMIN]
           - name: lei
             type: string
             required: false
@@ -699,7 +668,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: requires_confirmation
@@ -991,8 +960,7 @@ domains:
             type: string
             required: true
             maps_to: pricing_model
-            valid_values:
-              [BPS, FLAT, PER_TRANSACTION, TIERED, SPREAD, MINIMUM_FEE]
+            valid_values: [BPS, FLAT, PER_TRANSACTION, TIERED, SPREAD, MINIMUM_FEE]
           - name: rate-value
             type: decimal
             required: false
@@ -1194,7 +1162,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: reviewable
@@ -1239,7 +1207,7 @@ domains:
           name: new_rate_card_id
           capture: true
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: reviewable
@@ -1280,7 +1248,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
@@ -1325,8 +1293,7 @@ domains:
             type: string
             required: false
             maps_to: status
-            valid_values:
-              [DRAFT, PROPOSED, COUNTER_PROPOSED, AGREED, SUPERSEDED, CANCELLED]
+            valid_values: [DRAFT, PROPOSED, COUNTER_PROPOSED, AGREED, SUPERSEDED, CANCELLED]
         returns:
           type: record_set
         three_axis:
@@ -1584,26 +1551,13 @@ domains:
             type: string
             required: true
             maps_to: document_type
-            valid_values:
-              [
-                CONTRACT,
-                TERM_SHEET,
-                SIDE_LETTER,
-                NDA,
-                RATE_SCHEDULE,
-                SLA,
-                PROPOSAL,
-                RFP_RESPONSE,
-                BOARD_APPROVAL,
-                LEGAL_OPINION,
-              ]
+            valid_values: [CONTRACT, TERM_SHEET, SIDE_LETTER, NDA, RATE_SCHEDULE, SLA, PROPOSAL, RFP_RESPONSE, BOARD_APPROVAL, LEGAL_OPINION]
           - name: document-status
             type: string
             required: false
             maps_to: document_status
             default: "DRAFT"
-            valid_values:
-              [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
+            valid_values: [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
         returns:
           type: affected
         three_axis:
@@ -1641,12 +1595,11 @@ domains:
             type: string
             required: true
             maps_to: document_status
-            valid_values:
-              [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
+            valid_values: [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: reviewable
@@ -1757,8 +1710,7 @@ domains:
             type: string
             required: false
             maps_to: assessment_status
-            valid_values:
-              [PENDING, IN_PROGRESS, COMPLETED, REQUIRES_EDD, BLOCKED]
+            valid_values: [PENDING, IN_PROGRESS, COMPLETED, REQUIRES_EDD, BLOCKED]
           - name: risk-rating
             type: string
             required: false
@@ -1767,7 +1719,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: reviewable
@@ -1956,16 +1908,7 @@ domains:
             type: string
             required: true
             maps_to: request_status
-            valid_values:
-              [
-                REQUESTED,
-                KYC_PENDING,
-                KYC_CLEARED,
-                IN_PROGRESS,
-                COMPLETED,
-                BLOCKED,
-                CANCELLED,
-              ]
+            valid_values: [REQUESTED, KYC_PENDING, KYC_CLEARED, IN_PROGRESS, COMPLETED, BLOCKED, CANCELLED]
           - name: kyc-case-id
             type: uuid
             required: false
@@ -1973,7 +1916,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: reviewable
@@ -2156,8 +2099,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
         transition_args:
@@ -2190,8 +2133,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
         transition_args:
@@ -2228,8 +2171,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
         transition_args:
@@ -2262,8 +2205,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: reviewable
         transition_args:
@@ -2295,8 +2238,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
         transition_args:
@@ -2332,8 +2275,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
         transition_args:
@@ -2370,7 +2313,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: requires_explicit_authorisation
@@ -2407,7 +2350,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: requires_explicit_authorisation
@@ -2444,8 +2387,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
         transition_args:
@@ -2481,8 +2424,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
         transition_args:
@@ -2514,8 +2457,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
         transition_args:
@@ -2547,8 +2490,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
         transition_args:
@@ -2580,8 +2523,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: reviewable
         transition_args:
@@ -2613,8 +2556,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
         transition_args:
@@ -2650,8 +2593,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
         transition_args:

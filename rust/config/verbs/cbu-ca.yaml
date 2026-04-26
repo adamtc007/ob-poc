@@ -32,8 +32,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: reviewable
         transition_args:
@@ -65,8 +65,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
         transition_args:
@@ -101,8 +101,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
         transition_args:
@@ -134,7 +134,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: requires_confirmation
@@ -167,8 +167,8 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
-          external_effects: [emitting] 
+          state_effect: transition
+          external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
         transition_args:

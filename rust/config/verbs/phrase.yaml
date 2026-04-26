@@ -12,20 +12,20 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "observe misses"
-        - "find utterance misses"
-        - "trawl session traces for misses"
-        - "what utterances are failing"
-        - "show miss patterns"
-        - "scan for wrong matches"
-        - "phrase observation run"
+          - "observe misses"
+          - "find utterance misses"
+          - "trawl session traces for misses"
+          - "what utterances are failing"
+          - "show miss patterns"
+          - "scan for wrong matches"
+          - "phrase observation run"
         behavior: plugin
         handler: phrase_observe_misses
         args:
-        - name: limit
-          type: integer
-          required: false
-          default: "100"
+          - name: limit
+            type: integer
+            required: false
+            default: "100"
         returns:
           type: record
           description: Pattern summary with miss count, wrong-match count, top patterns
@@ -45,11 +45,11 @@ domains:
           phase_tags: [stewardship]
           side_effects: facts_only
         invocation_phrases:
-        - "phrase coverage report"
-        - "show phrase coverage"
-        - "phrase gaps by workspace"
-        - "which workspaces need more phrases"
-        - "utterance coverage analysis"
+          - "phrase coverage report"
+          - "show phrase coverage"
+          - "phrase gaps by workspace"
+          - "which workspaces need more phrases"
+          - "utterance coverage analysis"
         behavior: plugin
         handler: phrase_coverage_report
         args: []
@@ -72,26 +72,26 @@ domains:
           phase_tags: [stewardship]
           side_effects: facts_only
         invocation_phrases:
-        - "check phrase collisions"
-        - "collision check"
-        - "will this phrase collide"
-        - "test phrase for conflicts"
-        - "phrase collision audit"
+          - "check phrase collisions"
+          - "collision check"
+          - "will this phrase collide"
+          - "test phrase for conflicts"
+          - "phrase collision audit"
         behavior: plugin
         handler: phrase_check_collisions
         args:
-        - name: phrase
-          type: string
-          required: true
-          description: The candidate phrase to check
-        - name: target-verb
-          type: string
-          required: true
-          description: The verb FQN the phrase should map to
-        - name: workspace
-          type: string
-          required: false
-          description: Workspace scope (null for global)
+          - name: phrase
+            type: string
+            required: true
+            description: The candidate phrase to check
+          - name: target-verb
+            type: string
+            required: true
+            description: The verb FQN the phrase should map to
+          - name: workspace
+            type: string
+            required: false
+            description: Workspace scope (null for global)
         returns:
           type: record
           description: Collision report with exact conflicts, semantic near-misses, cross-workspace conflicts
@@ -111,25 +111,25 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "propose a new phrase"
-        - "suggest phrase mapping"
-        - "create phrase proposal"
-        - "propose phrase for verb"
+          - "propose a new phrase"
+          - "suggest phrase mapping"
+          - "create phrase proposal"
+          - "propose phrase for verb"
         behavior: plugin
         handler: phrase_propose
         args:
-        - name: phrase
-          type: string
-          required: true
-        - name: target-verb
-          type: string
-          required: true
-        - name: workspace
-          type: string
-          required: false
-        - name: rationale
-          type: string
-          required: false
+          - name: phrase
+            type: string
+            required: true
+          - name: target-verb
+            type: string
+            required: true
+          - name: workspace
+            type: string
+            required: false
+          - name: rationale
+            type: string
+            required: false
         returns:
           type: record
           description: Proposal with confidence score, risk tier, collision report
@@ -149,17 +149,17 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "batch propose phrases"
-        - "bulk phrase proposals"
-        - "generate phrase proposals from misses"
-        - "propose phrases from observation"
+          - "batch propose phrases"
+          - "bulk phrase proposals"
+          - "generate phrase proposals from misses"
+          - "propose phrases from observation"
         behavior: plugin
         handler: phrase_batch_propose
         args:
-        - name: limit
-          type: integer
-          required: false
-          default: "50"
+          - name: limit
+            type: integer
+            required: false
+            default: "50"
         returns:
           type: record_set
           description: Batch of proposals ordered by risk tier then confidence
@@ -179,10 +179,10 @@ domains:
           phase_tags: [stewardship]
           side_effects: facts_only
         invocation_phrases:
-        - "review phrase proposals"
-        - "show pending proposals"
-        - "list phrase proposals"
-        - "what phrases are pending review"
+          - "review phrase proposals"
+          - "show pending proposals"
+          - "list phrase proposals"
+          - "what phrases are pending review"
         behavior: plugin
         handler: phrase_review_proposals
         args: []
@@ -205,24 +205,24 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "approve phrase"
-        - "accept phrase proposal"
-        - "publish this phrase"
+          - "approve phrase"
+          - "accept phrase proposal"
+          - "publish this phrase"
         behavior: plugin
         handler: phrase_approve
         args:
-        - name: proposal-id
-          type: uuid
-          required: true
-        - name: rationale
-          type: string
-          required: false
-          description: Written rationale (mandatory for critical-tier verbs)
+          - name: proposal-id
+            type: uuid
+            required: true
+          - name: rationale
+            type: string
+            required: false
+            description: Written rationale (mandatory for critical-tier verbs)
         returns:
           type: record
           description: Published phrase with phrase_bank entry ID
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
@@ -241,23 +241,23 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "reject phrase"
-        - "decline phrase proposal"
-        - "reject this phrase"
+          - "reject phrase"
+          - "decline phrase proposal"
+          - "reject this phrase"
         behavior: plugin
         handler: phrase_reject
         args:
-        - name: proposal-id
-          type: uuid
-          required: true
-        - name: reason
-          type: string
-          required: true
+          - name: proposal-id
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: true
         returns:
           type: record
           description: Rejection confirmation with reason
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
@@ -276,18 +276,18 @@ domains:
           phase_tags: [stewardship]
           side_effects: state_write
         invocation_phrases:
-        - "defer phrase"
-        - "park this proposal"
-        - "defer phrase review"
+          - "defer phrase"
+          - "park this proposal"
+          - "defer phrase review"
         behavior: plugin
         handler: phrase_defer
         args:
-        - name: proposal-id
-          type: uuid
-          required: true
-        - name: reason
-          type: string
-          required: false
+          - name: proposal-id
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: false
         returns:
           type: record
           description: Deferred confirmation

@@ -17,64 +17,64 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         invocation_phrases:
-        - "define a new trade gateway"
-        - "register SWIFT FIN connectivity"
-        - "add FIX protocol gateway"
-        - "set up Omgeo CTM gateway"
-        - "create Bloomberg TOMS connection"
-        - "configure Tradeweb gateway endpoint"
-        - "provision MarkitWire trade gateway"
-        - "register new settlement gateway"
+          - "define a new trade gateway"
+          - "register SWIFT FIN connectivity"
+          - "add FIX protocol gateway"
+          - "set up Omgeo CTM gateway"
+          - "create Bloomberg TOMS connection"
+          - "configure Tradeweb gateway endpoint"
+          - "provision MarkitWire trade gateway"
+          - "register new settlement gateway"
         behavior: crud
         crud:
           operation: upsert
           table: trade_gateways
           schema: ob-poc
           conflict_keys:
-          - gateway_code
+            - gateway_code
           returning: gateway_id
         args:
-        - name: code
-          type: string
-          required: true
-          maps_to: gateway_code
-        - name: name
-          type: string
-          required: true
-          maps_to: gateway_name
-        - name: gateway-type
-          type: string
-          required: true
-          maps_to: gateway_type
-          description: "SWIFT_FIN, SWIFT_INTERACT, FIX, OMGEO_CTM, OMGEO_ALERT, BLOOMBERG_TOMS, TRADEWEB, MARKITWIRE, DTCC_GTR, PROPRIETARY, MANUAL"
-        - name: protocol
-          type: string
-          required: true
-          maps_to: protocol
-          description: "MT, MX, FIX_4_2, FIX_4_4, FIX_5_0, FPML, REST, SOAP, FILE, MANUAL"
-        - name: provider
-          type: string
-          required: false
-          maps_to: provider
-          description: "SWIFT, BLOOMBERG, REFINITIV, DIRECT"
-        - name: supported-events
-          type: string_list
-          required: true
-          maps_to: supported_events
-          description: "Lifecycle events this gateway supports"
-        - name: description
-          type: string
-          required: false
-          maps_to: description
+          - name: code
+            type: string
+            required: true
+            maps_to: gateway_code
+          - name: name
+            type: string
+            required: true
+            maps_to: gateway_name
+          - name: gateway-type
+            type: string
+            required: true
+            maps_to: gateway_type
+            description: "SWIFT_FIN, SWIFT_INTERACT, FIX, OMGEO_CTM, OMGEO_ALERT, BLOOMBERG_TOMS, TRADEWEB, MARKITWIRE, DTCC_GTR, PROPRIETARY, MANUAL"
+          - name: protocol
+            type: string
+            required: true
+            maps_to: protocol
+            description: "MT, MX, FIX_4_2, FIX_4_4, FIX_5_0, FPML, REST, SOAP, FILE, MANUAL"
+          - name: provider
+            type: string
+            required: false
+            maps_to: provider
+            description: "SWIFT, BLOOMBERG, REFINITIV, DIRECT"
+          - name: supported-events
+            type: string_list
+            required: true
+            maps_to: supported_events
+            description: "Lifecycle events this gateway supports"
+          - name: description
+            type: string
+            required: false
+            maps_to: description
         returns:
           type: uuid
           name: gateway_id
           capture: true
         lifecycle:
           precondition_checks:
-          - "reviewed:none"
+            - "reviewed:none"
           writes_tables:
-          - custody.trade_gateways
+            - custody.trade_gateways
         three_axis:
           state_effect: preserving
           external_effects: []
@@ -91,33 +91,33 @@ domains:
           phase_tags: [trading]
           side_effects: facts_only
         invocation_phrases:
-        - "show gateway definition details"
-        - "read trade gateway configuration"
-        - "get gateway by code"
-        - "what protocol does this gateway use"
-        - "display gateway supported events"
-        - "inspect SWIFT gateway settings"
-        - "view FIX gateway specification"
-        - "check gateway provider details"
+          - "show gateway definition details"
+          - "read trade gateway configuration"
+          - "get gateway by code"
+          - "what protocol does this gateway use"
+          - "display gateway supported events"
+          - "inspect SWIFT gateway settings"
+          - "view FIX gateway specification"
+          - "check gateway provider details"
         behavior: crud
         crud:
           operation: select
           table: trade_gateways
           schema: ob-poc
         args:
-        - name: gateway-id
-          type: uuid
-          required: false
-          maps_to: gateway_id
-        - name: code
-          type: string
-          required: false
-          maps_to: gateway_code
+          - name: gateway-id
+            type: uuid
+            required: false
+            maps_to: gateway_id
+          - name: code
+            type: string
+            required: false
+            maps_to: gateway_code
         returns:
           type: record
         lifecycle:
           reads_tables:
-          - custody.trade_gateways
+            - custody.trade_gateways
         three_axis:
           state_effect: preserving
           external_effects: [observational]
@@ -134,33 +134,33 @@ domains:
           phase_tags: [trading]
           side_effects: facts_only
         invocation_phrases:
-        - "list available trade gateways"
-        - "show all configured gateways"
-        - "which FIX gateways exist"
-        - "display SWIFT gateway inventory"
-        - "what trade connectivity is available"
-        - "browse gateways by protocol"
-        - "show registered gateway endpoints"
-        - "list gateways by type"
+          - "list available trade gateways"
+          - "show all configured gateways"
+          - "which FIX gateways exist"
+          - "display SWIFT gateway inventory"
+          - "what trade connectivity is available"
+          - "browse gateways by protocol"
+          - "show registered gateway endpoints"
+          - "list gateways by type"
         behavior: crud
         crud:
           operation: select
           table: trade_gateways
           schema: ob-poc
         args:
-        - name: gateway-type
-          type: string
-          required: false
-          maps_to: gateway_type
-        - name: protocol
-          type: string
-          required: false
-          maps_to: protocol
+          - name: gateway-type
+            type: string
+            required: false
+            maps_to: gateway_type
+          - name: protocol
+            type: string
+            required: false
+            maps_to: protocol
         returns:
           type: record_set
         lifecycle:
           reads_tables:
-          - custody.trade_gateways
+            - custody.trade_gateways
 
       # =========================================================================
       # CBU GATEWAY CONNECTIVITY
@@ -181,87 +181,87 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         invocation_phrases:
-        - "enable gateway for this CBU"
-        - "connect fund to SWIFT gateway"
-        - "provision FIX connectivity for CBU"
-        - "link CBU to trade gateway"
-        - "set up CTM connectivity for fund"
-        - "onboard CBU to settlement gateway"
-        - "enable Tradeweb connection for CBU"
-        - "configure gateway credentials for fund"
+          - "enable gateway for this CBU"
+          - "connect fund to SWIFT gateway"
+          - "provision FIX connectivity for CBU"
+          - "link CBU to trade gateway"
+          - "set up CTM connectivity for fund"
+          - "onboard CBU to settlement gateway"
+          - "enable Tradeweb connection for CBU"
+          - "configure gateway credentials for fund"
         behavior: crud
         crud:
           operation: upsert
           table: cbu_gateway_connectivity
           schema: ob-poc
           conflict_keys:
-          - cbu_id
-          - gateway_id
+            - cbu_id
+            - gateway_id
           returning: connectivity_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          maps_to: cbu_id
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: gateway-id
-          type: uuid
-          required: true
-          maps_to: gateway_id
-          lookup:
-            table: trade_gateways
-            schema: ob-poc
-            search_key: gateway_code
-            primary_key: gateway_id
-        - name: status
-          type: string
-          required: false
-          maps_to: status
-          default: PENDING
-          description: "PENDING, TESTING, ACTIVE, SUSPENDED, DECOMMISSIONED"
-        - name: connectivity-resource-id
-          type: uuid
-          required: false
-          maps_to: connectivity_resource_id
-          lookup:
-            table: cbu_resource_instances
-            entity_type: resource_instance
-            schema: ob-poc
-            search_key: instance_name
-            primary_key: instance_id
-          description: "Link to provisioned connectivity resource"
-        - name: credentials-reference
-          type: string
-          required: false
-          maps_to: credentials_reference
-          description: "Reference to secure credentials store"
-        - name: effective-date
-          type: date
-          required: false
-          maps_to: effective_date
-        - name: config
-          type: json
-          required: false
-          maps_to: gateway_config
-          description: "Gateway-specific configuration"
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: gateway-id
+            type: uuid
+            required: true
+            maps_to: gateway_id
+            lookup:
+              table: trade_gateways
+              schema: ob-poc
+              search_key: gateway_code
+              primary_key: gateway_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+            default: PENDING
+            description: "PENDING, TESTING, ACTIVE, SUSPENDED, DECOMMISSIONED"
+          - name: connectivity-resource-id
+            type: uuid
+            required: false
+            maps_to: connectivity_resource_id
+            lookup:
+              table: cbu_resource_instances
+              entity_type: resource_instance
+              schema: ob-poc
+              search_key: instance_name
+              primary_key: instance_id
+            description: "Link to provisioned connectivity resource"
+          - name: credentials-reference
+            type: string
+            required: false
+            maps_to: credentials_reference
+            description: "Reference to secure credentials store"
+          - name: effective-date
+            type: date
+            required: false
+            maps_to: effective_date
+          - name: config
+            type: json
+            required: false
+            maps_to: gateway_config
+            description: "Gateway-specific configuration"
         returns:
           type: uuid
           name: connectivity_id
           capture: true
         lifecycle:
           precondition_checks:
-          - "requires_scope:cbu"
+            - "requires_scope:cbu"
           writes_tables:
-          - custody.cbu_gateway_connectivity
+            - custody.cbu_gateway_connectivity
           reads_tables:
-          - custody.trade_gateways
+            - custody.trade_gateways
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: requires_confirmation
@@ -280,14 +280,14 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         invocation_phrases:
-        - "activate gateway connectivity"
-        - "go live on trade gateway"
-        - "mark gateway connection as active"
-        - "promote gateway from testing"
-        - "switch gateway status to active"
-        - "complete gateway UAT and activate"
-        - "enable live trade flow on gateway"
-        - "transition gateway to production"
+          - "activate gateway connectivity"
+          - "go live on trade gateway"
+          - "mark gateway connection as active"
+          - "promote gateway from testing"
+          - "switch gateway status to active"
+          - "complete gateway UAT and activate"
+          - "enable live trade flow on gateway"
+          - "transition gateway to production"
         behavior: crud
         crud:
           operation: update
@@ -298,17 +298,17 @@ domains:
             status: ACTIVE
             activated_at: now()
         args:
-        - name: connectivity-id
-          type: uuid
-          required: true
-          maps_to: connectivity_id
+          - name: connectivity-id
+            type: uuid
+            required: true
+            maps_to: connectivity_id
         returns:
           type: affected
         lifecycle:
           precondition_checks:
-          - "requires_scope:cbu"
+            - "requires_scope:cbu"
           writes_tables:
-          - custody.cbu_gateway_connectivity
+            - custody.cbu_gateway_connectivity
         three_axis:
           state_effect: preserving
           external_effects: []
@@ -325,14 +325,14 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         invocation_phrases:
-        - "suspend gateway connectivity"
-        - "pause trade routing via gateway"
-        - "temporarily disable gateway"
-        - "hold gateway for maintenance"
-        - "stop sending trades through gateway"
-        - "suspend SWIFT connectivity for CBU"
-        - "freeze FIX connection for fund"
-        - "take gateway offline"
+          - "suspend gateway connectivity"
+          - "pause trade routing via gateway"
+          - "temporarily disable gateway"
+          - "hold gateway for maintenance"
+          - "stop sending trades through gateway"
+          - "suspend SWIFT connectivity for CBU"
+          - "freeze FIX connection for fund"
+          - "take gateway offline"
         behavior: crud
         crud:
           operation: update
@@ -343,20 +343,20 @@ domains:
             status: SUSPENDED
             suspended_at: now()
         args:
-        - name: connectivity-id
-          type: uuid
-          required: true
-          maps_to: connectivity_id
-        - name: reason
-          type: string
-          required: false
+          - name: connectivity-id
+            type: uuid
+            required: true
+            maps_to: connectivity_id
+          - name: reason
+            type: string
+            required: false
         returns:
           type: affected
         lifecycle:
           precondition_checks:
-          - "requires_scope:cbu"
+            - "requires_scope:cbu"
           writes_tables:
-          - custody.cbu_gateway_connectivity
+            - custody.cbu_gateway_connectivity
         three_axis:
           state_effect: preserving
           external_effects: []
@@ -373,14 +373,14 @@ domains:
           phase_tags: [trading]
           side_effects: facts_only
         invocation_phrases:
-        - "list gateway connections for CBU"
-        - "show CBU trade connectivity status"
-        - "which gateways are enabled for fund"
-        - "display SWIFT connections for this CBU"
-        - "get all gateway links for structure"
-        - "check CBU settlement gateway setup"
-        - "show active FIX connections for CBU"
-        - "what trade gateways does CBU use"
+          - "list gateway connections for CBU"
+          - "show CBU trade connectivity status"
+          - "which gateways are enabled for fund"
+          - "display SWIFT connections for this CBU"
+          - "get all gateway links for structure"
+          - "check CBU settlement gateway setup"
+          - "show active FIX connections for CBU"
+          - "what trade gateways does CBU use"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -388,24 +388,24 @@ domains:
           schema: ob-poc
           fk_col: cbu_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: status
-          type: string
-          required: false
-          maps_to: status
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
         returns:
           type: record_set
         lifecycle:
           reads_tables:
-          - custody.cbu_gateway_connectivity
+            - custody.cbu_gateway_connectivity
 
       # =========================================================================
       # GATEWAY ROUTING RULES
@@ -426,102 +426,102 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         invocation_phrases:
-        - "add trade routing rule for CBU"
-        - "route equity trades through SWIFT gateway"
-        - "create settlement routing by instrument class"
-        - "set up gateway rule for market"
-        - "configure counterparty-specific trade routing"
-        - "assign priority routing for lifecycle event"
-        - "define FIX routing for OTC trades"
-        - "map instrument class to settlement gateway"
+          - "add trade routing rule for CBU"
+          - "route equity trades through SWIFT gateway"
+          - "create settlement routing by instrument class"
+          - "set up gateway rule for market"
+          - "configure counterparty-specific trade routing"
+          - "assign priority routing for lifecycle event"
+          - "define FIX routing for OTC trades"
+          - "map instrument class to settlement gateway"
         behavior: crud
         crud:
           operation: upsert
           table: cbu_gateway_routing
           schema: ob-poc
           conflict_keys:
-          - cbu_id
-          - gateway_id
-          - lifecycle_event
-          - instrument_class_id
-          - market_id
-          - counterparty_entity_id
+            - cbu_id
+            - gateway_id
+            - lifecycle_event
+            - instrument_class_id
+            - market_id
+            - counterparty_entity_id
           returning: routing_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          maps_to: cbu_id
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: gateway-id
-          type: uuid
-          required: true
-          maps_to: gateway_id
-          lookup:
-            table: trade_gateways
-            schema: ob-poc
-            search_key: gateway_code
-            primary_key: gateway_id
-        - name: lifecycle-event
-          type: string
-          required: true
-          maps_to: lifecycle_event
-        - name: instrument-class
-          type: lookup
-          required: false
-          maps_to: instrument_class_id
-          lookup:
-            table: instrument_classes
-            entity_type: instrument_class
-            schema: ob-poc
-            code_column: class_code
-            id_column: class_id
-        - name: market
-          type: lookup
-          required: false
-          maps_to: market_id
-          lookup:
-            table: markets
-            entity_type: market
-            schema: ob-poc
-            code_column: mic
-            id_column: market_id
-        - name: counterparty
-          type: uuid
-          required: false
-          maps_to: counterparty_entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: priority
-          type: integer
-          required: true
-          maps_to: priority
-          default: 50
-        - name: is-active
-          type: boolean
-          required: false
-          maps_to: is_active
-          default: true
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: gateway-id
+            type: uuid
+            required: true
+            maps_to: gateway_id
+            lookup:
+              table: trade_gateways
+              schema: ob-poc
+              search_key: gateway_code
+              primary_key: gateway_id
+          - name: lifecycle-event
+            type: string
+            required: true
+            maps_to: lifecycle_event
+          - name: instrument-class
+            type: lookup
+            required: false
+            maps_to: instrument_class_id
+            lookup:
+              table: instrument_classes
+              entity_type: instrument_class
+              schema: ob-poc
+              code_column: class_code
+              id_column: class_id
+          - name: market
+            type: lookup
+            required: false
+            maps_to: market_id
+            lookup:
+              table: markets
+              entity_type: market
+              schema: ob-poc
+              code_column: mic
+              id_column: market_id
+          - name: counterparty
+            type: uuid
+            required: false
+            maps_to: counterparty_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: priority
+            type: integer
+            required: true
+            maps_to: priority
+            default: 50
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
+            default: true
         returns:
           type: uuid
           name: routing_id
           capture: true
         lifecycle:
           precondition_checks:
-          - "requires_scope:cbu"
+            - "requires_scope:cbu"
           writes_tables:
-          - custody.cbu_gateway_routing
+            - custody.cbu_gateway_routing
           reads_tables:
-          - custody.trade_gateways
+            - custody.trade_gateways
         three_axis:
           state_effect: preserving
           external_effects: []
@@ -538,14 +538,14 @@ domains:
           phase_tags: [trading]
           side_effects: facts_only
         invocation_phrases:
-        - "list trade routing rules for CBU"
-        - "show settlement routing configuration"
-        - "display gateway routing by priority"
-        - "which gateway handles equity confirmations"
-        - "get routing rules for lifecycle event"
-        - "check trade routing setup for fund"
-        - "show active gateway routing table"
-        - "what are the routing rules for this CBU"
+          - "list trade routing rules for CBU"
+          - "show settlement routing configuration"
+          - "display gateway routing by priority"
+          - "which gateway handles equity confirmations"
+          - "get routing rules for lifecycle event"
+          - "check trade routing setup for fund"
+          - "show active gateway routing table"
+          - "what are the routing rules for this CBU"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -554,28 +554,28 @@ domains:
           fk_col: cbu_id
           order_by: priority
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: lifecycle-event
-          type: string
-          required: false
-          maps_to: lifecycle_event
-        - name: is-active
-          type: boolean
-          required: false
-          maps_to: is_active
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: lifecycle-event
+            type: string
+            required: false
+            maps_to: lifecycle_event
+          - name: is-active
+            type: boolean
+            required: false
+            maps_to: is_active
         returns:
           type: record_set
         lifecycle:
           reads_tables:
-          - custody.cbu_gateway_routing
+            - custody.cbu_gateway_routing
         three_axis:
           state_effect: preserving
           external_effects: [observational]
@@ -592,24 +592,24 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         invocation_phrases:
-        - "remove trade routing rule"
-        - "delete gateway routing entry"
-        - "clear routing rule for instrument class"
-        - "drop settlement routing for counterparty"
-        - "unassign gateway from lifecycle event"
-        - "remove FIX routing for this market"
-        - "delete SWIFT routing rule for CBU"
-        - "take out obsolete routing configuration"
+          - "remove trade routing rule"
+          - "delete gateway routing entry"
+          - "clear routing rule for instrument class"
+          - "drop settlement routing for counterparty"
+          - "unassign gateway from lifecycle event"
+          - "remove FIX routing for this market"
+          - "delete SWIFT routing rule for CBU"
+          - "take out obsolete routing configuration"
         behavior: crud
         crud:
           operation: delete
           table: cbu_gateway_routing
           schema: ob-poc
         args:
-        - name: routing-id
-          type: uuid
-          required: true
-          maps_to: routing_id
+          - name: routing-id
+            type: uuid
+            required: true
+            maps_to: routing_id
         returns:
           type: affected
 
@@ -632,78 +632,78 @@ domains:
           phase_tags: [trading]
           side_effects: state_write
         invocation_phrases:
-        - "set fallback gateway for CBU"
-        - "configure backup settlement route"
-        - "add failover gateway on timeout"
-        - "define secondary trade routing path"
-        - "set up gateway failover for rejections"
-        - "configure SWIFT fallback to FIX gateway"
-        - "add backup connectivity for trade routing"
-        - "assign fallback for primary gateway failure"
+          - "set fallback gateway for CBU"
+          - "configure backup settlement route"
+          - "add failover gateway on timeout"
+          - "define secondary trade routing path"
+          - "set up gateway failover for rejections"
+          - "configure SWIFT fallback to FIX gateway"
+          - "add backup connectivity for trade routing"
+          - "assign fallback for primary gateway failure"
         behavior: crud
         crud:
           operation: upsert
           table: cbu_gateway_fallbacks
           schema: ob-poc
           conflict_keys:
-          - cbu_id
-          - primary_gateway_id
-          - lifecycle_event
+            - cbu_id
+            - primary_gateway_id
+            - lifecycle_event
           returning: fallback_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          maps_to: cbu_id
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: primary-gateway-id
-          type: uuid
-          required: true
-          maps_to: primary_gateway_id
-          lookup:
-            table: trade_gateways
-            schema: ob-poc
-            search_key: gateway_code
-            primary_key: gateway_id
-        - name: fallback-gateway-id
-          type: uuid
-          required: true
-          maps_to: fallback_gateway_id
-          lookup:
-            table: trade_gateways
-            schema: ob-poc
-            search_key: gateway_code
-            primary_key: gateway_id
-        - name: lifecycle-event
-          type: string
-          required: false
-          maps_to: lifecycle_event
-          description: "NULL = all events"
-        - name: trigger-conditions
-          type: string_list
-          required: true
-          maps_to: trigger_conditions
-          description: "TIMEOUT, ERROR, REJECTION, MANUAL"
-        - name: priority
-          type: integer
-          required: true
-          maps_to: priority
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: primary-gateway-id
+            type: uuid
+            required: true
+            maps_to: primary_gateway_id
+            lookup:
+              table: trade_gateways
+              schema: ob-poc
+              search_key: gateway_code
+              primary_key: gateway_id
+          - name: fallback-gateway-id
+            type: uuid
+            required: true
+            maps_to: fallback_gateway_id
+            lookup:
+              table: trade_gateways
+              schema: ob-poc
+              search_key: gateway_code
+              primary_key: gateway_id
+          - name: lifecycle-event
+            type: string
+            required: false
+            maps_to: lifecycle_event
+            description: "NULL = all events"
+          - name: trigger-conditions
+            type: string_list
+            required: true
+            maps_to: trigger_conditions
+            description: "TIMEOUT, ERROR, REJECTION, MANUAL"
+          - name: priority
+            type: integer
+            required: true
+            maps_to: priority
         returns:
           type: uuid
           name: fallback_id
           capture: true
         lifecycle:
           precondition_checks:
-          - "requires_scope:cbu"
+            - "requires_scope:cbu"
           writes_tables:
-          - custody.cbu_gateway_fallbacks
+            - custody.cbu_gateway_fallbacks
           reads_tables:
-          - custody.trade_gateways
+            - custody.trade_gateways
         three_axis:
           state_effect: preserving
           external_effects: []
@@ -720,14 +720,14 @@ domains:
           phase_tags: [trading]
           side_effects: facts_only
         invocation_phrases:
-        - "list fallback gateway configurations"
-        - "show backup settlement routes for CBU"
-        - "display gateway failover setup"
-        - "what fallback gateways are configured"
-        - "check failover routing for this fund"
-        - "get all backup trade connectivity"
-        - "show gateway resilience configuration"
-        - "list secondary routing paths for CBU"
+          - "list fallback gateway configurations"
+          - "show backup settlement routes for CBU"
+          - "display gateway failover setup"
+          - "what fallback gateways are configured"
+          - "check failover routing for this fund"
+          - "get all backup trade connectivity"
+          - "show gateway resilience configuration"
+          - "list secondary routing paths for CBU"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -735,20 +735,20 @@ domains:
           schema: ob-poc
           fk_col: cbu_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record_set
         lifecycle:
           reads_tables:
-          - custody.cbu_gateway_fallbacks
+            - custody.cbu_gateway_fallbacks
 
       # =========================================================================
       # RESOLUTION & VALIDATION
