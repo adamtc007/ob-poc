@@ -113,6 +113,10 @@ pub fn resolve_slot_table(
         (("deal", "billing_profile"), ("fee_billing_profiles", "status", "profile_id")),
         (("deal", "billing_period"), ("fee_billing_periods", "calc_status", "period_id")),
         (("deal", "deal_sla"), ("deal_slas", "sla_status", "sla_id")),
+        // R3 (2026-04-26): Booking Principal clearance carrier — third leg of
+        // Adam's deal tollgate triad (BAC + KYC + BP). Per-deal-per-principal
+        // scope (option (a)). Gates deal KYC_CLEARANCE → CONTRACTED.
+        (("deal", "booking_principal_clearance"), ("booking_principal_clearances", "clearance_status", "id")),
         // KYC workspace
         (("kyc", "kyc_case"), ("cases", "status", "case_id")),
         (("kyc", "entity_workstream"), ("entity_workstreams", "status", "workstream_id")),
