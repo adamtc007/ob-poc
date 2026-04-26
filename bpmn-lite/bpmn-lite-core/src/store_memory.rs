@@ -196,6 +196,13 @@ impl ProcessStore for MemoryStore {
 
     async fn enqueue_job(&self, activation: &JobActivation) -> Result<()> {
         let mut w = self.inner.write().await;
+        if w.job_queue
+            .iter()
+            .any(|job| job.job_key == activation.job_key)
+            || w.inflight_jobs.contains_key(&activation.job_key)
+        {
+            return Ok(());
+        }
         w.job_queue.push_back(activation.clone());
         Ok(())
     }
@@ -446,8 +453,11 @@ impl ProcessStore for MemoryStore {
             .collect();
         let count = stale_keys.len() as u32;
         for key in stale_keys {
-            if let Some((job, _)) = w.inflight_jobs.remove(&key) {
-                w.job_queue.push_back(job);
+            if let Some((mut job, _)) = w.inflight_jobs.remove(&key) {
+                if job.retries_remaining > 1 {
+                    job.retries_remaining -= 1;
+                    w.job_queue.push_back(job);
+                }
             }
         }
         Ok(count)
@@ -470,6 +480,21 @@ impl ProcessStore for MemoryStore {
             .filter(|(_, inst)| !inst.state.is_terminal() && inst.tenant_id == tenant_id)
             .map(|(id, _)| *id)
             .collect())
+    }
+
+    async fn claim_running_instances(
+        &self,
+        tenant_id: &str,
+        _owner: &str,
+        limit: usize,
+        _lease_ms: u64,
+    ) -> Result<Vec<Uuid>> {
+        let ids = self.list_running_instances(tenant_id).await?;
+        Ok(ids.into_iter().take(limit).collect())
+    }
+
+    async fn health_check(&self) -> Result<()> {
+        Ok(())
     }
 }
 

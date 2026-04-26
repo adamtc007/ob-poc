@@ -408,10 +408,12 @@ pub fn verify(graph: &IRGraph) -> Vec<VerifyError> {
 /// Allows backward `BrCounterLt` (bounded by counter limit).
 pub fn verify_bytecode(program: &CompiledProgram) -> Vec<VerifyError> {
     let mut errors = Vec::new();
+    let program_len = program.program.len() as Addr;
     for (addr, instr) in program.program.iter().enumerate() {
         let addr = addr as Addr;
         match instr {
             Instr::Jump { target } | Instr::BrIf { target } | Instr::BrIfNot { target } => {
+                check_target(&mut errors, program, addr, *target, program_len);
                 if *target < addr {
                     errors.push(VerifyError {
                         message: format!(
@@ -422,13 +424,57 @@ pub fn verify_bytecode(program: &CompiledProgram) -> Vec<VerifyError> {
                     });
                 }
             }
-            Instr::BrCounterLt { .. } => {
+            Instr::BrCounterLt { target, .. } => {
+                check_target(&mut errors, program, addr, *target, program_len);
                 // BrCounterLt is allowed to jump backward (it's bounded by limit)
+            }
+            Instr::Fork { targets } => {
+                for target in targets.iter().copied() {
+                    check_target(&mut errors, program, addr, target, program_len);
+                }
+            }
+            Instr::Join { next, .. } | Instr::JoinDynamic { next, .. } => {
+                check_target(&mut errors, program, addr, *next, program_len);
+            }
+            Instr::WaitAny { arms, .. } => {
+                for arm in arms.iter() {
+                    check_target(&mut errors, program, addr, arm.resume_at(), program_len);
+                }
+            }
+            Instr::ForkInclusive {
+                branches,
+                default_target,
+                ..
+            } => {
+                for branch in branches.iter() {
+                    check_target(&mut errors, program, addr, branch.target, program_len);
+                }
+                if let Some(target) = default_target {
+                    check_target(&mut errors, program, addr, *target, program_len);
+                }
             }
             _ => {}
         }
     }
     errors
+}
+
+fn check_target(
+    errors: &mut Vec<VerifyError>,
+    program: &CompiledProgram,
+    addr: Addr,
+    target: Addr,
+    program_len: Addr,
+) {
+    if target >= program_len {
+        errors.push(VerifyError {
+            message: format!(
+                "Bytecode target out of bounds at addr {}: target {} >= program len {}",
+                addr, target, program_len
+            ),
+            element_id: program.debug_map.get(&addr).cloned(),
+        });
+    }
 }
 
 /// Verify and return Result — convenience wrapper.

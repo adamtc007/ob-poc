@@ -138,4 +138,16 @@ pub trait ProcessStore: Send + Sync {
 
     /// List all running (non-terminal) instance IDs.
     async fn list_running_instances(&self, tenant_id: &str) -> Result<Vec<Uuid>>;
+
+    /// Claim a bounded batch of running instances for scheduler work.
+    async fn claim_running_instances(
+        &self,
+        tenant_id: &str,
+        owner: &str,
+        limit: usize,
+        lease_ms: u64,
+    ) -> Result<Vec<Uuid>>;
+
+    /// Lightweight readiness probe for the backing store.
+    async fn health_check(&self) -> Result<()>;
 }

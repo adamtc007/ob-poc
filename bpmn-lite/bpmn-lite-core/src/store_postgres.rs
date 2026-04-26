@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
+const EVENT_NOTIFY_CHANNEL: &str = "bpmn_lite_events";
+
 /// Serialize a `Value` into a deterministic string key for dead-letter lookup.
 /// Must match MemoryStore's `value_key()` exactly.
 fn value_key(v: &Value) -> String {
@@ -71,6 +73,18 @@ impl PostgresProcessStore {
             .context("failed to run bpmn-lite migrations")?;
         Ok(())
     }
+}
+
+async fn notify_event_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    instance_id: Uuid,
+) -> Result<()> {
+    sqlx::query("SELECT pg_notify($1, $2)")
+        .bind(EVENT_NOTIFY_CHANNEL)
+        .bind(instance_id.to_string())
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
 }
 
 #[async_trait]
@@ -433,6 +447,7 @@ impl ProcessStore for PostgresProcessStore {
                 domain_payload, domain_payload_hash, session_stack, orch_flags, retries_remaining,
                 entry_id, runbook_id
             ) VALUES ($1, (SELECT tenant_id FROM process_instances WHERE instance_id = $2), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ON CONFLICT (job_key) DO NOTHING
             "#,
         )
         .bind(&activation.job_key)
@@ -471,7 +486,9 @@ impl ProcessStore for PostgresProcessStore {
                 FOR UPDATE SKIP LOCKED
             )
             UPDATE job_queue
-            SET status = 'claimed', claimed_at = now()
+            SET status = 'claimed',
+                claimed_at = now(),
+                attempt_count = attempt_count + 1
             FROM claimed
             WHERE job_queue.job_key = claimed.job_key
             RETURNING job_queue.job_key,
@@ -625,6 +642,7 @@ impl ProcessStore for PostgresProcessStore {
     // ── Event log ──
 
     async fn append_event(&self, instance_id: Uuid, event: &RuntimeEvent) -> Result<u64> {
+        let mut tx = self.pool.begin().await?;
         let event_json = serde_json::to_value(event)?;
 
         let row = sqlx::query(
@@ -644,11 +662,13 @@ impl ProcessStore for PostgresProcessStore {
         )
         .bind(instance_id)
         .bind(&event_json)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         use sqlx::Row;
         let seq: i64 = row.get("seq");
+        notify_event_tx(&mut tx, instance_id).await?;
+        tx.commit().await?;
         Ok(seq as u64)
     }
 
@@ -680,6 +700,9 @@ impl ProcessStore for PostgresProcessStore {
             use sqlx::Row;
             let seq: i64 = row.get("seq");
             last_seq = seq as u64;
+        }
+        if !events.is_empty() {
+            notify_event_tx(&mut tx, instance_id).await?;
         }
         tx.commit().await?;
         Ok(last_seq)
@@ -853,8 +876,8 @@ impl ProcessStore for PostgresProcessStore {
             INSERT INTO process_instances (
                 instance_id, tenant_id, process_key, bytecode_version, domain_payload,
                 domain_payload_hash, session_stack, flags, counters, join_expected, state,
-                correlation_id, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                correlation_id, entry_id, runbook_id, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             "#,
         )
         .bind(instance.instance_id)
@@ -869,6 +892,8 @@ impl ProcessStore for PostgresProcessStore {
         .bind(&join_expected)
         .bind(&state)
         .bind(&instance.correlation_id)
+        .bind(instance.entry_id)
+        .bind(instance.runbook_id)
         .bind(created_at)
         .execute(&mut *tx)
         .await?;
@@ -920,6 +945,7 @@ impl ProcessStore for PostgresProcessStore {
         use sqlx::Row;
         let seq: i64 = row.get("seq");
 
+        notify_event_tx(&mut tx, instance.instance_id).await?;
         tx.commit().await?;
         Ok(seq as u64)
     }
@@ -944,8 +970,8 @@ impl ProcessStore for PostgresProcessStore {
             INSERT INTO process_instances (
                 instance_id, tenant_id, process_key, bytecode_version, domain_payload,
                 domain_payload_hash, session_stack, flags, counters, join_expected, state,
-                correlation_id, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                correlation_id, entry_id, runbook_id, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             ON CONFLICT (instance_id) DO UPDATE SET
                 tenant_id = EXCLUDED.tenant_id,
                 process_key = EXCLUDED.process_key,
@@ -957,7 +983,9 @@ impl ProcessStore for PostgresProcessStore {
                 counters = EXCLUDED.counters,
                 join_expected = EXCLUDED.join_expected,
                 state = EXCLUDED.state,
-                correlation_id = EXCLUDED.correlation_id
+                correlation_id = EXCLUDED.correlation_id,
+                entry_id = EXCLUDED.entry_id,
+                runbook_id = EXCLUDED.runbook_id
             "#,
         )
         .bind(instance.instance_id)
@@ -972,6 +1000,8 @@ impl ProcessStore for PostgresProcessStore {
         .bind(&join_expected)
         .bind(&state)
         .bind(&instance.correlation_id)
+        .bind(instance.entry_id)
+        .bind(instance.runbook_id)
         .bind(created_at)
         .execute(&mut *tx)
         .await?;
@@ -1013,13 +1043,38 @@ impl ProcessStore for PostgresProcessStore {
     async fn reclaim_stale_jobs(&self, timeout_ms: u64) -> Result<u32> {
         let row = sqlx::query(
             r#"
-            WITH reclaimed AS (
-                UPDATE job_queue SET status = 'pending', claimed_at = NULL
+            WITH stale AS (
+                SELECT job_key, retries_remaining
+                FROM job_queue
                 WHERE status = 'claimed'
                   AND claimed_at < now() - make_interval(secs => $1::float / 1000.0)
-                RETURNING job_key
+                FOR UPDATE SKIP LOCKED
+            ),
+            dead_lettered AS (
+                UPDATE job_queue
+                SET status = 'dead_lettered',
+                    claimed_at = NULL,
+                    dead_lettered_at = now(),
+                    last_failed_at = now(),
+                    last_error = 'stale claimed job exhausted retry budget'
+                FROM stale
+                WHERE job_queue.job_key = stale.job_key
+                  AND stale.retries_remaining <= 1
+                RETURNING job_queue.job_key
+            ),
+            reclaimed AS (
+                UPDATE job_queue
+                SET status = 'pending',
+                    claimed_at = NULL,
+                    retries_remaining = job_queue.retries_remaining - 1,
+                    last_failed_at = now(),
+                    last_error = 'stale claimed job reclaimed'
+                FROM stale
+                WHERE job_queue.job_key = stale.job_key
+                  AND stale.retries_remaining > 1
+                RETURNING job_queue.job_key
             )
-            SELECT count(*) AS cnt FROM reclaimed
+            SELECT (SELECT count(*) FROM reclaimed) + (SELECT count(*) FROM dead_lettered) AS cnt
             "#,
         )
         .bind(timeout_ms as f64)
@@ -1061,6 +1116,50 @@ impl ProcessStore for PostgresProcessStore {
 
         use sqlx::Row;
         Ok(rows.iter().map(|r| r.get("instance_id")).collect())
+    }
+
+    async fn claim_running_instances(
+        &self,
+        tenant_id: &str,
+        owner: &str,
+        limit: usize,
+        lease_ms: u64,
+    ) -> Result<Vec<Uuid>> {
+        let rows = sqlx::query(
+            r#"
+            WITH candidates AS (
+                SELECT instance_id
+                FROM process_instances
+                WHERE tenant_id = $1
+                  AND state = '"Running"'::jsonb
+                  AND (lease_until IS NULL OR lease_until < now() OR lease_owner = $2)
+                ORDER BY updated_at
+                LIMIT $3
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE process_instances
+            SET lease_owner = $2,
+                lease_until = now() + make_interval(secs => $4::float / 1000.0),
+                last_tick_at = now()
+            FROM candidates
+            WHERE process_instances.instance_id = candidates.instance_id
+            RETURNING process_instances.instance_id
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(owner)
+        .bind(limit as i64)
+        .bind(lease_ms as f64)
+        .fetch_all(&self.pool)
+        .await?;
+
+        use sqlx::Row;
+        Ok(rows.iter().map(|r| r.get("instance_id")).collect())
+    }
+
+    async fn health_check(&self) -> Result<()> {
+        sqlx::query("SELECT 1").execute(&self.pool).await?;
+        Ok(())
     }
 }
 
@@ -1140,9 +1239,10 @@ mod tests {
         let hash = sha2_hash(payload);
         ProcessInstance {
             instance_id: id,
+            tenant_id: "default".to_string(),
             process_key: "test-process".to_string(),
             bytecode_version: [0u8; 32],
-            domain_payload: payload.to_string(),
+            domain_payload: payload.to_string().into(),
             domain_payload_hash: hash,
             session_stack: ob_poc_types::session_stack::SessionStackState::default(),
             flags: BTreeMap::from([(0, Value::Bool(true)), (1, Value::I64(42))]),
@@ -1150,6 +1250,8 @@ mod tests {
             join_expected: BTreeMap::from([(0, 3)]),
             state: ProcessState::Running,
             correlation_id: "runbook-entry-1".to_string(),
+            entry_id: Uuid::nil(),
+            runbook_id: Uuid::nil(),
             created_at: 1700000000000,
         }
     }
@@ -1329,6 +1431,8 @@ mod tests {
                     session_stack: ob_poc_types::session_stack::SessionStackState::default(),
                     orch_flags: BTreeMap::new(),
                     retries_remaining: 3,
+                    entry_id: Uuid::nil(),
+                    runbook_id: Uuid::nil(),
                 })
                 .await
                 .unwrap();
@@ -1336,7 +1440,7 @@ mod tests {
 
         // Dequeue 2
         let batch1 = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 2)
+            .dequeue_jobs(std::slice::from_ref(&task_type), 2, "default")
             .await
             .unwrap();
         assert_eq!(batch1.len(), 2);
@@ -1346,7 +1450,7 @@ mod tests {
 
         // Dequeue remaining
         let batch2 = store
-            .dequeue_jobs(std::slice::from_ref(&task_type), 10)
+            .dequeue_jobs(std::slice::from_ref(&task_type), 10, "default")
             .await
             .unwrap();
         assert_eq!(batch2.len(), 1);
@@ -1550,7 +1654,7 @@ mod tests {
             .await
             .unwrap();
         let loaded = store.load_instance(id).await.unwrap().unwrap();
-        assert_eq!(loaded.domain_payload, new_payload);
+        assert_eq!(loaded.domain_payload.as_ref(), new_payload);
         assert_eq!(loaded.domain_payload_hash, new_hash);
     }
 
@@ -1606,6 +1710,8 @@ mod tests {
                     session_stack: ob_poc_types::session_stack::SessionStackState::default(),
                     orch_flags: BTreeMap::new(),
                     retries_remaining: 3,
+                    entry_id: Uuid::nil(),
+                    runbook_id: Uuid::nil(),
                 })
                 .await
                 .unwrap();
@@ -1617,7 +1723,7 @@ mod tests {
             let s = store.clone();
             let tt = task_type.clone();
             handles.push(tokio::spawn(async move {
-                s.dequeue_jobs(&[tt], 1).await.unwrap()
+                s.dequeue_jobs(&[tt], 1, "default").await.unwrap()
             }));
         }
 
@@ -1678,7 +1784,7 @@ mod tests {
         );
 
         // Dequeue job
-        let jobs = store.dequeue_jobs(&task_types, 1).await.unwrap();
+        let jobs = store.dequeue_jobs(&task_types, 1, "default").await.unwrap();
         assert_eq!(jobs.len(), 1, "should have 1 job");
 
         let job = &jobs[0];
@@ -1752,6 +1858,8 @@ mod tests {
                     session_stack: ob_poc_types::session_stack::SessionStackState::default(),
                     orch_flags: BTreeMap::new(),
                     retries_remaining: 3,
+                    entry_id: Uuid::nil(),
+                    runbook_id: Uuid::nil(),
                 })
                 .await
                 .unwrap();
@@ -1767,6 +1875,8 @@ mod tests {
                 session_stack: ob_poc_types::session_stack::SessionStackState::default(),
                 orch_flags: BTreeMap::new(),
                 retries_remaining: 3,
+                entry_id: Uuid::nil(),
+                runbook_id: Uuid::nil(),
             })
             .await
             .unwrap();
@@ -1776,7 +1886,10 @@ mod tests {
         assert_eq!(cancelled.len(), 2);
 
         // Dequeue remaining — should only get B's job
-        let remaining = store.dequeue_jobs(&[task_type], 10).await.unwrap();
+        let remaining = store
+            .dequeue_jobs(&[task_type], 10, "default")
+            .await
+            .unwrap();
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].job_key, "cancel-b-0");
     }
