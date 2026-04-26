@@ -318,17 +318,6 @@ fn take_one_value(s: &str) -> Option<String> {
     }
 }
 
-fn extract_quoted(s: &str) -> Option<String> {
-    let s = s.trim();
-    let s = s.trim_start_matches(|c| c == ':' || c == ' ');
-    let s = s.trim_matches(|c: char| c == '"' || c == '\'' || c.is_whitespace());
-    if s.is_empty() {
-        None
-    } else {
-        Some(s.to_string())
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────
 // Report types
 // ─────────────────────────────────────────────────────────────────

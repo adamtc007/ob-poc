@@ -2043,8 +2043,17 @@ fn check(sh: &Shell, db: bool) -> Result<()> {
         println!("  Running governance check...");
         let rt = tokio::runtime::Runtime::new()?;
         rt.block_on(governed_check::run_check(true))?;
+
+        // Cross-workspace DAG harness (mock + live, both require DB).
+        // Live mode uses #[sqlx::test] ephemeral databases.
+        println!("  Running cross-workspace DAG harness (mock + live)...");
+        dag_test::run(sh, dag_test::DagTestMode::Both, false, None)?;
     } else {
         cmd!(sh, "cargo test --lib --features database").run()?;
+
+        // DAG harness mock-only path is fast and DB-free.
+        println!("  Running cross-workspace DAG harness (mock-only)...");
+        dag_test::run(sh, dag_test::DagTestMode::MockOnly, false, None)?;
     }
 
     println!("All checks passed!");
@@ -2258,6 +2267,9 @@ fn pre_commit(sh: &Shell) -> Result<()> {
 
     println!("\n=== Adapter Tests (constellation/state machine coverage) ===");
     cmd!(sh, "cargo test -p sem_os_obpoc_adapter").run()?;
+
+    println!("\n=== Cross-workspace DAG harness (mock-only, fast) ===");
+    dag_test::run(sh, dag_test::DagTestMode::MockOnly, false, None)?;
 
     println!("\n=== Verb Atlas Lint ===");
     verbs::verbs_atlas(None, true, false)?;
