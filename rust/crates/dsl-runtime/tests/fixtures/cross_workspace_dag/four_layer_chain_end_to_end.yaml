@@ -1,0 +1,116 @@
+name: "Four-layer chain end-to-end (Deal → CBU → Service → Capability binding)"
+suite_id: "four_layer_chain"
+description: |
+  The full Tranche 4 four-layer chain in one scenario:
+
+    Layer 1: Deal CONTRACTED (gated by KYC + BP)
+    Layer 2: CBU service_consumption proposed → provisioned
+             (R4: gated by Deal CONTRACTED for client_group)
+             (R2: gated by service.active in catalogue)
+    Layer 3: service.active in product_maintenance catalogue
+    Layer 4: cbu service_consumption provisioned → active
+             (R8: gated by capability_binding LIVE on application_instance ACTIVE)
+
+  Walks every gate from blocked → progressively satisfied → green.
+
+entity_aliases:
+  deal-1:    "00000000-0000-0000-0000-000000000050"
+  case-1:    "00000000-0000-0000-0000-000000000051"
+  bpc-1:     "00000000-0000-0000-0000-000000000052"
+  consume-1: "00000000-0000-0000-0000-000000000053"
+  service-1: "00000000-0000-0000-0000-000000000054"
+  binding-1: "00000000-0000-0000-0000-000000000055"
+
+initial_state:
+  - { workspace: deal,                slot: deal,                 entity: "deal-1",    state: "KYC_CLEARANCE" }
+  - { workspace: kyc,                 slot: kyc_case,             entity: "case-1",    state: "APPROVED" }
+  - { workspace: booking_principal,   slot: clearance,            entity: "bpc-1",     state: "ACTIVE" }
+  - { workspace: cbu,                 slot: service_consumption,  entity: "consume-1", state: "proposed" }
+  - { workspace: product_maintenance, slot: service,              entity: "service-1", state: "draft" }
+  - { workspace: lifecycle_resources, slot: capability_binding,   entity: "binding-1", state: "PILOT" }
+
+predicates:
+  # Deal layer (KYC + BP)
+  "cases.client_group_id = this_deal.primary_client_group_id":
+    - { target: "deal-1", source: "case-1" }
+  "booking_principal_clearances.deal_id = this_deal.deal_id":
+    - { target: "deal-1", source: "bpc-1" }
+  # L2 → L1 gate: service_consumption requires Deal CONTRACTED
+  "deals.primary_client_group_id = this_consumption_cbu.client_group_id":
+    - { target: "consume-1", source: "deal-1" }
+  # L2 → L3 gate: service_consumption requires service.active
+  "services.service_id = this_consumption.service_id":
+    - { target: "consume-1", source: "service-1" }
+  # L4 gate: capability_binding LIVE on ACTIVE application_instance
+  "capability_bindings.service_id = this_consumption.service_id AND EXISTS (SELECT 1 FROM \"ob-poc\".application_instances ai WHERE ai.id = capability_bindings.application_instance_id AND ai.lifecycle_status = 'ACTIVE')":
+    - { target: "consume-1", source: "binding-1" }
+
+steps:
+  # ─────────────────────────── Layer 1: Deal ───────────────────────────
+  - name: "L1: Deal CONTRACTED — green (KYC + BP both satisfied at start)"
+    check_transition:
+      workspace: deal
+      slot: deal
+      entity: "deal-1"
+      from: "KYC_CLEARANCE"
+      to: "CONTRACTED"
+    expect:
+      violations: []
+
+  - mutate:
+      - { workspace: deal, slot: deal, entity: "deal-1", state: "CONTRACTED" }
+
+  # ─────────────────────────── Layer 2 → 1: CBU service subscribe ───────
+  - name: "L2→L1: service_consumption.proposed → provisioned BLOCKED — service not active"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-1"
+      from: "proposed"
+      to: "provisioned"
+    expect:
+      violations:
+        - constraint_id: "service_consumption_requires_active_service"
+          severity: "error"
+
+  - mutate:
+      - { workspace: product_maintenance, slot: service, entity: "service-1", state: "active" }
+
+  - name: "L2→L1: service_consumption.proposed → provisioned GREEN — Deal contracted + service active"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-1"
+      from: "proposed"
+      to: "provisioned"
+    expect:
+      violations: []
+
+  - mutate:
+      - { workspace: cbu, slot: service_consumption, entity: "consume-1", state: "provisioned" }
+
+  # ─────────────────────────── Layer 4: capability binding ──────────────
+  - name: "L4: service_consumption.provisioned → active BLOCKED — binding not LIVE"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-1"
+      from: "provisioned"
+      to: "active"
+    expect:
+      violations:
+        - constraint_id: "service_consumption_active_requires_live_binding"
+          severity: "error"
+
+  - mutate:
+      - { workspace: lifecycle_resources, slot: capability_binding, entity: "binding-1", state: "LIVE" }
+
+  - name: "L4: service_consumption.provisioned → active GREEN — binding LIVE"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-1"
+      from: "provisioned"
+      to: "active"
+    expect:
+      violations: []

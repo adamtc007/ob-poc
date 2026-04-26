@@ -1,0 +1,45 @@
+name: "CBU VALIDATED requires KYC APPROVED"
+suite_id: "cbu_validated_kyc_gate"
+description: |
+  Single Mode A constraint. CBU cannot transition VALIDATION_PENDING →
+  VALIDATED unless the sponsoring KYC case is APPROVED.
+
+entity_aliases:
+  cbu-1:  "00000000-0000-0000-0000-000000000010"
+  case-1: "00000000-0000-0000-0000-000000000011"
+
+initial_state:
+  - { workspace: cbu, slot: cbu,     entity: "cbu-1",  state: "VALIDATION_PENDING" }
+  - { workspace: kyc, slot: kyc_case, entity: "case-1", state: "REVIEW" }
+
+predicates:
+  "cases.sponsor_cbu_id = this_cbu.cbu_id OR cases.client_group_id = this_cbu.primary_client_group_id":
+    - { target: "cbu-1", source: "case-1" }
+
+steps:
+  - name: "blocked: KYC case still in REVIEW"
+    check_transition:
+      workspace: cbu
+      slot: cbu
+      entity: "cbu-1"
+      from: "VALIDATION_PENDING"
+      to: "VALIDATED"
+    expect:
+      violations:
+        - constraint_id: "cbu_validated_requires_kyc_case_approved"
+          severity: "error"
+          required_state: ["APPROVED"]
+          actual_state: "REVIEW"
+
+  - mutate:
+      - { workspace: kyc, slot: kyc_case, entity: "case-1", state: "APPROVED" }
+
+  - name: "succeeds: KYC APPROVED"
+    check_transition:
+      workspace: cbu
+      slot: cbu
+      entity: "cbu-1"
+      from: "VALIDATION_PENDING"
+      to: "VALIDATED"
+    expect:
+      violations: []

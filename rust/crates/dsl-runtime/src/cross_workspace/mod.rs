@@ -141,6 +141,8 @@ pub mod replay;
 pub mod repository;
 pub mod slot_state;
 pub mod sql_predicate_resolver;
+#[cfg(any(test, feature = "harness"))]
+pub mod test_harness;
 pub mod types;
 
 pub use derived_state::{

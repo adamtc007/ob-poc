@@ -1,0 +1,44 @@
+name: "Instrument Matrix mandate requires VALIDATED CBU"
+suite_id: "im_mandate_cbu_gate"
+description: |
+  Cross-workspace pivot. trading_profile cannot leave DRAFT (DRAFT →
+  SUBMITTED) unless the sponsoring CBU is VALIDATED in the cbu workspace.
+
+  The constraint declares no source_predicate, so the GateChecker uses
+  same-entity lookup (the trading_profile_id IS the cbu_id for this
+  fixture, mirroring the production constraint's same-entity assumption).
+
+entity_aliases:
+  shared-id: "00000000-0000-0000-0000-000000000020"
+
+initial_state:
+  - { workspace: instrument_matrix, slot: trading_profile, entity: "shared-id", state: "DRAFT" }
+  - { workspace: cbu,               slot: cbu,             entity: "shared-id", state: "VALIDATION_PENDING" }
+
+steps:
+  - name: "blocked: CBU not VALIDATED"
+    check_transition:
+      workspace: instrument_matrix
+      slot: trading_profile
+      entity: "shared-id"
+      from: "DRAFT"
+      to: "SUBMITTED"
+    expect:
+      violations:
+        - constraint_id: "mandate_requires_validated_cbu"
+          severity: "error"
+          required_state: ["VALIDATED"]
+          actual_state: "VALIDATION_PENDING"
+
+  - mutate:
+      - { workspace: cbu, slot: cbu, entity: "shared-id", state: "VALIDATED" }
+
+  - name: "succeeds: CBU now VALIDATED"
+    check_transition:
+      workspace: instrument_matrix
+      slot: trading_profile
+      entity: "shared-id"
+      from: "DRAFT"
+      to: "SUBMITTED"
+    expect:
+      violations: []

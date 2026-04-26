@@ -68,5 +68,11 @@ thiserror = "1"
 tokio = { version = "1", features = ["time", "process"] }
 futures = "0.3"
 
+[features]
+# Cross-workspace DAG test harness. Off by default; enabled by integration
+# tests in this crate (and optionally by external crates that want to use
+# the harness for their own DAG-driven scenario tests).
+harness = []
+
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
