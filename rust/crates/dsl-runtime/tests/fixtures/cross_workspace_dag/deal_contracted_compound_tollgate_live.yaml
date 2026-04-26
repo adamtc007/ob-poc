@@ -1,0 +1,99 @@
+name: "Deal CONTRACTED compound tollgate (live)"
+suite_id: "deal_contracted_tollgate_live"
+description: |
+  Live-mode counterpart of deal_contracted_compound_tollgate.yaml.
+  Same scenario, but state lookups go through PostgresSlotStateProvider
+  + SqlPredicateResolver against an ephemeral DB created by sqlx::test.
+
+  Catches what the mock-mode fixture cannot: real SQL execution against
+  the real schema, FK shape, predicate parsing on the production
+  SqlPredicateResolver.
+
+mode: live
+
+# Shared client_group_id ties cases.client_group_id to deals.primary_client_group_id.
+# Shared deal_id ties booking_principal_clearances.deal_id to deals.deal_id.
+entity_aliases:
+  deal-1:    "11111111-1111-0000-0000-000000000001"
+  case-1:    "11111111-1111-0000-0000-000000000002"
+  bpc-1:     "11111111-1111-0000-0000-000000000003"
+  cbu-1:     "11111111-1111-0000-0000-000000000004"
+  client-group-1: "11111111-1111-0000-0000-000000000005"
+
+initial_state:
+  - workspace: deal
+    slot: deal
+    entity: "deal-1"
+    state: "KYC_CLEARANCE"
+    attrs:
+      # primary_client_group_id is the bridge column the KYC predicate
+      # joins on (cases.client_group_id = this_deal.primary_client_group_id).
+      primary_client_group_id: "alias:client-group-1"
+
+  - workspace: kyc
+    slot: kyc_case
+    entity: "case-1"
+    state: "REVIEW"
+    attrs:
+      # cbu_id is NOT NULL in cases — point it at our test cbu (which we
+      # also seed below so the row exists).
+      cbu_id: "alias:cbu-1"
+      # client_group_id is what the KYC predicate joins on.
+      client_group_id: "alias:client-group-1"
+
+  - workspace: booking_principal
+    slot: clearance
+    entity: "bpc-1"
+    state: "PENDING"
+    attrs:
+      # deal_id is what the BP predicate joins on
+      # (booking_principal_clearances.deal_id = this_deal.deal_id).
+      deal_id: "alias:deal-1"
+
+  # Seed the cbu so cases.cbu_id has a real row to point at.
+  - workspace: cbu
+    slot: cbu
+    entity: "cbu-1"
+    state: "DISCOVERED"
+
+steps:
+  - name: "live: blocked: KYC + BP both pending"
+    check_transition:
+      workspace: deal
+      slot: deal
+      entity: "deal-1"
+      from: "KYC_CLEARANCE"
+      to: "CONTRACTED"
+    expect:
+      violations:
+        - constraint_id: "deal_contracted_requires_kyc_approved"
+          severity: "error"
+        - constraint_id: "deal_contracted_requires_bp_approved"
+          severity: "error"
+
+  - mutate:
+      - { workspace: kyc, slot: kyc_case, entity: "case-1", state: "APPROVED" }
+
+  - name: "live: still blocked: BP not approved"
+    check_transition:
+      workspace: deal
+      slot: deal
+      entity: "deal-1"
+      from: "KYC_CLEARANCE"
+      to: "CONTRACTED"
+    expect:
+      violations:
+        - constraint_id: "deal_contracted_requires_bp_approved"
+
+  - mutate:
+      - { workspace: booking_principal, slot: clearance, entity: "bpc-1", state: "ACTIVE" }
+
+  - name: "live: succeeds: all three tollgates green"
+    check_transition:
+      workspace: deal
+      slot: deal
+      entity: "deal-1"
+      from: "KYC_CLEARANCE"
+      to: "CONTRACTED"
+    expect:
+      violations: []

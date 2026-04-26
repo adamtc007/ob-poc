@@ -201,6 +201,15 @@ fn guess_source_pk(table: &str) -> String {
         "manco_regulatory_status" => "manco_entity_id".to_string(),
         "cbu_trading_activity" => "cbu_id".to_string(),
         "cbu_service_consumption" => "consumption_id".to_string(),
+        // R3 (2026-04-26): bp_clearances + R1 lifecycle_resources tables use
+        // single-column PK named just `id` (DEFAULT gen_random_uuid()).
+        // Surfaced by the live test harness — without this case the
+        // SqlPredicateResolver would generate booking_principal_clearance_id
+        // and fail with "column does not exist" against the real schema.
+        "booking_principal_clearances" => "id".to_string(),
+        "application_instances" => "id".to_string(),
+        "capability_bindings" => "id".to_string(),
+        "service_versions" => "id".to_string(),
         // {plural}s → {singular}_id
         t if t.ends_with('s') => format!("{}_id", t.trim_end_matches('s')),
         // Fallback: id

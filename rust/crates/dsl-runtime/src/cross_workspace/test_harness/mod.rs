@@ -40,15 +40,17 @@
 //! [`SqlPredicateResolver`]: crate::cross_workspace::sql_predicate_resolver::SqlPredicateResolver
 
 pub mod assertions;
+pub mod live;
 pub mod mocks;
 pub mod runner;
 pub mod scenario;
 
 pub use assertions::AssertionFailure;
+pub use live::LiveScenarioRunner;
 pub use mocks::{MockChildEntityResolver, MockPredicateResolver, MockSlotStateProvider};
 pub use runner::{ScenarioReport, ScenarioRunner, StepResult};
 pub use scenario::{
     CheckTransitionOp, ChildEntry, EvaluateDerivedOp, ExpectedCascadeAction, ExpectedCondition,
     ExpectedDerivedValue, ExpectedViolation, PlanCascadeOp, PredicateEntry, Scenario,
-    ScenarioStep, StateEntry, StepExpectation,
+    ScenarioMode, ScenarioStep, SeedDependency, StateEntry, StepExpectation,
 };
