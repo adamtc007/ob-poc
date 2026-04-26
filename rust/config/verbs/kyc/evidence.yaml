@@ -144,6 +144,10 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: evidence-id
+          target_workspace: kyc
+          target_slot: ubo_evidence
 
       mark-rejected:
         description: "Reject an evidence record (clears document link for re-submission)"
@@ -178,6 +182,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: evidence-id
+          target_workspace: kyc
+          target_slot: ubo_evidence
 
       mark-waived:
         description: "Waive an evidence requirement with documented authority"

@@ -191,6 +191,11 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: case-id
+          target_state_arg: status
+          target_workspace: kyc
+          target_slot: kyc_case
       escalate:
         description: Escalate case to higher authority
         invocation_phrases:
@@ -453,6 +458,11 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: case-id
+          target_state_arg: status
+          target_workspace: kyc
+          target_slot: kyc_case
       read:
         description: Read case details
         invocation_phrases:

@@ -1963,6 +1963,11 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: request-id
+          target_state_arg: request-status
+          target_workspace: deal
+          target_slot: deal_onboarding_request
 
       list-onboarding-requests:
         description: "List onboarding requests for a deal"

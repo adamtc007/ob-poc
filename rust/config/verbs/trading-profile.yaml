@@ -1111,6 +1111,10 @@ domains:
                   value: true
                 tier: requires_explicit_authorisation
                 reason: "Profile includes derivative instruments — requires compliance + risk sign-off."
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
 
       approve:
         description: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
@@ -1155,6 +1159,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
 
       reject:
         description: Reject a pending trading profile (transitions PENDING_REVIEW -> DRAFT with rejection reason)
@@ -1199,6 +1207,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
 
       archive:
         description: Archive a trading profile (soft delete, transitions to ARCHIVED status)
@@ -1814,6 +1826,10 @@ domains:
             edges:
               - from: PARALLEL_RUN
                 to: ACTIVE
+        transition_args:
+          entity_id_arg: profile
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
 
       abort-parallel-run:
         description: "Abort parallel run — roll back to approved"
@@ -1880,6 +1896,10 @@ domains:
             edges:
               - from: ACTIVE
                 to: SUSPENDED
+        transition_args:
+          entity_id_arg: profile
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
 
       reactivate:
         description: "Reactivate a suspended mandate (suspended → active)"
@@ -1910,6 +1930,10 @@ domains:
             edges:
               - from: SUSPENDED
                 to: ACTIVE
+        transition_args:
+          entity_id_arg: profile
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
 
       supersede:
         description: "Supersede active version with newer version (active → superseded)"
