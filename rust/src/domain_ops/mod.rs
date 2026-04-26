@@ -56,6 +56,7 @@
 // alongside the `bods/` module it consumes.
 mod booking_principal_ops;
 mod bpmn_lite_ops;
+mod catalogue_ops;
 mod simple_status_op;
 mod stub_op;
 // Phase 5a composite-blocker #20 — capital_ops relocated to
@@ -603,6 +604,13 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // one target state, one entity id arg). See simple_status_op.rs
     // for the registration table and inclusion criteria.
     simple_status_op::register_simple_status_ops(registry);
+
+    // Tranche 3 Phase 3.B (2026-04-26) — Catalogue workspace authorship
+    // verbs. Real implementations replacing the v1.2 §P.8 stubs.
+    registry.register(Arc::new(catalogue_ops::CataloguePropose));
+    registry.register(Arc::new(catalogue_ops::CatalogueCommit));
+    registry.register(Arc::new(catalogue_ops::CatalogueRollback));
+    registry.register(Arc::new(catalogue_ops::CatalogueListProposals));
 
     // Phase B Pattern B slice #80: StubOp — registers FQNs for plugin
     // verbs whose real impls are pending (catalogue.* P.8 prototype +

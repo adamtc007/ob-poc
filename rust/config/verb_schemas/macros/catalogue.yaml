@@ -1,0 +1,141 @@
+# Catalogue Domain Macros — Tranche 3 Phase 3.B (2026-04-26)
+#
+# v1.2 §8.2 Phase 3.A authoring macros, evidence-based from the patterns
+# Tranche 2 surfaced. Each macro wraps the four authorship verbs into a
+# deterministic compound workflow with a runbook composition tier
+# already declared.
+#
+# Matched at Tier -2B (MacroIndex, score 0.96) before semantic search.
+
+# ── 1. Tier-tightening (most common authorship pattern) ──────────────────
+catalogue.tier-tightening:
+  kind: macro
+
+  aliases:
+    - "tighten verb tier"
+    - "raise tier on verb"
+    - "tier-up this verb"
+    - "fix tier mislabel"
+
+  ui:
+    label: "Catalogue: Tighten Verb Tier"
+    description: "Tighten one verb's baseline tier (monotonic floor — only ever upward)"
+    target-label: "Tier-Tightening Proposal"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: catalogue
+
+  composition_tier: requires_explicit_authorisation
+
+  expansion:
+    - verb: catalogue.propose-verb-declaration
+      args:
+        verb-fqn: "{{verb-fqn}}"
+        proposed-declaration: "{{proposed-declaration}}"
+        rationale: "Tier tightened to {{new-tier}} per cluster-alignment review"
+    # Stage check is automatic on validator-clean (out-of-band).
+    - verb: catalogue.commit-verb-declaration
+      args:
+        proposal-id: "{{proposal-id}}"
+        approver: "{{approver}}"
+
+# ── 2. Add escalation rule (R25 pattern) ─────────────────────────────────
+catalogue.add-escalation-rule:
+  kind: macro
+
+  aliases:
+    - "add escalation rule"
+    - "escalate verb on context"
+    - "add context-dependent tier"
+
+  ui:
+    label: "Catalogue: Add Escalation Rule"
+    description: "Add a context-dependent escalation rule to a verb's consequence block"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: catalogue
+
+  composition_tier: requires_explicit_authorisation
+
+  expansion:
+    - verb: catalogue.propose-verb-declaration
+    - verb: catalogue.commit-verb-declaration
+
+# ── 3. Migrate to transition_args (Phase 2.C revisit pattern) ────────────
+catalogue.migrate-to-transition-args:
+  kind: macro
+
+  aliases:
+    - "migrate to transition_args"
+    - "modernise verb shape"
+    - "v1.2 migration"
+
+  ui:
+    label: "Catalogue: Migrate to v1.2 transition_args Shape"
+    description: "Migrate a v1.1 verb (legacy transitions: block) to v1.2 canonical transition_args:"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: catalogue
+
+  composition_tier: requires_confirmation
+
+  expansion:
+    - verb: catalogue.propose-verb-declaration
+    - verb: catalogue.commit-verb-declaration
+
+# ── 4. Declare new verb (greenfield) ─────────────────────────────────────
+catalogue.declare-new-verb:
+  kind: macro
+
+  aliases:
+    - "add new verb"
+    - "declare a new verb"
+    - "register new verb in catalogue"
+
+  ui:
+    label: "Catalogue: Declare New Verb"
+    description: "Declare a brand-new verb with full three-axis from a shape template"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: catalogue
+
+  composition_tier: requires_explicit_authorisation
+
+  expansion:
+    - verb: catalogue.propose-verb-declaration
+    - verb: catalogue.commit-verb-declaration
+
+# ── 5. Bulk tier-tightening (Phase 2.G.4 pattern) ────────────────────────
+catalogue.bulk-tier-tightening:
+  kind: macro
+
+  aliases:
+    - "bulk tighten tiers"
+    - "cluster-fix tier outliers"
+    - "Phase 2.G self-consistency fix"
+
+  ui:
+    label: "Catalogue: Bulk Tier-Tightening"
+    description: "Tighten multiple verbs to align with a cluster pattern (composition_rules: aggregation > 5 = escalate)"
+
+  routing:
+    mode-tags: [stewardship]
+    operator-domain: catalogue
+
+  composition_tier: requires_explicit_authorisation
+
+  composition_rules:
+    aggregation:
+      - condition: "cardinality > 5"
+        rationale: ">5 verb changes = larger blast radius; escalate one tier"
+
+  expansion:
+    # Per-verb propose iteration handled by macro expansion engine.
+    - verb: catalogue.propose-verb-declaration
+      foreach: "{{verb-fqns}}"
+    # Single explicit-auth commit covers the whole batch.
+    - verb: catalogue.commit-verb-declaration
