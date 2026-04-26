@@ -910,7 +910,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
       reactivate:
         description: "Reactivate suspended user"
         invocation_phrases:
@@ -949,7 +949,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
       offboard:
         description: "Offboard user completely (left company)"
         invocation_phrases:

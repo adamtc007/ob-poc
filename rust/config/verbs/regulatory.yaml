@@ -228,7 +228,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
   regulatory.status:
     description: "Entity regulatory status queries"
     verbs:

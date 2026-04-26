@@ -252,7 +252,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
       add-product:
         description: "Add a product to a contract with rate card"
         behavior: crud

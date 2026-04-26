@@ -342,7 +342,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
       terminate:
         description: Terminate an IM assignment
         metadata:
@@ -385,7 +385,7 @@ domains:
           state_effect: preserving
           external_effects: []
           consequence:
-            baseline: reviewable
+            baseline: requires_confirmation
       find-for-trade:
         description: Find IM assignment that covers given trade characteristics
         metadata:
