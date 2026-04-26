@@ -796,6 +796,10 @@ domains:
               - from: suspended
                 to: active
 
+        transition_args:
+          entity_id_arg: connectivity-id
+          target_workspace: instrument_matrix
+          target_slot: trade_gateway
       retire-gateway:
         description: "Retire a trade gateway (terminal — broker relationship ended)"
         invocation_phrases:
@@ -831,3 +835,7 @@ domains:
                 to: retired
               - from: suspended
                 to: retired
+        transition_args:
+          entity_id_arg: connectivity-id
+          target_workspace: instrument_matrix
+          target_slot: trade_gateway

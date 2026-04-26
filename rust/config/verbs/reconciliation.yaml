@@ -66,16 +66,10 @@ domains:
           name: reconciliation_id
           capture: true
         three_axis:
-          state_effect: transition
+          state_effect: preserving
           external_effects: []
           consequence:
             baseline: reviewable
-          transitions:
-            dag: instrument_matrix_dag
-            edges:
-              - from: "(new)"
-                to: draft
-
       activate:
         description: "Activate a reconciliation config (draft → active)"
         invocation_phrases:

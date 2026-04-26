@@ -152,6 +152,9 @@ fn v1_2_legacy_transitions_block_grandfathered() {
             | StructuralError::PreservingWithTransitionArgs(loc) => {
                 format!("{}", loc).contains("legacy-v1-1-transition")
             }
+            StructuralError::TransitionArgsSlotNotFound { location, .. } => {
+                format!("{}", location).contains("legacy-v1-1-transition")
+            }
         })
         .count();
     assert_eq!(

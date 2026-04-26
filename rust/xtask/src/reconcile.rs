@@ -112,8 +112,43 @@ async fn validate(strict_warnings: bool) -> Result<()> {
         total
     );
 
+    // V1.3 — load DAGs FIRST so we can populate known_slots for the
+    // verb validator's transition_args slot-resolution check (v1.3
+    // amendment, 2026-04-26).
+    let dags_dir = PathBuf::from("config/sem_os_seeds/dag_taxonomies");
+    let dags_loaded = if dags_dir.exists() {
+        let loaded = load_dags_from_dir(&dags_dir)
+            .context("loading config/sem_os_seeds/dag_taxonomies/ for v1.3 checks")?;
+        println!(
+            "Loaded {} DAG taxonomies from config/sem_os_seeds/dag_taxonomies/",
+            loaded.len()
+        );
+        Some(loaded)
+    } else {
+        None
+    };
+    let dag_report = if let Some(loaded) = &dags_loaded {
+        validate_dags(loaded)
+    } else {
+        dsl_core::config::DagValidationReport::default()
+    };
+
+    // Populate known_slots from loaded DAGs for v1.3 transition_args
+    // slot-resolution check.
+    let mut known_slots: std::collections::HashSet<(String, String)> =
+        std::collections::HashSet::new();
+    if let Some(loaded) = &dags_loaded {
+        for (_path, loaded_dag) in loaded.iter() {
+            let dag = &loaded_dag.dag;
+            for slot in &dag.slots {
+                known_slots.insert((dag.workspace.clone(), slot.id.clone()));
+            }
+        }
+    }
+
     let ctx = ValidationContext {
         require_declaration: false,
+        known_slots,
         ..ValidationContext::default()
     };
     let report = validate_verbs_config(&cfg, &ctx);
@@ -134,20 +169,6 @@ async fn validate(strict_warnings: bool) -> Result<()> {
         validate_pack_fqns(&declared, &macros, flatten_pack_entries(&packs))
     } else {
         Vec::new()
-    };
-
-    // V1.3 — DAG taxonomy cross-DAG validation (R-2b).
-    let dags_dir = PathBuf::from("config/sem_os_seeds/dag_taxonomies");
-    let dag_report = if dags_dir.exists() {
-        let loaded = load_dags_from_dir(&dags_dir)
-            .context("loading config/sem_os_seeds/dag_taxonomies/ for v1.3 checks")?;
-        println!(
-            "Loaded {} DAG taxonomies from config/sem_os_seeds/dag_taxonomies/",
-            loaded.len()
-        );
-        validate_dags(&loaded)
-    } else {
-        dsl_core::config::DagValidationReport::default()
     };
 
     let struct_n = report.structural.len();

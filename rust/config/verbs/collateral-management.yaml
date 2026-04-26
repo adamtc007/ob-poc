@@ -75,6 +75,10 @@ domains:
               - from: "(new)"
                 to: configured
 
+        transition_args:
+          entity_id_arg: collateral-id
+          target_workspace: instrument_matrix
+          target_slot: collateral_management
       activate:
         description: "Activate collateral management (configured → active)"
         invocation_phrases:

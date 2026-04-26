@@ -182,6 +182,34 @@ pub fn resolve_slot_table(
             ("instrument_matrix", "trading_activity"),
             ("cbu_trading_activity", "activity_state", "cbu_id"),
         ),
+        // v1.2 Phase 2.C revisit (2026-04-26) — added 6 IM dispatch
+        // entries to unblock the 14 grandfathered transition verbs
+        // (legacy `transitions:` block, no `transition_args:`). The
+        // table targets match `simple_status_op.rs::STATUS_FLIP_VERBS`.
+        (
+            ("instrument_matrix", "corporate_action_event"),
+            ("corporate_action_events", "status", "event_id"),
+        ),
+        (
+            ("instrument_matrix", "settlement_pattern_template"),
+            ("cbu_settlement_chains", "status", "chain_id"),
+        ),
+        (
+            ("instrument_matrix", "trade_gateway"),
+            ("cbu_gateway_connectivity", "status", "connectivity_id"),
+        ),
+        (
+            ("instrument_matrix", "service_resource"),
+            ("cbu_lifecycle_instances", "status", "instance_id"),
+        ),
+        (
+            ("instrument_matrix", "collateral_management"),
+            ("cbu_collateral_management", "status", "collateral_id"),
+        ),
+        (
+            ("instrument_matrix", "reconciliation"),
+            ("cbu_reconciliation_configs", "status", "config_id"),
+        ),
         // SemOS workspace
         (
             ("semos_maintenance", "changeset"),
