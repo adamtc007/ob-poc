@@ -1319,6 +1319,32 @@ cross_workspace_constraints:
     severity: error
     message: "CBU cannot subscribe to services until a Deal is CONTRACTED for the client"
 
+  # Closes the four-layer chain at the L3 → L4 hop. R1 deferred this constraint
+  # to "joint slice with R2"; the dedicated final slice (post-R7e) lands it.
+  # cbu.service_consumption cannot transition provisioned → active unless the
+  # capability_binding for this (cbu, service) is LIVE — i.e. a BNY application
+  # instance is bound and live for the consumed service. This is what makes
+  # the operational chain runtime-enforced end-to-end:
+  #   Deal CONTRACTED (L1) → CBU service active service (L3) →
+  #   capability_binding LIVE on application_instance ACTIVE (L4) →
+  #   cbu.service_consumption.active.
+  - id: service_consumption_active_requires_live_binding
+    description: |
+      cbu.service_consumption cannot transition provisioned → active unless
+      the capability_binding for the consumed (cbu, service) pair is LIVE
+      and the underlying application_instance is in ACTIVE state. Without
+      this gate a CBU could be marked actively-consuming a service that has
+      no live BNY application instance to fulfil it.
+    source_workspace: lifecycle_resources
+    source_slot: capability_binding
+    source_state: LIVE
+    source_predicate: "capability_bindings.service_id = this_consumption.service_id AND EXISTS (SELECT 1 FROM \"ob-poc\".application_instances ai WHERE ai.id = capability_bindings.application_instance_id AND ai.lifecycle_status = 'ACTIVE')"
+    target_workspace: cbu
+    target_slot: service_consumption
+    target_transition: "provisioned -> active"
+    severity: error
+    message: "Cannot activate service consumption without a LIVE capability binding on an ACTIVE application instance"
+
 # =============================================================================
 # 5. DERIVED CROSS-WORKSPACE STATE (V1.3-2 — Mode B aggregation / tollgate)
 # =============================================================================
