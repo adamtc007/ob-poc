@@ -86,6 +86,16 @@ pub enum StructuralError {
     /// `transition_args:` block. The block is only meaningful for
     /// transition-effect verbs.
     PreservingWithTransitionArgs(Location),
+    /// v1.3 candidate amendment (2026-04-26): `transition_args:` points at
+    /// a `(workspace, slot)` pair the catalogue's DAG taxonomies don't
+    /// declare. The verb cannot be runtime-gated because the
+    /// SlotStateProvider has no way to look up its state. Only emitted
+    /// when ValidationContext.known_slots is non-empty.
+    TransitionArgsSlotNotFound {
+        location: Location,
+        workspace: String,
+        slot: String,
+    },
 }
 
 impl std::fmt::Display for StructuralError {
@@ -106,6 +116,15 @@ impl std::fmt::Display for StructuralError {
             Self::PreservingWithTransitionArgs(loc) => write!(
                 f,
                 "{loc}: state_effect=preserving must not declare transition_args (v1.2 §6.2)"
+            ),
+            Self::TransitionArgsSlotNotFound {
+                location,
+                workspace,
+                slot,
+            } => write!(
+                f,
+                "{location}: transition_args points at unknown slot ({workspace}, {slot}) — \
+                 not declared in any DAG taxonomy (v1.3 amendment)"
             ),
         }
     }
@@ -257,12 +276,20 @@ impl ValidationReport {
 // ---------------------------------------------------------------------------
 
 /// Optional cross-reference information. If provided, the validator
-/// additionally checks `transitions.dag` references against known DAGs.
+/// additionally checks `transitions.dag` references against known DAGs
+/// and `transition_args` references against known (workspace, slot) pairs.
 #[derive(Debug, Clone, Default)]
 pub struct ValidationContext {
     /// Set of DAG taxonomy names the catalogue knows about. If empty, DAG
     /// cross-checks are skipped.
     pub known_dags: HashSet<String>,
+    /// Set of (workspace, slot) pairs the catalogue knows about, derived
+    /// from the loaded DAG taxonomies. If empty, transition_args slot-
+    /// resolution checks are skipped (rollout / test mode). v1.3 candidate
+    /// amendment (2026-04-26): when populated, the validator verifies
+    /// every `transition_args:` block points at a slot the runtime can
+    /// resolve.
+    pub known_slots: HashSet<(String, String)>,
     /// Whether verbs MUST carry a declaration. During rollout, set false so
     /// missing declarations don't error (but are reported via
     /// `DeclarationIncomplete` if caller opts in).
@@ -348,7 +375,29 @@ fn validate_declaration(
     // missing-transition_args error during the v1.1 → v1.2 migration window
     // (no estate-wide migration is in scope for Tranche 1).
     match (decl.state_effect, verb.transition_args.is_some()) {
-        (StateEffect::Transition, true) => { /* OK — v1.2 canonical */ }
+        (StateEffect::Transition, true) => {
+            // v1.3 amendment: when known_slots is populated, verify the
+            // (workspace, slot) the transition_args points at exists.
+            if !ctx.known_slots.is_empty() {
+                if let Some(ta) = &verb.transition_args {
+                    let workspace = ta.target_workspace.clone().unwrap_or_else(|| {
+                        // Default: derive from FQN domain (e.g.
+                        // `deal.update-status` → workspace `deal`).
+                        fqn.split('.').next().unwrap_or("").to_string()
+                    });
+                    let slot = ta.target_slot.clone().unwrap_or_else(|| workspace.clone());
+                    if !ctx.known_slots.contains(&(workspace.clone(), slot.clone())) {
+                        report
+                            .structural
+                            .push(StructuralError::TransitionArgsSlotNotFound {
+                                location: Location::verb_path(fqn, "transition_args"),
+                                workspace,
+                                slot,
+                            });
+                    }
+                }
+            }
+        }
         (StateEffect::Transition, false) if has_legacy_transitions => {
             // Backward-compat: v1.1 verb with legacy `transitions:` block but
             // no `transition_args:`. Accepted with no error during the
@@ -629,6 +678,65 @@ mod tests {
         let vc = bare_verb_config();
         let ctx = ValidationContext::default(); // require_declaration=false
         let r = validate_verb("test.verb", &vc, &ctx);
+        assert!(r.is_clean());
+    }
+
+    #[test]
+    fn transition_args_slot_not_found_is_structural_error_when_known_slots_populated() {
+        // v1.3 amendment: when known_slots is populated and the
+        // transition_args block points at an unknown (workspace, slot)
+        // pair, emit a TransitionArgsSlotNotFound structural error.
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Reviewable,
+                escalation: vec![],
+            },
+            transitions: None,
+        });
+        vc.transition_args = Some(TransitionArgs {
+            entity_id_arg: "entity-id".into(),
+            target_state_arg: None,
+            target_workspace: Some("nonexistent_workspace".into()),
+            target_slot: Some("nonexistent_slot".into()),
+        });
+        let mut ctx = ValidationContext {
+            require_declaration: false,
+            ..Default::default()
+        };
+        ctx.known_slots.insert(("deal".into(), "deal".into()));
+        ctx.known_slots.insert(("cbu".into(), "cbu".into()));
+        let r = validate_verb("test.verb", &vc, &ctx);
+        assert_eq!(r.structural.len(), 1);
+        assert!(matches!(
+            r.structural[0],
+            StructuralError::TransitionArgsSlotNotFound { .. }
+        ));
+    }
+
+    #[test]
+    fn transition_args_slot_resolution_skipped_when_known_slots_empty() {
+        // Backward compat: when known_slots is empty (rollout / test
+        // mode), the new check is a no-op.
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Reviewable,
+                escalation: vec![],
+            },
+            transitions: None,
+        });
+        vc.transition_args = Some(TransitionArgs {
+            entity_id_arg: "entity-id".into(),
+            target_state_arg: None,
+            target_workspace: Some("nonexistent_workspace".into()),
+            target_slot: Some("nonexistent_slot".into()),
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
         assert!(r.is_clean());
     }
 
@@ -969,6 +1077,7 @@ mod tests {
         known.insert("real_dag".to_string());
         let ctx = ValidationContext {
             known_dags: known,
+            known_slots: HashSet::new(),
             require_declaration: false,
         };
         let r = validate_verb("test.verb", &vc, &ctx);

@@ -264,11 +264,15 @@ domains:
         returns:
           type: record
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
 
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
       materialize:
         description: Materialize trading profile to operational tables (universe, SSIs, booking rules)
         behavior: plugin
@@ -1252,11 +1256,15 @@ domains:
       # =========================================================================
 
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects:
             - emitting
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
       ca.enable-event-types:
         description: Enable CA event types for this trading profile
         invocation_phrases:
@@ -1798,6 +1806,10 @@ domains:
               - from: APPROVED
                 to: PARALLEL_RUN
 
+        transition_args:
+          entity_id_arg: profile
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
       go-live:
         description: "Go-live on a mandate (parallel_run → active)"
         invocation_phrases:
@@ -1866,6 +1878,10 @@ domains:
               - from: PARALLEL_RUN
                 to: APPROVED
 
+        transition_args:
+          entity_id_arg: profile
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
       suspend:
         description: "Suspend active mandate (operational hold)"
         invocation_phrases:
@@ -1975,6 +1991,10 @@ domains:
       # Support for template-lifecycle + content-maintenance macros.
       # =========================================================================
 
+        transition_args:
+          entity_id_arg: profile
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
       retire-template:
         description: "Retire a template (available → unavailable)"
         invocation_phrases:
@@ -2008,6 +2028,10 @@ domains:
               - from: available
                 to: unavailable
 
+        transition_args:
+          entity_id_arg: template
+          target_workspace: instrument_matrix
+          target_slot: trading_profile
       add-instrument-class:
         description: "Add instrument class to trading profile / template"
         invocation_phrases:

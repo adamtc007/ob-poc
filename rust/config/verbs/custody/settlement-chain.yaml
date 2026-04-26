@@ -949,6 +949,10 @@ domains:
               - from: reviewed
                 to: parallel_run
 
+        transition_args:
+          entity_id_arg: chain
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
       go-live:
         description: "Activate chain as live (parallel_run → live)"
         invocation_phrases:
@@ -1018,6 +1022,10 @@ domains:
               - from: parallel_run
                 to: reviewed
 
+        transition_args:
+          entity_id_arg: chain
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template
       suspend:
         description: "Suspend a live settlement chain (operational hold)"
         invocation_phrases:
@@ -1085,3 +1093,7 @@ domains:
             edges:
               - from: suspended
                 to: live
+        transition_args:
+          entity_id_arg: chain
+          target_workspace: instrument_matrix
+          target_slot: settlement_pattern_template

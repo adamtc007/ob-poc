@@ -778,11 +778,15 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: reviewable
 
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor
       offboard:
         description: Transition to OFFBOARDED (terminal state)
         metadata:

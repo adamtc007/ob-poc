@@ -76,6 +76,10 @@ domains:
               - from: "(new)"
                 to: election_pending
 
+        transition_args:
+          entity_id_arg: event-id
+          target_workspace: instrument_matrix
+          target_slot: corporate_action_event
       elect:
         description: "Make an election on a pending CA event"
         invocation_phrases:
@@ -125,3 +129,7 @@ domains:
             edges:
               - from: election_pending
                 to: elected
+        transition_args:
+          entity_id_arg: event
+          target_workspace: instrument_matrix
+          target_slot: corporate_action_event
