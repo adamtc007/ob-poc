@@ -1,11 +1,11 @@
 //! Governed phrase authoring (Phases 1-3 + batch).
 //!
-//! 9 `phrase.*` verbs covering observation, coverage, collision checks,
+//! Nine `phrase.*` verbs covering observation, coverage, collision checks,
 //! and the propose → review → approve/reject/defer lifecycle. The bridge
-//! lives in ob-poc because it touches `crate::sem_reg::store::SnapshotStore`
-//! + `crate::sem_reg::types::*` + `crate::sem_reg::ids::object_id_for`
-//! and the embedding-similarity SQL on `verb_pattern_embeddings` /
-//! `phrase_bank` / `session_traces`.
+//! lives in ob-poc because it touches `crate::sem_reg::store::SnapshotStore`,
+//! `crate::sem_reg::types::*`, and `crate::sem_reg::ids::object_id_for`,
+//! plus the embedding-similarity SQL on `verb_pattern_embeddings`,
+//! `phrase_bank`, and `session_traces`.
 //!
 //! Snapshot writes record `created_by = principal.actor_id`, so the
 //! dispatch signature carries `&Principal` (mirroring

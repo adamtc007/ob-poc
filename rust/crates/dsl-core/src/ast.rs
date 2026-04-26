@@ -923,22 +923,23 @@ fn collect_unresolved_from_node(
             span,
             ref_id,
             ..
-        } => {
-            if resolved_key.is_none() {
-                // Use the stored ref_id if present (set during enrichment with list_index),
-                // otherwise generate from span. This ensures list items have unique ref_ids.
-                let final_ref_id = ref_id
-                    .clone()
-                    .unwrap_or_else(|| format!("{}:{}-{}", stmt_idx, span.start, span.end));
-                results.push(UnresolvedRefLocation {
-                    statement_index: stmt_idx,
-                    arg_key: arg_key.to_string(),
-                    entity_type: entity_type.clone(),
-                    search_text: value.clone(),
-                    search_column: Some(search_column.clone()),
-                    ref_id: Some(final_ref_id),
-                });
-            }
+        } if resolved_key.is_none() => {
+            // Use the stored ref_id if present (set during enrichment with list_index),
+            // otherwise generate from span. This ensures list items have unique ref_ids.
+            let final_ref_id = ref_id
+                .clone()
+                .unwrap_or_else(|| format!("{}:{}-{}", stmt_idx, span.start, span.end));
+            results.push(UnresolvedRefLocation {
+                statement_index: stmt_idx,
+                arg_key: arg_key.to_string(),
+                entity_type: entity_type.clone(),
+                search_text: value.clone(),
+                search_column: Some(search_column.clone()),
+                ref_id: Some(final_ref_id),
+            });
+        }
+        AstNode::EntityRef { .. } => {
+            // resolved_key.is_some() — already resolved, nothing to collect.
         }
         AstNode::List { items, .. } => {
             for item in items {

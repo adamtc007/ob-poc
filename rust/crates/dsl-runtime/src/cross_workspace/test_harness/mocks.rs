@@ -113,12 +113,15 @@ impl PredicateResolver for MockPredicateResolver {
 // MockChildEntityResolver — parent → list of (child_workspace, child_slot, child_id).
 // ---------------------------------------------------------------------------
 
+type ParentKey = (String, String, Uuid);
+type ChildEntry = (String, String, Uuid);
+
 /// `(parent_ws, parent_slot, parent_id)` → list of children. The
 /// `list_children` impl filters by the requested `(child_workspace,
 /// child_slot)` pair so a parent can have children of multiple slot types.
 #[derive(Default)]
 pub struct MockChildEntityResolver {
-    table: Mutex<HashMap<(String, String, Uuid), Vec<(String, String, Uuid)>>>,
+    table: Mutex<HashMap<ParentKey, Vec<ChildEntry>>>,
 }
 
 impl MockChildEntityResolver {

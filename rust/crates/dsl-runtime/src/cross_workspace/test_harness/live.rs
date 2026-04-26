@@ -423,6 +423,10 @@ fn repo_root_join(rel: &str) -> std::path::PathBuf {
     }
 }
 
+/// `(workspace, slot)` → `(table, state_column, pk_column)`.
+type SlotKey = (&'static str, &'static str);
+type SlotTarget = (&'static str, &'static str, &'static str);
+
 /// Re-implementation of `slot_state::resolve_slot_table` that's accessible
 /// from the live runner. Kept in lockstep with the production dispatch
 /// table; if a workspace/slot is added to production, add it here too
@@ -434,7 +438,7 @@ fn resolve_slot_table(
     // Phase 1 MVP coverage: the 4 tables in
     // rust/test-migrations/cross_workspace_dag/0001_schema.sql.
     // Phase 2+ extends as more tables are added to that migration.
-    let mapping: &[((&str, &str), (&str, &str, &str))] = &[
+    let mapping: &[(SlotKey, SlotTarget)] = &[
         // Phase 1
         (("cbu", "cbu"), ("cbus", "status", "cbu_id")),
         (("kyc", "kyc_case"), ("cases", "status", "case_id")),

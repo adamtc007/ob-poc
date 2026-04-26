@@ -17,8 +17,8 @@
 //!   orthogonality means MOST "unusual" combinations are legitimate
 //!   (state-preserving + `requires_explicit_authorisation`, state-transition
 //!   + `external_effects: []` + `requires_explicit_authorisation`) and the
-//!   validator stays silent. Warnings are for the narrow mechanically-broken
-//!   set — not opinion.
+//!     validator stays silent. Warnings are for the narrow mechanically-broken
+//!     set — not opinion.
 //!
 //! P.1.c implements structural + well-formedness. P.1.d adds the policy-
 //! sanity warnings.

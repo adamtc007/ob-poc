@@ -76,3 +76,11 @@ harness = []
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
+
+[[test]]
+name = "cross_workspace_dag_scenarios"
+required-features = ["harness"]
+
+[[test]]
+name = "cross_workspace_dag_live_scenarios"
+required-features = ["harness"]

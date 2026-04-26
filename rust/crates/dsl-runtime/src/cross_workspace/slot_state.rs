@@ -90,11 +90,14 @@ impl SlotStateProvider for PostgresSlotStateProvider {
 /// Public so other modules in `cross_workspace::*` (e.g. the SQL
 /// predicate resolver) can resolve the same mapping when constructing
 /// predicate-driven queries.
+type SlotKey = (&'static str, &'static str);
+type SlotTarget = (&'static str, &'static str, &'static str);
+
 pub fn resolve_slot_table(
     workspace: &str,
     slot: &str,
 ) -> Result<(&'static str, &'static str, &'static str)> {
-    let mapping: &[((&str, &str), (&str, &str, &str))] = &[
+    let mapping: &[(SlotKey, SlotTarget)] = &[
         // CBU workspace
         (("cbu", "cbu"), ("cbus", "status", "cbu_id")),
         (("cbu", "cbu_evidence"), ("cbu_evidence", "verification_status", "evidence_id")),
@@ -172,7 +175,8 @@ mod tests {
             ),
         ];
         for ((ws, slot), expected) in cases {
-            let got = resolve_slot_table(ws, slot).expect(&format!("({ws}, {slot}) should resolve"));
+            let got = resolve_slot_table(ws, slot)
+                .unwrap_or_else(|_| panic!("({ws}, {slot}) should resolve"));
             assert_eq!(got, expected, "mismatch for ({ws}, {slot})");
         }
     }

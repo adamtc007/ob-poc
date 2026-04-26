@@ -330,6 +330,9 @@ mod tests {
     }
 
     impl MockSlotStateProvider {
+        #[allow(dead_code)] // Reserved for future tests that exercise
+        // construction-with-state paths; kept inline so future tests don't
+        // have to rebuild the helper.
         fn set(&self, ws: &str, slot: &str, id: Uuid, state: Option<&str>) {
             self.states.lock().unwrap().insert(
                 (ws.to_string(), slot.to_string(), id),

@@ -360,7 +360,7 @@ mod tests {
         let at = (0..5)
             .map(|_| mk_step("x", ConsequenceTier::Benign, StateEffect::Preserving, "w"))
             .collect::<Vec<_>>();
-        assert_eq!(component_b(&below, &[rule.clone()]), ConsequenceTier::Benign);
+        assert_eq!(component_b(&below, std::slice::from_ref(&rule)), ConsequenceTier::Benign);
         assert_eq!(component_b(&at, &[rule]), ConsequenceTier::Reviewable);
     }
 
@@ -392,7 +392,7 @@ mod tests {
             mk_emitting(ConsequenceTier::Benign),
             mk_emitting(ConsequenceTier::Benign),
         ];
-        assert_eq!(component_b(&below, &[rule.clone()]), ConsequenceTier::Benign);
+        assert_eq!(component_b(&below, std::slice::from_ref(&rule)), ConsequenceTier::Benign);
         assert_eq!(
             component_b(&at, &[rule]),
             ConsequenceTier::RequiresConfirmation
@@ -457,7 +457,7 @@ mod tests {
             mk_step("b", ConsequenceTier::Benign, StateEffect::Preserving, "w2"),
         ];
         assert_eq!(
-            component_c(&same_ws, &[rule.clone()]),
+            component_c(&same_ws, std::slice::from_ref(&rule)),
             ConsequenceTier::Benign
         );
         assert_eq!(
@@ -480,7 +480,7 @@ mod tests {
         let stateless = mk_step("s", ConsequenceTier::Benign, StateEffect::Preserving, "w");
         // 2 distinct DAGs → fires.
         assert_eq!(
-            component_c(&[s1.clone(), s2.clone(), stateless.clone()], &[rule.clone()]),
+            component_c(&[s1.clone(), s2.clone(), stateless.clone()], std::slice::from_ref(&rule)),
             ConsequenceTier::Reviewable
         );
         // Only 1 DAG → doesn't fire.
