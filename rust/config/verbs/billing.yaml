@@ -167,6 +167,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: deal
+          target_slot: billing_profile
 
       suspend-profile:
         description: "Suspend billing (e.g. dispute, investigation)"
@@ -207,6 +211,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: deal
+          target_slot: billing_profile
 
       close-profile:
         description: "Close billing profile (offboarding)"
@@ -247,6 +255,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: profile-id
+          target_workspace: deal
+          target_slot: billing_profile
 
       get-profile:
         description: "Retrieve billing profile with account targets"
@@ -591,6 +603,10 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
+        transition_args:
+          entity_id_arg: period-id
+          target_workspace: deal
+          target_slot: billing_period
 
       review-period:
         description: "Mark billing period as reviewed, optionally apply adjustments"
@@ -638,6 +654,10 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
+        transition_args:
+          entity_id_arg: period-id
+          target_workspace: deal
+          target_slot: billing_period
 
       approve-period:
         description: "Approve billing period for invoicing"
@@ -686,6 +706,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: period-id
+          target_workspace: deal
+          target_slot: billing_period
 
       generate-invoice:
         description: "Generate invoice from approved billing period"
@@ -732,6 +756,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: period-id
+          target_workspace: deal
+          target_slot: billing_period
 
       dispute-period:
         description: "Client disputes a billing period"
@@ -776,6 +804,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: period-id
+          target_workspace: deal
+          target_slot: billing_period
 
       period-summary:
         description: "Get billing period with line-level detail"

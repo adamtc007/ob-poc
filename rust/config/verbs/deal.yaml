@@ -703,6 +703,10 @@ domains:
           external_effects: []
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: product-id
+          target_workspace: deal
+          target_slot: deal_product
 
       list-products:
         description: "List all products in the deal's commercial scope"
@@ -1646,6 +1650,11 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: document-id
+          target_state_arg: document-status
+          target_workspace: deal
+          target_slot: deal_document
 
       list-documents:
         description: "List all documents linked to a deal"
@@ -1762,6 +1771,11 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: assessment-id
+          target_state_arg: assessment-status
+          target_workspace: deal
+          target_slot: deal_ubo_assessment
 
       # =========================================================================
       # ONBOARDING HANDOFF
