@@ -2814,11 +2814,9 @@ fn lint_macros(errors_only: bool, verbose: bool) -> Result<()> {
                 total_errors += 1;
                 println!("  [PACK001] error: {}", msg);
             }
-            "warn" => {
-                if !errors_only {
-                    total_warnings += 1;
-                    println!("  [PACK001] warn: {}", msg);
-                }
+            "warn" if !errors_only => {
+                total_warnings += 1;
+                println!("  [PACK001] warn: {}", msg);
             }
             _ => {}
         }
@@ -2832,11 +2830,9 @@ fn lint_macros(errors_only: bool, verbose: bool) -> Result<()> {
                 total_errors += 1;
                 println!("  [PACK002] error: {}", msg);
             }
-            "warn" => {
-                if !errors_only {
-                    total_warnings += 1;
-                    println!("  [PACK002] warn: {}", msg);
-                }
+            "warn" if !errors_only => {
+                total_warnings += 1;
+                println!("  [PACK002] warn: {}", msg);
             }
             _ => {}
         }

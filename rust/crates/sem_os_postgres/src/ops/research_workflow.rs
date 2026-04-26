@@ -225,9 +225,16 @@ impl SemOsVerbOp for AuditTrail {
 
         if include_decisions {
             type Row = (
-                Uuid, String, String, i32,
-                Option<String>, Option<String>, Option<rust_decimal::Decimal>,
-                String, bool, chrono::DateTime<chrono::Utc>,
+                Uuid,
+                String,
+                String,
+                i32,
+                Option<String>,
+                Option<String>,
+                Option<rust_decimal::Decimal>,
+                String,
+                bool,
+                chrono::DateTime<chrono::Utc>,
             );
             let decisions: Vec<Row> = sqlx::query_as(
                 r#"
@@ -242,25 +249,38 @@ impl SemOsVerbOp for AuditTrail {
             .bind(entity_id)
             .fetch_all(scope.executor())
             .await?;
-            result["decisions"] = json!(decisions.iter().map(|d| json!({
-                "decision_id": d.0,
-                "search_query": d.1,
-                "source_provider": d.2,
-                "candidates_count": d.3,
-                "selected_key": d.4,
-                "selected_key_type": d.5,
-                "confidence": d.6,
-                "decision_type": d.7,
-                "auto_selected": d.8,
-                "created_at": d.9
-            })).collect::<Vec<_>>());
+            result["decisions"] = json!(decisions
+                .iter()
+                .map(|d| json!({
+                    "decision_id": d.0,
+                    "search_query": d.1,
+                    "source_provider": d.2,
+                    "candidates_count": d.3,
+                    "selected_key": d.4,
+                    "selected_key_type": d.5,
+                    "confidence": d.6,
+                    "decision_type": d.7,
+                    "auto_selected": d.8,
+                    "created_at": d.9
+                }))
+                .collect::<Vec<_>>());
         }
 
         if include_actions {
             type Row = (
-                Uuid, Option<Uuid>, String, Option<String>, Option<String>,
-                Option<String>, Option<String>, bool,
-                i32, i32, i32, Option<String>, Option<i32>,
+                Uuid,
+                Option<Uuid>,
+                String,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+                bool,
+                i32,
+                i32,
+                i32,
+                Option<String>,
+                Option<i32>,
                 chrono::DateTime<chrono::Utc>,
             );
             let actions: Vec<Row> = sqlx::query_as(
@@ -296,8 +316,13 @@ impl SemOsVerbOp for AuditTrail {
 
         if include_corrections {
             type Row = (
-                Uuid, Uuid, String, Option<String>, Option<String>,
-                String, Option<chrono::DateTime<chrono::Utc>>,
+                Uuid,
+                Uuid,
+                String,
+                Option<String>,
+                Option<String>,
+                String,
+                Option<chrono::DateTime<chrono::Utc>>,
             );
             let corrections: Vec<Row> = sqlx::query_as(
                 r#"
@@ -313,21 +338,30 @@ impl SemOsVerbOp for AuditTrail {
             .bind(entity_id)
             .fetch_all(scope.executor())
             .await?;
-            result["corrections"] = json!(corrections.iter().map(|c| json!({
-                "correction_id": c.0,
-                "original_decision_id": c.1,
-                "correction_type": c.2,
-                "wrong_key": c.3,
-                "correct_key": c.4,
-                "reason": c.5,
-                "corrected_at": c.6
-            })).collect::<Vec<_>>());
+            result["corrections"] = json!(corrections
+                .iter()
+                .map(|c| json!({
+                    "correction_id": c.0,
+                    "original_decision_id": c.1,
+                    "correction_type": c.2,
+                    "wrong_key": c.3,
+                    "correct_key": c.4,
+                    "reason": c.5,
+                    "corrected_at": c.6
+                }))
+                .collect::<Vec<_>>());
         }
 
         if include_anomalies {
             type Row = (
-                Uuid, Option<Uuid>, String, String, String,
-                String, Option<String>, chrono::DateTime<chrono::Utc>,
+                Uuid,
+                Option<Uuid>,
+                String,
+                String,
+                String,
+                String,
+                Option<String>,
+                chrono::DateTime<chrono::Utc>,
             );
             let anomalies: Vec<Row> = sqlx::query_as(
                 r#"
@@ -341,22 +375,31 @@ impl SemOsVerbOp for AuditTrail {
             .bind(entity_id)
             .fetch_all(scope.executor())
             .await?;
-            result["anomalies"] = json!(anomalies.iter().map(|a| json!({
-                "anomaly_id": a.0,
-                "action_id": a.1,
-                "rule_code": a.2,
-                "severity": a.3,
-                "description": a.4,
-                "status": a.5,
-                "resolution": a.6,
-                "detected_at": a.7
-            })).collect::<Vec<_>>());
+            result["anomalies"] = json!(anomalies
+                .iter()
+                .map(|a| json!({
+                    "anomaly_id": a.0,
+                    "action_id": a.1,
+                    "rule_code": a.2,
+                    "severity": a.3,
+                    "description": a.4,
+                    "status": a.5,
+                    "resolution": a.6,
+                    "detected_at": a.7
+                }))
+                .collect::<Vec<_>>());
         }
 
         if include_import_runs {
             type Row = (
-                Uuid, String, String, String, Option<i32>,
-                Option<Uuid>, Option<String>, Option<chrono::DateTime<chrono::Utc>>,
+                Uuid,
+                String,
+                String,
+                String,
+                Option<i32>,
+                Option<Uuid>,
+                Option<String>,
+                Option<chrono::DateTime<chrono::Utc>>,
             );
             let import_runs: Vec<Row> = sqlx::query_as(
                 r#"SELECT run_id, run_kind, source, status, edges_created,
@@ -368,16 +411,19 @@ impl SemOsVerbOp for AuditTrail {
             .bind(entity_id)
             .fetch_all(scope.executor())
             .await?;
-            result["import_runs"] = json!(import_runs.iter().map(|r| json!({
-                "run_id": r.0,
-                "run_kind": r.1,
-                "source": r.2,
-                "status": r.3,
-                "edges_created": r.4,
-                "superseded_by": r.5,
-                "superseded_reason": r.6,
-                "imported_at": r.7
-            })).collect::<Vec<_>>());
+            result["import_runs"] = json!(import_runs
+                .iter()
+                .map(|r| json!({
+                    "run_id": r.0,
+                    "run_kind": r.1,
+                    "source": r.2,
+                    "status": r.3,
+                    "edges_created": r.4,
+                    "superseded_by": r.5,
+                    "superseded_reason": r.6,
+                    "imported_at": r.7
+                }))
+                .collect::<Vec<_>>());
         }
 
         Ok(VerbExecutionOutcome::Record(result))
@@ -404,8 +450,14 @@ impl SemOsVerbOp for SupersessionTrail {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
 
         type ImportRow = (
-            Uuid, String, String, String, Option<i32>,
-            Option<Uuid>, Option<String>, Option<chrono::DateTime<chrono::Utc>>,
+            Uuid,
+            String,
+            String,
+            String,
+            Option<i32>,
+            Option<Uuid>,
+            Option<String>,
+            Option<chrono::DateTime<chrono::Utc>>,
         );
         let import_run_rows: Vec<ImportRow> = sqlx::query_as(
             r#"SELECT g.run_id, g.run_kind, g.source, g.status,
@@ -435,7 +487,12 @@ impl SemOsVerbOp for SupersessionTrail {
             .collect();
 
         type CorrRow = (
-            Uuid, Uuid, String, Option<String>, Option<String>, String,
+            Uuid,
+            Uuid,
+            String,
+            Option<String>,
+            Option<String>,
+            String,
             Option<chrono::DateTime<chrono::Utc>>,
         );
         let correction_rows: Vec<CorrRow> = sqlx::query_as(
@@ -465,7 +522,11 @@ impl SemOsVerbOp for SupersessionTrail {
             .collect();
 
         type StaleRow = (
-            Uuid, Uuid, chrono::NaiveDate, i32, bool,
+            Uuid,
+            Uuid,
+            chrono::NaiveDate,
+            i32,
+            bool,
             Option<chrono::DateTime<chrono::Utc>>,
         );
         let stale_det_rows: Vec<StaleRow> = sqlx::query_as(
@@ -493,7 +554,10 @@ impl SemOsVerbOp for SupersessionTrail {
             .collect();
 
         type OutreachRow = (
-            Uuid, String, i32, Option<Uuid>,
+            Uuid,
+            String,
+            i32,
+            Option<Uuid>,
             Option<chrono::DateTime<chrono::Utc>>,
         );
         let outreach_rows: Vec<OutreachRow> = sqlx::query_as(
@@ -519,7 +583,10 @@ impl SemOsVerbOp for SupersessionTrail {
             .collect();
 
         type TgRow = (
-            Uuid, String, bool, Option<Value>,
+            Uuid,
+            String,
+            bool,
+            Option<Value>,
             Option<chrono::DateTime<chrono::Utc>>,
         );
         let tollgate_rows: Vec<TgRow> = sqlx::query_as(
@@ -537,20 +604,22 @@ impl SemOsVerbOp for SupersessionTrail {
 
         let stale_tollgate_evaluations: Vec<StaleTollgateEntry> = tollgate_rows
             .into_iter()
-            .map(|(evaluation_id, tollgate_id, passed, evaluation_detail, evaluated_at)| {
-                let stale_reason = evaluation_detail
-                    .as_ref()
-                    .and_then(|d| d.get("stale_reason"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                StaleTollgateEntry {
-                    evaluation_id,
-                    tollgate_id,
-                    passed,
-                    stale_reason,
-                    evaluated_at: evaluated_at.map(|t| t.to_rfc3339()),
-                }
-            })
+            .map(
+                |(evaluation_id, tollgate_id, passed, evaluation_detail, evaluated_at)| {
+                    let stale_reason = evaluation_detail
+                        .as_ref()
+                        .and_then(|d| d.get("stale_reason"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    StaleTollgateEntry {
+                        evaluation_id,
+                        tollgate_id,
+                        passed,
+                        stale_reason,
+                        evaluated_at: evaluated_at.map(|t| t.to_rfc3339()),
+                    }
+                },
+            )
             .collect();
 
         let result = SupersessionTrailResult {

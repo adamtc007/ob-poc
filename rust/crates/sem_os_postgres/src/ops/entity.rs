@@ -71,7 +71,8 @@ impl SemOsVerbOp for Ghost {
         )
         .fetch_optional(scope.executor())
         .await?;
-        let type_row = type_row.ok_or_else(|| anyhow!("Entity type PROPER_PERSON_NATURAL not found"))?;
+        let type_row =
+            type_row.ok_or_else(|| anyhow!("Entity type PROPER_PERSON_NATURAL not found"))?;
 
         let entity_id = Uuid::new_v4();
 
@@ -175,8 +176,9 @@ impl SemOsVerbOp for Identify {
         let dob: Option<chrono::NaiveDate> = date_of_birth
             .as_deref()
             .map(|s| {
-                chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|e| anyhow!("Invalid date-of-birth format (expected YYYY-MM-DD): {}", e))
+                chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|e| {
+                    anyhow!("Invalid date-of-birth format (expected YYYY-MM-DD): {}", e)
+                })
             })
             .transpose()?;
 

@@ -845,7 +845,7 @@ mod tests {
             1,
             &constraints,
             Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
-            None, // verb_snapshot_pins
+            None,                              // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled(), "Expected Compiled, got {:?}", resp);
@@ -875,7 +875,7 @@ mod tests {
             1,
             &constraints,
             Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
-            None, // verb_snapshot_pins
+            None,                              // verb_snapshot_pins
         );
 
         assert!(
@@ -912,7 +912,7 @@ mod tests {
             1,
             &constraints,
             Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
-            None, // verb_snapshot_pins
+            None,                              // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled());
@@ -941,7 +941,7 @@ mod tests {
             1,
             &constraints,
             Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
-            None, // verb_snapshot_pins
+            None,                              // verb_snapshot_pins
         );
 
         assert!(matches!(resp, OrchestratorResponse::Clarification(_)));
@@ -970,7 +970,7 @@ mod tests {
             1,
             &constraints,
             Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
-            None, // verb_snapshot_pins
+            None,                              // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled());
@@ -1004,7 +1004,7 @@ mod tests {
             1,
             &constraints,
             Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
-            None, // verb_snapshot_pins
+            None,                              // verb_snapshot_pins
         );
 
         assert!(
@@ -1044,7 +1044,7 @@ mod tests {
             1,
             &constraints,
             Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
-            None, // verb_snapshot_pins
+            None,                              // verb_snapshot_pins
         );
 
         assert!(
@@ -1150,7 +1150,7 @@ mod tests {
             1,
             &constraints,
             Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
-            None, // verb_snapshot_pins
+            None,                              // verb_snapshot_pins
         );
 
         assert!(resp.is_compiled());
@@ -1562,7 +1562,7 @@ mod tests {
             1,
             &constraints,
             Some(&permissive_allowed_verbs()), // Slice 3.2: pre-3.2 tests used None; now fail-closed forces explicit set
-            None, // verb_snapshot_pins
+            None,                              // verb_snapshot_pins
         );
 
         match resp {

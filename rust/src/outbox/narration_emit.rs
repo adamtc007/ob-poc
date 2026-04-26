@@ -28,11 +28,8 @@ pub async fn emit_narration_outbox(
     narration: &serde_json::Value,
 ) -> Result<Uuid> {
     let outbox_id = Uuid::new_v4();
-    let idempotency_key = IdempotencyKey::from_parts(
-        "narrate",
-        trace_id,
-        &format!("session:{}", session_id),
-    );
+    let idempotency_key =
+        IdempotencyKey::from_parts("narrate", trace_id, &format!("session:{}", session_id));
     let payload = json!({
         "session_id": session_id,
         "workspace_key": workspace_key,

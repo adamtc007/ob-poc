@@ -48,9 +48,15 @@ async fn evaluate_skeleton_ready(
     .fetch_one(scope.executor())
     .await
     .unwrap_or((0, 0));
-    let ownership_pct = if total > 0 { (proved as f64 / total as f64) * 100.0 } else { 0.0 };
+    let ownership_pct = if total > 0 {
+        (proved as f64 / total as f64) * 100.0
+    } else {
+        0.0
+    };
     let passed = ownership_pct >= ownership_threshold;
-    if !passed { all_passed = false; }
+    if !passed {
+        all_passed = false;
+    }
     checks.push(GateCheckResult {
         criterion: "ownership_coverage_pct".into(),
         passed,
@@ -78,16 +84,24 @@ async fn evaluate_skeleton_ready(
     .await
     .unwrap_or((0,));
     let passed = entities_without_edges == 0;
-    if !passed { all_passed = false; }
+    if !passed {
+        all_passed = false;
+    }
     checks.push(GateCheckResult {
         criterion: "all_entities_have_ownership_edge".into(),
         passed,
         actual_value: json!(entities_without_edges),
         threshold_value: json!(0),
-        detail: format!("{} workstream entities without ownership edges", entities_without_edges),
+        detail: format!(
+            "{} workstream entities without ownership edges",
+            entities_without_edges
+        ),
     });
 
-    if let Some(min_sources) = thresholds.get("minimum_sources_consulted").and_then(|v| v.as_i64()) {
+    if let Some(min_sources) = thresholds
+        .get("minimum_sources_consulted")
+        .and_then(|v| v.as_i64())
+    {
         let (source_count,): (i64,) = sqlx::query_as(
             r#"SELECT COUNT(DISTINCT run_id)
                FROM "ob-poc".ubo_determination_runs WHERE case_id = $1"#,
@@ -97,13 +111,18 @@ async fn evaluate_skeleton_ready(
         .await
         .unwrap_or((0,));
         let passed = source_count >= min_sources;
-        if !passed { all_passed = false; }
+        if !passed {
+            all_passed = false;
+        }
         checks.push(GateCheckResult {
             criterion: "minimum_sources_consulted".into(),
             passed,
             actual_value: json!(source_count),
             threshold_value: json!(min_sources),
-            detail: format!("{} sources consulted (minimum: {})", source_count, min_sources),
+            detail: format!(
+                "{} sources consulted (minimum: {})",
+                source_count, min_sources
+            ),
         });
     }
 
@@ -119,13 +138,20 @@ async fn check_pct(
     default_threshold: f64,
     label: &str,
 ) -> Result<(bool, GateCheckResult)> {
-    let threshold = thresholds.get(key).and_then(|v| v.as_f64()).unwrap_or(default_threshold);
+    let threshold = thresholds
+        .get(key)
+        .and_then(|v| v.as_f64())
+        .unwrap_or(default_threshold);
     let (total, count): (i64, i64) = sqlx::query_as(sql)
         .bind(case_id)
         .fetch_one(scope.executor())
         .await
         .unwrap_or((0, 0));
-    let pct = if total > 0 { (count as f64 / total as f64) * 100.0 } else { 100.0 };
+    let pct = if total > 0 {
+        (count as f64 / total as f64) * 100.0
+    } else {
+        100.0
+    };
     let passed = pct >= threshold;
     Ok((
         passed,
@@ -158,7 +184,9 @@ async fn evaluate_evidence_complete(
         "Ownership coverage",
     )
     .await?;
-    if !passed { all_passed = false; }
+    if !passed {
+        all_passed = false;
+    }
     checks.push(check);
 
     let (passed, check) = check_pct(
@@ -172,7 +200,9 @@ async fn evaluate_evidence_complete(
         "Identity verification",
     )
     .await?;
-    if !passed { all_passed = false; }
+    if !passed {
+        all_passed = false;
+    }
     checks.push(check);
 
     let (passed, check) = check_pct(
@@ -186,7 +216,9 @@ async fn evaluate_evidence_complete(
         "Screening cleared",
     )
     .await?;
-    if !passed { all_passed = false; }
+    if !passed {
+        all_passed = false;
+    }
     checks.push(check);
 
     let max_outstanding = thresholds
@@ -204,13 +236,18 @@ async fn evaluate_evidence_complete(
     .await
     .unwrap_or((0,));
     let passed = outstanding <= max_outstanding;
-    if !passed { all_passed = false; }
+    if !passed {
+        all_passed = false;
+    }
     checks.push(GateCheckResult {
         criterion: "outreach_plan_items_max".into(),
         passed,
         actual_value: json!(outstanding),
         threshold_value: json!(max_outstanding),
-        detail: format!("{} outstanding outreach items (max: {})", outstanding, max_outstanding),
+        detail: format!(
+            "{} outstanding outreach items (max: {})",
+            outstanding, max_outstanding
+        ),
     });
 
     Ok((all_passed, checks))
@@ -224,7 +261,11 @@ async fn evaluate_review_complete(
     let mut checks = Vec::new();
     let mut all_passed = true;
 
-    if thresholds.get("all_workstreams_closed").and_then(|v| v.as_bool()).unwrap_or(true) {
+    if thresholds
+        .get("all_workstreams_closed")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true)
+    {
         let (open,): (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM "ob-poc".entity_workstreams
                WHERE case_id = $1 AND status NOT IN ('CLOSED', 'COMPLETED')"#,
@@ -234,7 +275,9 @@ async fn evaluate_review_complete(
         .await
         .unwrap_or((0,));
         let passed = open == 0;
-        if !passed { all_passed = false; }
+        if !passed {
+            all_passed = false;
+        }
         checks.push(GateCheckResult {
             criterion: "all_workstreams_closed".into(),
             passed,
@@ -244,7 +287,11 @@ async fn evaluate_review_complete(
         });
     }
 
-    if thresholds.get("all_ubos_approved").and_then(|v| v.as_bool()).unwrap_or(true) {
+    if thresholds
+        .get("all_ubos_approved")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true)
+    {
         let (unapproved,): (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM "ob-poc".entity_workstreams
                WHERE case_id = $1 AND is_ubo = TRUE
@@ -255,7 +302,9 @@ async fn evaluate_review_complete(
         .await
         .unwrap_or((0,));
         let passed = unapproved == 0;
-        if !passed { all_passed = false; }
+        if !passed {
+            all_passed = false;
+        }
         checks.push(GateCheckResult {
             criterion: "all_ubos_approved".into(),
             passed,
@@ -265,7 +314,11 @@ async fn evaluate_review_complete(
         });
     }
 
-    if thresholds.get("no_open_discrepancies").and_then(|v| v.as_bool()).unwrap_or(true) {
+    if thresholds
+        .get("no_open_discrepancies")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true)
+    {
         let (open_findings,): (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*)
                FROM "ob-poc".ownership_reconciliation_findings orf
@@ -277,7 +330,9 @@ async fn evaluate_review_complete(
         .await
         .unwrap_or((0,));
         let passed = open_findings == 0;
-        if !passed { all_passed = false; }
+        if !passed {
+            all_passed = false;
+        }
         checks.push(GateCheckResult {
             criterion: "no_open_discrepancies".into(),
             passed,
@@ -375,9 +430,15 @@ impl SemOsVerbOp for CheckGate {
         }
 
         let (passed, checks) = match gate_name.as_str() {
-            "SKELETON_READY" => evaluate_skeleton_ready(scope, case_id, &gate_row.default_thresholds).await?,
-            "EVIDENCE_COMPLETE" => evaluate_evidence_complete(scope, case_id, &gate_row.default_thresholds).await?,
-            "REVIEW_COMPLETE" => evaluate_review_complete(scope, case_id, &gate_row.default_thresholds).await?,
+            "SKELETON_READY" => {
+                evaluate_skeleton_ready(scope, case_id, &gate_row.default_thresholds).await?
+            }
+            "EVIDENCE_COMPLETE" => {
+                evaluate_evidence_complete(scope, case_id, &gate_row.default_thresholds).await?
+            }
+            "REVIEW_COMPLETE" => {
+                evaluate_review_complete(scope, case_id, &gate_row.default_thresholds).await?
+            }
             _ => return Err(anyhow!("No evaluation logic for gate: {}", gate_name)),
         };
 
@@ -402,7 +463,11 @@ impl SemOsVerbOp for CheckGate {
             "thresholds_used": gate_row.default_thresholds,
             "case_status": case_status,
         });
-        let gaps_json = if gaps.is_empty() { Value::Null } else { json!(gaps) };
+        let gaps_json = if gaps.is_empty() {
+            Value::Null
+        } else {
+            json!(gaps)
+        };
 
         let (eval_id, evaluated_at): (Uuid, String) = sqlx::query_as(
             r#"INSERT INTO "ob-poc".tollgate_evaluations (

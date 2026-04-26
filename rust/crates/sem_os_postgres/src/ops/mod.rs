@@ -35,8 +35,8 @@ pub mod audit;
 pub mod batch_control;
 pub mod billing;
 pub mod board;
-pub mod capital;
 pub mod bods;
+pub mod capital;
 pub mod cbu;
 pub mod cbu_role;
 pub mod changeset;
@@ -73,8 +73,8 @@ pub mod outreach;
 pub mod outreach_plan;
 pub mod ownership;
 pub mod pack_answer;
-pub mod partnership;
 pub mod pack_select;
+pub mod partnership;
 pub mod phrase;
 pub mod refdata;
 pub mod refdata_loader;
@@ -90,8 +90,8 @@ pub mod screening;
 pub mod semantic;
 pub mod service_pipeline;
 pub mod service_resource;
-pub mod shared_atom;
 pub mod session;
+pub mod shared_atom;
 pub mod skeleton_build;
 pub mod state;
 pub mod stewardship_helper;
@@ -218,7 +218,9 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(service_pipeline::ReadinessCompute));
     registry.register(Arc::new(service_pipeline::ReadinessExplain));
     registry.register(Arc::new(service_pipeline::PipelineFull));
-    registry.register(Arc::new(service_pipeline::ServiceResourceCheckAttributeGaps));
+    registry.register(Arc::new(
+        service_pipeline::ServiceResourceCheckAttributeGaps,
+    ));
     registry.register(Arc::new(service_pipeline::ServiceResourceSyncDefinitions));
 
     // Phase B slice #6: sem_os_* stewardship-dispatch family

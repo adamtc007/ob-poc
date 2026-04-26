@@ -172,7 +172,10 @@ async fn compute_doc_completeness_pct(
     let mut mandatory_satisfied = 0usize;
     let mut matched_any_governed_profile = false;
     for entity_id in entity_ids {
-        if let Some(matrix) = governed_service.compute_matrix_for_entity(entity_id).await? {
+        if let Some(matrix) = governed_service
+            .compute_matrix_for_entity(entity_id)
+            .await?
+        {
             matched_any_governed_profile = true;
             mandatory_total += matrix.mandatory_obligations;
             mandatory_satisfied += matrix.mandatory_satisfied_obligations;
@@ -183,7 +186,8 @@ async fn compute_doc_completeness_pct(
         let pct = if mandatory_total == 0 {
             Decimal::from(100)
         } else {
-            Decimal::from((mandatory_satisfied * 100) as i64) / Decimal::from(mandatory_total as i64)
+            Decimal::from((mandatory_satisfied * 100) as i64)
+                / Decimal::from(mandatory_total as i64)
         };
         return Ok(Some(pct));
     }
@@ -546,7 +550,11 @@ impl SemOsVerbOp for GetDecisionReadiness {
             }
         }
 
-        for req in ["DISCOVERY_COMPLETE", "EVIDENCE_COMPLETE", "VERIFICATION_COMPLETE"] {
+        for req in [
+            "DISCOVERY_COMPLETE",
+            "EVIDENCE_COMPLETE",
+            "VERIFICATION_COMPLETE",
+        ] {
             if !completion_summary.contains_key(req) {
                 blocking_issues.push(json!({
                     "evaluation_type": req,

@@ -40,9 +40,13 @@ impl SemOsVerbOp for MarkDeceased {
 
         let date_of_death_str = json_extract_string_opt(args, "date-of-death")
             .or_else(|| json_extract_string_opt(args, "death-date"))
-            .ok_or_else(|| anyhow!("Missing or invalid date-of-death argument (format: YYYY-MM-DD)"))?;
+            .ok_or_else(|| {
+                anyhow!("Missing or invalid date-of-death argument (format: YYYY-MM-DD)")
+            })?;
         let date_of_death = chrono::NaiveDate::parse_from_str(&date_of_death_str, "%Y-%m-%d")
-            .map_err(|_| anyhow!("Missing or invalid date-of-death argument (format: YYYY-MM-DD)"))?;
+            .map_err(|_| {
+                anyhow!("Missing or invalid date-of-death argument (format: YYYY-MM-DD)")
+            })?;
         let reason = json_extract_string_opt(args, "reason")
             .or_else(|| json_extract_string_opt(args, "notes"))
             .unwrap_or_else(|| "Deceased - death certificate received".to_string());

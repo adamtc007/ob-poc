@@ -12,10 +12,10 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::sequencer::DslExecutor;
 use crate::dsl_v2::execution::{ExecutionContext, ExecutionResult};
 use crate::dsl_v2::planning::compile;
 use crate::dsl_v2::syntax::parse_program;
+use crate::sequencer::DslExecutor;
 
 // ---------------------------------------------------------------------------
 // RealDslExecutor
@@ -52,10 +52,7 @@ impl RealDslExecutor {
 
     /// Install the platform service registry. Threaded into every inner
     /// `DslExecutor` this bridge constructs.
-    pub fn with_services(
-        mut self,
-        services: std::sync::Arc<dsl_runtime::ServiceRegistry>,
-    ) -> Self {
+    pub fn with_services(mut self, services: std::sync::Arc<dsl_runtime::ServiceRegistry>) -> Self {
         self.service_registry = services;
         self
     }
@@ -76,9 +73,7 @@ impl RealDslExecutor {
     /// Shared parse → compile → build context path used by both the
     /// self-scoped (`execute`) and in-scope (`execute_in_scope`) entry
     /// points.
-    fn build_executor_and_ctx(
-        &self,
-    ) -> (crate::dsl_v2::executor::DslExecutor, ExecutionContext) {
+    fn build_executor_and_ctx(&self) -> (crate::dsl_v2::executor::DslExecutor, ExecutionContext) {
         let mut ctx = if self.allow_durable_direct {
             ExecutionContext::new().allow_durable_direct()
         } else {
@@ -95,10 +90,7 @@ impl RealDslExecutor {
         (executor, ctx)
     }
 
-    fn build_response(
-        results: &[ExecutionResult],
-        ctx: &ExecutionContext,
-    ) -> serde_json::Value {
+    fn build_response(results: &[ExecutionResult], ctx: &ExecutionContext) -> serde_json::Value {
         let step_results: Vec<serde_json::Value> =
             results.iter().map(execution_result_to_json).collect();
 

@@ -202,13 +202,7 @@ impl GateChecker {
         let source_entity_id = if let Some(pred) = &c.source_predicate {
             match self
                 .predicate_resolver
-                .resolve_source_entity(
-                    pred,
-                    target_entity_id,
-                    target_workspace,
-                    target_slot,
-                    pool,
-                )
+                .resolve_source_entity(pred, target_entity_id, target_workspace, target_slot, pool)
                 .await?
             {
                 Some(id) => id,
@@ -237,12 +231,7 @@ impl GateChecker {
         // Read the source slot's state.
         let actual = self
             .slot_state_provider
-            .read_slot_state(
-                &c.source_workspace,
-                &c.source_slot,
-                source_entity_id,
-                pool,
-            )
+            .read_slot_state(&c.source_workspace, &c.source_slot, source_entity_id, pool)
             .await?;
 
         // Compare against required.
@@ -331,8 +320,8 @@ mod tests {
 
     impl MockSlotStateProvider {
         #[allow(dead_code)] // Reserved for future tests that exercise
-        // construction-with-state paths; kept inline so future tests don't
-        // have to rebuild the helper.
+                            // construction-with-state paths; kept inline so future tests don't
+                            // have to rebuild the helper.
         fn set(&self, ws: &str, slot: &str, id: Uuid, state: Option<&str>) {
             self.states.lock().unwrap().insert(
                 (ws.to_string(), slot.to_string(), id),
@@ -383,10 +372,9 @@ slots:
         // but actually we must construct one. Skip the actual check call;
         // the registry returns an empty constraint list, so we just test
         // the lookup directly.
-        let constraints =
-            checker
-                .registry
-                .constraints_for_transition("demo", "thing", "A", "B");
+        let constraints = checker
+            .registry
+            .constraints_for_transition("demo", "thing", "A", "B");
         assert!(constraints.is_empty());
     }
 

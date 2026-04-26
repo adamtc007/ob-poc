@@ -464,8 +464,8 @@ impl MacroIndex {
             return MacroResolveOutcome::NoMatch;
         }
 
-        // Sort by score descending
-        scored.sort_by(|a, b| b.score.cmp(&a.score));
+        // Sort by score descending.
+        scored.sort_by_key(|item| std::cmp::Reverse(item.score));
 
         // Gate M3: disambiguation band
         if scored.len() >= 2 {

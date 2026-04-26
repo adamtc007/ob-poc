@@ -41,7 +41,9 @@ use uuid::Uuid;
 pub struct HarnessSemOsClient;
 
 impl HarnessSemOsClient {
-    pub fn new() -> Arc<dyn SemOsClient> {
+    /// Build the stub as a trait-object Arc ready to assign to
+    /// `OrchestratorContext::sem_os_client`.
+    pub fn new_arc() -> Arc<dyn SemOsClient> {
         Arc::new(Self)
     }
 

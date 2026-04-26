@@ -465,7 +465,7 @@ impl ViewportContext {
 
         // Return top 2 types
         let mut sorted: Vec<_> = type_counts.into_iter().collect();
-        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted.sort_by_key(|item| std::cmp::Reverse(item.1));
 
         sorted
             .into_iter()

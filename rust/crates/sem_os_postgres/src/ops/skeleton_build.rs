@@ -76,13 +76,14 @@ struct GraphAnomaly {
     severity: String,
 }
 
-async fn run_graph_validate(
-    scope: &mut dyn TransactionScope,
-    case_id: Uuid,
-) -> Result<i64> {
+async fn run_graph_validate(scope: &mut dyn TransactionScope, case_id: Uuid) -> Result<i64> {
     type EdgeRow = (
-        Uuid, Uuid, Uuid, String,
-        Option<rust_decimal::Decimal>, Option<String>,
+        Uuid,
+        Uuid,
+        Uuid,
+        String,
+        Option<rust_decimal::Decimal>,
+        Option<String>,
     );
     let rows: Vec<EdgeRow> = sqlx::query_as(
         r#"
@@ -406,12 +407,11 @@ async fn run_ubo_compute(
 ) -> Result<(Uuid, i64)> {
     let start = std::time::Instant::now();
 
-    let subject_entities: Vec<(Uuid,)> = sqlx::query_as(
-        r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1"#,
-    )
-    .bind(case_id)
-    .fetch_all(scope.executor())
-    .await?;
+    let subject_entities: Vec<(Uuid,)> =
+        sqlx::query_as(r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE case_id = $1"#)
+            .bind(case_id)
+            .fetch_all(scope.executor())
+            .await?;
 
     let subject_entity_ids: Vec<Uuid> = subject_entities.iter().map(|(eid,)| *eid).collect();
 
@@ -840,11 +840,10 @@ async fn run_coverage_compute(
             "coverage_pct": pct
         }));
     }
-    let overall_coverage_pct = if prongs.is_empty() {
-        100.0
-    } else {
-        overall_sum / prongs.len() as f64
-    };
+    // prongs is a fixed-size 4-element array (declared above); the
+    // empty-array fallback is statically unreachable. clippy's
+    // const_is_empty correctly flags this. Compute directly.
+    let overall_coverage_pct = overall_sum / prongs.len() as f64;
 
     let coverage_snapshot = json!({
         "overall_coverage_pct": overall_coverage_pct,
@@ -1040,10 +1039,7 @@ async fn run_outreach_plan(
 // Step 6 — tollgate.check-gate (SKELETON_READY only)
 // ===========================================================================
 
-async fn run_tollgate_evaluate(
-    scope: &mut dyn TransactionScope,
-    case_id: Uuid,
-) -> Result<bool> {
+async fn run_tollgate_evaluate(scope: &mut dyn TransactionScope, case_id: Uuid) -> Result<bool> {
     let gate_row: Option<(String, Value)> = sqlx::query_as(
         r#"SELECT tollgate_id, default_thresholds
            FROM "ob-poc".tollgate_definitions
@@ -1164,7 +1160,8 @@ impl SemOsVerbOp for Build {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let case_id = json_extract_uuid(args, ctx, "case-id")?;
-        let source = json_extract_string_opt(args, "source").unwrap_or_else(|| "MANUAL".to_string());
+        let source =
+            json_extract_string_opt(args, "source").unwrap_or_else(|| "MANUAL".to_string());
         let threshold: f64 = json_extract_string_opt(args, "threshold")
             .and_then(|s| s.parse().ok())
             .unwrap_or(5.0);

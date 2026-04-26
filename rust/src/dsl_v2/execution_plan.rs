@@ -665,17 +665,16 @@ fn collect_symbol_refs_with_type(
     out: &mut Vec<RequiredBinding>,
 ) {
     match node {
-        AstNode::SymbolRef { name, .. } => {
-            // Check if we already have this binding
-            if !out.iter().any(|r| r.binding == *name) {
-                out.push(RequiredBinding {
-                    binding: name.clone(),
-                    entity_type: entity_type.to_string(),
-                    subtype: subtype.map(String::from),
-                    required_by_stmt: stmt_idx,
-                });
-            }
+        AstNode::SymbolRef { name, .. } if !out.iter().any(|r| r.binding == *name) => {
+            // Not already tracked — append.
+            out.push(RequiredBinding {
+                binding: name.clone(),
+                entity_type: entity_type.to_string(),
+                subtype: subtype.map(String::from),
+                required_by_stmt: stmt_idx,
+            });
         }
+        AstNode::SymbolRef { .. } => {}
         AstNode::List { items, .. } => {
             for item in items {
                 collect_symbol_refs_with_type(item, entity_type, subtype, stmt_idx, _arg_name, out);
@@ -693,19 +692,17 @@ fn collect_untyped_symbol_refs(
     out: &mut Vec<RequiredBinding>,
 ) {
     match node {
-        AstNode::SymbolRef { name, .. } => {
-            // Only add if we don't already have this binding with a known type
-            if !out.iter().any(|r| r.binding == *name) {
-                // Try to infer type from arg name pattern
-                let entity_type = infer_entity_type_from_arg(arg_name);
-                out.push(RequiredBinding {
-                    binding: name.clone(),
-                    entity_type,
-                    subtype: None,
-                    required_by_stmt: stmt_idx,
-                });
-            }
+        AstNode::SymbolRef { name, .. } if !out.iter().any(|r| r.binding == *name) => {
+            // Not already tracked — infer type from arg name pattern + append.
+            let entity_type = infer_entity_type_from_arg(arg_name);
+            out.push(RequiredBinding {
+                binding: name.clone(),
+                entity_type,
+                subtype: None,
+                required_by_stmt: stmt_idx,
+            });
         }
+        AstNode::SymbolRef { .. } => {}
         AstNode::List { items, .. } => {
             for item in items {
                 collect_untyped_symbol_refs(item, stmt_idx, arg_name, out);

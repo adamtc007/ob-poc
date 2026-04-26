@@ -76,9 +76,15 @@ impl SemOsVerbOp for OnboardingAutoComplete {
 
         let mut exec_ctx = crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub(ctx);
         let pool = scope.pool().clone();
-        let result =
-            run_auto_complete(cbu_id, max_steps, dry_run, target_stage, &mut exec_ctx, &pool)
-                .await?;
+        let result = run_auto_complete(
+            cbu_id,
+            max_steps,
+            dry_run,
+            target_stage,
+            &mut exec_ctx,
+            &pool,
+        )
+        .await?;
 
         for (name, uuid) in &exec_ctx.symbols {
             ctx.bind(name, *uuid);
@@ -126,8 +132,7 @@ async fn run_auto_complete(
 
         if let Some(ref target) = target_stage {
             let target_complete = state.required_stages.iter().any(|s| {
-                &s.code == target
-                    && s.status == ob_poc_types::semantic_stage::StageStatus::Complete
+                &s.code == target && s.status == ob_poc_types::semantic_stage::StageStatus::Complete
             });
             if target_complete {
                 return Ok(AutoCompleteResult {
@@ -252,8 +257,7 @@ async fn run_auto_complete(
 
     let target_reached = if let Some(ref target) = target_stage {
         final_state.required_stages.iter().any(|s| {
-            &s.code == target
-                && s.status == ob_poc_types::semantic_stage::StageStatus::Complete
+            &s.code == target && s.status == ob_poc_types::semantic_stage::StageStatus::Complete
         })
     } else {
         remaining_missing.is_empty()

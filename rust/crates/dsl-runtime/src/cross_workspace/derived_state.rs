@@ -21,9 +21,7 @@
 //! itself is stateless and just executes one evaluation pass.
 
 use anyhow::Result;
-use dsl_core::config::dag::{
-    DerivationCondition, DerivedCrossWorkspaceState, StateSelector,
-};
+use dsl_core::config::dag::{DerivationCondition, DerivedCrossWorkspaceState, StateSelector};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -207,10 +205,7 @@ impl DerivedStateEvaluator {
                 if s.state.is_none() {
                     return Ok(ConditionResult {
                         clause,
-                        description: format!(
-                            "{}.{}: predicate satisfied",
-                            s.workspace, s.slot
-                        ),
+                        description: format!("{}.{}: predicate satisfied", s.workspace, s.slot),
                         satisfied: true,
                         actual_state: None,
                     });
@@ -227,8 +222,7 @@ impl DerivedStateEvaluator {
                     Some(StateSelector::Set(v)) => v.clone(),
                     None => unreachable!("checked above"),
                 };
-                let satisfied =
-                    matches!(&actual, Some(a) if required.iter().any(|r| r == a));
+                let satisfied = matches!(&actual, Some(a) if required.iter().any(|r| r == a));
 
                 Ok(ConditionResult {
                     clause,

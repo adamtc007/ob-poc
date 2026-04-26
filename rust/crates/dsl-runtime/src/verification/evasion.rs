@@ -13,8 +13,8 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use sqlx::PgPool;
+use uuid::Uuid;
 
 // ============================================================================
 // Evasion Signal Types

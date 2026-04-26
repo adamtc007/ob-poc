@@ -88,19 +88,30 @@ impl SemOsVerbOp for SubcustodianLookup {
         .await?;
 
         match row {
-            Some((network_id, subcustodian_bic, subcustodian_name, local_agent_bic, local_agent_account, pset_bic, csd_participant_id, is_primary)) => {
-                Ok(VerbExecutionOutcome::Record(json!({
-                    "network_id": network_id,
-                    "subcustodian_bic": subcustodian_bic,
-                    "subcustodian_name": subcustodian_name,
-                    "local_agent_bic": local_agent_bic,
-                    "local_agent_account": local_agent_account,
-                    "pset_bic": pset_bic,
-                    "csd_participant_id": csd_participant_id,
-                    "is_primary": is_primary,
-                })))
-            }
-            None => Err(anyhow!("No sub-custodian found for market {} currency {}", market, currency)),
+            Some((
+                network_id,
+                subcustodian_bic,
+                subcustodian_name,
+                local_agent_bic,
+                local_agent_account,
+                pset_bic,
+                csd_participant_id,
+                is_primary,
+            )) => Ok(VerbExecutionOutcome::Record(json!({
+                "network_id": network_id,
+                "subcustodian_bic": subcustodian_bic,
+                "subcustodian_name": subcustodian_name,
+                "local_agent_bic": local_agent_bic,
+                "local_agent_account": local_agent_account,
+                "pset_bic": pset_bic,
+                "csd_participant_id": csd_participant_id,
+                "is_primary": is_primary,
+            }))),
+            None => Err(anyhow!(
+                "No sub-custodian found for market {} currency {}",
+                market,
+                currency
+            )),
         }
     }
 }
@@ -133,8 +144,8 @@ impl SemOsVerbOp for LookupSsiForTrade {
         .bind(&instrument_class)
         .fetch_optional(scope.executor())
         .await?;
-        let class_id = class_id
-            .ok_or_else(|| anyhow!("Unknown instrument class: {}", instrument_class))?;
+        let class_id =
+            class_id.ok_or_else(|| anyhow!("Unknown instrument class: {}", instrument_class))?;
 
         let security_type_id: Option<Uuid> = if let Some(ref st) = security_type {
             sqlx::query_scalar(
@@ -189,7 +200,9 @@ impl SemOsVerbOp for LookupSsiForTrade {
             }))),
             None => Err(anyhow!(
                 "No SSI found for CBU {} with instrument class {} currency {}",
-                cbu_id, instrument_class, currency
+                cbu_id,
+                instrument_class,
+                currency
             )),
         }
     }
@@ -212,7 +225,13 @@ impl SemOsVerbOp for ValidateBookingCoverage {
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
 
-        type GapRow = (Uuid, String, Option<String>, Option<Vec<String>>, Option<Vec<String>>);
+        type GapRow = (
+            Uuid,
+            String,
+            Option<String>,
+            Option<Vec<String>>,
+            Option<Vec<String>>,
+        );
         let gaps: Vec<GapRow> = sqlx::query_as(
             r#"
             SELECT u.universe_id, ic.code, m.mic, u.currencies, u.settlement_types
@@ -428,8 +447,8 @@ impl SemOsVerbOp for SetupSsi {
 
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
-        let validation_mode =
-            json_extract_string_opt(args, "validation-mode").unwrap_or_else(|| "STRICT".to_string());
+        let validation_mode = json_extract_string_opt(args, "validation-mode")
+            .unwrap_or_else(|| "STRICT".to_string());
 
         let doc_row: Option<(Option<Value>, String)> = sqlx::query_as(
             r#"
@@ -450,8 +469,8 @@ impl SemOsVerbOp for SetupSsi {
                 type_code
             ));
         }
-        let extracted_data = extracted_data
-            .ok_or_else(|| anyhow!("Document has no extracted_data"))?;
+        let extracted_data =
+            extracted_data.ok_or_else(|| anyhow!("Document has no extracted_data"))?;
         let ssi_doc: SsiOnboardingDocument = serde_json::from_value(extracted_data)
             .map_err(|e| anyhow!("Failed to parse SSI document: {}", e))?;
 

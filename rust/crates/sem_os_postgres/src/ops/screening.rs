@@ -21,9 +21,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{
-    json_extract_string_opt, json_extract_uuid,
-};
+use dsl_runtime::domain_ops::helpers::{json_extract_string_opt, json_extract_uuid};
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
@@ -49,9 +47,9 @@ async fn enqueue_workstream_screening(
     .fetch_optional(scope.executor())
     .await?;
 
-    let workstream_id = workstream
-        .map(|(id,)| id)
-        .ok_or_else(|| anyhow!("No active workstream for entity. Use case-screening.initiate instead."))?;
+    let workstream_id = workstream.map(|(id,)| id).ok_or_else(|| {
+        anyhow!("No active workstream for entity. Use case-screening.initiate instead.")
+    })?;
 
     let existing: Option<(Uuid,)> = sqlx::query_as(
         r#"SELECT screening_id FROM "ob-poc".screenings

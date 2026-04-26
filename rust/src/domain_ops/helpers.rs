@@ -494,7 +494,9 @@ pub const EXT_KEY_PENDING_SESSION: &str = "pending_session";
 /// boundary.
 pub const EXT_KEY_PENDING_VIEW_STATE: &str = "pending_view_state";
 
-fn ext_obj_mut(ctx: &mut dsl_runtime::VerbExecutionContext) -> &mut serde_json::Map<String, serde_json::Value> {
+fn ext_obj_mut(
+    ctx: &mut dsl_runtime::VerbExecutionContext,
+) -> &mut serde_json::Map<String, serde_json::Value> {
     if !ctx.extensions.is_object() {
         ctx.extensions = serde_json::Value::Object(serde_json::Map::new());
     }
@@ -502,14 +504,19 @@ fn ext_obj_mut(ctx: &mut dsl_runtime::VerbExecutionContext) -> &mut serde_json::
 }
 
 /// Consume the pending `UnifiedSession` from `sem_ctx.extensions` if any.
-pub fn ext_take_pending_session(ctx: &mut dsl_runtime::VerbExecutionContext) -> Option<UnifiedSession> {
+pub fn ext_take_pending_session(
+    ctx: &mut dsl_runtime::VerbExecutionContext,
+) -> Option<UnifiedSession> {
     let obj = ctx.extensions.as_object_mut()?;
     let v = obj.remove(EXT_KEY_PENDING_SESSION)?;
     serde_json::from_value(v).ok()
 }
 
 /// Write a `UnifiedSession` to `sem_ctx.extensions` under the pending-session key.
-pub fn ext_set_pending_session(ctx: &mut dsl_runtime::VerbExecutionContext, session: UnifiedSession) {
+pub fn ext_set_pending_session(
+    ctx: &mut dsl_runtime::VerbExecutionContext,
+    session: UnifiedSession,
+) {
     if let Ok(v) = serde_json::to_value(&session) {
         ext_obj_mut(ctx).insert(EXT_KEY_PENDING_SESSION.to_string(), v);
     }
@@ -522,7 +529,7 @@ pub fn ext_set_pending_session(ctx: &mut dsl_runtime::VerbExecutionContext, sess
 pub fn ext_take_or_create_pending_session(
     ctx: &mut dsl_runtime::VerbExecutionContext,
 ) -> UnifiedSession {
-    ext_take_pending_session(ctx).unwrap_or_else(UnifiedSession::new)
+    ext_take_pending_session(ctx).unwrap_or_default()
 }
 
 /// Write a `ViewState` to `sem_ctx.extensions` under the pending-view-state key.

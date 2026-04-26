@@ -96,7 +96,12 @@ async fn entity_query_impl(
                 .fetch_all(scope.executor())
                 .await?
         }
-        (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(scope.executor()).await?,
+        (None, Some(jur)) => {
+            sqlx::query_as(&query)
+                .bind(jur)
+                .fetch_all(scope.executor())
+                .await?
+        }
         (None, None) => sqlx::query_as(&query).fetch_all(scope.executor()).await?,
     };
 
@@ -168,7 +173,12 @@ async fn execute_unified_entity_query(
                 .fetch_all(scope.executor())
                 .await?
         }
-        (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(scope.executor()).await?,
+        (None, Some(jur)) => {
+            sqlx::query_as(&query)
+                .bind(jur)
+                .fetch_all(scope.executor())
+                .await?
+        }
         (None, None) => sqlx::query_as(&query).fetch_all(scope.executor()).await?,
     };
 

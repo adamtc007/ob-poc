@@ -1273,7 +1273,11 @@ impl SemOsVerbOp for TradingProfileAddComponent {
                     .execute(&forwarded, ctx, scope)
                     .await
             }
-            "market" => TradingProfileAddMarket.execute(&forwarded, ctx, scope).await,
+            "market" => {
+                TradingProfileAddMarket
+                    .execute(&forwarded, ctx, scope)
+                    .await
+            }
             "allowed-currency" => {
                 TradingProfileAddAllowedCurrency
                     .execute(&forwarded, ctx, scope)
@@ -1345,7 +1349,11 @@ impl SemOsVerbOp for TradingProfileRemoveComponent {
                     .execute(&forwarded, ctx, scope)
                     .await
             }
-            "standing-instruction" => TradingProfileRemoveSsi.execute(&forwarded, ctx, scope).await,
+            "standing-instruction" => {
+                TradingProfileRemoveSsi
+                    .execute(&forwarded, ctx, scope)
+                    .await
+            }
             "booking-rule" => {
                 TradingProfileRemoveBookingRule
                     .execute(&forwarded, ctx, scope)
@@ -1446,9 +1454,10 @@ impl SemOsVerbOp for TradingProfileRemoveInstrumentClass {
         // Build node ID: _Trading Universe / {class_code}
         let node_id = TradingMatrixNodeId::category(categories::UNIVERSE).child(&class_code);
 
-        let doc = ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to remove instrument class: {}", e))?;
+        let doc =
+            ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to remove instrument class: {}", e))?;
 
         Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
@@ -1559,9 +1568,10 @@ impl SemOsVerbOp for TradingProfileRemoveMarket {
             .child(&instrument_class)
             .child(&mic);
 
-        let doc = ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to remove market: {}", e))?;
+        let doc =
+            ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to remove market: {}", e))?;
 
         Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
@@ -1659,9 +1669,10 @@ impl SemOsVerbOp for TradingProfileRemoveSsi {
         // Build node ID: _Standing Settlement Instructions / {ssi_name}
         let node_id = TradingMatrixNodeId::category(categories::SSI).child(&ssi_name);
 
-        let doc = ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to remove SSI: {}", e))?;
+        let doc =
+            ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to remove SSI: {}", e))?;
 
         Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
@@ -1760,9 +1771,10 @@ impl SemOsVerbOp for TradingProfileRemoveBookingRule {
             .child(&ssi_ref)
             .child(&rule_id);
 
-        let doc = ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to remove booking rule: {}", e))?;
+        let doc =
+            ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to remove booking rule: {}", e))?;
 
         Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
@@ -2200,8 +2212,8 @@ impl SemOsVerbOp for TradingProfileAddImMandate {
 
         let manager_ref = json_extract_string(args, "manager-ref")?;
 
-        let manager_ref_type = json_extract_string_opt(args, "manager-ref-type")
-            .unwrap_or_else(|| "NAME".to_string());
+        let manager_ref_type =
+            json_extract_string_opt(args, "manager-ref-type").unwrap_or_else(|| "NAME".to_string());
 
         let priority = json_extract_int_opt(args, "priority")
             .map(|i| i as i32)
@@ -2346,9 +2358,10 @@ impl SemOsVerbOp for TradingProfileRemoveImMandate {
         let node_id = TradingMatrixNodeId::category(categories::MANAGERS).child(&manager_ref);
 
         // Apply operation to AST and save
-        let doc = ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to remove IM mandate: {}", e))?;
+        let doc =
+            ast_db::apply_and_save(&pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to remove IM mandate: {}", e))?;
 
         Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,

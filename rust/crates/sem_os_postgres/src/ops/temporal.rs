@@ -148,12 +148,13 @@ impl SemOsVerbOp for UboChainAsOf {
             i32,
         );
 
-        let rows: Vec<Row> = sqlx::query_as(r#"SELECT * FROM "ob-poc".ubo_chain_as_of($1, $2, $3)"#)
-            .bind(entity_id)
-            .bind(as_of_date)
-            .bind(sqlx::types::BigDecimal::try_from(threshold).unwrap_or_default())
-            .fetch_all(scope.executor())
-            .await?;
+        let rows: Vec<Row> =
+            sqlx::query_as(r#"SELECT * FROM "ob-poc".ubo_chain_as_of($1, $2, $3)"#)
+                .bind(entity_id)
+                .bind(as_of_date)
+                .bind(sqlx::types::BigDecimal::try_from(threshold).unwrap_or_default())
+                .fetch_all(scope.executor())
+                .await?;
 
         let chains: Vec<Value> = rows
             .iter()
@@ -540,10 +541,10 @@ impl SemOsVerbOp for CompareOwnership {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
-        let date_a = get_optional_date_arg(args, "date-a")?
-            .ok_or_else(|| anyhow!("date-a is required"))?;
-        let date_b = get_optional_date_arg(args, "date-b")?
-            .ok_or_else(|| anyhow!("date-b is required"))?;
+        let date_a =
+            get_optional_date_arg(args, "date-a")?.ok_or_else(|| anyhow!("date-a is required"))?;
+        let date_b =
+            get_optional_date_arg(args, "date-b")?.ok_or_else(|| anyhow!("date-b is required"))?;
 
         type OwnershipRow = (Uuid, Uuid, Option<sqlx::types::BigDecimal>, Option<String>);
 

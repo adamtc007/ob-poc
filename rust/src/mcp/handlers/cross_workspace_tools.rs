@@ -17,7 +17,8 @@ impl ToolHandlers {
             .map(dsl_runtime::cross_workspace::types::SharedAtomLifecycle::try_from_str)
             .transpose()?;
 
-        let atoms = dsl_runtime::cross_workspace::repository::list_shared_atoms(pool, lifecycle).await?;
+        let atoms =
+            dsl_runtime::cross_workspace::repository::list_shared_atoms(pool, lifecycle).await?;
 
         Ok(json!({
             "atoms": atoms,
@@ -68,7 +69,8 @@ impl ToolHandlers {
             )
             .await?
         } else {
-            dsl_runtime::cross_workspace::fact_refs::list_stale_refs(pool, consumer_workspace).await?
+            dsl_runtime::cross_workspace::fact_refs::list_stale_refs(pool, consumer_workspace)
+                .await?
         };
 
         Ok(json!({
@@ -87,7 +89,8 @@ impl ToolHandlers {
         let workspace = args["workspace"].as_str();
 
         let events =
-            dsl_runtime::cross_workspace::remediation::list_open(pool, entity_id, workspace).await?;
+            dsl_runtime::cross_workspace::remediation::list_open(pool, entity_id, workspace)
+                .await?;
 
         Ok(json!({
             "open_count": events.len(),
@@ -149,7 +152,8 @@ impl ToolHandlers {
             .ok_or_else(|| anyhow!("remediation_id required"))?;
         let id: uuid::Uuid = id_str.parse().map_err(|_| anyhow!("Invalid UUID"))?;
 
-        let records = dsl_runtime::cross_workspace::compensation::list_for_remediation(pool, id).await?;
+        let records =
+            dsl_runtime::cross_workspace::compensation::list_for_remediation(pool, id).await?;
 
         Ok(json!({
             "remediation_id": id,
@@ -176,9 +180,10 @@ impl ToolHandlers {
             .await?
             .ok_or_else(|| anyhow!("Shared atom '{}' not found", atom_path))?;
 
-        let versions =
-            dsl_runtime::cross_workspace::fact_versions::get_version_history(pool, atom.id, entity_id)
-                .await?;
+        let versions = dsl_runtime::cross_workspace::fact_versions::get_version_history(
+            pool, atom.id, entity_id,
+        )
+        .await?;
 
         let version_summaries: Vec<Value> = versions
             .iter()

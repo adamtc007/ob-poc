@@ -98,11 +98,7 @@ async fn p0_bypass_regression_all_cases() {
                 let scenario_fqns: Vec<&str> = case
                     .scenarios_yaml
                     .lines()
-                    .filter_map(|line| {
-                        line.trim()
-                            .strip_prefix("macro_fqn:")
-                            .map(|v| v.trim())
-                    })
+                    .filter_map(|line| line.trim().strip_prefix("macro_fqn:").map(|v| v.trim()))
                     .collect();
 
                 let bypass_hit = results

@@ -374,7 +374,9 @@ pub struct ConstellationMark {
 pub enum CatalogueEffect {
     /// Catalogue snapshot id advanced — all in-flight envelopes with older
     /// snapshot ids must be rejected by the runtime.
-    SnapshotAdvanced { new_snapshot_id: CatalogueSnapshotId },
+    SnapshotAdvanced {
+        new_snapshot_id: CatalogueSnapshotId,
+    },
     /// An allowed-verb fingerprint invalidation was triggered.
     AllowedVerbSetInvalidated,
 }
@@ -451,12 +453,7 @@ impl IdempotencyKey {
     /// Construct from parts. Convention documented for consistency across
     /// consumers.
     pub fn from_parts(effect_kind: &str, trace_id: TraceId, sub_key: &str) -> Self {
-        IdempotencyKey(format!(
-            "{}:{}:{}",
-            effect_kind,
-            trace_id.0,
-            sub_key
-        ))
+        IdempotencyKey(format!("{}:{}:{}", effect_kind, trace_id.0, sub_key))
     }
 }
 

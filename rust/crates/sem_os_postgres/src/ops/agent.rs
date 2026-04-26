@@ -176,7 +176,8 @@ impl SemOsVerbOp for ConfirmDecision {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let checkpoint_id = json_extract_uuid_opt(args, ctx, "checkpoint-id");
-        let selected_candidate = json_extract_int_opt(args, "selected-candidate").unwrap_or(0) as i32;
+        let selected_candidate =
+            json_extract_int_opt(args, "selected-candidate").unwrap_or(0) as i32;
 
         if let Some(cp_id) = checkpoint_id {
             sqlx::query(
@@ -332,8 +333,9 @@ impl SemOsVerbOp for ReadStatus {
 
         match latest {
             Some((decision_id, search_query, decision_type, created_at)) => {
-                let (decision_count, confirmed_count, rejected_count): (i64, i64, i64) = sqlx::query_as(
-                    r#"
+                let (decision_count, confirmed_count, rejected_count): (i64, i64, i64) =
+                    sqlx::query_as(
+                        r#"
                     SELECT
                         COUNT(*) FILTER (WHERE search_query NOT LIKE 'agent:%'),
                         COUNT(*) FILTER (WHERE decision_type = 'USER_CONFIRMED'),
@@ -342,11 +344,11 @@ impl SemOsVerbOp for ReadStatus {
                     WHERE session_id = $1
                       AND created_at >= $2
                     "#,
-                )
-                .bind(session_id)
-                .bind(created_at)
-                .fetch_one(scope.executor())
-                .await?;
+                    )
+                    .bind(session_id)
+                    .bind(created_at)
+                    .fetch_one(scope.executor())
+                    .await?;
 
                 let action_count: i64 = sqlx::query_scalar(
                     r#"
@@ -397,8 +399,13 @@ impl SemOsVerbOp for ReadHistory {
         let limit = json_extract_int_opt(args, "limit").unwrap_or(50);
 
         type DecRow = (
-            Uuid, String, String, String,
-            Option<rust_decimal::Decimal>, Option<String>, DateTime<Utc>,
+            Uuid,
+            String,
+            String,
+            String,
+            Option<rust_decimal::Decimal>,
+            Option<String>,
+            DateTime<Utc>,
         );
         let decisions: Vec<DecRow> = sqlx::query_as(
             r#"
@@ -417,20 +424,27 @@ impl SemOsVerbOp for ReadHistory {
 
         let decision_list: Vec<Value> = decisions
             .into_iter()
-            .map(|d| json!({
-                "decision_id": d.0,
-                "source_provider": d.1,
-                "query": d.2,
-                "decision_type": d.3,
-                "confidence": d.4.map(|c| c.to_string()),
-                "selected_key": d.5,
-                "created_at": d.6
-            }))
+            .map(|d| {
+                json!({
+                    "decision_id": d.0,
+                    "source_provider": d.1,
+                    "query": d.2,
+                    "decision_type": d.3,
+                    "confidence": d.4.map(|c| c.to_string()),
+                    "selected_key": d.5,
+                    "created_at": d.6
+                })
+            })
             .collect();
 
         type ActRow = (
-            Uuid, Option<Uuid>, Option<String>, Option<String>,
-            bool, i32, DateTime<Utc>,
+            Uuid,
+            Option<Uuid>,
+            Option<String>,
+            Option<String>,
+            bool,
+            i32,
+            DateTime<Utc>,
         );
         let actions: Vec<ActRow> = sqlx::query_as(
             r#"
@@ -449,14 +463,16 @@ impl SemOsVerbOp for ReadHistory {
 
         let action_list: Vec<Value> = actions
             .into_iter()
-            .map(|a| json!({
-                "action_id": a.0,
-                "decision_id": a.1,
-                "verb": format!("{}:{}", a.2.unwrap_or_default(), a.3.unwrap_or_default()),
-                "success": a.4,
-                "entities_created": a.5,
-                "executed_at": a.6
-            }))
+            .map(|a| {
+                json!({
+                    "action_id": a.0,
+                    "decision_id": a.1,
+                    "verb": format!("{}:{}", a.2.unwrap_or_default(), a.3.unwrap_or_default()),
+                    "success": a.4,
+                    "entities_created": a.5,
+                    "executed_at": a.6
+                })
+            })
             .collect();
 
         Ok(VerbExecutionOutcome::Record(json!({
@@ -666,13 +682,14 @@ impl SemOsVerbOp for Unteach {
         let reason =
             json_extract_string_opt(args, "reason").unwrap_or_else(|| "dsl_unteach".to_string());
 
-        let (removed_count,): (i32,) = sqlx::query_as(r#"SELECT "ob-poc".unteach_phrase($1, $2, $3)"#)
-            .bind(&phrase)
-            .bind(verb.as_deref())
-            .bind(&reason)
-            .fetch_one(scope.executor())
-            .await
-            .map_err(|e| anyhow!("Failed to unteach phrase: {}", e))?;
+        let (removed_count,): (i32,) =
+            sqlx::query_as(r#"SELECT "ob-poc".unteach_phrase($1, $2, $3)"#)
+                .bind(&phrase)
+                .bind(verb.as_deref())
+                .bind(&reason)
+                .fetch_one(scope.executor())
+                .await
+                .map_err(|e| anyhow!("Failed to unteach phrase: {}", e))?;
 
         Ok(VerbExecutionOutcome::Record(json!({
             "success": true,
@@ -720,10 +737,12 @@ impl SemOsVerbOp for ReadTeachingStatus {
 
         let recent_json: Vec<Value> = recent
             .iter()
-            .map(|(phrase, verb, source, taught_at)| json!({
-                "phrase": phrase, "verb": verb, "source": source,
-                "taught_at": taught_at.to_rfc3339()
-            }))
+            .map(|(phrase, verb, source, taught_at)| {
+                json!({
+                    "phrase": phrase, "verb": verb, "source": source,
+                    "taught_at": taught_at.to_rfc3339()
+                })
+            })
             .collect();
 
         let stats = if include_stats {
@@ -736,11 +755,13 @@ impl SemOsVerbOp for ReadTeachingStatus {
             .fetch_optional(scope.executor())
             .await
             .map_err(|e| anyhow!("Failed to get teaching stats: {}", e))?;
-            row.map(|(total, today, week, most_recent)| json!({
-                "total_taught": total, "taught_today": today,
-                "taught_this_week": week,
-                "most_recent": most_recent.map(|t| t.to_rfc3339())
-            }))
+            row.map(|(total, today, week, most_recent)| {
+                json!({
+                    "total_taught": total, "taught_today": today,
+                    "taught_this_week": week,
+                    "most_recent": most_recent.map(|t| t.to_rfc3339())
+                })
+            })
         } else {
             None
         };

@@ -265,35 +265,36 @@ impl ResolutionSubSession {
                 span,
                 ref_id,
                 ..
-            } => {
-                if resolved_key.is_none() {
-                    // Use ref_id if available, otherwise generate from span
-                    let ref_id_str = ref_id
-                        .clone()
-                        .unwrap_or_else(|| format!("{}:{}-{}", stmt_idx, span.start, span.end));
+            } if resolved_key.is_none() => {
+                // Use ref_id if available, otherwise generate from span.
+                let ref_id_str = ref_id
+                    .clone()
+                    .unwrap_or_else(|| format!("{}:{}-{}", stmt_idx, span.start, span.end));
 
-                    // Extract search keys and discriminators from LookupConfig
-                    let (search_keys, discriminators, resolution_mode) =
-                        Self::extract_search_config(lookup_config, value);
+                // Extract search keys and discriminators from LookupConfig.
+                let (search_keys, discriminators, resolution_mode) =
+                    Self::extract_search_config(lookup_config, value);
 
-                    out.push(UnresolvedRefInfo {
-                        ref_id: ref_id_str,
-                        entity_type: entity_type.clone(),
-                        search_value: value.clone(),
-                        context_line: context_line.to_string(),
-                        initial_matches: Vec::new(), // Populated by pre_fetch_matches
-                        search_keys,
-                        discriminators,
-                        resolution_mode,
-                        verb_context: Some(VerbArgContext {
-                            verb: verb.to_string(),
-                            arg_name: arg_name.to_string(),
-                            stmt_index: stmt_idx,
-                        }),
-                        resolved_key: None,
-                        resolved_display: None,
-                    });
-                }
+                out.push(UnresolvedRefInfo {
+                    ref_id: ref_id_str,
+                    entity_type: entity_type.clone(),
+                    search_value: value.clone(),
+                    context_line: context_line.to_string(),
+                    initial_matches: Vec::new(), // Populated by pre_fetch_matches
+                    search_keys,
+                    discriminators,
+                    resolution_mode,
+                    verb_context: Some(VerbArgContext {
+                        verb: verb.to_string(),
+                        arg_name: arg_name.to_string(),
+                        stmt_index: stmt_idx,
+                    }),
+                    resolved_key: None,
+                    resolved_display: None,
+                });
+            }
+            AstNode::EntityRef { .. } => {
+                // Already resolved — nothing to add.
             }
             AstNode::List { items, .. } => {
                 for item in items {
@@ -2521,20 +2522,14 @@ impl SessionContext {
     /// Update primary keys from execution result
     pub fn update_primary_key(&mut self, domain: &str, binding: &str, id: Uuid) {
         match domain {
-            "cbu" => {
-                if self.primary_keys.cbu_id.is_none() {
-                    self.primary_keys.cbu_id = Some(id);
-                }
+            "cbu" if self.primary_keys.cbu_id.is_none() => {
+                self.primary_keys.cbu_id = Some(id);
             }
-            "kyc-case" => {
-                if self.primary_keys.kyc_case_id.is_none() {
-                    self.primary_keys.kyc_case_id = Some(id);
-                }
+            "kyc-case" if self.primary_keys.kyc_case_id.is_none() => {
+                self.primary_keys.kyc_case_id = Some(id);
             }
-            "service-resource" => {
-                if self.primary_keys.resource_instance_id.is_none() {
-                    self.primary_keys.resource_instance_id = Some(id);
-                }
+            "service-resource" if self.primary_keys.resource_instance_id.is_none() => {
+                self.primary_keys.resource_instance_id = Some(id);
             }
             _ => {}
         }

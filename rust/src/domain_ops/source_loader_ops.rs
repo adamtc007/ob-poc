@@ -166,7 +166,9 @@ impl SemOsVerbOp for SourcesSearch {
             })
             .collect();
 
-        Ok(Some(serde_json::json!({ "_sources_search_results": results })))
+        Ok(Some(
+            serde_json::json!({ "_sources_search_results": results }),
+        ))
     }
 
     async fn execute(
@@ -206,8 +208,8 @@ impl SemOsVerbOp for SourcesFetch {
     ) -> Result<Option<serde_json::Value>> {
         let source_id = json_extract_string_opt(args, "source-id")
             .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
-        let key = json_extract_string_opt(args, "key")
-            .ok_or_else(|| anyhow::anyhow!(":key required"))?;
+        let key =
+            json_extract_string_opt(args, "key").ok_or_else(|| anyhow::anyhow!(":key required"))?;
         let include_raw = json_extract_bool_opt(args, "include-raw").unwrap_or(false);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
 
@@ -236,7 +238,9 @@ impl SemOsVerbOp for SourcesFetch {
         let entity = source.fetch_entity(&key, Some(options)).await?;
         let result = normalized_entity_to_json(&entity);
 
-        Ok(Some(serde_json::json!({ "_sources_fetched_entity": result })))
+        Ok(Some(
+            serde_json::json!({ "_sources_fetched_entity": result }),
+        ))
     }
 
     async fn execute(
@@ -245,12 +249,15 @@ impl SemOsVerbOp for SourcesFetch {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let result = args.get("_sources_fetched_entity").cloned().ok_or_else(|| {
-            anyhow::anyhow!(
-                "sources.fetch: pre_fetch result missing \
+        let result = args
+            .get("_sources_fetched_entity")
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sources.fetch: pre_fetch result missing \
                  (`_sources_fetched_entity` absent from args)"
-            )
-        })?;
+                )
+            })?;
 
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         if let Some(dec_id) = decision_id {
@@ -258,8 +265,15 @@ impl SemOsVerbOp for SourcesFetch {
             let source_id = json_extract_string_opt(args, "source-id")
                 .ok_or_else(|| anyhow::anyhow!(":source-id required"))?;
             let pool = scope.pool().clone();
-            log_research_action(&pool, dec_id, &format!("{}:fetch", source_id), &result, 0, 0)
-                .await?;
+            log_research_action(
+                &pool,
+                dec_id,
+                &format!("{}:fetch", source_id),
+                &result,
+                0,
+                0,
+            )
+            .await?;
         }
 
         Ok(VerbExecutionOutcome::Record(result))
@@ -441,8 +455,15 @@ impl SemOsVerbOp for CompaniesHouseFetchCompany {
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         if let Some(dec_id) = decision_id {
             let pool = scope.pool().clone();
-            log_research_action(&pool, dec_id, "companies-house:fetch-company", &result, 0, 0)
-                .await?;
+            log_research_action(
+                &pool,
+                dec_id,
+                "companies-house:fetch-company",
+                &result,
+                0,
+                0,
+            )
+            .await?;
         }
 
         Ok(VerbExecutionOutcome::Record(result))
@@ -804,8 +825,8 @@ impl SemOsVerbOp for SecEdgarFetchCompany {
         ctx: &mut VerbExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        let cik = json_extract_string_opt(args, "cik")
-            .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+        let cik =
+            json_extract_string_opt(args, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
 
         let loader = SecEdgarLoader::new()?;
@@ -859,8 +880,8 @@ impl SemOsVerbOp for SecEdgarFetchBeneficialOwners {
         ctx: &mut VerbExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        let cik = json_extract_string_opt(args, "cik")
-            .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+        let cik =
+            json_extract_string_opt(args, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let _include_13d = json_extract_bool_opt(args, "include-13d").unwrap_or(true);
         let _include_13g = json_extract_bool_opt(args, "include-13g").unwrap_or(true);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
@@ -888,7 +909,9 @@ impl SemOsVerbOp for SecEdgarFetchBeneficialOwners {
             })
             .collect();
 
-        Ok(Some(serde_json::json!({ "_sec_beneficial_owners": results })))
+        Ok(Some(
+            serde_json::json!({ "_sec_beneficial_owners": results }),
+        ))
     }
 
     async fn execute(
@@ -941,8 +964,8 @@ impl SemOsVerbOp for SecEdgarFetchFilings {
         _ctx: &mut VerbExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        let cik = json_extract_string_opt(args, "cik")
-            .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+        let cik =
+            json_extract_string_opt(args, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let _limit = json_extract_int_opt(args, "limit").unwrap_or(50);
 
         let loader = SecEdgarLoader::new()?;
@@ -996,8 +1019,8 @@ impl SemOsVerbOp for SecEdgarImportCompany {
         ctx: &mut VerbExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        let cik = json_extract_string_opt(args, "cik")
-            .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+        let cik =
+            json_extract_string_opt(args, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let include_beneficial_owners =
             json_extract_bool_opt(args, "include-beneficial-owners").unwrap_or(true);
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
@@ -1029,8 +1052,8 @@ impl SemOsVerbOp for SecEdgarImportCompany {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let cik = json_extract_string_opt(args, "cik")
-            .ok_or_else(|| anyhow::anyhow!(":cik required"))?;
+        let cik =
+            json_extract_string_opt(args, "cik").ok_or_else(|| anyhow::anyhow!(":cik required"))?;
         let decision_id = json_extract_uuid_opt(args, ctx, "decision-id");
         let pool = scope.pool().clone();
 

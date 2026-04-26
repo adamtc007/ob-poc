@@ -431,11 +431,7 @@ impl CoverageReport {
 }
 
 fn pct(hit: usize, total: usize) -> usize {
-    if total == 0 {
-        0
-    } else {
-        (hit * 100) / total
-    }
+    (hit * 100).checked_div(total).unwrap_or(0)
 }
 
 fn repo_root() -> PathBuf {

@@ -1,8 +1,8 @@
-//! Lifecycle resource instance verbs (12 plugin verbs — 6 canonical
-//! + 6 `service-resource.*-lifecycle` compat aliases). YAML-first
+//! Lifecycle resource instance verbs (12 plugin verbs total — 6 canonical
+//! plus 6 `service-resource.*-lifecycle` compat aliases). YAML-first
 //! re-implementation of `lifecycle.*` from
-//! `rust/config/verbs/lifecycle.yaml` (plus the 6 compat aliases
-//! carried from `service-resource.yaml`).
+//! `rust/config/verbs/lifecycle.yaml` (with 6 compat aliases carried
+//! from `service-resource.yaml`).
 //!
 //! Canonical ops:
 //! - `lifecycle.provision` — upsert `cbu_lifecycle_instances` with
@@ -85,9 +85,9 @@ async fn do_provision(
     let provider_code = json_extract_string_opt(args, "provider");
     let provider_account = json_extract_string_opt(args, "provider-account");
     let provider_bic = json_extract_string_opt(args, "provider-bic");
-    let config: Option<Value> = args
-        .get("config")
-        .and_then(|v| if v.is_object() { Some(v.clone()) } else { None });
+    let config: Option<Value> =
+        args.get("config")
+            .and_then(|v| if v.is_object() { Some(v.clone()) } else { None });
 
     let context_suffix = market_id
         .map(|m| m.to_string())
@@ -155,9 +155,21 @@ async fn do_analyze_gaps(
     let cbu_id: Uuid = json_extract_uuid(args, ctx, "cbu-id")?;
 
     type GapRow = (
-        Uuid, String, String, Option<String>, Option<String>,
-        String, String, bool, String, String,
-        Option<String>, Option<String>, bool, bool, bool,
+        Uuid,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        String,
+        String,
+        bool,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        bool,
+        bool,
+        bool,
     );
     let gaps: Vec<GapRow> = sqlx::query_as(
         r#"SELECT
@@ -175,23 +187,25 @@ async fn do_analyze_gaps(
 
     let out: Vec<Value> = gaps
         .into_iter()
-        .map(|g| json!({
-            "cbu_id": g.0,
-            "cbu_name": g.1,
-            "instrument_class": g.2,
-            "market": g.3,
-            "counterparty_name": g.4,
-            "lifecycle_code": g.5,
-            "lifecycle_name": g.6,
-            "is_mandatory": g.7,
-            "missing_resource_code": g.8,
-            "missing_resource_name": g.9,
-            "provisioning_verb": g.10,
-            "location_type": g.11,
-            "per_market": g.12,
-            "per_currency": g.13,
-            "per_counterparty": g.14
-        }))
+        .map(|g| {
+            json!({
+                "cbu_id": g.0,
+                "cbu_name": g.1,
+                "instrument_class": g.2,
+                "market": g.3,
+                "counterparty_name": g.4,
+                "lifecycle_code": g.5,
+                "lifecycle_name": g.6,
+                "is_mandatory": g.7,
+                "missing_resource_code": g.8,
+                "missing_resource_name": g.9,
+                "provisioning_verb": g.10,
+                "location_type": g.11,
+                "per_market": g.12,
+                "per_currency": g.13,
+                "per_counterparty": g.14
+            })
+        })
         .collect();
     Ok(VerbExecutionOutcome::RecordSet(out))
 }
@@ -316,8 +330,18 @@ async fn do_generate_plan(
         .unwrap_or_else(|| json!({}));
 
     type GapRow = (
-        String, Option<String>, Option<String>, String, bool,
-        String, String, Option<String>, Option<String>, bool, bool, bool,
+        String,
+        Option<String>,
+        Option<String>,
+        String,
+        bool,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        bool,
+        bool,
+        bool,
     );
     let gaps: Vec<GapRow> = sqlx::query_as(
         r#"SELECT instrument_class, market, counterparty_name, lifecycle_code,
@@ -449,7 +473,11 @@ macro_rules! lifecycle_op {
 
 lifecycle_op!(Provision, "lifecycle.provision", do_provision);
 lifecycle_op!(AnalyzeGaps, "lifecycle.analyze-gaps", do_analyze_gaps);
-lifecycle_op!(CheckReadiness, "lifecycle.check-readiness", do_check_readiness);
+lifecycle_op!(
+    CheckReadiness,
+    "lifecycle.check-readiness",
+    do_check_readiness
+);
 lifecycle_op!(Discover, "lifecycle.discover", do_discover);
 lifecycle_op!(GeneratePlan, "lifecycle.generate-plan", do_generate_plan);
 lifecycle_op!(ExecutePlan, "lifecycle.execute-plan", do_execute_plan);

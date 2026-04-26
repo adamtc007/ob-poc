@@ -240,6 +240,7 @@ impl SagaReaper {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::anyhow;
     use std::sync::Mutex;
 
     /// Mock source that returns a canned list.

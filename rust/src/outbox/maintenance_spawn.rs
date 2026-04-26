@@ -122,10 +122,7 @@ impl AsyncOutboxConsumer for MaintenanceSpawnConsumer {
             }
             Err(_) => {
                 return OutboxProcessOutcome::Retryable {
-                    reason: format!(
-                        "subprocess timed out after {}s",
-                        self.timeout.as_secs()
-                    ),
+                    reason: format!("subprocess timed out after {}s", self.timeout.as_secs()),
                 };
             }
         };

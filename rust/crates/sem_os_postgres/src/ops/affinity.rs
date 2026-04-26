@@ -358,10 +358,7 @@ impl SemOsVerbOp for AdjacentVerbs {
             .collect();
 
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(
-            AdjacentVerbsResult {
-                verb_fqn,
-                adjacent,
-            },
+            AdjacentVerbsResult { verb_fqn, adjacent },
         )?))
     }
 }
@@ -414,24 +411,30 @@ impl SemOsVerbOp for GovernanceGaps {
             .collect();
 
         let result = GovernanceGapsResult {
-            orphan_tables: gap_includes(&gap_type, GapType::OrphanTables)
-                .then(|| {
-                    graph
-                        .orphan_tables(&known_table_refs)
-                        .into_iter()
-                        .map(|t| t.key())
-                        .collect()
-                })
-                .unwrap_or_default(),
-            orphan_verbs: gap_includes(&gap_type, GapType::OrphanVerbs)
-                .then(|| graph.orphan_verbs())
-                .unwrap_or_default(),
-            write_only_attributes: gap_includes(&gap_type, GapType::WriteOnly)
-                .then(|| graph.write_only_attributes())
-                .unwrap_or_default(),
-            read_before_write_attributes: gap_includes(&gap_type, GapType::ReadBeforeWrite)
-                .then(|| graph.read_before_write_attributes())
-                .unwrap_or_default(),
+            orphan_tables: if gap_includes(&gap_type, GapType::OrphanTables) {
+                graph
+                    .orphan_tables(&known_table_refs)
+                    .into_iter()
+                    .map(|t| t.key())
+                    .collect()
+            } else {
+                Default::default()
+            },
+            orphan_verbs: if gap_includes(&gap_type, GapType::OrphanVerbs) {
+                graph.orphan_verbs()
+            } else {
+                Default::default()
+            },
+            write_only_attributes: if gap_includes(&gap_type, GapType::WriteOnly) {
+                graph.write_only_attributes()
+            } else {
+                Default::default()
+            },
+            read_before_write_attributes: if gap_includes(&gap_type, GapType::ReadBeforeWrite) {
+                graph.read_before_write_attributes()
+            } else {
+                Default::default()
+            },
         };
 
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))

@@ -36,9 +36,17 @@ macro_rules! audit_op {
 audit_op!(CreatePlan, "create-plan", "sem_reg_create_plan");
 audit_op!(AddPlanStep, "add-plan-step", "sem_reg_add_plan_step");
 audit_op!(ValidatePlan, "validate-plan", "sem_reg_validate_plan");
-audit_op!(ExecutePlanStep, "execute-plan-step", "sem_reg_execute_plan_step");
+audit_op!(
+    ExecutePlanStep,
+    "execute-plan-step",
+    "sem_reg_execute_plan_step"
+);
 audit_op!(RecordDecision, "record-decision", "sem_reg_record_decision");
-audit_op!(RecordEscalation, "record-escalation", "sem_reg_record_escalation");
+audit_op!(
+    RecordEscalation,
+    "record-escalation",
+    "sem_reg_record_escalation"
+);
 audit_op!(
     RecordDisambiguation,
     "record-disambiguation",

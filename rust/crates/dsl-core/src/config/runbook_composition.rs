@@ -111,16 +111,20 @@ impl AggregationRule {
             Self::BulkCardinality { threshold, .. } => steps.len() >= *threshold,
             Self::RepeatedExternalEffect {
                 effect, threshold, ..
-            } => steps
-                .iter()
-                .filter(|s| s.external_effects.contains(effect))
-                .count()
-                >= *threshold,
-            Self::TransitionCount { threshold, .. } => steps
-                .iter()
-                .filter(|s| s.state_effect == StateEffect::Transition)
-                .count()
-                >= *threshold,
+            } => {
+                steps
+                    .iter()
+                    .filter(|s| s.external_effects.contains(effect))
+                    .count()
+                    >= *threshold
+            }
+            Self::TransitionCount { threshold, .. } => {
+                steps
+                    .iter()
+                    .filter(|s| s.state_effect == StateEffect::Transition)
+                    .count()
+                    >= *threshold
+            }
         }
     }
 }
@@ -173,15 +177,12 @@ impl CrossScopeRule {
     pub fn matches(&self, steps: &[RunbookStep]) -> bool {
         match self {
             Self::MultiWorkspace { min_workspaces, .. } => {
-                let distinct: HashSet<&str> =
-                    steps.iter().map(|s| s.workspace.as_str()).collect();
+                let distinct: HashSet<&str> = steps.iter().map(|s| s.workspace.as_str()).collect();
                 distinct.len() >= *min_workspaces
             }
             Self::MultiDag { min_dags, .. } => {
-                let distinct: HashSet<&str> = steps
-                    .iter()
-                    .filter_map(|s| s.dag.as_deref())
-                    .collect();
+                let distinct: HashSet<&str> =
+                    steps.iter().filter_map(|s| s.dag.as_deref()).collect();
                 distinct.len() >= *min_dags
             }
             Self::MultiEntityKind { min_kinds, .. } => {
@@ -333,8 +334,18 @@ mod tests {
     #[test]
     fn component_a_returns_max_step_tier() {
         let steps = vec![
-            mk_step("a.low", ConsequenceTier::Benign, StateEffect::Preserving, "w"),
-            mk_step("a.mid", ConsequenceTier::Reviewable, StateEffect::Preserving, "w"),
+            mk_step(
+                "a.low",
+                ConsequenceTier::Benign,
+                StateEffect::Preserving,
+                "w",
+            ),
+            mk_step(
+                "a.mid",
+                ConsequenceTier::Reviewable,
+                StateEffect::Preserving,
+                "w",
+            ),
             mk_step(
                 "a.high",
                 ConsequenceTier::RequiresConfirmation,
@@ -360,7 +371,10 @@ mod tests {
         let at = (0..5)
             .map(|_| mk_step("x", ConsequenceTier::Benign, StateEffect::Preserving, "w"))
             .collect::<Vec<_>>();
-        assert_eq!(component_b(&below, std::slice::from_ref(&rule)), ConsequenceTier::Benign);
+        assert_eq!(
+            component_b(&below, std::slice::from_ref(&rule)),
+            ConsequenceTier::Benign
+        );
         assert_eq!(component_b(&at, &[rule]), ConsequenceTier::Reviewable);
     }
 
@@ -392,7 +406,10 @@ mod tests {
             mk_emitting(ConsequenceTier::Benign),
             mk_emitting(ConsequenceTier::Benign),
         ];
-        assert_eq!(component_b(&below, std::slice::from_ref(&rule)), ConsequenceTier::Benign);
+        assert_eq!(
+            component_b(&below, std::slice::from_ref(&rule)),
+            ConsequenceTier::Benign
+        );
         assert_eq!(
             component_b(&at, &[rule]),
             ConsequenceTier::RequiresConfirmation
@@ -480,7 +497,10 @@ mod tests {
         let stateless = mk_step("s", ConsequenceTier::Benign, StateEffect::Preserving, "w");
         // 2 distinct DAGs → fires.
         assert_eq!(
-            component_c(&[s1.clone(), s2.clone(), stateless.clone()], std::slice::from_ref(&rule)),
+            component_c(
+                &[s1.clone(), s2.clone(), stateless.clone()],
+                std::slice::from_ref(&rule)
+            ),
             ConsequenceTier::Reviewable
         );
         // Only 1 DAG → doesn't fire.
@@ -540,7 +560,12 @@ mod tests {
     #[test]
     fn trace_records_component_tiers_and_fired_rules() {
         let steps = vec![
-            mk_step("s1", ConsequenceTier::Reviewable, StateEffect::Transition, "w1"),
+            mk_step(
+                "s1",
+                ConsequenceTier::Reviewable,
+                StateEffect::Transition,
+                "w1",
+            ),
             mk_step("s2", ConsequenceTier::Benign, StateEffect::Transition, "w2"),
         ];
         let agg = vec![AggregationRule::TransitionCount {
@@ -570,8 +595,18 @@ mod tests {
         // regardless of how they were assembled (macro-expansion vs
         // REPL typing — the composition function doesn't distinguish).
         let macro_expanded = vec![
-            mk_step("a", ConsequenceTier::Reviewable, StateEffect::Preserving, "w"),
-            mk_step("b", ConsequenceTier::Reviewable, StateEffect::Preserving, "w"),
+            mk_step(
+                "a",
+                ConsequenceTier::Reviewable,
+                StateEffect::Preserving,
+                "w",
+            ),
+            mk_step(
+                "b",
+                ConsequenceTier::Reviewable,
+                StateEffect::Preserving,
+                "w",
+            ),
         ];
         let adhoc_assembled = macro_expanded.clone();
         let rules = vec![AggregationRule::BulkCardinality {

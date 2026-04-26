@@ -71,24 +71,31 @@ impl EvaluationContext {
 /// cannot cause a spurious escalation.
 pub fn evaluate_predicate(pred: &EscalationPredicate, ctx: &EvaluationContext) -> bool {
     match pred {
-        EscalationPredicate::ArgEq { arg, value } => {
-            ctx.args.get(arg).is_some_and(|v| v == value)
-        }
-        EscalationPredicate::ArgIn { arg, values } => {
-            ctx.args.get(arg).is_some_and(|v| values.iter().any(|w| w == v))
-        }
-        EscalationPredicate::ArgGt { arg, value } => {
-            ctx.args.get(arg).and_then(as_f64).is_some_and(|n| n > *value)
-        }
-        EscalationPredicate::ArgGte { arg, value } => {
-            ctx.args.get(arg).and_then(as_f64).is_some_and(|n| n >= *value)
-        }
-        EscalationPredicate::ArgLt { arg, value } => {
-            ctx.args.get(arg).and_then(as_f64).is_some_and(|n| n < *value)
-        }
-        EscalationPredicate::ArgLte { arg, value } => {
-            ctx.args.get(arg).and_then(as_f64).is_some_and(|n| n <= *value)
-        }
+        EscalationPredicate::ArgEq { arg, value } => ctx.args.get(arg).is_some_and(|v| v == value),
+        EscalationPredicate::ArgIn { arg, values } => ctx
+            .args
+            .get(arg)
+            .is_some_and(|v| values.iter().any(|w| w == v)),
+        EscalationPredicate::ArgGt { arg, value } => ctx
+            .args
+            .get(arg)
+            .and_then(as_f64)
+            .is_some_and(|n| n > *value),
+        EscalationPredicate::ArgGte { arg, value } => ctx
+            .args
+            .get(arg)
+            .and_then(as_f64)
+            .is_some_and(|n| n >= *value),
+        EscalationPredicate::ArgLt { arg, value } => ctx
+            .args
+            .get(arg)
+            .and_then(as_f64)
+            .is_some_and(|n| n < *value),
+        EscalationPredicate::ArgLte { arg, value } => ctx
+            .args
+            .get(arg)
+            .and_then(as_f64)
+            .is_some_and(|n| n <= *value),
         EscalationPredicate::EntityAttrEq {
             entity_kind,
             attr,
@@ -110,12 +117,8 @@ pub fn evaluate_predicate(pred: &EscalationPredicate, ctx: &EvaluationContext) -
         EscalationPredicate::ContextFlag { flag } => {
             ctx.context_flags.get(flag).copied().unwrap_or(false)
         }
-        EscalationPredicate::And { preds } => {
-            preds.iter().all(|p| evaluate_predicate(p, ctx))
-        }
-        EscalationPredicate::Or { preds } => {
-            preds.iter().any(|p| evaluate_predicate(p, ctx))
-        }
+        EscalationPredicate::And { preds } => preds.iter().all(|p| evaluate_predicate(p, ctx)),
+        EscalationPredicate::Or { preds } => preds.iter().any(|p| evaluate_predicate(p, ctx)),
         EscalationPredicate::Not { pred } => !evaluate_predicate(pred, ctx),
     }
 }
@@ -175,11 +178,7 @@ mod tests {
         }
     }
 
-    fn rule(
-        name: &str,
-        pred: EscalationPredicate,
-        tier: ConsequenceTier,
-    ) -> EscalationRule {
+    fn rule(name: &str, pred: EscalationPredicate, tier: ConsequenceTier) -> EscalationRule {
         EscalationRule {
             name: name.into(),
             when: pred,
@@ -311,8 +310,7 @@ mod tests {
                 ConsequenceTier::RequiresExplicitAuthorisation,
             )],
         );
-        let ctx =
-            EvaluationContext::new().with_entity_attr("cbu", "jurisdiction", json!("IR"));
+        let ctx = EvaluationContext::new().with_entity_attr("cbu", "jurisdiction", json!("IR"));
         assert_eq!(
             compute_effective_tier(&d, &ctx),
             ConsequenceTier::RequiresExplicitAuthorisation

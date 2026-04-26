@@ -328,9 +328,7 @@ impl OutboxDrainerImpl {
             });
 
         let result = match outcome {
-            OutboxProcessOutcome::Done | OutboxProcessOutcome::Deduped => {
-                self.mark_done(id).await
-            }
+            OutboxProcessOutcome::Done | OutboxProcessOutcome::Deduped => self.mark_done(id).await,
             OutboxProcessOutcome::Retryable { reason } => {
                 if attempts >= self.config.max_attempts {
                     tracing::error!(
@@ -342,7 +340,10 @@ impl OutboxDrainerImpl {
                     );
                     self.mark_terminal(
                         id,
-                        &format!("max_attempts ({}) exceeded: {reason}", self.config.max_attempts),
+                        &format!(
+                            "max_attempts ({}) exceeded: {reason}",
+                            self.config.max_attempts
+                        ),
                     )
                     .await
                 } else {

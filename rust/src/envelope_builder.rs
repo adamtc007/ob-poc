@@ -49,24 +49,12 @@
 //! builder so the determinism harness can detect when a placeholder is
 //! replaced by real data.
 
-use ob_poc_types::{
-    AuthorisationProof,
-    CatalogueSnapshotId,
-    ClosedLoopMarker,
-    DagNodeId,
-    DagNodeVersion,
-    DiscoverySignals,
-    EnvelopeVersion,
-    GatedVerbEnvelope,
-    LogicalClock,
-    ResolvedEntities,
-    SessionScopeRef,
-    TraceId,
-    VerbArgs,
-    VerbRef,
-    WorkspaceSnapshotId,
-};
 use ob_poc_types::gated_envelope::state_gate_hash;
+use ob_poc_types::{
+    AuthorisationProof, CatalogueSnapshotId, ClosedLoopMarker, DagNodeId, DagNodeVersion,
+    DiscoverySignals, EnvelopeVersion, GatedVerbEnvelope, LogicalClock, ResolvedEntities,
+    SessionScopeRef, TraceId, VerbArgs, VerbRef, WorkspaceSnapshotId,
+};
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
 

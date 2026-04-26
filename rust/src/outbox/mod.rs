@@ -50,6 +50,6 @@ pub mod narration_emit;
 
 pub use bpmn_signal::{BpmnCancelConsumer, BpmnSignalConsumer};
 pub use consumer::AsyncOutboxConsumer;
-pub use drainer::{OutboxDrainerImpl, OutboxDrainerConfig, OutboxDrainerHandle};
+pub use drainer::{OutboxDrainerConfig, OutboxDrainerHandle, OutboxDrainerImpl};
 pub use maintenance_spawn::MaintenanceSpawnConsumer;
 pub use narrate::NarrateConsumer;

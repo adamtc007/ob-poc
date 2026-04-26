@@ -476,14 +476,14 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<
 
         println!("\n  By Tier:");
         let mut tiers: Vec<_> = tier_counts.into_iter().collect();
-        tiers.sort_by(|a, b| b.1.cmp(&a.1));
+        tiers.sort_by_key(|item| std::cmp::Reverse(item.1));
         for (tier, count) in tiers {
             println!("    {:15} {}", tier, count);
         }
 
         println!("\n  By Source of Truth:");
         let mut sources: Vec<_> = source_counts.into_iter().collect();
-        sources.sort_by(|a, b| b.1.cmp(&a.1));
+        sources.sort_by_key(|item| std::cmp::Reverse(item.1));
         for (source, count) in sources {
             println!("    {:15} {}", source, count);
         }
@@ -505,8 +505,8 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<
     // =========================================================================
     {
         use dsl_core::config::{
-            collect_declared_fqns, flatten_pack_entries, load_packs_from_dir,
-            validate_pack_fqns, validate_verbs_config, ValidationContext,
+            collect_declared_fqns, flatten_pack_entries, load_packs_from_dir, validate_pack_fqns,
+            validate_verbs_config, ValidationContext,
         };
         use std::collections::HashSet;
         use std::path::PathBuf;
@@ -533,15 +533,15 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<
                         if p.extension().and_then(|e| e.to_str()) != Some("yaml") {
                             continue;
                         }
-                        let Ok(raw) = std::fs::read_to_string(&p) else { continue; };
+                        let Ok(raw) = std::fs::read_to_string(&p) else {
+                            continue;
+                        };
                         let Ok(v) = serde_yaml::from_str::<serde_yaml::Value>(&raw) else {
                             continue;
                         };
                         if let Some(m) = v.as_mapping() {
                             for (k, b) in m {
-                                if let (Some(fqn), Some(body)) =
-                                    (k.as_str(), b.as_mapping())
-                                {
+                                if let (Some(fqn), Some(body)) = (k.as_str(), b.as_mapping()) {
                                     if body
                                         .get(serde_yaml::Value::String("kind".into()))
                                         .and_then(|x| x.as_str())
@@ -575,10 +575,7 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<
             .values()
             .map(|d| d.verbs.len())
             .sum::<usize>();
-        println!(
-            "  Declared:             {} / {}",
-            declared, total
-        );
+        println!("  Declared:             {} / {}", declared, total);
         println!(
             "  Structural errors:    {}",
             three_axis_report.structural.len()

@@ -16,9 +16,7 @@
 //! - No actual Sequencer implementation (that's Phase 5b).
 //! - No fixture DB orchestration (Phase 5e).
 
-use ob_poc_types::{
-    GatedOutcome, GatedVerbEnvelope, OutboxDraft, PendingStateAdvance,
-};
+use ob_poc_types::{GatedOutcome, GatedVerbEnvelope, OutboxDraft, PendingStateAdvance};
 use serde::{Deserialize, Serialize};
 
 /// A single stage-capture point. Each run emits one of these per stage that
@@ -117,8 +115,14 @@ impl HarnessRun {
 /// A divergence reason returned by [`HarnessRun::first_divergence`].
 #[derive(Debug)]
 pub enum StageDivergence<'a> {
-    FixtureMismatch { lhs: &'a str, rhs: &'a str },
-    LengthMismatch { lhs_len: usize, rhs_len: usize },
+    FixtureMismatch {
+        lhs: &'a str,
+        rhs: &'a str,
+    },
+    LengthMismatch {
+        lhs_len: usize,
+        rhs_len: usize,
+    },
     StageDiffers {
         index: usize,
         lhs: &'a StageCapture,

@@ -73,8 +73,12 @@ impl SemOsVerbOp for RecordContribution {
 
         let partner = load_partner(scope, partnership_id, partner_id).await?;
 
-        let old_contributed = partner.capital_contributed.unwrap_or(rust_decimal::Decimal::ZERO);
-        let commitment = partner.capital_commitment.unwrap_or(rust_decimal::Decimal::ZERO);
+        let old_contributed = partner
+            .capital_contributed
+            .unwrap_or(rust_decimal::Decimal::ZERO);
+        let commitment = partner
+            .capital_commitment
+            .unwrap_or(rust_decimal::Decimal::ZERO);
         let new_contributed = old_contributed + amount;
 
         if commitment > rust_decimal::Decimal::ZERO && new_contributed > commitment {
@@ -103,7 +107,9 @@ impl SemOsVerbOp for RecordContribution {
         );
 
         let unfunded = commitment - new_contributed
-            + partner.capital_returned.unwrap_or(rust_decimal::Decimal::ZERO);
+            + partner
+                .capital_returned
+                .unwrap_or(rust_decimal::Decimal::ZERO);
 
         Ok(VerbExecutionOutcome::Record(json!({
             "partnership_capital_id": partner.id.to_string(),
@@ -146,8 +152,12 @@ impl SemOsVerbOp for RecordDistribution {
             .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
 
         let partner = load_partner(scope, partnership_id, partner_id).await?;
-        let contributed = partner.capital_contributed.unwrap_or(rust_decimal::Decimal::ZERO);
-        let old_returned = partner.capital_returned.unwrap_or(rust_decimal::Decimal::ZERO);
+        let contributed = partner
+            .capital_contributed
+            .unwrap_or(rust_decimal::Decimal::ZERO);
+        let old_returned = partner
+            .capital_returned
+            .unwrap_or(rust_decimal::Decimal::ZERO);
 
         if distribution_type == "capital_return" {
             let max_returnable = contributed - old_returned;
@@ -243,9 +253,15 @@ impl SemOsVerbOp for Reconcile {
         let mut partner_details: Vec<Value> = Vec::new();
 
         for p in &partners {
-            let profit_pct: f64 = p.profit_share_pct.map(|d| d.to_string().parse().unwrap_or(0.0)).unwrap_or(0.0);
+            let profit_pct: f64 = p
+                .profit_share_pct
+                .map(|d| d.to_string().parse().unwrap_or(0.0))
+                .unwrap_or(0.0);
             total_profit_share += profit_pct;
-            let voting: f64 = p.voting_pct.map(|d| d.to_string().parse().unwrap_or(0.0)).unwrap_or(0.0);
+            let voting: f64 = p
+                .voting_pct
+                .map(|d| d.to_string().parse().unwrap_or(0.0))
+                .unwrap_or(0.0);
             total_voting += voting;
             let commitment = p.capital_commitment.unwrap_or(rust_decimal::Decimal::ZERO);
             total_commitment += commitment;
@@ -273,16 +289,26 @@ impl SemOsVerbOp for Reconcile {
 
         let mut issues: Vec<String> = Vec::new();
         if !is_profit_balanced {
-            issues.push(format!("Profit shares sum to {:.2}%, expected 100%", total_profit_share));
+            issues.push(format!(
+                "Profit shares sum to {:.2}%, expected 100%",
+                total_profit_share
+            ));
         }
         if !is_voting_balanced {
-            issues.push(format!("Voting percentages sum to {:.2}%, expected 100%", total_voting));
+            issues.push(format!(
+                "Voting percentages sum to {:.2}%, expected 100%",
+                total_voting
+            ));
         }
         if gp_count == 0 && lp_count > 0 {
             issues.push("No General Partner (GP) found in limited partnership".into());
         }
 
-        let status = if issues.is_empty() { "reconciled" } else { "discrepancies_found" };
+        let status = if issues.is_empty() {
+            "reconciled"
+        } else {
+            "discrepancies_found"
+        };
 
         Ok(VerbExecutionOutcome::Record(json!({
             "partnership_entity_id": partnership_id.to_string(),
@@ -356,8 +382,14 @@ impl SemOsVerbOp for AnalyzeControl {
         let mut lps: Vec<Value> = Vec::new();
 
         for p in &partners {
-            let profit_pct: f64 = p.profit_share_pct.map(|d| d.to_string().parse().unwrap_or(0.0)).unwrap_or(0.0);
-            let voting_pct: f64 = p.voting_pct.map(|d| d.to_string().parse().unwrap_or(0.0)).unwrap_or(0.0);
+            let profit_pct: f64 = p
+                .profit_share_pct
+                .map(|d| d.to_string().parse().unwrap_or(0.0))
+                .unwrap_or(0.0);
+            let voting_pct: f64 = p
+                .voting_pct
+                .map(|d| d.to_string().parse().unwrap_or(0.0))
+                .unwrap_or(0.0);
             let partner_info = json!({
                 "partner_id": p.partner_entity_id.to_string(),
                 "partner_name": p.partner_name,
@@ -398,19 +430,18 @@ impl SemOsVerbOp for AnalyzeControl {
                         }));
                     }
                 }
-                "MEMBER" => {
-                    if p.management_rights.unwrap_or(false) || voting_pct > 50.0 {
-                        controllers.push(json!({
-                            "controller_id": p.partner_entity_id.to_string(),
-                            "controller_name": p.partner_name,
-                            "control_type": "managing_member",
-                            "control_strength": 0.80,
-                            "voting_pct": voting_pct,
-                            "is_natural_person": p.is_natural_person.unwrap_or(false),
-                            "needs_further_tracing": !p.is_natural_person.unwrap_or(false),
-                        }));
-                    }
+                "MEMBER" if p.management_rights.unwrap_or(false) || voting_pct > 50.0 => {
+                    controllers.push(json!({
+                        "controller_id": p.partner_entity_id.to_string(),
+                        "controller_name": p.partner_name,
+                        "control_type": "managing_member",
+                        "control_strength": 0.80,
+                        "voting_pct": voting_pct,
+                        "is_natural_person": p.is_natural_person.unwrap_or(false),
+                        "needs_further_tracing": !p.is_natural_person.unwrap_or(false),
+                    }));
                 }
+                "MEMBER" => {}
                 _ => {}
             }
         }

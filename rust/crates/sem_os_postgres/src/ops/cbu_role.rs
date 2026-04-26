@@ -28,12 +28,11 @@ use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use super::SemOsVerbOp;
 
 async fn get_role_id(scope: &mut dyn TransactionScope, role_name: &str) -> Result<Uuid> {
-    let row: Option<(Uuid,)> = sqlx::query_as(
-        r#"SELECT role_id FROM "ob-poc".roles WHERE name = UPPER($1)"#,
-    )
-    .bind(role_name)
-    .fetch_optional(scope.executor())
-    .await?;
+    let row: Option<(Uuid,)> =
+        sqlx::query_as(r#"SELECT role_id FROM "ob-poc".roles WHERE name = UPPER($1)"#)
+            .bind(role_name)
+            .fetch_optional(scope.executor())
+            .await?;
     row.map(|(id,)| id)
         .ok_or_else(|| anyhow!("Role '{}' not found in taxonomy", role_name))
 }
@@ -542,7 +541,10 @@ impl SemOsVerbOp for AssignSignatory {
                 "cbu.assign-signatory — {} as '{}' (authority {} {}; co-sig={}; CBU {})",
                 person_entity_id,
                 role,
-                authority_limit.as_ref().map(|d| d.to_string()).unwrap_or_else(|| "—".to_string()),
+                authority_limit
+                    .as_ref()
+                    .map(|d| d.to_string())
+                    .unwrap_or_else(|| "—".to_string()),
                 authority_currency,
                 requires_co_signatory,
                 cbu_id
@@ -607,9 +609,8 @@ impl SemOsVerbOp for ValidateRoles {
             .fetch_one(scope.executor())
             .await?;
             if !has_manco {
-                issues.push(
-                    "Fund CBU requires MANAGEMENT_COMPANY or INVESTMENT_MANAGER".to_string(),
-                );
+                issues
+                    .push("Fund CBU requires MANAGEMENT_COMPANY or INVESTMENT_MANAGER".to_string());
             }
         }
 

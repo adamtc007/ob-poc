@@ -184,6 +184,8 @@ mod tests {
             ]
         });
         let resolved = resolve_pending_state_advance(&raw);
-        assert!(resolved["state_transitions"][0].get("to_node_resolved").is_none());
+        assert!(resolved["state_transitions"][0]
+            .get("to_node_resolved")
+            .is_none());
     }
 }

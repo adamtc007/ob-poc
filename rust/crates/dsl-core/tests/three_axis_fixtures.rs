@@ -295,7 +295,8 @@ fn cross_workspace_runbook_escalates_via_component_c() {
     }];
     let t = compute_runbook_tier(&steps, &[], &cross_scope);
     assert_eq!(
-        t, ConsequenceTier::RequiresConfirmation,
+        t,
+        ConsequenceTier::RequiresConfirmation,
         "cross-workspace rule should escalate a runbook with all-benign steps"
     );
 }
@@ -316,7 +317,8 @@ fn bulk_emission_runbook_escalates_via_component_b() {
     }];
     let t = compute_runbook_tier(&steps, &rules, &[]);
     assert_eq!(
-        t, ConsequenceTier::RequiresConfirmation,
+        t,
+        ConsequenceTier::RequiresConfirmation,
         "4 emitting steps above threshold=3 should escalate"
     );
 }

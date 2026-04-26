@@ -89,7 +89,9 @@ impl SemOsVerbOp for ControlAnalyze {
 
         for (from_id, owner_name, pct, own_type) in ownership {
             let owner_id = from_id.to_string();
-            let pct_f: f64 = pct.map(|p| p.to_string().parse().unwrap_or(0.0)).unwrap_or(0.0);
+            let pct_f: f64 = pct
+                .map(|p| p.to_string().parse().unwrap_or(0.0))
+                .unwrap_or(0.0);
             control_vectors.push(json!({
                 "vector_type": "ownership",
                 "holder_id": owner_id,
@@ -98,7 +100,10 @@ impl SemOsVerbOp for ControlAnalyze {
                 "ownership_type": own_type,
                 "strength": pct_f / 100.0,
             }));
-            controllers.entry(owner_id).or_default().push("ownership".into());
+            controllers
+                .entry(owner_id)
+                .or_default()
+                .push("ownership".into());
         }
 
         // 2. Voting rights
@@ -123,7 +128,9 @@ impl SemOsVerbOp for ControlAnalyze {
 
         for (from_id, name, pct) in voting {
             let holder_id = from_id.to_string();
-            let pct_f: f64 = pct.map(|p| p.to_string().parse().unwrap_or(0.0)).unwrap_or(0.0);
+            let pct_f: f64 = pct
+                .map(|p| p.to_string().parse().unwrap_or(0.0))
+                .unwrap_or(0.0);
             control_vectors.push(json!({
                 "vector_type": "voting_rights",
                 "holder_id": holder_id,
@@ -131,7 +138,10 @@ impl SemOsVerbOp for ControlAnalyze {
                 "percentage": pct_f,
                 "strength": pct_f / 100.0,
             }));
-            controllers.entry(holder_id).or_default().push("voting_rights".into());
+            controllers
+                .entry(holder_id)
+                .or_default()
+                .push("voting_rights".into());
         }
 
         // 3. Board control (majority appointer)
@@ -188,7 +198,10 @@ impl SemOsVerbOp for ControlAnalyze {
                     "has_majority": true,
                     "strength": 0.9,
                 }));
-                controllers.entry(holder_id).or_default().push("board_appointment".into());
+                controllers
+                    .entry(holder_id)
+                    .or_default()
+                    .push("board_appointment".into());
             }
         }
 
@@ -235,7 +248,10 @@ impl SemOsVerbOp for ControlAnalyze {
                     "has_discretion": row.has_discretion,
                     "strength": strength,
                 }));
-                controllers.entry(holder_id).or_default().push("trust_role".into());
+                controllers
+                    .entry(holder_id)
+                    .or_default()
+                    .push("trust_role".into());
             }
         }
 
@@ -264,7 +280,10 @@ impl SemOsVerbOp for ControlAnalyze {
                     "holder_name": name,
                     "strength": 0.95,
                 }));
-                controllers.entry(holder_id).or_default().push("general_partner".into());
+                controllers
+                    .entry(holder_id)
+                    .or_default()
+                    .push("general_partner".into());
             }
         }
 
@@ -294,7 +313,10 @@ impl SemOsVerbOp for ControlAnalyze {
                 "position": role_name,
                 "strength": 0.6,
             }));
-            controllers.entry(holder_id).or_default().push("executive_control".into());
+            controllers
+                .entry(holder_id)
+                .or_default()
+                .push("executive_control".into());
         }
 
         // Build controller summary with natural-person flag + aggregate score
@@ -376,10 +398,7 @@ impl SemOsVerbOp for ControlBuildGraph {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
-        let max_depth = args
-            .get("max-depth")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(10) as i32;
+        let max_depth = args.get("max-depth").and_then(|v| v.as_i64()).unwrap_or(10) as i32;
 
         let cbu_entities: Vec<(Uuid,)> = sqlx::query_as(
             r#"SELECT DISTINCT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1"#,
@@ -685,7 +704,9 @@ impl SemOsVerbOp for ControlIdentifyUbos {
             });
 
             if let Some(obj) = entry.as_object_mut() {
-                if let Some(vectors) = obj.get_mut("control_vectors").and_then(|v| v.as_array_mut())
+                if let Some(vectors) = obj
+                    .get_mut("control_vectors")
+                    .and_then(|v| v.as_array_mut())
                 {
                     vectors.push(json!({
                         "type": "ownership",
@@ -719,7 +740,9 @@ impl SemOsVerbOp for ControlIdentifyUbos {
                 })
             });
             if let Some(obj) = entry.as_object_mut() {
-                if let Some(vectors) = obj.get_mut("control_vectors").and_then(|v| v.as_array_mut())
+                if let Some(vectors) = obj
+                    .get_mut("control_vectors")
+                    .and_then(|v| v.as_array_mut())
                 {
                     vectors.push(json!({
                         "type": row.control_vector,
@@ -758,10 +781,7 @@ impl SemOsVerbOp for ControlTraceChain {
     ) -> Result<VerbExecutionOutcome> {
         let from_entity_id = json_extract_uuid(args, ctx, "from-entity-id")?;
         let to_entity_id = json_extract_uuid(args, ctx, "to-entity-id")?;
-        let max_depth = args
-            .get("max-depth")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(10) as i32;
+        let max_depth = args.get("max-depth").and_then(|v| v.as_i64()).unwrap_or(10) as i32;
 
         let chain: Option<(Vec<Uuid>, i32)> = sqlx::query_as(
             r#"
@@ -825,20 +845,23 @@ impl SemOsVerbOp for ControlTraceChain {
 
                 if let Some((name, entity_type)) = entity_info {
                     let relationship = if i < path.len() - 1 {
-                        let rel: Option<(Option<String>, Option<String>, Option<rust_decimal::Decimal>)> =
-                            sqlx::query_as(
-                                r#"
+                        let rel: Option<(
+                            Option<String>,
+                            Option<String>,
+                            Option<rust_decimal::Decimal>,
+                        )> = sqlx::query_as(
+                            r#"
                                 SELECT relationship_type, control_type, percentage
                                 FROM "ob-poc".entity_relationships
                                 WHERE from_entity_id = $1 AND to_entity_id = $2
                                   AND (effective_to IS NULL OR effective_to > CURRENT_DATE)
                                 LIMIT 1
                                 "#,
-                            )
-                            .bind(entity_id)
-                            .bind(path[i + 1])
-                            .fetch_optional(scope.executor())
-                            .await?;
+                        )
+                        .bind(entity_id)
+                        .bind(path[i + 1])
+                        .fetch_optional(scope.executor())
+                        .await?;
 
                         rel.map(|(rel_type, ctrl_type, pct)| {
                             json!({
@@ -966,12 +989,19 @@ impl SemOsVerbOp for ControlReconcileOwnership {
 
         let share_map: HashMap<String, f64> = share_ownership
             .into_iter()
-            .map(|r| (r.investor_entity_id.to_string(), r.ownership_pct.unwrap_or(0.0)))
+            .map(|r| {
+                (
+                    r.investor_entity_id.to_string(),
+                    r.ownership_pct.unwrap_or(0.0),
+                )
+            })
             .collect();
         let rel_map: HashMap<String, f64> = relationship_ownership
             .into_iter()
             .map(|(owner_id, _, pct)| {
-                let f: f64 = pct.map(|p| p.to_string().parse().unwrap_or(0.0)).unwrap_or(0.0);
+                let f: f64 = pct
+                    .map(|p| p.to_string().parse().unwrap_or(0.0))
+                    .unwrap_or(0.0);
                 (owner_id.to_string(), f)
             })
             .collect();

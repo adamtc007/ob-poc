@@ -258,13 +258,11 @@ impl SemOsVerbOp for RecordSubscription {
         .await?;
 
         if let Some(hid) = holding_id {
-            sqlx::query(
-                r#"UPDATE "ob-poc".holdings SET investor_id = $1 WHERE id = $2"#,
-            )
-            .bind(investor_id)
-            .bind(hid)
-            .execute(scope.executor())
-            .await?;
+            sqlx::query(r#"UPDATE "ob-poc".holdings SET investor_id = $1 WHERE id = $2"#)
+                .bind(investor_id)
+                .bind(hid)
+                .execute(scope.executor())
+                .await?;
         }
         dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
             ctx,
@@ -600,4 +598,3 @@ impl SemOsVerbOp for CountByState {
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(counts)?))
     }
 }
-

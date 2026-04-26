@@ -209,7 +209,10 @@ impl std::fmt::Display for DagWarning {
                      review state. Cadence will have no runtime effect. (V1.3-6)"
                 )
             }
-            Self::ValidityWindowWithoutExpiredState { location, evidence_type_id } => write!(
+            Self::ValidityWindowWithoutExpiredState {
+                location,
+                evidence_type_id,
+            } => write!(
                 f,
                 "{location}: evidence_type '{evidence_type_id}' has a validity_window \
                  but the evidence state machine has no EXPIRED state. \
@@ -459,20 +462,12 @@ fn validate_derived_cross_workspace_state_refs(
                 .push(DagError::DerivedCrossWorkspaceStateUnresolved {
                     location: loc.clone(),
                     derived_id: d.id.clone(),
-                    unresolved_ref: format!(
-                        "host {}.{}",
-                        d.host_workspace, d.host_slot
-                    ),
+                    unresolved_ref: format!("host {}.{}", d.host_workspace, d.host_slot),
                 });
         }
 
         // Each derivation condition resolvable
-        for cond in d
-            .derivation
-            .all_of
-            .iter()
-            .chain(d.derivation.any_of.iter())
-        {
+        for cond in d.derivation.all_of.iter().chain(d.derivation.any_of.iter()) {
             if let DerivationCondition::Structured(s) = cond {
                 if !index.slot_exists(&s.workspace, &s.slot) {
                     report
@@ -491,16 +486,13 @@ fn validate_derived_cross_workspace_state_refs(
                     };
                     for st in states {
                         if !index.state_exists(&s.workspace, &s.slot, &st) {
-                            report.errors.push(
-                                DagError::DerivedCrossWorkspaceStateUnresolved {
+                            report
+                                .errors
+                                .push(DagError::DerivedCrossWorkspaceStateUnresolved {
                                     location: loc.clone(),
                                     derived_id: d.id.clone(),
-                                    unresolved_ref: format!(
-                                        "{}.{}::{}",
-                                        s.workspace, s.slot, st
-                                    ),
-                                },
-                            );
+                                    unresolved_ref: format!("{}.{}::{}", s.workspace, s.slot, st),
+                                });
                         }
                     }
                 }
@@ -559,8 +551,7 @@ fn validate_dual_lifecycles(workspace: &str, dag: &Dag, report: &mut DagValidati
             continue; // can't validate reference form
         };
 
-        let primary_states: HashSet<&str> =
-            sm.states.iter().map(|s| s.id.as_str()).collect();
+        let primary_states: HashSet<&str> = sm.states.iter().map(|s| s.id.as_str()).collect();
 
         for dual in &slot.dual_lifecycle {
             if !primary_states.contains(dual.junction_state_from_primary.as_str()) {
@@ -628,22 +619,20 @@ fn validate_long_lived_suspended_convention(
                 .any(|s| s.id.eq_ignore_ascii_case("SUSPENDED"))
         });
         if !has_suspended_primary && !has_suspended_dual {
-            report.warnings.push(DagWarning::LongLivedSlotMissingSuspended {
-                location: DagLocation {
-                    workspace: workspace.to_string(),
-                    path: format!("slots.{}.state_machine", slot.id),
-                },
-                slot_id: slot.id.clone(),
-            });
+            report
+                .warnings
+                .push(DagWarning::LongLivedSlotMissingSuspended {
+                    location: DagLocation {
+                        workspace: workspace.to_string(),
+                        path: format!("slots.{}.state_machine", slot.id),
+                    },
+                    slot_id: slot.id.clone(),
+                });
         }
     }
 }
 
-fn validate_periodic_review_cadence(
-    workspace: &str,
-    dag: &Dag,
-    report: &mut DagValidationReport,
-) {
+fn validate_periodic_review_cadence(workspace: &str, dag: &Dag, report: &mut DagValidationReport) {
     for slot in &dag.slots {
         let Some(_cadence) = &slot.periodic_review_cadence else {
             continue;
@@ -668,29 +657,29 @@ fn validate_periodic_review_cadence(
         let mut to_counts: std::collections::HashMap<&str, usize> =
             std::collections::HashMap::new();
         for t in &sm.transitions {
-            to_counts.entry(t.to.as_str()).and_modify(|v| *v += 1).or_insert(1);
+            to_counts
+                .entry(t.to.as_str())
+                .and_modify(|v| *v += 1)
+                .or_insert(1);
         }
         let has_back_edge = to_counts.values().any(|&c| c >= 2);
 
-        let entry_state_id: Option<&str> = sm
-            .states
-            .iter()
-            .find(|s| s.entry)
-            .map(|s| s.id.as_str());
+        let entry_state_id: Option<&str> =
+            sm.states.iter().find(|s| s.entry).map(|s| s.id.as_str());
         let entry_reached = entry_state_id
             .map(|eid| sm.transitions.iter().any(|t| t.to == eid))
             .unwrap_or(false);
 
         if !has_back_edge && !entry_reached {
-            report.warnings.push(
-                DagWarning::PeriodicReviewCadenceWithoutRereviewTransition {
+            report
+                .warnings
+                .push(DagWarning::PeriodicReviewCadenceWithoutRereviewTransition {
                     location: DagLocation {
                         workspace: workspace.to_string(),
                         path: format!("slots.{}.periodic_review_cadence", slot.id),
                     },
                     slot_id: slot.id.clone(),
-                },
-            );
+                });
         }
     }
 }
@@ -790,8 +779,7 @@ fn detect_derivation_cycles(
         let mut path: Vec<Node> = vec![start.clone()];
         color.insert(start.clone(), Color::Gray);
         while let Some((node, idx)) = stack.pop() {
-            let neighbours: Vec<Node> =
-                edges.get(&node).cloned().unwrap_or_default();
+            let neighbours: Vec<Node> = edges.get(&node).cloned().unwrap_or_default();
             if idx < neighbours.len() {
                 stack.push((node.clone(), idx + 1));
                 let next = neighbours[idx].clone();
@@ -800,12 +788,9 @@ fn detect_derivation_cycles(
                 }
                 match color.get(&next).copied().unwrap_or(Color::White) {
                     Color::Gray => {
-                        let cycle_start = path
-                            .iter()
-                            .position(|n| n == &next)
-                            .unwrap_or(path.len());
-                        let mut cycle_path: Vec<String> =
-                            path[cycle_start..].to_vec();
+                        let cycle_start =
+                            path.iter().position(|n| n == &next).unwrap_or(path.len());
+                        let mut cycle_path: Vec<String> = path[cycle_start..].to_vec();
                         cycle_path.push(next);
                         report
                             .errors
@@ -844,7 +829,8 @@ mod tests {
 
     #[test]
     fn unresolved_cross_workspace_source_slot_errors() {
-        let deal = ws_dag(r#"
+        let deal = ws_dag(
+            r#"
 workspace: deal
 dag_id: deal_dag
 cross_workspace_constraints:
@@ -862,8 +848,10 @@ slots:
     state_machine:
       id: deal_lifecycle
       states: [{ id: A, entry: true }, { id: B }]
-"#);
-        let kyc = ws_dag(r#"
+"#,
+        );
+        let kyc = ws_dag(
+            r#"
 workspace: kyc
 dag_id: kyc_dag
 slots:
@@ -872,22 +860,22 @@ slots:
     state_machine:
       id: kyc_case_lifecycle
       states: [{ id: APPROVED }]
-"#);
+"#,
+        );
         let mut map = BTreeMap::new();
         map.insert("deal".to_string(), deal);
         map.insert("kyc".to_string(), kyc);
         let report = validate_dags(&map);
-        assert!(
-            report
-                .errors
-                .iter()
-                .any(|e| matches!(e, DagError::CrossWorkspaceConstraintUnresolved { .. }))
-        );
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| matches!(e, DagError::CrossWorkspaceConstraintUnresolved { .. })));
     }
 
     #[test]
     fn self_referencing_cross_workspace_errors() {
-        let deal = ws_dag(r#"
+        let deal = ws_dag(
+            r#"
 workspace: deal
 dag_id: deal_dag
 cross_workspace_constraints:
@@ -904,18 +892,21 @@ slots:
     state_machine:
       id: deal_lifecycle
       states: [{ id: A, entry: true }, { id: B }]
-"#);
+"#,
+        );
         let mut map = BTreeMap::new();
         map.insert("deal".to_string(), deal);
         let report = validate_dags(&map);
-        assert!(report.errors.iter().any(
-            |e| matches!(e, DagError::CrossWorkspaceConstraintSelfReference { .. })
-        ));
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| matches!(e, DagError::CrossWorkspaceConstraintSelfReference { .. })));
     }
 
     #[test]
     fn parent_slot_unresolved_errors() {
-        let cbu = ws_dag(r#"
+        let cbu = ws_dag(
+            r#"
 workspace: cbu
 dag_id: cbu_dag
 slots:
@@ -928,21 +919,21 @@ slots:
       cascade_rules:
         - parent_state: SUSPENDED
           child_allowed_states: [SUSPENDED]
-"#);
+"#,
+        );
         let mut map = BTreeMap::new();
         map.insert("cbu".to_string(), cbu);
         let report = validate_dags(&map);
-        assert!(
-            report
-                .errors
-                .iter()
-                .any(|e| matches!(e, DagError::ParentSlotUnresolved { .. }))
-        );
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| matches!(e, DagError::ParentSlotUnresolved { .. })));
     }
 
     #[test]
     fn long_lived_missing_suspended_warns() {
-        let dag = ws_dag(r#"
+        let dag = ws_dag(
+            r#"
 workspace: demo
 dag_id: demo
 slots:
@@ -952,18 +943,21 @@ slots:
       id: widget_lifecycle
       expected_lifetime: long_lived
       states: [{ id: DRAFT, entry: true }, { id: ACTIVE }, { id: CLOSED }]
-"#);
+"#,
+        );
         let mut map = BTreeMap::new();
         map.insert("demo".to_string(), dag);
         let report = validate_dags(&map);
-        assert!(report.warnings.iter().any(
-            |w| matches!(w, DagWarning::LongLivedSlotMissingSuspended { .. })
-        ));
+        assert!(report
+            .warnings
+            .iter()
+            .any(|w| matches!(w, DagWarning::LongLivedSlotMissingSuspended { .. })));
     }
 
     #[test]
     fn long_lived_exempt_suppresses_warning() {
-        let dag = ws_dag(r#"
+        let dag = ws_dag(
+            r#"
 workspace: demo
 dag_id: demo
 slots:
@@ -974,7 +968,8 @@ slots:
       id: widget_lifecycle
       expected_lifetime: long_lived
       states: [{ id: DRAFT, entry: true }, { id: CLOSED }]
-"#);
+"#,
+        );
         let mut map = BTreeMap::new();
         map.insert("demo".to_string(), dag);
         let report = validate_dags(&map);
@@ -983,7 +978,8 @@ slots:
 
     #[test]
     fn dual_lifecycle_missing_junction_errors() {
-        let dag = ws_dag(r#"
+        let dag = ws_dag(
+            r#"
 workspace: demo
 dag_id: demo
 slots:
@@ -996,21 +992,21 @@ slots:
       - id: secondary
         junction_state_from_primary: NOT_IN_PRIMARY
         states: [{ id: B }]
-"#);
+"#,
+        );
         let mut map = BTreeMap::new();
         map.insert("demo".to_string(), dag);
         let report = validate_dags(&map);
-        assert!(
-            report
-                .errors
-                .iter()
-                .any(|e| matches!(e, DagError::DualLifecycleJunctionMissing { .. }))
-        );
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| matches!(e, DagError::DualLifecycleJunctionMissing { .. })));
     }
 
     #[test]
     fn category_gated_both_gates_errors() {
-        let dag = ws_dag(r#"
+        let dag = ws_dag(
+            r#"
 workspace: demo
 dag_id: demo
 slots:
@@ -1021,19 +1017,22 @@ slots:
       category_source: cbus
       activated_by: [FUND_MANDATE]
       deactivated_by: [RETAIL_CLIENT]
-"#);
+"#,
+        );
         let mut map = BTreeMap::new();
         map.insert("demo".to_string(), dag);
         let report = validate_dags(&map);
-        assert!(report.errors.iter().any(
-            |e| matches!(e, DagError::CategoryGatedMutuallyExclusiveGates { .. })
-        ));
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| matches!(e, DagError::CategoryGatedMutuallyExclusiveGates { .. })));
     }
 
     #[test]
     fn derivation_cycle_detected() {
         // A -> B -> A cycle in derived states
-        let a = ws_dag(r#"
+        let a = ws_dag(
+            r#"
 workspace: a
 dag_id: a_dag
 slots:
@@ -1050,8 +1049,10 @@ derived_cross_workspace_state:
     derivation:
       all_of:
         - { workspace: b, slot: main, state: ready }
-"#);
-        let b = ws_dag(r#"
+"#,
+        );
+        let b = ws_dag(
+            r#"
 workspace: b
 dag_id: b_dag
 slots:
@@ -1068,7 +1069,8 @@ derived_cross_workspace_state:
     derivation:
       all_of:
         - { workspace: a, slot: main, state: ready }
-"#);
+"#,
+        );
         let mut map = BTreeMap::new();
         map.insert("a".to_string(), a);
         map.insert("b".to_string(), b);
@@ -1086,7 +1088,8 @@ derived_cross_workspace_state:
     #[test]
     fn resolved_tollgate_clean() {
         // Full happy path: KYC approved → CBU tollgate derived from KYC+deal
-        let kyc = ws_dag(r#"
+        let kyc = ws_dag(
+            r#"
 workspace: kyc
 dag_id: kyc_dag
 slots:
@@ -1096,8 +1099,10 @@ slots:
     state_machine:
       id: kyc_case_lifecycle
       states: [{ id: INTAKE, entry: true }, { id: APPROVED }]
-"#);
-        let deal = ws_dag(r#"
+"#,
+        );
+        let deal = ws_dag(
+            r#"
 workspace: deal
 dag_id: deal_dag
 slots:
@@ -1107,8 +1112,10 @@ slots:
       id: deal_lifecycle
       expected_lifetime: long_lived
       states: [{ id: PROSPECT, entry: true }, { id: CONTRACTED }, { id: ACTIVE }, { id: SUSPENDED }, { id: OFFBOARDED }]
-"#);
-        let cbu = ws_dag(r#"
+"#,
+        );
+        let cbu = ws_dag(
+            r#"
 workspace: cbu
 dag_id: cbu_dag
 slots:
@@ -1128,7 +1135,8 @@ derived_cross_workspace_state:
       all_of:
         - { workspace: kyc, slot: kyc_case, state: APPROVED }
         - { workspace: deal, slot: deal, state: [CONTRACTED, ACTIVE] }
-"#);
+"#,
+        );
         let mut map = BTreeMap::new();
         map.insert("kyc".to_string(), kyc);
         map.insert("deal".to_string(), deal);

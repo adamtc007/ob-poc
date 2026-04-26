@@ -29,11 +29,20 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+use crate::dsl_v2::macros::MacroRegistry;
+use crate::journey::handoff::PackHandoff;
+use crate::journey::pack::AnswerKind;
+use crate::journey::playback::PackPlayback;
+use crate::journey::router::{PackRouteOutcome, PackRouter};
+use crate::journey::template::instantiate_template;
+use crate::lookup::LookupService;
+use crate::mcp::verb_search::{VerbSearchResult, VerbSearchSource};
 use crate::repl::context_stack::ContextStack;
 use crate::repl::decision_log::{
     ContextSummary, DecisionLog, ExtractionDecision, ExtractionMethod, TurnType,
     VerbCandidateSnapshot, VerbDecision,
 };
+use crate::repl::intent_matcher::IntentMatcher;
 use crate::repl::intent_service::{ClarificationOutcome, IntentService, VerbMatchOutcome};
 use crate::repl::proposal_engine::ProposalEngine;
 use crate::repl::response_v2::{ChapterView, ReplResponseKindV2, ReplResponseV2, StepResult};
@@ -43,33 +52,24 @@ use crate::repl::runbook::{
 };
 use crate::repl::sentence_gen::SentenceGenerator;
 use crate::repl::session_v2::{MessageRole, ReplSessionV2};
+use crate::repl::types::{MatchContext, MatchOutcome};
 use crate::repl::types_v2::{
     ConstellationContextRef, ExecutionProgress, ReplCommandV2, ReplStateV2,
     ResolvedConstellationContext, SessionFeedback, SubjectKind, UserInputV2, WorkspaceFrame,
     WorkspaceKind, WorkspaceOption, WorkspaceStateView,
 };
 use crate::repl::verb_config_index::VerbConfigIndex;
-use crate::dsl_v2::macros::MacroRegistry;
-use crate::journey::handoff::PackHandoff;
-use crate::journey::pack::AnswerKind;
-use crate::journey::playback::PackPlayback;
-use crate::journey::router::{PackRouteOutcome, PackRouter};
-use crate::journey::template::instantiate_template;
-use crate::lookup::LookupService;
-use crate::mcp::verb_search::{VerbSearchResult, VerbSearchSource};
-use crate::repl::intent_matcher::IntentMatcher;
-use crate::repl::types::{MatchContext, MatchOutcome};
 use crate::runbook::envelope::ReplayEnvelope;
 #[cfg(feature = "database")]
 use crate::runbook::executor::PostgresRunbookStore;
 use crate::runbook::executor::{execute_runbook_with_pool, RunbookStoreBackend, StepOutcome};
-use crate::runbook::CompiledRunbookId;
 use crate::runbook::step_executor_bridge::{
     DslExecutorV2StepExecutor, DslStepExecutor, VerbExecutionPortStepExecutor,
 };
 use crate::runbook::types::{
     CompiledRunbook, CompiledStep, ExecutionMode as CompiledExecutionMode,
 };
+use crate::runbook::CompiledRunbookId;
 use crate::runbook::RunbookStore;
 use crate::traceability::{
     build_phase2_unavailable_payload, build_phase3_unavailable_payload,
@@ -1008,10 +1008,9 @@ impl ReplOrchestratorV2 {
                                     .collect()
                             })
                             .unwrap_or_default();
-                        let stage_3 =
-                            crate::sequencer_stages::DagNavigationOutput::from_rehydrate(
-                                nodes, true,
-                            );
+                        let stage_3 = crate::sequencer_stages::DagNavigationOutput::from_rehydrate(
+                            nodes, true,
+                        );
                         tracing::debug!(
                             session_id = %session.id,
                             node_count = stage_3.current_state_nodes.len(),
@@ -1085,12 +1084,9 @@ impl ReplOrchestratorV2 {
                                 // the future async push channel.
                                 #[cfg(feature = "database")]
                                 if let Some(pool) = self.pool() {
-                                    if let Ok(narration_value) =
-                                        serde_json::to_value(&narration)
-                                    {
-                                        let trace_id = ob_poc_types::TraceId(
-                                            stage_1_receipt.trace_id.0,
-                                        );
+                                    if let Ok(narration_value) = serde_json::to_value(&narration) {
+                                        let trace_id =
+                                            ob_poc_types::TraceId(stage_1_receipt.trace_id.0);
                                         let _ =
                                             crate::outbox::narration_emit::emit_narration_outbox(
                                                 pool,
@@ -1100,12 +1096,14 @@ impl ReplOrchestratorV2 {
                                                 &narration_value,
                                             )
                                             .await
-                                            .map_err(|e| {
-                                                tracing::warn!(
-                                                    error = %e,
-                                                    "narrate outbox emit failed (non-fatal)"
-                                                );
-                                            });
+                                            .map_err(
+                                                |e| {
+                                                    tracing::warn!(
+                                                        error = %e,
+                                                        "narrate outbox emit failed (non-fatal)"
+                                                    );
+                                                },
+                                            );
                                     }
                                 }
                                 response.narration = Some(narration);
@@ -1505,7 +1503,8 @@ impl ReplOrchestratorV2 {
                 #[cfg(feature = "database")]
                 {
                     if let Some(pool) = self.pool() {
-                        let outcome = crate::repl::bootstrap::resolve_client_input(&content, pool).await;
+                        let outcome =
+                            crate::repl::bootstrap::resolve_client_input(&content, pool).await;
                         return self.handle_bootstrap_outcome(session, outcome).await;
                     }
                 }
@@ -2885,7 +2884,8 @@ impl ReplOrchestratorV2 {
                 candidates,
                 original_input,
             } => {
-                let message = crate::repl::bootstrap::format_disambiguation(&candidates, &original_input);
+                let message =
+                    crate::repl::bootstrap::format_disambiguation(&candidates, &original_input);
                 session.set_state(ReplStateV2::ScopeGate {
                     pending_input: Some(original_input),
                     candidates: Some(candidates),
@@ -3839,10 +3839,8 @@ impl ReplOrchestratorV2 {
                     })
                 })
                 .collect();
-            let stage_2b = crate::sequencer_stages::EntityResolutionOutput::from_lookup(
-                resolved,
-                Vec::new(),
-            );
+            let stage_2b =
+                crate::sequencer_stages::EntityResolutionOutput::from_lookup(resolved, Vec::new());
             tracing::debug!(
                 session_id = %session.id,
                 resolved_count = stage_2b.resolved.len(),
@@ -3874,10 +3872,8 @@ impl ReplOrchestratorV2 {
                 )
                 .await;
                 session.pending_sem_os_envelope = Some(envelope.clone());
-                let phase2 = Phase2Service::evaluate(
-                    session.pending_lookup_result.clone(),
-                    Some(envelope),
-                );
+                let phase2 =
+                    Phase2Service::evaluate(session.pending_lookup_result.clone(), Some(envelope));
 
                 if !phase2.is_available {
                     tracing::warn!(
@@ -3891,19 +3887,11 @@ impl ReplOrchestratorV2 {
                         "REPL: Sem OS deny-all — verb search will return empty"
                     );
                     crate::sequencer_stages::VerbSurfaceComposition::SemOsDenyAll {
-                        legal_verbs: phase2
-                            .legal_verbs_or_empty
-                            .clone()
-                            .into_iter()
-                            .collect(),
+                        legal_verbs: phase2.legal_verbs_or_empty.clone().into_iter().collect(),
                     }
                 } else {
                     crate::sequencer_stages::VerbSurfaceComposition::SemOsAvailable {
-                        legal_verbs: phase2
-                            .legal_verbs_or_empty
-                            .clone()
-                            .into_iter()
-                            .collect(),
+                        legal_verbs: phase2.legal_verbs_or_empty.clone().into_iter().collect(),
                         fingerprint: phase2.fingerprint(),
                         pruned_count: phase2.pruned_verb_count(),
                     }
@@ -3918,7 +3906,7 @@ impl ReplOrchestratorV2 {
                 session.pending_sem_os_envelope = None;
                 crate::sequencer_stages::VerbSurfaceComposition::SemOsUnavailableWithPack {
                     pack_id: pack.id.to_string(),
-                    pack_verbs: pack.allowed_verbs.iter().cloned().collect(),
+                    pack_verbs: pack.allowed_verbs.to_vec(),
                 }
             } else {
                 tracing::warn!(
@@ -3974,10 +3962,7 @@ impl ReplOrchestratorV2 {
                             ..
                         } => (
                             Some(candidates.iter().map(|c| c.verb_fqn.clone()).collect()),
-                            candidates
-                                .first()
-                                .map(|c| c.score as f64)
-                                .unwrap_or(0.0),
+                            candidates.first().map(|c| c.score as f64).unwrap_or(0.0),
                         ),
                         _ => (None, 0.0),
                     };
@@ -4073,9 +4058,9 @@ impl ReplOrchestratorV2 {
                                     confidence: score,
                                 }
                             }
-                            crate::repl::scoring::AmbiguityOutcome::Ambiguous { margin, .. } => {
-                                crate::repl::types::MatchOutcome::Ambiguous { margin }
-                            }
+                            crate::repl::scoring::AmbiguityOutcome::Ambiguous {
+                                margin, ..
+                            } => crate::repl::types::MatchOutcome::Ambiguous { margin },
                             crate::repl::scoring::AmbiguityOutcome::Proposed { verb, score } => {
                                 crate::repl::types::MatchOutcome::Matched {
                                     verb,
@@ -4907,7 +4892,10 @@ impl ReplOrchestratorV2 {
     }
 
     /// Regenerate sentence and DSL for an entry after an arg change.
-    fn regenerate_entry_sentence(&self, entry: &crate::repl::runbook::RunbookEntry) -> (String, String) {
+    fn regenerate_entry_sentence(
+        &self,
+        entry: &crate::repl::runbook::RunbookEntry,
+    ) -> (String, String) {
         let sentence = if let Some(ref svc) = self.intent_service {
             svc.generate_sentence(&entry.verb, &entry.args)
         } else {
@@ -4965,10 +4953,10 @@ impl ReplOrchestratorV2 {
         );
 
         if let Some(entry_mut) = session.runbook.entry_by_id_mut(step_id) {
-            entry_mut
-                .slot_provenance
-                .slots
-                .insert(field.to_string(), crate::repl::runbook::SlotSource::UserProvided);
+            entry_mut.slot_provenance.slots.insert(
+                field.to_string(),
+                crate::repl::runbook::SlotSource::UserProvided,
+            );
         }
 
         let summary = self.runbook_summary(session);
@@ -5328,10 +5316,12 @@ impl ReplOrchestratorV2 {
         if let Some(ref mut scope) = outer_scope {
             let mut aggregate_write_set = std::collections::BTreeSet::new();
             for entry in session.runbook.entries[start_index..].iter() {
-                let args_map: std::collections::BTreeMap<String, String> =
-                    entry.args.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                let entry_ws =
-                    crate::runbook::derive_write_set(&entry.verb, &args_map, None);
+                let args_map: std::collections::BTreeMap<String, String> = entry
+                    .args
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+                let entry_ws = crate::runbook::derive_write_set(&entry.verb, &args_map, None);
                 aggregate_write_set.extend(entry_ws);
             }
 
@@ -6002,7 +5992,7 @@ impl ReplOrchestratorV2 {
                 session_id: session.id,
                 verb_fqn: &entry.verb,
                 args: serde_json::json!({
-                    "dsl_hash": entry_dsl.as_bytes().len(),
+                    "dsl_hash": entry_dsl.len(),
                 }),
                 writes_since_push_at_gate: session
                     .workspace_stack
@@ -6019,9 +6009,7 @@ impl ReplOrchestratorV2 {
                     .and_then(|f| f.subject_id)
                     .map(|id| vec![id])
                     .unwrap_or_default(),
-                semreg_fingerprint_proxy: Some(
-                    envelope.fingerprint.0.as_str(),
-                ),
+                semreg_fingerprint_proxy: Some(envelope.fingerprint.0.as_str()),
                 logical_clock: session.trace_sequence,
                 // Phase A.2 (F5 follow-on): reuse the session's trace_id so
                 // the envelope and the response share one correlation id.
@@ -6139,6 +6127,11 @@ impl ReplOrchestratorV2 {
     /// other call sites (park-resume, direct single-entry execute)
     /// keep `None` — they don't run in a multi-entry batch and so
     /// can't benefit from a shared outer scope.
+    #[allow(clippy::too_many_arguments)] // Each parameter is a distinct
+                                         // input to the gate-checked execution path: the runbook entry, the
+                                         // session context (id + stack + durability + version), the runbook id,
+                                         // and an optional shared transaction scope. Bundling them obscures
+                                         // the call sites which all pass these explicitly.
     async fn execute_entry_via_gate_impl(
         &self,
         entry: &RunbookEntry,
@@ -6219,15 +6212,14 @@ impl ReplOrchestratorV2 {
             bridge: &dyn crate::runbook::StepExecutor,
             scope: Option<&mut dyn dsl_runtime::tx::TransactionScope>,
             pool: Option<&sqlx::PgPool>,
-        ) -> Result<crate::runbook::executor::RunbookExecutionResult, crate::runbook::ExecutionError> {
+        ) -> Result<crate::runbook::executor::RunbookExecutionResult, crate::runbook::ExecutionError>
+        {
             match scope {
                 Some(s) => {
                     crate::runbook::execute_runbook_in_scope(store, compiled_id, None, bridge, s)
                         .await
                 }
-                None => {
-                    execute_runbook_with_pool(store, compiled_id, None, bridge, pool).await
-                }
+                None => execute_runbook_with_pool(store, compiled_id, None, bridge, pool).await,
             }
         }
 

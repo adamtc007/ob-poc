@@ -236,10 +236,9 @@ pub mod policy;
 #[cfg(feature = "database")]
 pub mod sem_reg;
 
-// Constellation — CBU case/structure ownership graph with resolver
-#[cfg(feature = "database")]
 // Phase 4 Slice B (Group 9) — `state_reducer` module relocated to
 // `dsl-runtime::state_reducer`; consumer `state_ops` moved alongside it.
+// Constellation graph + resolver was removed/relocated alongside this.
 
 // SemTaxonomy — replacement discovery/composition contract for utterance handling
 #[cfg(feature = "database")]

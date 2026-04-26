@@ -163,10 +163,8 @@ fn arg_string_list(args: &Value, name: &str) -> Option<Vec<String>> {
         } else {
             Some(strings)
         }
-    } else if let Some(s) = v.as_str() {
-        Some(vec![s.to_string()])
     } else {
-        None
+        v.as_str().map(|s| vec![s.to_string()])
     }
 }
 
@@ -183,7 +181,9 @@ fn arg_uuid_list(args: &Value, name: &str) -> Option<Vec<Uuid>> {
             Some(uuids)
         }
     } else {
-        v.as_str().and_then(|s| Uuid::parse_str(s).ok()).map(|u| vec![u])
+        v.as_str()
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .map(|u| vec![u])
     }
 }
 
@@ -267,8 +267,8 @@ async fn view_universe(pool: &PgPool, args: &Value, extensions: &mut Value) -> R
 // ── view.book ─────────────────────────────────────────────────────────────────
 
 async fn view_book(pool: &PgPool, args: &Value, extensions: &mut Value) -> Result<Value> {
-    let client_id = arg_uuid(args, "client")
-        .ok_or_else(|| anyhow!("view.book requires :client UUID arg"))?;
+    let client_id =
+        arg_uuid(args, "client").ok_or_else(|| anyhow!("view.book requires :client UUID arg"))?;
     let taxonomy_ctx = TaxonomyContext::Book { client_id };
     let rules = taxonomy_ctx.to_rules_from_config(pool).await?;
     let taxonomy = TaxonomyBuilder::new(rules).build(pool).await?;
@@ -283,8 +283,8 @@ async fn view_book(pool: &PgPool, args: &Value, extensions: &mut Value) -> Resul
 // ── view.cbu ──────────────────────────────────────────────────────────────────
 
 async fn view_cbu(pool: &PgPool, args: &Value, extensions: &mut Value) -> Result<Value> {
-    let cbu_id = arg_uuid(args, "cbu-id")
-        .ok_or_else(|| anyhow!("view.cbu requires :cbu-id UUID arg"))?;
+    let cbu_id =
+        arg_uuid(args, "cbu-id").ok_or_else(|| anyhow!("view.cbu requires :cbu-id UUID arg"))?;
     let mode = arg_string_opt(args, "mode").unwrap_or_else(|| "trading".to_string());
     let taxonomy_ctx = match mode.as_str() {
         "ubo" => TaxonomyContext::CbuUbo { cbu_id },
@@ -302,11 +302,7 @@ async fn view_cbu(pool: &PgPool, args: &Value, extensions: &mut Value) -> Result
 
 // ── view.entity-forest ────────────────────────────────────────────────────────
 
-async fn view_entity_forest(
-    pool: &PgPool,
-    args: &Value,
-    extensions: &mut Value,
-) -> Result<Value> {
+async fn view_entity_forest(pool: &PgPool, args: &Value, extensions: &mut Value) -> Result<Value> {
     let mut filters = Vec::new();
     if let Some(jurisdictions) = arg_string_list(args, "jurisdiction") {
         filters.push(Filter::Jurisdiction(jurisdictions));

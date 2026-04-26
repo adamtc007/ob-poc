@@ -99,8 +99,13 @@ impl SemOsVerbOp for Compute {
         .fetch_optional(scope.executor())
         .await?;
 
-        let (subject_entity_id, output_snapshot, chains_snapshot) = run_row
-            .ok_or_else(|| anyhow!("Determination run {} not found for case {}", run_id, case_id))?;
+        let (subject_entity_id, output_snapshot, chains_snapshot) = run_row.ok_or_else(|| {
+            anyhow!(
+                "Determination run {} not found for case {}",
+                run_id,
+                case_id
+            )
+        })?;
 
         let candidates = extract_candidates(&output_snapshot)?;
 

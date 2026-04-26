@@ -48,8 +48,10 @@ pub struct PostStateRows(pub Vec<CapturedRow>);
 impl PostStateRows {
     /// Sort rows in canonical order. Callers MUST invoke before comparing.
     pub fn canonicalise(&mut self) {
-        self.0
-            .sort_by(|a, b| (a.table.as_str(), a.primary_key.as_str()).cmp(&(b.table.as_str(), b.primary_key.as_str())));
+        self.0.sort_by(|a, b| {
+            (a.table.as_str(), a.primary_key.as_str())
+                .cmp(&(b.table.as_str(), b.primary_key.as_str()))
+        });
     }
 }
 
@@ -71,9 +73,7 @@ pub enum RoundTripOutcome {
     /// All five comparison axes identical. Op dissolves to metadata.
     Pass,
     /// At least one axis differs. Op reclassified to plugin for Phase 6.
-    Fail {
-        diffs: Vec<RoundTripDiff>,
-    },
+    Fail { diffs: Vec<RoundTripDiff> },
 }
 
 /// Which comparison axis differed.
@@ -81,9 +81,7 @@ pub enum RoundTripOutcome {
 #[serde(tag = "axis", rename_all = "snake_case")]
 pub enum RoundTripDiff {
     /// Post-state rows differ. Caller gets row-level detail downstream.
-    PostState {
-        row_diff_count: usize,
-    },
+    PostState { row_diff_count: usize },
     /// Returned values differ.
     ReturnedValue,
     /// Side-effect summary differs (e.g. different number of audit rows).
@@ -96,10 +94,7 @@ pub enum RoundTripDiff {
 
 /// Effect-equivalence comparator. Compares two observations captured from
 /// the same fixture (Rust impl vs metadata-CRUD interpretation).
-pub fn compare(
-    lhs: &RoundTripObservation,
-    rhs: &RoundTripObservation,
-) -> RoundTripOutcome {
+pub fn compare(lhs: &RoundTripObservation, rhs: &RoundTripObservation) -> RoundTripOutcome {
     let mut diffs = Vec::new();
 
     // --- post-state rows ---
@@ -145,10 +140,14 @@ pub fn compare(
 /// Outbox drafts compare as sets keyed by idempotency_key + effect_kind.
 /// Per v0.3 §14 "OutboxDraft vector — set-equal on `idempotency_key`".
 fn outbox_set_equal(lhs: &[OutboxDraft], rhs: &[OutboxDraft]) -> bool {
-    let mut lhs_keys: Vec<(&IdempotencyKey, OutboxEffectKind)> =
-        lhs.iter().map(|d| (&d.idempotency_key, d.effect_kind)).collect();
-    let mut rhs_keys: Vec<(&IdempotencyKey, OutboxEffectKind)> =
-        rhs.iter().map(|d| (&d.idempotency_key, d.effect_kind)).collect();
+    let mut lhs_keys: Vec<(&IdempotencyKey, OutboxEffectKind)> = lhs
+        .iter()
+        .map(|d| (&d.idempotency_key, d.effect_kind))
+        .collect();
+    let mut rhs_keys: Vec<(&IdempotencyKey, OutboxEffectKind)> = rhs
+        .iter()
+        .map(|d| (&d.idempotency_key, d.effect_kind))
+        .collect();
     lhs_keys.sort_by(|a, b| a.0 .0.cmp(&b.0 .0));
     rhs_keys.sort_by(|a, b| a.0 .0.cmp(&b.0 .0));
     lhs_keys == rhs_keys
@@ -161,7 +160,7 @@ fn outbox_set_equal(lhs: &[OutboxDraft], rhs: &[OutboxDraft]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ob_poc_types::{TraceId};
+    use ob_poc_types::TraceId;
     use uuid::Uuid;
 
     fn sample_observation(label: &str) -> RoundTripObservation {
@@ -192,7 +191,9 @@ mod tests {
         let out = compare(&a, &b);
         match out {
             RoundTripOutcome::Fail { diffs } => {
-                assert!(diffs.iter().any(|d| matches!(d, RoundTripDiff::ReturnedValue)));
+                assert!(diffs
+                    .iter()
+                    .any(|d| matches!(d, RoundTripDiff::ReturnedValue)));
             }
             _ => panic!("expected Fail"),
         }

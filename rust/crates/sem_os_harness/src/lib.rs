@@ -488,9 +488,7 @@ async fn test_manifest_stability(client: &dyn SemOsClient) {
 /// handles verb dispatch, symbol propagation, unknown verbs, and outcome types.
 /// The scenarios use a pre-loaded MockVerbExecutor; for integration testing with
 /// a real executor, use the external harness in `tests/verb_execution_port_test.rs`.
-pub async fn run_execution_scenario_suite(
-    executor: &dyn dsl_runtime::VerbExecutionPort,
-) {
+pub async fn run_execution_scenario_suite(executor: &dyn dsl_runtime::VerbExecutionPort) {
     test_execution_uuid_outcome(executor).await;
     test_execution_record_outcome(executor).await;
     test_execution_symbol_propagation(executor).await;
@@ -510,10 +508,7 @@ async fn test_execution_uuid_outcome(executor: &dyn dsl_runtime::VerbExecutionPo
     match result {
         Ok(r) => {
             assert!(
-                matches!(
-                    r.outcome,
-                    dsl_runtime::VerbExecutionOutcome::Uuid(_)
-                ),
+                matches!(r.outcome, dsl_runtime::VerbExecutionOutcome::Uuid(_)),
                 "Expected Uuid outcome for cbu.create, got {:?}",
                 r.outcome
             );
@@ -540,10 +535,7 @@ async fn test_execution_record_outcome(executor: &dyn dsl_runtime::VerbExecution
     match result {
         Ok(r) => {
             assert!(
-                matches!(
-                    r.outcome,
-                    dsl_runtime::VerbExecutionOutcome::Record(_)
-                ),
+                matches!(r.outcome, dsl_runtime::VerbExecutionOutcome::Record(_)),
                 "Expected Record outcome for cbu.show, got {:?}",
                 r.outcome
             );
@@ -555,9 +547,7 @@ async fn test_execution_record_outcome(executor: &dyn dsl_runtime::VerbExecution
     }
 }
 
-async fn test_execution_symbol_propagation(
-    executor: &dyn dsl_runtime::VerbExecutionPort,
-) {
+async fn test_execution_symbol_propagation(executor: &dyn dsl_runtime::VerbExecutionPort) {
     let mut ctx = dsl_runtime::VerbExecutionContext::new(test_principal());
     let result = executor
         .execute_verb(
@@ -590,9 +580,7 @@ async fn test_execution_symbol_propagation(
     }
 }
 
-async fn test_execution_unknown_verb_error(
-    executor: &dyn dsl_runtime::VerbExecutionPort,
-) {
+async fn test_execution_unknown_verb_error(executor: &dyn dsl_runtime::VerbExecutionPort) {
     let mut ctx = dsl_runtime::VerbExecutionContext::new(test_principal());
     let result = executor
         .execute_verb("nonexistent.verb", serde_json::json!({}), &mut ctx)

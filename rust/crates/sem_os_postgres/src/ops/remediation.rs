@@ -36,8 +36,7 @@ impl SemOsVerbOp for ListOpen {
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid_opt(args, ctx, "entity-id");
         let workspace = json_extract_string_opt(args, "workspace");
-        let events =
-            remediation::list_open(scope.pool(), entity_id, workspace.as_deref()).await?;
+        let events = remediation::list_open(scope.pool(), entity_id, workspace.as_deref()).await?;
         let value = serde_json::to_value(events)?;
         match value {
             serde_json::Value::Array(items) => Ok(VerbExecutionOutcome::RecordSet(items)),

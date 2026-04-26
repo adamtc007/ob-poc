@@ -403,8 +403,8 @@ impl ScenarioIndex {
             return ScenarioResolveOutcome::NoMatch;
         }
 
-        // Sort by score descending
-        scored.sort_by(|a, b| b.score.cmp(&a.score));
+        // Sort by score descending.
+        scored.sort_by_key(|item| std::cmp::Reverse(item.score));
 
         // Disambiguation band
         if scored.len() >= 2 {

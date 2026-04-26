@@ -209,8 +209,8 @@ async fn do_load_markets(
 ) -> Result<Value> {
     let yaml_content = std::fs::read_to_string(file_path)
         .map_err(|e| anyhow!("Failed to read file {}: {}", file_path, e))?;
-    let data: MarketsYaml = serde_yaml::from_str(&yaml_content)
-        .map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
+    let data: MarketsYaml =
+        serde_yaml::from_str(&yaml_content).map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
 
     if mode == "REPLACE" {
         sqlx::query(r#"DELETE FROM "ob-poc".markets"#)
@@ -286,8 +286,8 @@ async fn do_load_instrument_classes(
 ) -> Result<Value> {
     let yaml_content = std::fs::read_to_string(file_path)
         .map_err(|e| anyhow!("Failed to read file {}: {}", file_path, e))?;
-    let data: InstrumentClassesYaml = serde_yaml::from_str(&yaml_content)
-        .map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
+    let data: InstrumentClassesYaml =
+        serde_yaml::from_str(&yaml_content).map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
 
     if mode == "REPLACE" {
         sqlx::query(r#"DELETE FROM "ob-poc".instrument_classes WHERE parent_class_id IS NOT NULL"#)
@@ -374,7 +374,12 @@ async fn do_load_instrument_classes(
             .bind(child.requires_isda || ic.requires_isda)
             .bind(child.requires_collateral || ic.requires_collateral)
             .bind(child.smpg_code.as_ref().or(ic.smpg_group.as_ref()))
-            .bind(child.isda_asset_class.as_ref().or(ic.isda_asset_class.as_ref()))
+            .bind(
+                child
+                    .isda_asset_class
+                    .as_ref()
+                    .or(ic.isda_asset_class.as_ref()),
+            )
             .bind(id)
             .bind(true)
             .fetch_one(scope.executor())
@@ -400,15 +405,14 @@ async fn do_load_subcustodians(
 ) -> Result<Value> {
     let yaml_content = std::fs::read_to_string(file_path)
         .map_err(|e| anyhow!("Failed to read file {}: {}", file_path, e))?;
-    let data: SubcustodianNetworkYaml = serde_yaml::from_str(&yaml_content)
-        .map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
+    let data: SubcustodianNetworkYaml =
+        serde_yaml::from_str(&yaml_content).map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
 
     let markets: Vec<(Uuid, String)> =
         sqlx::query_as(r#"SELECT market_id, mic FROM "ob-poc".markets"#)
             .fetch_all(scope.executor())
             .await?;
-    let mic_to_id: HashMap<String, Uuid> =
-        markets.into_iter().map(|(id, mic)| (mic, id)).collect();
+    let mic_to_id: HashMap<String, Uuid> = markets.into_iter().map(|(id, mic)| (mic, id)).collect();
 
     if mode == "REPLACE" {
         sqlx::query(r#"DELETE FROM "ob-poc".subcustodian_network"#)
@@ -518,7 +522,9 @@ async fn ensure_metric_type_exists(
         .map(|word| {
             let mut chars = word.chars();
             match chars.next() {
-                Some(c) => c.to_uppercase().collect::<String>() + chars.as_str().to_lowercase().as_str(),
+                Some(c) => {
+                    c.to_uppercase().collect::<String>() + chars.as_str().to_lowercase().as_str()
+                }
                 None => String::new(),
             }
         })
@@ -628,8 +634,8 @@ async fn do_load_sla_templates(
 
     let yaml_content = std::fs::read_to_string(file_path)
         .map_err(|e| anyhow!("Failed to read file {}: {}", file_path, e))?;
-    let data: SlaTemplatesYaml = serde_yaml::from_str(&yaml_content)
-        .map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
+    let data: SlaTemplatesYaml =
+        serde_yaml::from_str(&yaml_content).map_err(|e| anyhow!("Failed to parse YAML: {}", e))?;
 
     let required_metrics: HashSet<String> = data
         .sla_templates

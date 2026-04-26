@@ -109,7 +109,10 @@ impl SemOsVerbOp for AnalyzeControl {
                 "description": desc,
             }));
             if role == "TRUSTEE" || role == "PROTECTOR" {
-                controllers.entry(holder_id).or_default().push(role.to_lowercase());
+                controllers
+                    .entry(holder_id)
+                    .or_default()
+                    .push(role.to_lowercase());
             }
         }
 
@@ -117,17 +120,29 @@ impl SemOsVerbOp for AnalyzeControl {
             if let Some(holder_id) = prov.holder_entity_id {
                 let holder_id_str = holder_id.to_string();
                 let (vector_type, strength, description) = match prov.provision_type.as_str() {
-                    "APPOINTOR_POWER" => ("appointor", 0.85, "Power to appoint and remove trustees"),
+                    "APPOINTOR_POWER" => {
+                        ("appointor", 0.85, "Power to appoint and remove trustees")
+                    }
                     "TRUSTEE_REMOVAL" => ("trustee_removal", 0.80, "Power to remove trustees"),
-                    "PROTECTOR_POWER" => ("protector_veto", 0.75, "Protector with veto or consent powers"),
+                    "PROTECTOR_POWER" => (
+                        "protector_veto",
+                        0.75,
+                        "Protector with veto or consent powers",
+                    ),
                     "TRUST_VARIATION" => ("trust_variation", 0.70, "Power to vary trust terms"),
                     "ADD_BENEFICIARY" | "EXCLUDE_BENEFICIARY" => (
                         "beneficiary_control",
                         0.65,
                         "Power to add or exclude beneficiaries",
                     ),
-                    "INVESTMENT_DIRECTION" => ("investment_direction", 0.50, "Power to direct investments"),
-                    "DISTRIBUTION_DIRECTION" => ("distribution_direction", 0.60, "Power to direct distributions"),
+                    "INVESTMENT_DIRECTION" => {
+                        ("investment_direction", 0.50, "Power to direct investments")
+                    }
+                    "DISTRIBUTION_DIRECTION" => (
+                        "distribution_direction",
+                        0.60,
+                        "Power to direct distributions",
+                    ),
                     "RESERVED_POWER" => ("reserved_power", 0.70, "Settlor reserved powers"),
                     _ => continue,
                 };
@@ -147,7 +162,12 @@ impl SemOsVerbOp for AnalyzeControl {
             }
         }
 
-        let significant = ["APPOINTOR_POWER", "TRUSTEE_REMOVAL", "TRUST_VARIATION", "RESERVED_POWER"];
+        let significant = [
+            "APPOINTOR_POWER",
+            "TRUSTEE_REMOVAL",
+            "TRUST_VARIATION",
+            "RESERVED_POWER",
+        ];
         let mut primary_controllers: Vec<Value> = Vec::new();
         for (holder_id, vectors) in &controllers {
             if vectors.iter().any(|v| significant.contains(&v.as_str())) {
@@ -288,7 +308,10 @@ impl SemOsVerbOp for IdentifyUbos {
                     }
                 }
                 "DISCRETIONARY_BENEFICIARY" => {
-                    if matches!(prov.discretion_level.as_deref(), Some("NONE") | Some("FETTERED")) {
+                    if matches!(
+                        prov.discretion_level.as_deref(),
+                        Some("NONE") | Some("FETTERED")
+                    ) {
                         is_ubo = true;
                         ubo_reasons.push(
                             "Discretionary beneficiary with limited trustee discretion".into(),
@@ -315,8 +338,14 @@ impl SemOsVerbOp for IdentifyUbos {
         }
 
         let ubo_count = ubos.len();
-        let natural_person_count = ubos.iter().filter(|u| u["is_natural_person"] == true).count();
-        let entities_needing_tracing = ubos.iter().filter(|u| u["needs_further_tracing"] == true).count();
+        let natural_person_count = ubos
+            .iter()
+            .filter(|u| u["is_natural_person"] == true)
+            .count();
+        let entities_needing_tracing = ubos
+            .iter()
+            .filter(|u| u["needs_further_tracing"] == true)
+            .count();
         let class_count = class_beneficiaries.len();
 
         Ok(VerbExecutionOutcome::Record(json!({

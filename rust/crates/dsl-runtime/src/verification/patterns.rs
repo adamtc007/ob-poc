@@ -15,9 +15,9 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
-use sqlx::PgPool;
 
 // ============================================================================
 // Pattern Types

@@ -651,7 +651,7 @@ fn print_summary_report(results: &[TestResult]) {
         .into_iter()
         .map(|(k, (t, h))| (k, t, h))
         .collect();
-    source_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    source_vec.sort_by_key(|item| std::cmp::Reverse(item.1));
     for (source, fired, hit) in &source_vec {
         let acc = if *fired > 0 {
             *hit as f64 / *fired as f64 * 100.0
@@ -1047,7 +1047,7 @@ fn print_domain_breakdown(results: &[TestResult]) {
     }
 
     let mut domains: Vec<_> = domain_stats.into_iter().collect();
-    domains.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+    domains.sort_by_key(|item| std::cmp::Reverse(item.1 .0));
 
     for (domain, (total, first, two)) in &domains {
         println!(

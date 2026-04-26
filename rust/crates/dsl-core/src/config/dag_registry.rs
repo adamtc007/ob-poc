@@ -75,8 +75,7 @@ pub struct DagRegistry {
     /// constraints_by_target[TransitionKey] → list of indices into
     /// the owning Dag's cross_workspace_constraints. Stores
     /// (workspace, index) for re-lookup against `dags`.
-    constraints_by_target:
-        HashMap<TransitionKey, Vec<ConstraintLocator>>,
+    constraints_by_target: HashMap<TransitionKey, Vec<ConstraintLocator>>,
 
     /// derived_states_by_host[SlotKey] → list of (workspace, index)
     /// into the owning Dag's derived_cross_workspace_state.
@@ -223,10 +222,7 @@ impl DagRegistry {
         out
     }
 
-    fn lookup_constraint(
-        &self,
-        loc: &ConstraintLocator,
-    ) -> Option<&CrossWorkspaceConstraint> {
+    fn lookup_constraint(&self, loc: &ConstraintLocator) -> Option<&CrossWorkspaceConstraint> {
         self.dags
             .get(&loc.workspace)
             .and_then(|dag| dag.cross_workspace_constraints.get(loc.index))
@@ -270,11 +266,7 @@ impl DagRegistry {
 
     /// Find the parent slot reference for a given (workspace, slot), if
     /// declared. Returns `(parent_workspace, parent_slot)`.
-    pub fn parent_slot_for(
-        &self,
-        workspace: &str,
-        slot: &str,
-    ) -> Option<&ParentSlot> {
+    pub fn parent_slot_for(&self, workspace: &str, slot: &str) -> Option<&ParentSlot> {
         let key = SlotKey::new(workspace, slot);
         let loc = self.parent_slot_by_child.get(&key)?;
         let dag = self.dags.get(&loc.declaring_workspace)?;
@@ -286,11 +278,7 @@ impl DagRegistry {
     /// Get the resolved parent SlotKey for a child slot, with the
     /// child's declaring workspace as the default if `parent_slot.workspace`
     /// is unset.
-    pub fn parent_slot_key(
-        &self,
-        workspace: &str,
-        slot: &str,
-    ) -> Option<SlotKey> {
+    pub fn parent_slot_key(&self, workspace: &str, slot: &str) -> Option<SlotKey> {
         self.parent_slot_by_child
             .get(&SlotKey::new(workspace, slot))
             .map(|loc| loc.parent.clone())
@@ -328,11 +316,7 @@ impl DagRegistry {
     /// Look up a child slot's `state_dependency` block, if declared.
     /// Returns the cascade rules that govern how the child reacts to
     /// parent state changes.
-    pub fn state_dependency_for(
-        &self,
-        workspace: &str,
-        slot: &str,
-    ) -> Option<&StateDependency> {
+    pub fn state_dependency_for(&self, workspace: &str, slot: &str) -> Option<&StateDependency> {
         let dag = self.dags.get(workspace)?;
         dag.slots
             .iter()
@@ -359,28 +343,15 @@ impl DagRegistry {
             for slot in &dag.slots {
                 if let Some(SlotStateMachine::Structured(sm)) = &slot.state_machine {
                     for t in &sm.transitions {
-                        index_transition(
-                            ws,
-                            &slot.id,
-                            t,
-                            false,
-                            &mut self.transitions_by_verb_fqn,
-                        );
+                        index_transition(ws, &slot.id, t, false, &mut self.transitions_by_verb_fqn);
                     }
                 }
                 for dl in &slot.dual_lifecycle {
                     for t in &dl.transitions {
-                        index_transition(
-                            ws,
-                            &slot.id,
-                            t,
-                            true,
-                            &mut self.transitions_by_verb_fqn,
-                        );
+                        index_transition(ws, &slot.id, t, true, &mut self.transitions_by_verb_fqn);
                     }
                 }
             }
-
 
             // V1.3-1 cross_workspace_constraints — index by target
             // transition.
@@ -416,10 +387,7 @@ impl DagRegistry {
             // V1.3-3 parent_slot — index by child + reverse index by parent.
             for (slot_idx, slot) in dag.slots.iter().enumerate() {
                 if let Some(parent) = &slot.parent_slot {
-                    let parent_ws = parent
-                        .workspace
-                        .clone()
-                        .unwrap_or_else(|| ws.clone());
+                    let parent_ws = parent.workspace.clone().unwrap_or_else(|| ws.clone());
                     let child_key = SlotKey::new(ws, &slot.id);
                     let parent_key = SlotKey::new(&parent_ws, &parent.slot);
                     self.parent_slot_by_child.insert(
@@ -461,13 +429,15 @@ fn index_transition(
             if !is_valid_state_id(from_state) {
                 continue;
             }
-            out.entry(verb_fqn.clone()).or_default().push(TransitionRef {
-                workspace: workspace.to_string(),
-                slot: slot.to_string(),
-                from_state: from_state.clone(),
-                to_state: t.to.clone(),
-                from_dual_lifecycle: from_dual,
-            });
+            out.entry(verb_fqn.clone())
+                .or_default()
+                .push(TransitionRef {
+                    workspace: workspace.to_string(),
+                    slot: slot.to_string(),
+                    from_state: from_state.clone(),
+                    to_state: t.to.clone(),
+                    from_dual_lifecycle: from_dual,
+                });
         }
     }
 }
@@ -535,9 +505,7 @@ fn extract_from_states(from: &serde_yaml::Value) -> Vec<String> {
 /// Heuristic: a state id is a single token of letters / digits /
 /// underscores. Excludes free-text escapes like "any non-terminal".
 fn is_valid_state_id(s: &str) -> bool {
-    !s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 /// Parse a `"FROM -> TO"` or `"* -> TO"` string into (Option<from>, to).
@@ -649,12 +617,7 @@ slots:
             ),
         ]);
 
-        let hits = r.constraints_for_transition(
-            "deal",
-            "deal",
-            "KYC_CLEARANCE",
-            "CONTRACTED",
-        );
+        let hits = r.constraints_for_transition("deal", "deal", "KYC_CLEARANCE", "CONTRACTED");
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].source_workspace, "kyc");
         assert_eq!(
@@ -663,12 +626,7 @@ slots:
         );
 
         // No match for unrelated transition.
-        let no_hits = r.constraints_for_transition(
-            "deal",
-            "deal",
-            "PROSPECT",
-            "QUALIFYING",
-        );
+        let no_hits = r.constraints_for_transition("deal", "deal", "PROSPECT", "QUALIFYING");
         assert!(no_hits.is_empty());
     }
 
@@ -803,10 +761,7 @@ slots:
             parse_transition("* -> ACTIVE"),
             (None, "ACTIVE".to_string()),
         );
-        assert_eq!(
-            parse_transition("malformed"),
-            (None, String::new()),
-        );
+        assert_eq!(parse_transition("malformed"), (None, String::new()),);
     }
 
     #[test]
@@ -950,7 +905,9 @@ slots:
         // No verbs declared; backend-marker via doesn't get indexed.
         // Only check that no real verb FQN got accidentally indexed.
         assert!(r.transitions_for_verb("backend").is_empty());
-        assert!(r.transitions_for_verb("(backend: first trade posted)").is_empty());
+        assert!(r
+            .transitions_for_verb("(backend: first trade posted)")
+            .is_empty());
     }
 
     #[test]
@@ -981,9 +938,7 @@ slots:
     fn loads_real_dags_from_disk() {
         // Live integration: registry should pick up all 9 DAGs cleanly
         // from the repo's actual dag_taxonomies/ directory.
-        let path = std::path::Path::new(
-            "../../config/sem_os_seeds/dag_taxonomies",
-        );
+        let path = std::path::Path::new("../../config/sem_os_seeds/dag_taxonomies");
         if !path.exists() {
             eprintln!("real DAG dir not present (test running outside repo) — skipping");
             return;
@@ -1001,12 +956,8 @@ slots:
         );
 
         // Deal should have its KYC-clearance constraint indexed.
-        let deal_constraints = r.constraints_for_transition(
-            "deal",
-            "deal",
-            "KYC_CLEARANCE",
-            "CONTRACTED",
-        );
+        let deal_constraints =
+            r.constraints_for_transition("deal", "deal", "KYC_CLEARANCE", "CONTRACTED");
         assert!(
             deal_constraints
                 .iter()
@@ -1022,7 +973,9 @@ slots:
             cancel_hits.len()
         );
         assert!(
-            cancel_hits.iter().all(|h| h.workspace == "deal" && h.slot == "deal"),
+            cancel_hits
+                .iter()
+                .all(|h| h.workspace == "deal" && h.slot == "deal"),
             "all deal.cancel transitions should target the deal slot"
         );
         assert!(
@@ -1033,7 +986,11 @@ slots:
         // deal.bac-approve (added in R-5) should index a single
         // BAC_APPROVAL → KYC_CLEARANCE transition.
         let bac_hits = r.transitions_for_verb("deal.bac-approve");
-        assert_eq!(bac_hits.len(), 1, "expected deal.bac-approve once: {bac_hits:?}");
+        assert_eq!(
+            bac_hits.len(),
+            1,
+            "expected deal.bac-approve once: {bac_hits:?}"
+        );
         assert_eq!(bac_hits[0].from_state, "BAC_APPROVAL");
         assert_eq!(bac_hits[0].to_state, "KYC_CLEARANCE");
     }

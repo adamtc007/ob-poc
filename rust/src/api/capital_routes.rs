@@ -1587,8 +1587,8 @@ where
         })
         .collect();
 
-    // Sort by count descending
-    breakdowns.sort_by(|a, b| b.count.cmp(&a.count));
+    // Sort by count descending.
+    breakdowns.sort_by_key(|item| std::cmp::Reverse(item.count));
     breakdowns
 }
 

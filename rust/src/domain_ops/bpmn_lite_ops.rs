@@ -192,11 +192,13 @@ impl SemOsVerbOp for BpmnStart {
             .get("_bpmn_start_instance_id")
             .and_then(|v| v.as_str())
             .and_then(|s| Uuid::parse_str(s).ok())
-            .ok_or_else(|| anyhow::anyhow!(
-                "bpmn.start: pre_fetch result missing \
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "bpmn.start: pre_fetch result missing \
                  (`_bpmn_start_instance_id` absent from args — dispatcher \
                  must have bypassed the pre_fetch hook)"
-            ))?;
+                )
+            })?;
         Ok(VerbExecutionOutcome::Uuid(instance_id))
     }
 }
@@ -261,7 +263,9 @@ impl SemOsVerbOp for BpmnSignal {
         let payload_hash = hasher.finalize().to_hex().to_string();
         let idempotency_key = format!(
             "bpmn_signal:{}:{}:{}",
-            instance_id, message_name, &payload_hash[..16]
+            instance_id,
+            message_name,
+            &payload_hash[..16]
         );
 
         let outbox_payload = serde_json::json!({
@@ -329,11 +333,7 @@ impl SemOsVerbOp for BpmnCancel {
         let trace_id = uuid::Uuid::new_v4();
 
         let reason_hash = blake3::hash(reason.as_bytes()).to_hex().to_string();
-        let idempotency_key = format!(
-            "bpmn_cancel:{}:{}",
-            instance_id,
-            &reason_hash[..16]
-        );
+        let idempotency_key = format!("bpmn_cancel:{}:{}", instance_id, &reason_hash[..16]);
 
         let outbox_payload = serde_json::json!({
             "instance_id": instance_id,
@@ -422,14 +422,13 @@ impl SemOsVerbOp for BpmnInspect {
         // Pre-fetch populated `_inspection`. If it's missing something
         // went wrong upstream — surface that rather than silently
         // falling back to an in-txn gRPC call.
-        let inspection = args
-            .get("_inspection")
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!(
+        let inspection = args.get("_inspection").cloned().ok_or_else(|| {
+            anyhow::anyhow!(
                 "bpmn.inspect: pre_fetch result missing — dispatcher did not \
                  merge `_inspection` into args. This indicates a dispatcher \
                  regression (Phase F.1 pre-fetch hook must run before execute)."
-            ))?;
+            )
+        })?;
         Ok(VerbExecutionOutcome::Record(inspection))
     }
 }

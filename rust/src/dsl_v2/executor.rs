@@ -1201,10 +1201,7 @@ impl DslExecutor {
     /// and hands it to every `DslExecutor` via this builder. Without it,
     /// `execute_verb` will reject any verb that resolves to `RuntimeBehavior::Plugin`.
     #[cfg(feature = "database")]
-    pub fn with_sem_os_ops(
-        mut self,
-        ops: std::sync::Arc<SemOsVerbOpRegistry>,
-    ) -> Self {
+    pub fn with_sem_os_ops(mut self, ops: std::sync::Arc<SemOsVerbOpRegistry>) -> Self {
         self.sem_os_ops = Some(ops);
         self
     }
@@ -1525,7 +1522,9 @@ async fn dispatch_plugin_via_sem_os_op_in_scope(
     //     its own. Default `Ok(None)` makes this a no-op for ops
     //     that don't need it.
     let pre_fetch_pool = scope.pool().clone();
-    if let Some(pre_fetched) = op.pre_fetch(&args, &mut sem_ctx, &pre_fetch_pool).await
+    if let Some(pre_fetched) = op
+        .pre_fetch(&args, &mut sem_ctx, &pre_fetch_pool)
+        .await
         .map_err(|e| anyhow!("sem_os_op({}) pre_fetch failed: {}", fqn, e))?
     {
         if let (Some(existing_obj), serde_json::Value::Object(pf_obj)) =
@@ -1539,7 +1538,9 @@ async fn dispatch_plugin_via_sem_os_op_in_scope(
 
     // 3. Dispatch against the caller-supplied scope. No begin / commit /
     //    rollback — transaction boundary is the caller's responsibility.
-    let outcome = op.execute(&args, &mut sem_ctx, scope).await
+    let outcome = op
+        .execute(&args, &mut sem_ctx, scope)
+        .await
         .map_err(|e| anyhow!("sem_os_op({}) failed: {}", fqn, e))?;
 
     // Phase C.1/C.3 (F7 follow-on, 2026-04-22): shadow-observe any
@@ -1557,9 +1558,7 @@ async fn dispatch_plugin_via_sem_os_op_in_scope(
     // apply path lands (blocked on B.2b.f follow-ups around
     // apply-via-SemOS-in-txn), it will consume the resolved ids to
     // construct a typed `PendingStateAdvance` for persistence.
-    if let Some(advance) =
-        dsl_runtime::domain_ops::helpers::peek_pending_state_advance(&sem_ctx)
-    {
+    if let Some(advance) = dsl_runtime::domain_ops::helpers::peek_pending_state_advance(&sem_ctx) {
         let resolved = ob_poc_types::resolve_pending_state_advance(advance);
         tracing::debug!(
             fqn,
@@ -2110,7 +2109,8 @@ impl DslExecutor {
 
         let outcome = {
             let scope_dyn: &mut dyn dsl_runtime::tx::TransactionScope = &mut scope;
-            self.execute_plan_atomic_in_scope(plan, ctx, scope_dyn).await
+            self.execute_plan_atomic_in_scope(plan, ctx, scope_dyn)
+                .await
         };
 
         match outcome {
@@ -2187,7 +2187,9 @@ impl DslExecutor {
                 }
             }
 
-            let result = self.execute_verb_in_scope(&vc, ctx, scope).await
+            let result = self
+                .execute_verb_in_scope(&vc, ctx, scope)
+                .await
                 .map_err(|e| {
                     tracing::error!(
                         step_index,

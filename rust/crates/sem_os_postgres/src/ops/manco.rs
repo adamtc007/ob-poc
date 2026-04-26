@@ -24,7 +24,9 @@ use rust_decimal::Decimal;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use dsl_runtime::domain_ops::helpers::{json_extract_int_opt, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt};
+use dsl_runtime::domain_ops::helpers::{
+    json_extract_int_opt, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
 use dsl_runtime::tx::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
@@ -185,15 +187,16 @@ impl SemOsVerbOp for GroupCbus {
             String,
         );
 
-        let rows: Vec<Row> = sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_get_manco_group_cbus($1)"#)
-            .bind(manco_entity_id)
-            .fetch_all(scope.executor())
-            .await?;
+        let rows: Vec<Row> =
+            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_get_manco_group_cbus($1)"#)
+                .bind(manco_entity_id)
+                .fetch_all(scope.executor())
+                .await?;
 
         let results: Vec<Value> = rows
             .into_iter()
-            .map(|(cbu_id, cbu_name, cbu_category, jurisdiction, fund_entity_id, fund_entity_name, membership_source)| {
-                let entry = GroupCbuEntry {
+            .map(
+                |(
                     cbu_id,
                     cbu_name,
                     cbu_category,
@@ -201,9 +204,19 @@ impl SemOsVerbOp for GroupCbus {
                     fund_entity_id,
                     fund_entity_name,
                     membership_source,
-                };
-                serde_json::to_value(entry).unwrap_or_default()
-            })
+                )| {
+                    let entry = GroupCbuEntry {
+                        cbu_id,
+                        cbu_name,
+                        cbu_category,
+                        jurisdiction,
+                        fund_entity_id,
+                        fund_entity_name,
+                        membership_source,
+                    };
+                    serde_json::to_value(entry).unwrap_or_default()
+                },
+            )
             .collect();
 
         Ok(VerbExecutionOutcome::RecordSet(results))
@@ -235,17 +248,23 @@ impl SemOsVerbOp for GroupForCbu {
             .await?;
 
         let value = match row {
-            Some((manco_entity_id, manco_name, manco_lei, group_id, group_name, group_type, source)) => {
-                serde_json::to_value(CbuMancoResult {
-                    manco_entity_id,
-                    manco_name,
-                    manco_lei,
-                    group_id,
-                    group_name,
-                    group_type,
-                    source,
-                })?
-            }
+            Some((
+                manco_entity_id,
+                manco_name,
+                manco_lei,
+                group_id,
+                group_name,
+                group_type,
+                source,
+            )) => serde_json::to_value(CbuMancoResult {
+                manco_entity_id,
+                manco_name,
+                manco_lei,
+                group_id,
+                group_name,
+                group_type,
+                source,
+            })?,
             None => serde_json::to_value(CbuMancoNotFound {
                 message: "No governance controller found for this CBU".to_string(),
             })?,
@@ -284,36 +303,43 @@ impl SemOsVerbOp for PrimaryController {
             Option<bool>,
         );
 
-        let row: Option<Row> = sqlx::query_as(
-            r#"SELECT * FROM "ob-poc".fn_primary_governance_controller($1, $2)"#,
-        )
-        .bind(issuer_entity_id)
-        .bind(as_of)
-        .fetch_optional(scope.executor())
-        .await?;
+        let row: Option<Row> =
+            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_primary_governance_controller($1, $2)"#)
+                .bind(issuer_entity_id)
+                .bind(as_of)
+                .fetch_optional(scope.executor())
+                .await?;
 
         let value = match row {
-            Some((_, primary, governance, basis, board_seats, voting_pct, economic_pct, has_control, has_sig)) => {
-                serde_json::to_value(PrimaryGovernanceController {
-                    issuer_entity_id,
-                    primary_controller_entity_id: primary.unwrap_or(Uuid::nil()),
-                    governance_controller_entity_id: governance.unwrap_or(Uuid::nil()),
-                    basis: basis
-                        .as_deref()
-                        .map(|s| match s {
-                            "BOARD_APPOINTMENT" => ControllerBasis::BoardAppointment,
-                            "VOTING_CONTROL" => ControllerBasis::VotingControl,
-                            "SIGNIFICANT_INFLUENCE" => ControllerBasis::SignificantInfluence,
-                            _ => ControllerBasis::None,
-                        })
-                        .unwrap_or(ControllerBasis::None),
-                    board_seats: board_seats.unwrap_or(0),
-                    voting_pct,
-                    economic_pct,
-                    has_control: has_control.unwrap_or(false),
-                    has_significant_influence: has_sig.unwrap_or(false),
-                })?
-            }
+            Some((
+                _,
+                primary,
+                governance,
+                basis,
+                board_seats,
+                voting_pct,
+                economic_pct,
+                has_control,
+                has_sig,
+            )) => serde_json::to_value(PrimaryGovernanceController {
+                issuer_entity_id,
+                primary_controller_entity_id: primary.unwrap_or(Uuid::nil()),
+                governance_controller_entity_id: governance.unwrap_or(Uuid::nil()),
+                basis: basis
+                    .as_deref()
+                    .map(|s| match s {
+                        "BOARD_APPOINTMENT" => ControllerBasis::BoardAppointment,
+                        "VOTING_CONTROL" => ControllerBasis::VotingControl,
+                        "SIGNIFICANT_INFLUENCE" => ControllerBasis::SignificantInfluence,
+                        _ => ControllerBasis::None,
+                    })
+                    .unwrap_or(ControllerBasis::None),
+                board_seats: board_seats.unwrap_or(0),
+                voting_pct,
+                economic_pct,
+                has_control: has_control.unwrap_or(false),
+                has_significant_influence: has_sig.unwrap_or(false),
+            })?,
             None => serde_json::to_value(CbuMancoNotFound {
                 message: "No governance controller found".to_string(),
             })?,
@@ -352,37 +378,48 @@ impl SemOsVerbOp for ControlChain {
             bool,
         );
 
-        let rows: Vec<Row> = sqlx::query_as(
-            r#"SELECT * FROM "ob-poc".fn_manco_group_control_chain($1, $2)"#,
-        )
-        .bind(manco_entity_id)
-        .bind(max_depth as i32)
-        .fetch_all(scope.executor())
-        .await?;
+        let rows: Vec<Row> =
+            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_manco_group_control_chain($1, $2)"#)
+                .bind(manco_entity_id)
+                .bind(max_depth as i32)
+                .fetch_all(scope.executor())
+                .await?;
 
         let results: Vec<Value> = rows
             .into_iter()
-            .map(|(depth, entity_id, entity_name, entity_type, controlled_by_id, controlled_by_name, control_type_str, voting_pct, is_ultimate)| {
-                let control_type = control_type_str.as_deref().map(|s| match s {
-                    "CONTROLLING" => ControlType::Controlling,
-                    "SIGNIFICANT_INFLUENCE" => ControlType::SignificantInfluence,
-                    "MATERIAL" => ControlType::Material,
-                    "NOTIFIABLE" => ControlType::Notifiable,
-                    _ => ControlType::Minority,
-                });
-                serde_json::to_value(ControlChainNode {
+            .map(
+                |(
                     depth,
                     entity_id,
                     entity_name,
                     entity_type,
-                    controlled_by_entity_id: controlled_by_id,
+                    controlled_by_id,
                     controlled_by_name,
-                    control_type,
+                    control_type_str,
                     voting_pct,
-                    is_ultimate_controller: is_ultimate,
-                })
-                .unwrap_or_default()
-            })
+                    is_ultimate,
+                )| {
+                    let control_type = control_type_str.as_deref().map(|s| match s {
+                        "CONTROLLING" => ControlType::Controlling,
+                        "SIGNIFICANT_INFLUENCE" => ControlType::SignificantInfluence,
+                        "MATERIAL" => ControlType::Material,
+                        "NOTIFIABLE" => ControlType::Notifiable,
+                        _ => ControlType::Minority,
+                    });
+                    serde_json::to_value(ControlChainNode {
+                        depth,
+                        entity_id,
+                        entity_name,
+                        entity_type,
+                        controlled_by_entity_id: controlled_by_id,
+                        controlled_by_name,
+                        control_type,
+                        voting_pct,
+                        is_ultimate_controller: is_ultimate,
+                    })
+                    .unwrap_or_default()
+                },
+            )
             .collect();
 
         Ok(VerbExecutionOutcome::RecordSet(results))
@@ -407,9 +444,17 @@ impl SemOsVerbOp for BookSummary {
         let manco_entity_id = json_extract_uuid(args, ctx, "manco-entity-id")?;
 
         // 1. Group info
-        let group_row: Option<(Uuid, Uuid, String, Option<String>, String, Option<String>, Option<Uuid>, i64)> =
-            sqlx::query_as(
-                r#"
+        let group_row: Option<(
+            Uuid,
+            Uuid,
+            String,
+            Option<String>,
+            String,
+            Option<String>,
+            Option<Uuid>,
+            i64,
+        )> = sqlx::query_as(
+            r#"
                 SELECT g.group_id, g.manco_entity_id, g.group_name, g.group_code,
                        g.group_type, g.jurisdiction, g.ultimate_parent_entity_id,
                        COUNT(DISTINCT m.cbu_id) as cbu_count
@@ -420,10 +465,10 @@ impl SemOsVerbOp for BookSummary {
                 GROUP BY g.group_id
                 LIMIT 1
                 "#,
-            )
-            .bind(manco_entity_id)
-            .fetch_optional(scope.executor())
-            .await?;
+        )
+        .bind(manco_entity_id)
+        .fetch_optional(scope.executor())
+        .await?;
 
         let group_info = match group_row {
             Some((group_id, manco_id, name, code, gtype, jur, up_id, count)) => json!({
@@ -457,17 +502,27 @@ impl SemOsVerbOp for BookSummary {
 
         let cbus: Vec<Value> = cbu_rows
             .into_iter()
-            .map(|(cbu_id, cbu_name, cbu_category, jurisdiction, fund_entity_id, fund_entity_name, membership_source)| {
-                json!({
-                    "cbu_id": cbu_id,
-                    "cbu_name": cbu_name,
-                    "cbu_category": cbu_category,
-                    "jurisdiction": jurisdiction,
-                    "fund_entity_id": fund_entity_id,
-                    "fund_entity_name": fund_entity_name,
-                    "membership_source": membership_source,
-                })
-            })
+            .map(
+                |(
+                    cbu_id,
+                    cbu_name,
+                    cbu_category,
+                    jurisdiction,
+                    fund_entity_id,
+                    fund_entity_name,
+                    membership_source,
+                )| {
+                    json!({
+                        "cbu_id": cbu_id,
+                        "cbu_name": cbu_name,
+                        "cbu_category": cbu_category,
+                        "jurisdiction": jurisdiction,
+                        "fund_entity_id": fund_entity_id,
+                        "fund_entity_name": fund_entity_name,
+                        "membership_source": membership_source,
+                    })
+                },
+            )
             .collect();
 
         // 3. Control chain (max depth 5)
@@ -482,29 +537,40 @@ impl SemOsVerbOp for BookSummary {
             Option<Decimal>,
             bool,
         );
-        let chain_rows: Vec<ChainRow> = sqlx::query_as(
-            r#"SELECT * FROM "ob-poc".fn_manco_group_control_chain($1, $2)"#,
-        )
-        .bind(manco_entity_id)
-        .bind(5i32)
-        .fetch_all(scope.executor())
-        .await?;
+        let chain_rows: Vec<ChainRow> =
+            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_manco_group_control_chain($1, $2)"#)
+                .bind(manco_entity_id)
+                .bind(5i32)
+                .fetch_all(scope.executor())
+                .await?;
 
         let control_chain: Vec<Value> = chain_rows
             .into_iter()
-            .map(|(depth, entity_id, entity_name, entity_type, controlled_by_id, controlled_by_name, control_type, voting_pct, is_ultimate)| {
-                json!({
-                    "depth": depth,
-                    "entity_id": entity_id,
-                    "entity_name": entity_name,
-                    "entity_type": entity_type,
-                    "controlled_by_entity_id": controlled_by_id,
-                    "controlled_by_name": controlled_by_name,
-                    "control_type": control_type,
-                    "voting_pct": voting_pct,
-                    "is_ultimate_controller": is_ultimate,
-                })
-            })
+            .map(
+                |(
+                    depth,
+                    entity_id,
+                    entity_name,
+                    entity_type,
+                    controlled_by_id,
+                    controlled_by_name,
+                    control_type,
+                    voting_pct,
+                    is_ultimate,
+                )| {
+                    json!({
+                        "depth": depth,
+                        "entity_id": entity_id,
+                        "entity_name": entity_name,
+                        "entity_type": entity_type,
+                        "controlled_by_entity_id": controlled_by_id,
+                        "controlled_by_name": controlled_by_name,
+                        "control_type": control_type,
+                        "voting_pct": voting_pct,
+                        "is_ultimate_controller": is_ultimate,
+                    })
+                },
+            )
             .collect();
 
         Ok(VerbExecutionOutcome::Record(json!({

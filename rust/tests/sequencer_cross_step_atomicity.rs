@@ -139,10 +139,7 @@ mod cross_step_tests {
         let cbu_name = db.name("fund_two_step");
 
         // Step 1: creates a CBU (should succeed).
-        let step1_dsl = format!(
-            r#"(cbu.ensure :name "{}" :jurisdiction "LU")"#,
-            cbu_name
-        );
+        let step1_dsl = format!(r#"(cbu.ensure :name "{}" :jurisdiction "LU")"#, cbu_name);
         // Step 2: assign a role with an INVALID role code — triggers a
         // CRUD validation / FK failure.
         let step2_dsl = format!(

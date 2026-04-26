@@ -311,10 +311,7 @@ impl ToolHandlers {
     /// Install the canonical SemOS plugin op registry. Threaded into every
     /// inner `DslExecutor` these handlers construct so plugin verbs dispatch
     /// correctly (post-Phase-5c-migrate slice #80).
-    pub fn with_sem_os_ops(
-        mut self,
-        ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>,
-    ) -> Self {
+    pub fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>) -> Self {
         self.sem_os_ops = Some(ops);
         self
     }

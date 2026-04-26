@@ -98,10 +98,7 @@ pub fn json_extract_string_list(args: &serde_json::Value, arg_name: &str) -> Res
 }
 
 /// Extract CBU ID from JSON args, accepting "cbu" or "cbu-id".
-pub fn json_extract_cbu_id(
-    args: &serde_json::Value,
-    ctx: &VerbExecutionContext,
-) -> Result<Uuid> {
+pub fn json_extract_cbu_id(args: &serde_json::Value, ctx: &VerbExecutionContext) -> Result<Uuid> {
     json_extract_uuid_opt(args, ctx, "cbu-id")
         .or_else(|| json_extract_uuid_opt(args, ctx, "cbu"))
         .ok_or_else(|| anyhow!("Missing cbu or cbu-id argument"))
@@ -199,9 +196,7 @@ pub fn emit_pending_state_advance(
 /// subsequent verbs in the same plan don't see stale advance data from
 /// an earlier step. This matches the single-write, single-read
 /// contract the C.1/C.3 emitters assume.
-pub fn take_pending_state_advance(
-    ctx: &mut VerbExecutionContext,
-) -> Option<serde_json::Value> {
+pub fn take_pending_state_advance(ctx: &mut VerbExecutionContext) -> Option<serde_json::Value> {
     let obj = ctx.extensions.as_object_mut()?;
     obj.remove("_pending_state_advance")
 }
@@ -211,9 +206,7 @@ pub fn take_pending_state_advance(
 /// path uses `take_pending_state_advance` so the advance is applied
 /// exactly once; shadow logging uses `peek_pending_state_advance` so
 /// dispatch-level observability + stage-9a apply can coexist.
-pub fn peek_pending_state_advance(
-    ctx: &VerbExecutionContext,
-) -> Option<&serde_json::Value> {
+pub fn peek_pending_state_advance(ctx: &VerbExecutionContext) -> Option<&serde_json::Value> {
     ctx.extensions.as_object()?.get("_pending_state_advance")
 }
 
@@ -344,7 +337,10 @@ mod tests {
         // Peek must return the shape the emitter wrote.
         let peeked = peek_pending_state_advance(&ctx).expect("must be present");
         assert_eq!(peeked["state_transitions"][0]["to_node"], "cbu:onboarded");
-        assert_eq!(peeked["constellation_marks"][0]["slot_path"], "cbu/trading-profile");
+        assert_eq!(
+            peeked["constellation_marks"][0]["slot_path"],
+            "cbu/trading-profile"
+        );
         assert_eq!(peeked["writes_since_push_delta"], 1);
 
         // Peek does NOT consume.

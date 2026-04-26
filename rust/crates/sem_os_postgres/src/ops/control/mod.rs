@@ -21,6 +21,6 @@ pub use analysis::{
     ControlTraceChain,
 };
 pub use board::{
-    ClearBoardControllerOverride, ImportGleifControl, ImportPscRegister,
-    RecomputeBoardController, SetBoardController, ShowBoardController,
+    ClearBoardControllerOverride, ImportGleifControl, ImportPscRegister, RecomputeBoardController,
+    SetBoardController, ShowBoardController,
 };

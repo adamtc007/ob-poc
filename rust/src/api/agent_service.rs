@@ -538,10 +538,7 @@ impl AgentService {
     /// Install the canonical SemOS plugin op registry. Threaded into every
     /// inner `DslExecutor` / `RealDslExecutor` this service constructs so
     /// plugin verbs dispatch correctly (post-Phase-5c-migrate slice #80).
-    pub fn with_sem_os_ops(
-        mut self,
-        ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>,
-    ) -> Self {
+    pub fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>) -> Self {
         self.sem_os_ops = Some(ops);
         self
     }
@@ -549,10 +546,7 @@ impl AgentService {
     /// Install the platform service registry. Threaded into every inner
     /// executor this service constructs so ops that consume platform traits
     /// via `VerbExecutionContext::service::<dyn T>()` resolve correctly.
-    pub fn with_service_registry(
-        mut self,
-        services: Arc<dsl_runtime::ServiceRegistry>,
-    ) -> Self {
+    pub fn with_service_registry(mut self, services: Arc<dsl_runtime::ServiceRegistry>) -> Self {
         self.service_registry = Some(services);
         self
     }
@@ -575,8 +569,7 @@ impl AgentService {
     /// chained in. All agent-side runbook-gate-vnext `RealDslExecutor`
     /// construction MUST flow through this helper.
     fn build_real_dsl_executor(&self) -> crate::repl::executor_bridge::RealDslExecutor {
-        let mut executor =
-            crate::repl::executor_bridge::RealDslExecutor::new(self.pool.clone());
+        let mut executor = crate::repl::executor_bridge::RealDslExecutor::new(self.pool.clone());
         if let Some(ref services) = self.service_registry {
             executor = executor.with_services(services.clone());
         }
@@ -1822,33 +1815,38 @@ impl AgentService {
                     None
                 };
 
-                let verb_kind =
-                    match c.source {
-                        VerbSearchSource::MacroIndex | VerbSearchSource::ScenarioIndex => "macro",
-                        _ => match rv {
-                            Some(v) => match &v.behavior {
-                                crate::dsl_v2::runtime_registry::RuntimeBehavior::Crud(crud) => {
-                                    match crud.operation {
-                                        crate::dsl_v2::config::types::CrudOperation::Select => {
-                                            "query"
-                                        }
-                                        _ => "primitive",
-                                    }
+                let verb_kind = match c.source {
+                    VerbSearchSource::MacroIndex | VerbSearchSource::ScenarioIndex => "macro",
+                    _ => match rv {
+                        Some(v) => match &v.behavior {
+                            crate::dsl_v2::runtime_registry::RuntimeBehavior::Crud(crud) => {
+                                match crud.operation {
+                                    crate::dsl_v2::config::types::CrudOperation::Select => "query",
+                                    _ => "primitive",
                                 }
-                                crate::dsl_v2::runtime_registry::RuntimeBehavior::Plugin(_) => {
-                                    if v.produces.is_none() && v.harm_class.as_ref().map(|h| {
-                                    matches!(h, crate::dsl_v2::config::types::HarmClass::ReadOnly)
-                                }).unwrap_or(false) {
-                                    "query"
-                                } else {
-                                    "primitive"
-                                }
-                                }
-                                _ => "primitive",
-                            },
-                            None => "primitive",
+                            }
+                            crate::dsl_v2::runtime_registry::RuntimeBehavior::Plugin(_)
+                                if v.produces.is_none()
+                                    && v.harm_class
+                                        .as_ref()
+                                        .map(|h| {
+                                            matches!(
+                                                h,
+                                                crate::dsl_v2::config::types::HarmClass::ReadOnly
+                                            )
+                                        })
+                                        .unwrap_or(false) =>
+                            {
+                                "query"
+                            }
+                            crate::dsl_v2::runtime_registry::RuntimeBehavior::Plugin(_) => {
+                                "primitive"
+                            }
+                            _ => "primitive",
                         },
-                    };
+                        None => "primitive",
+                    },
+                };
 
                 let step_count: Option<u32> = None; // Populated when macro metadata available
 

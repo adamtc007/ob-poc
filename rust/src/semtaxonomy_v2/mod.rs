@@ -1261,7 +1261,7 @@ pub fn step3_select_verb(utterance: &str, state: &EntityState) -> Option<Selecte
         })
         .filter(|(score, _)| *score > 0)
         .collect::<Vec<_>>();
-    candidates.sort_by(|left, right| right.0.cmp(&left.0));
+    candidates.sort_by_key(|item| std::cmp::Reverse(item.0));
 
     let (score, verb) = candidates.first()?;
     if *score <= 0 {

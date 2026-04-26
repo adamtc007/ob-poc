@@ -2095,7 +2095,8 @@ impl SemOsVerbOp for EntityContext {
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
         let include_completed = json_extract_bool_opt(args, "include-completed").unwrap_or(false);
-        let record = build_entity_context_record(scope.pool(), entity_id, include_completed).await?;
+        let record =
+            build_entity_context_record(scope.pool(), entity_id, include_completed).await?;
         Ok(VerbExecutionOutcome::Record(record))
     }
 }
@@ -2122,9 +2123,13 @@ impl SemOsVerbOp for EntityRelationships {
         let relationship_types =
             json_extract_string_list_opt(args, "relationship-types").unwrap_or_default();
         let max_depth = json_extract_int_opt(args, "max-depth").unwrap_or(2) as i32;
-        let record =
-            build_entity_relationships_record(scope.pool(), entity_id, &relationship_types, max_depth)
-                .await?;
+        let record = build_entity_relationships_record(
+            scope.pool(),
+            entity_id,
+            &relationship_types,
+            max_depth,
+        )
+        .await?;
         Ok(VerbExecutionOutcome::Record(record))
     }
 }

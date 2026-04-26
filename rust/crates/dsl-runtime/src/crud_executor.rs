@@ -18,8 +18,8 @@ use sqlx::{Column, PgPool, Row, TypeInfo};
 use tracing::debug;
 use uuid::Uuid;
 
-use sem_os_core::error::SemOsError;
 use crate::{CrudExecutionPort, VerbExecutionContext, VerbExecutionOutcome};
+use sem_os_core::error::SemOsError;
 use sem_os_core::verb_contract::{VerbArgDef, VerbContractBody, VerbCrudMapping};
 
 /// SemOS-native CRUD executor backed by PostgreSQL.
@@ -1285,11 +1285,7 @@ fn bind_sql_value<'q>(
     }
 }
 
-async fn execute_query_one(
-    pool: &PgPool,
-    sql: &str,
-    values: &[SqlValue],
-) -> crate::Result<PgRow> {
+async fn execute_query_one(pool: &PgPool, sql: &str, values: &[SqlValue]) -> crate::Result<PgRow> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
@@ -1300,11 +1296,7 @@ async fn execute_query_one(
         .map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
 }
 
-async fn execute_non_query(
-    pool: &PgPool,
-    sql: &str,
-    values: &[SqlValue],
-) -> crate::Result<u64> {
+async fn execute_non_query(pool: &PgPool, sql: &str, values: &[SqlValue]) -> crate::Result<u64> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
@@ -1316,11 +1308,7 @@ async fn execute_non_query(
     Ok(result.rows_affected())
 }
 
-async fn execute_query(
-    pool: &PgPool,
-    sql: &str,
-    values: &[SqlValue],
-) -> crate::Result<Vec<PgRow>> {
+async fn execute_query(pool: &PgPool, sql: &str, values: &[SqlValue]) -> crate::Result<Vec<PgRow>> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);

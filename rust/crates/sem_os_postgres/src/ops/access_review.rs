@@ -51,8 +51,7 @@ impl SemOsVerbOp for PopulateCampaign {
         .bind(campaign_id)
         .fetch_optional(scope.executor())
         .await?;
-        let (scope_type, _scope_filter) =
-            campaign.ok_or_else(|| anyhow!("Campaign not found"))?;
+        let (scope_type, _scope_filter) = campaign.ok_or_else(|| anyhow!("Campaign not found"))?;
 
         sqlx::query(
             r#"UPDATE "ob-poc".access_review_campaigns SET status = 'POPULATING' WHERE campaign_id = $1"#,
@@ -306,7 +305,9 @@ impl SemOsVerbOp for BulkConfirm {
             .await?;
         }
 
-        Ok(VerbExecutionOutcome::Record(json!({ "confirmed": confirmed_count })))
+        Ok(VerbExecutionOutcome::Record(
+            json!({ "confirmed": confirmed_count }),
+        ))
     }
 }
 

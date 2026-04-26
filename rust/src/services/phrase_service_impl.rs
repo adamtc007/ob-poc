@@ -8,9 +8,9 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use sem_os_core::principal::Principal;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sem_os_core::principal::Principal;
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -180,7 +180,9 @@ fn arg_string(args: &Value, name: &str) -> Result<String> {
 }
 
 fn arg_string_opt(args: &Value, name: &str) -> Option<String> {
-    args.get(name).and_then(|v| v.as_str()).map(|s| s.to_string())
+    args.get(name)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 fn arg_int_opt(args: &Value, name: &str) -> Option<i64> {
@@ -307,7 +309,14 @@ async fn run_collision_check(
 
 fn risk_tier_for_verb(verb_fqn: &str) -> &'static str {
     let lower = verb_fqn.to_lowercase();
-    let critical_keywords = ["approve", "reject", "terminate", "delete", "close", "certify"];
+    let critical_keywords = [
+        "approve",
+        "reject",
+        "terminate",
+        "delete",
+        "close",
+        "certify",
+    ];
     let standard_keywords = ["read", "list", "get", "show", "describe", "search"];
     if critical_keywords.iter().any(|kw| lower.contains(kw)) {
         "critical"
@@ -340,11 +349,8 @@ fn next_phrase_meta(
     change_rationale: Option<String>,
     status: SnapshotStatus,
 ) -> SnapshotMeta {
-    let mut meta = SnapshotMeta::new_operational(
-        ObjectType::PhraseMapping,
-        object_id,
-        created_by.to_string(),
-    );
+    let mut meta =
+        SnapshotMeta::new_operational(ObjectType::PhraseMapping, object_id, created_by.to_string());
     meta.change_type = change_type;
     meta.change_rationale = change_rationale;
     meta.status = status;
@@ -474,12 +480,11 @@ async fn phrase_observe_misses(pool: &PgPool, args: &Value) -> Result<Value> {
     .fetch_all(pool)
     .await
     .unwrap_or_default();
-    let new_watermark: (Option<i64>,) = sqlx::query_as(
-        r#"SELECT MAX(sequence) FROM "ob-poc".session_traces WHERE sequence > $1"#,
-    )
-    .bind(last_seq)
-    .fetch_one(pool)
-    .await?;
+    let new_watermark: (Option<i64>,) =
+        sqlx::query_as(r#"SELECT MAX(sequence) FROM "ob-poc".session_traces WHERE sequence > $1"#)
+            .bind(last_seq)
+            .fetch_one(pool)
+            .await?;
     let advanced_to = new_watermark.0.unwrap_or(last_seq);
     let miss_count = miss_rows.iter().map(|(_, c)| c).sum::<i64>();
     let wrong_match_count = wrong_match_rows.iter().map(|(_, _, c)| c).sum::<i64>();
@@ -629,11 +634,7 @@ async fn phrase_propose(pool: &PgPool, args: &Value, principal: &Principal) -> R
 
 // ── phrase.batch-propose ──────────────────────────────────────────────────────
 
-async fn phrase_batch_propose(
-    pool: &PgPool,
-    args: &Value,
-    principal: &Principal,
-) -> Result<Value> {
+async fn phrase_batch_propose(pool: &PgPool, args: &Value, principal: &Principal) -> Result<Value> {
     let limit = arg_int_opt(args, "limit").unwrap_or(50) as usize;
     let watermark_result: Result<(i64,), _> = sqlx::query_as(
         r#"SELECT last_observed_sequence FROM "ob-poc".phrase_observation_state WHERE id = 1"#,
@@ -768,15 +769,23 @@ async fn phrase_batch_propose(
                 _ => 3,
             }
         };
-        let a_tier = a.get("risk_tier").and_then(|v| v.as_str()).unwrap_or("elevated");
-        let b_tier = b.get("risk_tier").and_then(|v| v.as_str()).unwrap_or("elevated");
+        let a_tier = a
+            .get("risk_tier")
+            .and_then(|v| v.as_str())
+            .unwrap_or("elevated");
+        let b_tier = b
+            .get("risk_tier")
+            .and_then(|v| v.as_str())
+            .unwrap_or("elevated");
         let tier_cmp = tier_order(a_tier).cmp(&tier_order(b_tier));
         if tier_cmp != std::cmp::Ordering::Equal {
             return tier_cmp;
         }
         let a_conf = a.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
         let b_conf = b.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        b_conf.partial_cmp(&a_conf).unwrap_or(std::cmp::Ordering::Equal)
+        b_conf
+            .partial_cmp(&a_conf)
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
     let generated = proposals.len() as i64;
     let mut result_set = Vec::with_capacity(proposals.len() + 1);
@@ -816,41 +825,43 @@ async fn phrase_review_proposals(pool: &PgPool) -> Result<Value> {
     .await?;
     let proposals: Vec<Value> = rows
         .into_iter()
-        .map(|(snapshot_id, definition, created_by, ver_major, ver_minor)| {
-            let phrase = definition
-                .get("phrase")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let verb_fqn = definition
-                .get("verb_fqn")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let workspace = definition
-                .get("workspace")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let state = definition
-                .get("state")
-                .and_then(|v| v.as_str())
-                .unwrap_or("proposed")
-                .to_string();
-            let collision_report = definition.get("collision_report").cloned();
-            let evidence = definition.get("evidence").cloned();
-            serde_json::to_value(PhraseProposalSummary {
-                snapshot_id,
-                phrase,
-                verb_fqn,
-                workspace,
-                state,
-                created_by,
-                version: format!("{}.{}", ver_major, ver_minor),
-                collision_report,
-                evidence,
-            })
-            .unwrap_or_default()
-        })
+        .map(
+            |(snapshot_id, definition, created_by, ver_major, ver_minor)| {
+                let phrase = definition
+                    .get("phrase")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let verb_fqn = definition
+                    .get("verb_fqn")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let workspace = definition
+                    .get("workspace")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let state = definition
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("proposed")
+                    .to_string();
+                let collision_report = definition.get("collision_report").cloned();
+                let evidence = definition.get("evidence").cloned();
+                serde_json::to_value(PhraseProposalSummary {
+                    snapshot_id,
+                    phrase,
+                    verb_fqn,
+                    workspace,
+                    state,
+                    created_by,
+                    version: format!("{}.{}", ver_major, ver_minor),
+                    collision_report,
+                    evidence,
+                })
+                .unwrap_or_default()
+            },
+        )
         .collect();
     Ok(json!(proposals))
 }
@@ -887,8 +898,7 @@ async fn phrase_approve(pool: &PgPool, args: &Value, principal: &Principal) -> R
         rationale,
         SnapshotStatus::Active,
     );
-    let published_snapshot_id =
-        publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+    let published_snapshot_id = publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
     tx.commit().await?;
     let phrase = definition
         .get("phrase")
@@ -939,8 +949,7 @@ async fn phrase_reject(pool: &PgPool, args: &Value, principal: &Principal) -> Re
         Some(reason.clone()),
         SnapshotStatus::Deprecated,
     );
-    let rejected_snapshot_id =
-        publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+    let rejected_snapshot_id = publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
     tx.commit().await?;
     let result = PhraseLifecycleResult {
         snapshot_id: rejected_snapshot_id,
@@ -982,8 +991,7 @@ async fn phrase_defer(pool: &PgPool, args: &Value, principal: &Principal) -> Res
         reason.clone(),
         SnapshotStatus::Active,
     );
-    let deferred_snapshot_id =
-        publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
+    let deferred_snapshot_id = publish_phrase_snapshot_in_tx(&mut tx, &meta, &definition).await?;
     tx.commit().await?;
     let result = PhraseLifecycleResult {
         snapshot_id: deferred_snapshot_id,

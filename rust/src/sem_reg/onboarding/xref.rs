@@ -149,7 +149,7 @@ pub fn cross_reference(verbs: &[VerbExtract], tables: &[TableExtract]) -> XrefRe
             let all_verb_refs: Vec<(&str, VerbRefKind)> = table_verb_refs
                 .iter()
                 .cloned()
-                .chain(col_verb_refs.into_iter())
+                .chain(col_verb_refs)
                 .collect();
 
             let verb_fqns: Vec<String> = all_verb_refs

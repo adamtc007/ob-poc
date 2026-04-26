@@ -220,9 +220,7 @@ pub enum VerbSurfaceComposition {
     /// SemOS responded but with a deny-all verdict. The surface is
     /// the (typically empty) verb set the deny-all envelope still
     /// permits — usually safe-harbor verbs.
-    SemOsDenyAll {
-        legal_verbs: Vec<String>,
-    },
+    SemOsDenyAll { legal_verbs: Vec<String> },
     /// SemOS unavailable AND a pack is active — fall back to the
     /// pack's `allowed_verbs` so the REPL stays usable in dev/test.
     SemOsUnavailableWithPack {
@@ -422,10 +420,7 @@ impl RunbookCompilationOutput {
     /// the wider `CompiledRunbook` shape to the §8.3 boundary (just
     /// the id + step count, since the per-step content is the
     /// runtime's concern not the harness's).
-    pub fn from_compiled(
-        runbook_id: Uuid,
-        step_count: usize,
-    ) -> Self {
+    pub fn from_compiled(runbook_id: Uuid, step_count: usize) -> Self {
         Self {
             runbook_id,
             step_count,
@@ -559,10 +554,7 @@ impl EntityResolutionOutput {
     /// triples. The orchestrator's `handle_scope_gate` and
     /// `handle_in_pack` both invoke entity resolution paths whose
     /// output collapses to `(resolved, unresolved)`.
-    pub fn from_lookup(
-        resolved: Vec<ResolvedEntity>,
-        unresolved: Vec<EntityTriple>,
-    ) -> Self {
+    pub fn from_lookup(resolved: Vec<ResolvedEntity>, unresolved: Vec<EntityTriple>) -> Self {
         Self {
             resolved,
             unresolved,

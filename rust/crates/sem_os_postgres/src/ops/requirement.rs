@@ -51,8 +51,8 @@ impl SemOsVerbOp for CreateSet {
         let due_date: Option<NaiveDate> = json_extract_string_opt(args, "due-date")
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
 
-        let required_state =
-            json_extract_string_opt(args, "required-state").unwrap_or_else(|| "verified".to_string());
+        let required_state = json_extract_string_opt(args, "required-state")
+            .unwrap_or_else(|| "verified".to_string());
 
         let mut requirement_ids: Vec<Uuid> = Vec::with_capacity(doc_types.len());
 

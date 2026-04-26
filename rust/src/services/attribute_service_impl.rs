@@ -3,8 +3,8 @@
 //! Single-method dispatch for the 16 attribute / document / derivation
 //! verbs that operate on the SemOS-first attribute lifecycle. Bridge
 //! stays in ob-poc because every snapshot write goes through
-//! `crate::sem_reg::store::SnapshotStore` + `crate::sem_reg::types::*`
-//! + `crate::sem_reg::derivation_spec::*` — multi-consumer surfaces
+//! `crate::sem_reg::store::SnapshotStore`, `crate::sem_reg::types::*`,
+//! and `crate::sem_reg::derivation_spec::*` — multi-consumer surfaces
 //! with no dsl-runtime analogue.
 //!
 //! `define`, `define-internal`, and `define-derived` produce post-
@@ -101,7 +101,9 @@ fn arg_string(args: &Value, name: &str) -> Result<String> {
 }
 
 fn arg_string_opt(args: &Value, name: &str) -> Option<String> {
-    args.get(name).and_then(|v| v.as_str()).map(|s| s.to_string())
+    args.get(name)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 fn arg_uuid(args: &Value, name: &str) -> Result<Uuid> {
@@ -477,10 +479,7 @@ async fn load_active_attribute_context(
     })
 }
 
-async fn load_active_derivation_snapshot(
-    pool: &PgPool,
-    fqn: &str,
-) -> Result<Option<SnapshotRow>> {
+async fn load_active_derivation_snapshot(pool: &PgPool, fqn: &str) -> Result<Option<SnapshotRow>> {
     SnapshotStore::find_active_by_definition_field(pool, ObjectType::DerivationSpec, "fqn", fqn)
         .await
 }
@@ -866,10 +865,7 @@ async fn attribute_list_by_document(
 
 // ── attribute.check-coverage ──────────────────────────────────────────────────
 
-async fn attribute_check_coverage(
-    pool: &PgPool,
-    args: &Value,
-) -> Result<AttributeDispatchOutcome> {
+async fn attribute_check_coverage(pool: &PgPool, args: &Value) -> Result<AttributeDispatchOutcome> {
     let doc_type = arg_string(args, "document-type")?;
     let doc = sqlx::query!(
         r#"
@@ -1045,10 +1041,8 @@ async fn attribute_define(
     let value_type = arg_string(args, "value-type")?;
     let domain = arg_string_opt(args, "domain");
     let semantic_id = normalize_attribute_id(&raw_id, domain.as_deref());
-    let description = effective_description(
-        &display_name,
-        arg_string_opt(args, "semos-description"),
-    );
+    let description =
+        effective_description(&display_name, arg_string_opt(args, "semos-description"));
     let evidence_grade =
         parse_evidence_grade(arg_string_opt(args, "evidence-grade"), EvidenceGrade::None)?;
     let validation_rules = parse_json_arg(args, "validation-rules")?;
@@ -1135,10 +1129,8 @@ async fn attribute_define_internal(
     let value_type = arg_string(args, "value-type")?;
     let domain = arg_string_opt(args, "domain");
     let semantic_id = normalize_attribute_id(&raw_id, domain.as_deref());
-    let description = effective_description(
-        &display_name,
-        arg_string_opt(args, "semos-description"),
-    );
+    let description =
+        effective_description(&display_name, arg_string_opt(args, "semos-description"));
     let validation_rules = parse_json_arg(args, "validation-rules")?;
     let applicability = parse_json_arg(args, "applicability")?;
 
@@ -1302,10 +1294,8 @@ async fn attribute_define_derived(
     let display_name = arg_string(args, "display-name")?;
     let category = arg_string(args, "category")?;
     let value_type = arg_string(args, "value-type")?;
-    let description = effective_description(
-        &display_name,
-        arg_string_opt(args, "semos-description"),
-    );
+    let description =
+        effective_description(&display_name, arg_string_opt(args, "semos-description"));
     let evidence_grade = parse_evidence_grade(
         arg_string_opt(args, "evidence-grade"),
         EvidenceGrade::Prohibited,
@@ -1387,7 +1377,10 @@ async fn attribute_define_derived(
             .as_ref()
             .map(|row| row.snapshot_id)
             .ok_or_else(|| {
-                anyhow!("Missing existing DerivationSpec snapshot for {}", semantic_id)
+                anyhow!(
+                    "Missing existing DerivationSpec snapshot for {}",
+                    semantic_id
+                )
             })?
     } else {
         let derivation_meta = next_meta_from_predecessor(
@@ -1406,13 +1399,12 @@ async fn attribute_define_derived(
         publish_snapshot_in_tx(&mut tx, &derivation_meta, &derivation_definition).await?
     };
     if let Some(previous) = derivation_predecessor.as_ref() {
-        let _affected: i64 = sqlx::query_scalar(
-            r#"SELECT COALESCE("ob-poc".propagate_spec_staleness($1, $2), 0)"#,
-        )
-        .bind(&semantic_id)
-        .bind(derivation_snapshot_id)
-        .fetch_one(&mut *tx)
-        .await?;
+        let _affected: i64 =
+            sqlx::query_scalar(r#"SELECT COALESCE("ob-poc".propagate_spec_staleness($1, $2), 0)"#)
+                .bind(&semantic_id)
+                .bind(derivation_snapshot_id)
+                .fetch_one(&mut *tx)
+                .await?;
         let _ = previous.snapshot_id;
     }
     let registry_uuid = materialize_to_store(
@@ -1712,7 +1704,10 @@ async fn attribute_bridge_to_semos(
     let limit = arg_int_opt(args, "limit").unwrap_or(100);
     let audit_user = audit_user_for(principal, "attribute.bridge-to-semos");
 
-    let rows: Vec<(
+    /// Row shape for the bridge-to-semos query: id, uuid, display_name,
+    /// category, value_type, domain, validation_rules, applicability,
+    /// evidence_grade. Tuple matches the SELECT column order verbatim.
+    type BridgeRow = (
         String,
         Uuid,
         String,
@@ -1722,7 +1717,9 @@ async fn attribute_bridge_to_semos(
         Option<Value>,
         Option<Value>,
         String,
-    )> = sqlx::query_as(
+    );
+
+    let rows: Vec<BridgeRow> = sqlx::query_as(
         r#"
         SELECT id, uuid, display_name, category, value_type, domain,
                validation_rules, applicability, evidence_grade

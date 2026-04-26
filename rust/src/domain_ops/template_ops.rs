@@ -249,6 +249,11 @@ impl SemOsVerbOp for TemplateBatch {
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Each parameter maps to a distinct
+                                     // piece of batch-template state (template id, foreach symbol, bind name,
+                                     // per-item param overrides, error policy, optional cap, mutable ctx,
+                                     // pool). Combining into a struct would just push the same fields one
+                                     // level up without simplifying the call sites.
 async fn template_batch_impl(
     template_id: String,
     source_symbol: String,

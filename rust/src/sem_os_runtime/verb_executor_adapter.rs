@@ -16,10 +16,10 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use dsl_runtime::VerbExecutionPort;
-use sem_os_core::error::SemOsError;
 use dsl_runtime::{
     VerbExecutionContext, VerbExecutionOutcome, VerbExecutionResult, VerbSideEffects,
 };
+use sem_os_core::error::SemOsError;
 
 use crate::dsl_v2::executor::{DslExecutor, ExecutionContext, ExecutionResult};
 use dsl_core::ast::{Argument, AstNode, Literal, Span, VerbCall};
@@ -92,10 +92,7 @@ impl ObPocVerbExecutor {
     ///
     /// When set, CRUD verbs route through `CrudExecutionPort::execute_crud()`
     /// using `VerbContractBody` metadata, bypassing the legacy GenericCrudExecutor.
-    pub fn with_crud_port(
-        mut self,
-        port: Arc<dyn dsl_runtime::CrudExecutionPort>,
-    ) -> Self {
+    pub fn with_crud_port(mut self, port: Arc<dyn dsl_runtime::CrudExecutionPort>) -> Self {
         self.crud_port = Some(port);
         self
     }
@@ -109,10 +106,7 @@ impl ObPocVerbExecutor {
     ///
     /// Phase A of the 5c-migrate relocation wires this with an empty
     /// registry; Phase B populates it one verb at a time.
-    pub fn with_sem_os_ops(
-        mut self,
-        ops: Arc<sem_os_postgres::SemOsVerbOpRegistry>,
-    ) -> Self {
+    pub fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::SemOsVerbOpRegistry>) -> Self {
         self.sem_os_ops = Some(ops);
         self
     }
@@ -419,10 +413,7 @@ pub fn to_verb_outcome_pub(result: &ExecutionResult) -> VerbExecutionOutcome {
 /// - `pending_*` side-channel state into `sem_ctx.extensions` under stable
 ///   JSON keys (later unpacked by `apply_sem_ctx_extensions_to_exec_ctx`
 ///   at the dispatch boundary)
-pub fn sync_exec_ctx_to_sem_ctx(
-    exec_ctx: &ExecutionContext,
-    sem_ctx: &mut VerbExecutionContext,
-) {
+pub fn sync_exec_ctx_to_sem_ctx(exec_ctx: &ExecutionContext, sem_ctx: &mut VerbExecutionContext) {
     // 1. Symbols.
     for (name, uuid) in &exec_ctx.symbols {
         sem_ctx.symbols.insert(name.clone(), *uuid);
@@ -480,10 +471,7 @@ pub fn sync_exec_ctx_to_sem_ctx(
         }
     }
     if exec_ctx.cbu_scope_dirty {
-        ext.insert(
-            "cbu_scope_dirty".to_string(),
-            serde_json::Value::Bool(true),
-        );
+        ext.insert("cbu_scope_dirty".to_string(), serde_json::Value::Bool(true));
     }
     if !exec_ctx.session_cbu_ids.is_empty() {
         let ids: Vec<serde_json::Value> = exec_ctx

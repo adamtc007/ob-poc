@@ -239,8 +239,8 @@ impl LexiconPipeline {
     /// DEPRECATED: Use Plan::unresolved_entities() instead.
     #[allow(dead_code)]
     #[allow(clippy::collapsible_match)] // Each arm reads more clearly with
-    // the explicit `if !x.is_resolved()` than as a guarded match arm; the
-    // function itself is a private diagnostic helper that's currently unused.
+                                        // the explicit `if !x.is_resolved()` than as a guarded match arm; the
+                                        // function itself is a private diagnostic helper that's currently unused.
     fn find_unresolved_entities(&self, intent: &IntentAst) -> Vec<String> {
         let mut unresolved = Vec::new();
 

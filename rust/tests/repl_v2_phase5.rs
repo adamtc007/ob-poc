@@ -53,9 +53,6 @@ use ob_poc::journey::pack::{load_pack_from_bytes, PackManifest};
 use ob_poc::journey::router::PackRouter;
 use ob_poc::repl::intent_matcher::IntentMatcher;
 use ob_poc::repl::intent_service::IntentService;
-use ob_poc::sequencer::{
-    DslExecutionOutcome, DslExecutorV2, ParkableStubExecutor, ReplOrchestratorV2, StubExecutor,
-};
 use ob_poc::repl::proposal_engine::ProposalEngine;
 use ob_poc::repl::response_v2::ReplResponseKindV2;
 use ob_poc::repl::runbook::{
@@ -65,6 +62,9 @@ use ob_poc::repl::runbook::{
 use ob_poc::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
 use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
 use ob_poc::repl::verb_config_index::VerbConfigIndex;
+use ob_poc::sequencer::{
+    DslExecutionOutcome, DslExecutorV2, ParkableStubExecutor, ReplOrchestratorV2, StubExecutor,
+};
 
 // ===========================================================================
 // Helpers (shared with Phase 3/4 test patterns)

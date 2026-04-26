@@ -115,7 +115,11 @@ fn extract_gaps_from_snapshot(
 fn synthesize_gaps_from_coverage(snapshot: &Value, subject_entity_id: Uuid) -> Vec<CoverageGap> {
     let mut gaps = Vec::new();
     for (key, prong, purpose) in [
-        ("ownership_coverage_pct", "OWNERSHIP", "evidence required to close gap"),
+        (
+            "ownership_coverage_pct",
+            "OWNERSHIP",
+            "evidence required to close gap",
+        ),
         ("identity_verified_pct", "IDENTITY", "documents required"),
         ("control_verified_pct", "CONTROL", "evidence required"),
     ] {
@@ -183,7 +187,8 @@ impl SemOsVerbOp for PlanGenerate {
             )
         })?;
 
-        let gaps = extract_gaps_from_snapshot(&det_run.coverage_snapshot, det_run.subject_entity_id);
+        let gaps =
+            extract_gaps_from_snapshot(&det_run.coverage_snapshot, det_run.subject_entity_id);
 
         if gaps.is_empty() {
             let (plan_id,): (Uuid,) = sqlx::query_as(

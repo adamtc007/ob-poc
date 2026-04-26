@@ -74,7 +74,8 @@ impl SemOsVerbOp for ComputeChains {
         let config_version =
             json_extract_string_opt(args, "config-version").unwrap_or_else(|| "v1.0".to_string());
 
-        let subject_entities: Vec<(Uuid, Option<Uuid>)> = if let Some(ws_id) = workstream_id_filter {
+        let subject_entities: Vec<(Uuid, Option<Uuid>)> = if let Some(ws_id) = workstream_id_filter
+        {
             sqlx::query_as(
                 r#"SELECT entity_id, workstream_id
                    FROM "ob-poc".entity_workstreams
@@ -117,7 +118,10 @@ impl SemOsVerbOp for ComputeChains {
                 .as_ref()
                 .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0))
                 .unwrap_or(0.0);
-            upward_adj.entry(*to_id).or_default().push((*from_id, pct_f));
+            upward_adj
+                .entry(*to_id)
+                .or_default()
+                .push((*from_id, pct_f));
             all_entity_ids.insert(*from_id);
             all_entity_ids.insert(*to_id);
         }
@@ -169,10 +173,13 @@ impl SemOsVerbOp for ComputeChains {
                 let is_terminus = is_natural_person || !has_further_owners;
 
                 if is_terminus {
-                    owner_chains.entry(current).or_default().push(OwnershipChain {
-                        path: path.clone(),
-                        effective_pct: cumulative_pct,
-                    });
+                    owner_chains
+                        .entry(current)
+                        .or_default()
+                        .push(OwnershipChain {
+                            path: path.clone(),
+                            effective_pct: cumulative_pct,
+                        });
                     continue;
                 }
 
@@ -181,10 +188,13 @@ impl SemOsVerbOp for ComputeChains {
                         if path.contains(owner_id) {
                             let mut cycle_path = path.clone();
                             cycle_path.push(*owner_id);
-                            owner_chains.entry(*owner_id).or_default().push(OwnershipChain {
-                                path: cycle_path,
-                                effective_pct: 0.0,
-                            });
+                            owner_chains
+                                .entry(*owner_id)
+                                .or_default()
+                                .push(OwnershipChain {
+                                    path: cycle_path,
+                                    effective_pct: 0.0,
+                                });
                             tracing::warn!(
                                 "ubo.compute-chains: cycle detected: {:?} -> {}",
                                 path,
@@ -197,10 +207,13 @@ impl SemOsVerbOp for ComputeChains {
                                 "ubo.compute-chains: max depth reached at entity {}",
                                 current
                             );
-                            owner_chains.entry(current).or_default().push(OwnershipChain {
-                                path: path.clone(),
-                                effective_pct: cumulative_pct,
-                            });
+                            owner_chains
+                                .entry(current)
+                                .or_default()
+                                .push(OwnershipChain {
+                                    path: path.clone(),
+                                    effective_pct: cumulative_pct,
+                                });
                             continue;
                         }
                         let mut new_path = path.clone();
@@ -424,17 +437,18 @@ impl SemOsVerbOp for SnapshotDiff {
             .find(|(rid, _, _)| *rid == run_id_b)
             .ok_or_else(|| anyhow!("Determination run {} not found", run_id_b))?;
 
-        let parse_candidates = |snapshot: &Option<Value>| -> Result<HashMap<Uuid, SnapshotCandidate>> {
-            let mut map = HashMap::new();
-            if let Some(val) = snapshot {
-                let candidates: Vec<SnapshotCandidate> = serde_json::from_value(val.clone())
-                    .map_err(|e| anyhow!("Failed to parse output_snapshot: {}", e))?;
-                for c in candidates {
-                    map.insert(c.entity_id, c);
+        let parse_candidates =
+            |snapshot: &Option<Value>| -> Result<HashMap<Uuid, SnapshotCandidate>> {
+                let mut map = HashMap::new();
+                if let Some(val) = snapshot {
+                    let candidates: Vec<SnapshotCandidate> = serde_json::from_value(val.clone())
+                        .map_err(|e| anyhow!("Failed to parse output_snapshot: {}", e))?;
+                    for c in candidates {
+                        map.insert(c.entity_id, c);
+                    }
                 }
-            }
-            Ok(map)
-        };
+                Ok(map)
+            };
 
         let map_a = parse_candidates(&snap_a.1)?;
         let map_b = parse_candidates(&snap_b.1)?;

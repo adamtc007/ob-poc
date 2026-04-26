@@ -68,15 +68,13 @@ impl ChildEntityResolver for PostgresChildEntityResolver {
             .ok_or_else(|| {
                 anyhow!(
                     "child slot {}.{} has no parent_slot declared in DAG",
-                    child_workspace, child_slot
+                    child_workspace,
+                    child_slot
                 )
             })?;
 
         // Verify the parent_slot points back to (parent_workspace, parent_slot).
-        let resolved_ws = parent_ref
-            .workspace
-            .as_deref()
-            .unwrap_or(child_workspace);
+        let resolved_ws = parent_ref.workspace.as_deref().unwrap_or(child_workspace);
         if resolved_ws != parent_workspace || parent_ref.slot != parent_slot {
             return Err(anyhow!(
                 "child slot {}.{} parent_slot points to {}.{}, expected {}.{}",
@@ -93,30 +91,43 @@ impl ChildEntityResolver for PostgresChildEntityResolver {
             anyhow!(
                 "child slot {}.{} parent_slot has no `join:` block — \
                  cannot resolve children without via/parent_fk/child_fk",
-                child_workspace, child_slot
+                child_workspace,
+                child_slot
             )
         })?;
         let via = join.via.as_deref().ok_or_else(|| {
-            anyhow!("child slot {}.{} parent_slot.join missing via", child_workspace, child_slot)
+            anyhow!(
+                "child slot {}.{} parent_slot.join missing via",
+                child_workspace,
+                child_slot
+            )
         })?;
         let parent_fk = join.parent_fk.as_deref().ok_or_else(|| {
-            anyhow!("child slot {}.{} parent_slot.join missing parent_fk", child_workspace, child_slot)
+            anyhow!(
+                "child slot {}.{} parent_slot.join missing parent_fk",
+                child_workspace,
+                child_slot
+            )
         })?;
         let child_fk = join.child_fk.as_deref().ok_or_else(|| {
-            anyhow!("child slot {}.{} parent_slot.join missing child_fk", child_workspace, child_slot)
+            anyhow!(
+                "child slot {}.{} parent_slot.join missing child_fk",
+                child_workspace,
+                child_slot
+            )
         })?;
 
         // Hygiene: identifiers must be alphanumeric + underscore.
         if !is_safe_ident(via) || !is_safe_ident(parent_fk) || !is_safe_ident(child_fk) {
             return Err(anyhow!(
                 "child slot {}.{} parent_slot.join contains non-identifier chars",
-                child_workspace, child_slot
+                child_workspace,
+                child_slot
             ));
         }
 
-        let sql = format!(
-            r#"SELECT {child_fk}::text AS v FROM "ob-poc".{via} WHERE {parent_fk} = $1"#,
-        );
+        let sql =
+            format!(r#"SELECT {child_fk}::text AS v FROM "ob-poc".{via} WHERE {parent_fk} = $1"#,);
         let rows = sqlx::query(&sql)
             .bind(parent_entity_id)
             .fetch_all(pool)
@@ -137,9 +148,7 @@ impl ChildEntityResolver for PostgresChildEntityResolver {
 }
 
 fn is_safe_ident(s: &str) -> bool {
-    !s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 // ---------------------------------------------------------------------------

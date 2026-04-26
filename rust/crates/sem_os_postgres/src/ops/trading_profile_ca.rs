@@ -58,15 +58,13 @@ async fn save_ca_section(
 fn json_extract_decimal_opt(args: &Value, arg_name: &str) -> Option<rust_decimal::Decimal> {
     use std::str::FromStr;
     args.get(arg_name).and_then(|v| {
-        if let Some(s) = v.as_str() {
-            rust_decimal::Decimal::from_str(s).ok()
-        } else if let Some(f) = v.as_f64() {
-            rust_decimal::Decimal::try_from(f).ok()
-        } else if let Some(i) = v.as_i64() {
-            Some(rust_decimal::Decimal::from(i))
-        } else {
-            None
-        }
+        v.as_str()
+            .and_then(|s| rust_decimal::Decimal::from_str(s).ok())
+            .or_else(|| {
+                v.as_f64()
+                    .and_then(|f| rust_decimal::Decimal::try_from(f).ok())
+            })
+            .or_else(|| v.as_i64().map(rust_decimal::Decimal::from))
     })
 }
 
@@ -92,7 +90,8 @@ impl SemOsVerbOp for EnableEventTypes {
                 ca.enabled_event_types.push(et);
             }
         }
-        let doc = save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca.clone(), self.fqn()).await?;
+        let doc =
+            save_ca_section(docs.as_ref(), ctx, profile_id, doc, ca.clone(), self.fqn()).await?;
         Ok(VerbExecutionOutcome::Record(json!({
             "profile_id": profile_id,
             "enabled_count": ca.enabled_event_types.len(),

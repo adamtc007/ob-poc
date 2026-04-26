@@ -20,12 +20,11 @@ use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use super::SemOsVerbOp;
 
 async fn fetch_status(scope: &mut dyn TransactionScope, evidence_id: Uuid) -> Result<String> {
-    let row: Option<(String,)> = sqlx::query_as(
-        r#"SELECT status FROM "ob-poc".kyc_ubo_evidence WHERE evidence_id = $1"#,
-    )
-    .bind(evidence_id)
-    .fetch_optional(scope.executor())
-    .await?;
+    let row: Option<(String,)> =
+        sqlx::query_as(r#"SELECT status FROM "ob-poc".kyc_ubo_evidence WHERE evidence_id = $1"#)
+            .bind(evidence_id)
+            .fetch_optional(scope.executor())
+            .await?;
     row.map(|(s,)| s)
         .ok_or_else(|| anyhow!("Evidence record not found: {}", evidence_id))
 }

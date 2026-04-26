@@ -15,8 +15,9 @@ use chrono::Utc;
 use serde_json::Value;
 
 use dsl_runtime::cross_workspace::{
-    fact_refs, fact_versions, repository,
+    fact_refs, fact_versions,
     replay::{RebuildContext, ReplayOutcome, ReplayResult, ReplayTrigger},
+    repository,
     types::{RegisterSharedAtomInput, SharedAtomLifecycle},
 };
 use dsl_runtime::domain_ops::helpers::{
@@ -203,12 +204,9 @@ impl SemOsVerbOp for ReplayConstellation {
 
         let current_version =
             fact_versions::current_version_number(scope.pool(), atom.id, entity_id).await?;
-        let stale_refs = fact_refs::check_staleness_for_entity(
-            scope.pool(),
-            &constellation_family,
-            entity_id,
-        )
-        .await?;
+        let stale_refs =
+            fact_refs::check_staleness_for_entity(scope.pool(), &constellation_family, entity_id)
+                .await?;
 
         let held_version = stale_refs
             .iter()

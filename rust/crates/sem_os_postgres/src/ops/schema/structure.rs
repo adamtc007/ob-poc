@@ -18,9 +18,15 @@ use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use crate::ops::SemOsVerbOp;
 
 fn resolve_entity_type(args: &Value, schema: &dyn SchemaIntrospectionAccess) -> Option<String> {
-    let raw = ["entity-type", "entity_type", "entity", "domain", "domain-name"]
-        .iter()
-        .find_map(|name| json_extract_string_opt(args, name))?;
+    let raw = [
+        "entity-type",
+        "entity_type",
+        "entity",
+        "domain",
+        "domain-name",
+    ]
+    .iter()
+    .find_map(|name| json_extract_string_opt(args, name))?;
     let normalized = normalize_structure_target(&raw);
     Some(schema.resolve_entity_alias(&normalized))
 }
@@ -72,7 +78,11 @@ async fn describe_entity(
     let description = snapshot
         .as_ref()
         .and_then(|b| b.get("description").cloned())
-        .or_else(|| ontology_summary.as_ref().and_then(|s| s.get("description").cloned()))
+        .or_else(|| {
+            ontology_summary
+                .as_ref()
+                .and_then(|s| s.get("description").cloned())
+        })
         .unwrap_or(Value::Null);
 
     let domain = snapshot
@@ -83,7 +93,11 @@ async fn describe_entity(
     let db_table = snapshot
         .as_ref()
         .and_then(|b| b.get("db_table").cloned())
-        .or_else(|| ontology_summary.as_ref().and_then(|s| s.get("db_table").cloned()))
+        .or_else(|| {
+            ontology_summary
+                .as_ref()
+                .and_then(|s| s.get("db_table").cloned())
+        })
         .unwrap_or(Value::Null);
 
     let source = if snapshot.is_some() {

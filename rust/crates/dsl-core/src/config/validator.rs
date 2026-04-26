@@ -123,10 +123,7 @@ pub enum WellFormednessError {
     /// known DAG taxonomy. Checked only when the caller passes a known-DAG
     /// set; otherwise skipped (P.2 produces the taxonomy; P.1.c alone
     /// can't cross-check).
-    UnknownDagReference {
-        location: Location,
-        dag: String,
-    },
+    UnknownDagReference { location: Location, dag: String },
     /// Two or more escalation rules within the same verb share a name.
     /// Names must be unique per verb so audit-trail records of which rule
     /// fired are unambiguous.
@@ -141,10 +138,7 @@ pub enum WellFormednessError {
     /// found 11 such cases in instrument-matrix.yaml). Catching this at
     /// catalogue-load time prevents drift accumulation across packs
     /// workspace-wide.
-    PackFqnWithoutDeclaration {
-        pack_name: String,
-        fqn: String,
-    },
+    PackFqnWithoutDeclaration { pack_name: String, fqn: String },
 }
 
 impl std::fmt::Display for WellFormednessError {
@@ -259,11 +253,7 @@ pub struct ValidationContext {
 
 /// Validate a single verb. Returns a report — callers aggregate across the
 /// catalogue.
-pub fn validate_verb(
-    fqn: &str,
-    verb: &VerbConfig,
-    ctx: &ValidationContext,
-) -> ValidationReport {
+pub fn validate_verb(fqn: &str, verb: &VerbConfig, ctx: &ValidationContext) -> ValidationReport {
     let mut report = ValidationReport::default();
 
     match &verb.three_axis {
@@ -318,14 +308,8 @@ fn validate_declaration(
     }
 
     // Well-formedness: escalation predicates reference declared args.
-    let declared_args: HashSet<String> =
-        verb.args.iter().map(|a| a.name.clone()).collect();
-    validate_consequence(
-        fqn,
-        &decl.consequence,
-        &declared_args,
-        report,
-    );
+    let declared_args: HashSet<String> = verb.args.iter().map(|a| a.name.clone()).collect();
+    validate_consequence(fqn, &decl.consequence, &declared_args, report);
 
     // P10 sanity note: state-preserving + any consequence tier is legal.
     // State-transition + empty external_effects + RequiresExplicitAuthorisation
@@ -343,8 +327,7 @@ fn validate_consequence(
     // --- well-formedness: duplicate rule names (P.1.d) ---
     // Rule names must be unique per verb so audit-trail records are
     // unambiguous about which rule fired. Flag any name that appears > 1.
-    let mut name_counts: std::collections::HashMap<&str, usize> =
-        std::collections::HashMap::new();
+    let mut name_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
     for rule in &conseq.escalation {
         *name_counts.entry(rule.name.as_str()).or_insert(0) += 1;
     }
@@ -431,10 +414,7 @@ fn collect_predicate_arg_refs(pred: &EscalationPredicate, acc: &mut HashSet<Stri
 }
 
 /// Validate every verb in a `VerbsConfig`. Returns one aggregated report.
-pub fn validate_verbs_config(
-    config: &VerbsConfig,
-    ctx: &ValidationContext,
-) -> ValidationReport {
+pub fn validate_verbs_config(config: &VerbsConfig, ctx: &ValidationContext) -> ValidationReport {
     let mut report = ValidationReport::default();
     for (domain_name, domain) in &config.domains {
         for (verb_name, verb) in &domain.verbs {
@@ -494,10 +474,7 @@ pub fn validate_pack_fqns(
         if declared_verbs.contains(&fqn) || macro_fqns.contains(&fqn) {
             continue;
         }
-        errors.push(WellFormednessError::PackFqnWithoutDeclaration {
-            pack_name,
-            fqn,
-        });
+        errors.push(WellFormednessError::PackFqnWithoutDeclaration { pack_name, fqn });
     }
     errors
 }
@@ -754,9 +731,7 @@ mod tests {
                 baseline: ConsequenceTier::RequiresConfirmation,
                 escalation: vec![EscalationRule {
                     name: "demote".into(),
-                    when: EscalationPredicate::ContextFlag {
-                        flag: "f".into(),
-                    },
+                    when: EscalationPredicate::ContextFlag { flag: "f".into() },
                     tier: ConsequenceTier::Benign, // strictly < baseline
                     reason: None,
                 }],
@@ -804,8 +779,7 @@ mod tests {
         });
         let r = validate_verb("test.verb", &vc, &ValidationContext::default());
         assert_eq!(r.well_formedness.len(), 1);
-        let WellFormednessError::EscalationArgNotDeclared { arg, .. } =
-            &r.well_formedness[0]
+        let WellFormednessError::EscalationArgNotDeclared { arg, .. } = &r.well_formedness[0]
         else {
             panic!("expected EscalationArgNotDeclared");
         };
@@ -963,7 +937,11 @@ mod tests {
                 escalation: vec![
                     mk_rule("collision", "a", ConsequenceTier::Reviewable),
                     mk_rule("collision", "b", ConsequenceTier::RequiresConfirmation),
-                    mk_rule("collision", "c", ConsequenceTier::RequiresExplicitAuthorisation),
+                    mk_rule(
+                        "collision",
+                        "c",
+                        ConsequenceTier::RequiresExplicitAuthorisation,
+                    ),
                 ],
             },
             transitions: None,
@@ -974,7 +952,11 @@ mod tests {
             .iter()
             .filter(|e| matches!(e, WellFormednessError::DuplicateRuleName { .. }))
             .collect();
-        assert_eq!(dup_errors.len(), 1, "one error per name, not per occurrence");
+        assert_eq!(
+            dup_errors.len(),
+            1,
+            "one error per name, not per occurrence"
+        );
         if let WellFormednessError::DuplicateRuleName { occurrences, .. } = dup_errors[0] {
             assert_eq!(*occurrences, 3);
         }
@@ -1102,8 +1084,7 @@ mod tests {
 
     #[test]
     fn unresolved_pack_fqn_reports_error() {
-        let declared: HashSet<String> =
-            ["foo.bar"].iter().map(|s| (*s).to_string()).collect();
+        let declared: HashSet<String> = ["foo.bar"].iter().map(|s| (*s).to_string()).collect();
         let macros: HashSet<String> = HashSet::new();
         // `baz.qux` isn't in either declared or macro sets.
         let pack = vec![
@@ -1129,9 +1110,18 @@ mod tests {
         let declared: HashSet<String> = HashSet::new();
         let macros: HashSet<String> = HashSet::new();
         let pack = vec![
-            ("instrument-matrix".to_string(), "matrix-overlay.apply".to_string()),
-            ("instrument-matrix".to_string(), "matrix-overlay.diff".to_string()),
-            ("instrument-matrix".to_string(), "delivery.create".to_string()),
+            (
+                "instrument-matrix".to_string(),
+                "matrix-overlay.apply".to_string(),
+            ),
+            (
+                "instrument-matrix".to_string(),
+                "matrix-overlay.diff".to_string(),
+            ),
+            (
+                "instrument-matrix".to_string(),
+                "delivery.create".to_string(),
+            ),
         ];
         let errs = validate_pack_fqns(&declared, &macros, pack);
         assert_eq!(errs.len(), 3);

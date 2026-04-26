@@ -1142,7 +1142,13 @@ pub async fn acquire_advisory_locks_on_scope(
 
     let lock_start = std::time::Instant::now();
 
-    match acquire_locks(scope.transaction(), &lock_keys, LockMode::Timeout(LOCK_TIMEOUT)).await {
+    match acquire_locks(
+        scope.transaction(),
+        &lock_keys,
+        LockMode::Timeout(LOCK_TIMEOUT),
+    )
+    .await
+    {
         Ok(result) => Ok(LockStats {
             locks_acquired: result.acquired.len(),
             lock_wait_ms: lock_start.elapsed().as_millis() as u64,

@@ -52,7 +52,11 @@ registry_op!(
     "sem_reg_regulation_trace"
 );
 registry_op!(TaxonomyTree, "taxonomy-tree", "sem_reg_taxonomy_tree");
-registry_op!(TaxonomyMembers, "taxonomy-members", "sem_reg_taxonomy_members");
+registry_op!(
+    TaxonomyMembers,
+    "taxonomy-members",
+    "sem_reg_taxonomy_members"
+);
 registry_op!(Classify, "classify", "sem_reg_classify");
 registry_op!(DescribeView, "describe-view", "sem_reg_describe_view");
 registry_op!(ApplyView, "apply-view", "sem_reg_apply_view");
@@ -68,7 +72,11 @@ registry_op!(
     "evidence-gaps",
     "sem_reg_identify_evidence_gaps"
 );
-registry_op!(SnapshotHistory, "snapshot-history", "sem_reg_resolve_context");
+registry_op!(
+    SnapshotHistory,
+    "snapshot-history",
+    "sem_reg_resolve_context"
+);
 registry_op!(SnapshotDiff, "snapshot-diff", "sem_reg_impact_analysis");
 
 /// `registry.describe-object` — polymorphic routing by object_type arg.

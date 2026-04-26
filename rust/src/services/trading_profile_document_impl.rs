@@ -34,11 +34,7 @@ impl TradingProfileDocument for ObPocTradingProfileDocument {
             .map_err(anyhow::Error::from)
     }
 
-    async fn save_document(
-        &self,
-        profile_id: Uuid,
-        doc: &TradingMatrixDocument,
-    ) -> Result<()> {
+    async fn save_document(&self, profile_id: Uuid, doc: &TradingMatrixDocument) -> Result<()> {
         ast_db::save_document(&self.pool, profile_id, doc)
             .await
             .map_err(anyhow::Error::from)

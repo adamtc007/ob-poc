@@ -11,12 +11,8 @@ mod integration {
 
     use anyhow::Result;
     use async_trait::async_trait;
-    use ob_poc::outbox::{
-        AsyncOutboxConsumer, OutboxDrainerConfig, OutboxDrainerImpl,
-    };
-    use ob_poc_types::{
-        ClaimedOutboxRow, OutboxEffectKind, OutboxProcessOutcome,
-    };
+    use ob_poc::outbox::{AsyncOutboxConsumer, OutboxDrainerConfig, OutboxDrainerImpl};
+    use ob_poc_types::{ClaimedOutboxRow, OutboxEffectKind, OutboxProcessOutcome};
     use serde_json::json;
     use sqlx::PgPool;
     use tokio::sync::Mutex;
@@ -32,11 +28,7 @@ mod integration {
     }
 
     impl RecordingConsumer {
-        fn new(
-            kind: OutboxEffectKind,
-            label: &'static str,
-            outcome: OutboxProcessOutcome,
-        ) -> Self {
+        fn new(kind: OutboxEffectKind, label: &'static str, outcome: OutboxProcessOutcome) -> Self {
             Self {
                 kind,
                 label,
@@ -219,10 +211,7 @@ mod integration {
         assert_eq!(status, "failed_terminal");
         assert_eq!(attempts, 3, "expected exactly max_attempts=3 attempts");
         assert!(
-            last_error
-                .as_deref()
-                .unwrap_or("")
-                .contains("max_attempts"),
+            last_error.as_deref().unwrap_or("").contains("max_attempts"),
             "last_error should mention max_attempts: {:?}",
             last_error
         );
@@ -323,7 +312,10 @@ mod integration {
             )
         })
         .await;
-        assert!(observed, "row not reprocessed within 5s after stale-claim recovery");
+        assert!(
+            observed,
+            "row not reprocessed within 5s after stale-claim recovery"
+        );
 
         // Worker B's consumer must have seen the row exactly once;
         // the stale-claim recycle path adds no extra invocations.

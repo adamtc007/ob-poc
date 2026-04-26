@@ -49,7 +49,9 @@ struct ControlComputeResult {
 fn classify_relationship(relationship_type: &str) -> (i32, &'static str) {
     match relationship_type {
         "BOARD_APPOINTMENT" => (PRIORITY_BOARD_APPOINTMENT, "BOARD_APPOINTMENT"),
-        "MANAGEMENT" | "MANAGEMENT_CONTRACT" => (PRIORITY_MANAGEMENT_CONTRACT, "MANAGEMENT_CONTRACT"),
+        "MANAGEMENT" | "MANAGEMENT_CONTRACT" => {
+            (PRIORITY_MANAGEMENT_CONTRACT, "MANAGEMENT_CONTRACT")
+        }
         "SPECIAL_RIGHTS" | "CONTROL" => (PRIORITY_SPECIAL_RIGHTS, "SPECIAL_RIGHTS"),
         _ => (PRIORITY_SPECIAL_RIGHTS, "SPECIAL_RIGHTS"),
     }

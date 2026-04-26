@@ -46,10 +46,7 @@ pub struct DerivedStateProjector {
 }
 
 impl DerivedStateProjector {
-    pub fn new(
-        registry: Arc<DagRegistry>,
-        evaluator: Arc<DerivedStateEvaluator>,
-    ) -> Self {
+    pub fn new(registry: Arc<DagRegistry>, evaluator: Arc<DerivedStateEvaluator>) -> Self {
         Self {
             registry,
             evaluator,
@@ -64,7 +61,9 @@ impl DerivedStateProjector {
         host_entity_id: Uuid,
         pool: &PgPool,
     ) -> Result<Vec<DerivedStateProjection>> {
-        let derived_specs = self.registry.derived_states_for_slot(host_workspace, host_slot);
+        let derived_specs = self
+            .registry
+            .derived_states_for_slot(host_workspace, host_slot);
         let mut out = Vec::with_capacity(derived_specs.len());
         for d in derived_specs {
             let value = self.evaluator.evaluate(d, host_entity_id, pool).await?;

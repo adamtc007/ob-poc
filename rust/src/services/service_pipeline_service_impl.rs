@@ -98,7 +98,9 @@ fn arg_string(args: &Value, name: &str) -> Result<String> {
 }
 
 fn arg_string_opt(args: &Value, name: &str) -> Option<String> {
-    args.get(name).and_then(|v| v.as_str()).map(|s| s.to_string())
+    args.get(name)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 // ── service-intent.create ─────────────────────────────────────────────────────
@@ -159,10 +161,12 @@ async fn service_intent_supersede(pool: &PgPool, args: &Value) -> Result<VerbExe
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| anyhow!("Intent not found: {intent_id}"))?;
-    sqlx::query(r#"UPDATE "ob-poc".service_intents SET status = 'superseded' WHERE intent_id = $1"#)
-        .bind(intent_id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        r#"UPDATE "ob-poc".service_intents SET status = 'superseded' WHERE intent_id = $1"#,
+    )
+    .bind(intent_id)
+    .execute(pool)
+    .await?;
     let new_id: Uuid = sqlx::query_scalar(
         r#"INSERT INTO "ob-poc".service_intents (cbu_id, product_id, service_id, options)
            VALUES ($1, $2, $3, $4) RETURNING intent_id"#,

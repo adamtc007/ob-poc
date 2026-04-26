@@ -84,12 +84,12 @@ async fn resolve_document_type_id(
     scope: &mut dyn TransactionScope,
     doc_type: &str,
 ) -> Result<Option<Uuid>> {
-    Ok(sqlx::query_scalar(
-        r#"SELECT type_id FROM "ob-poc".document_types WHERE type_code = $1"#,
+    Ok(
+        sqlx::query_scalar(r#"SELECT type_id FROM "ob-poc".document_types WHERE type_code = $1"#)
+            .bind(doc_type)
+            .fetch_optional(scope.executor())
+            .await?,
     )
-    .bind(doc_type)
-    .fetch_optional(scope.executor())
-    .await?)
 }
 
 async fn table_exists(scope: &mut dyn TransactionScope, qualified_name: &str) -> Result<bool> {
@@ -484,7 +484,8 @@ impl SemOsVerbOp for SolicitBatch {
             .unwrap_or("verified");
 
         let task_id = Uuid::now_v7();
-        let mut request_items: Vec<DocumentSolicitationResult> = Vec::with_capacity(doc_types.len());
+        let mut request_items: Vec<DocumentSolicitationResult> =
+            Vec::with_capacity(doc_types.len());
         let has_document_requirements =
             table_exists(scope, "\"ob-poc\".document_requirements").await?;
         let has_workflow_pending_tasks =
@@ -627,7 +628,10 @@ impl SemOsVerbOp for UploadVersion {
     ) -> Result<VerbExecutionOutcome> {
         let document_id = json_extract_uuid(args, ctx, "document-id")?;
         let content_type = json_extract_string(args, "content-type")?;
-        let blob_ref = args.get("blob-ref").and_then(|v| v.as_str()).map(String::from);
+        let blob_ref = args
+            .get("blob-ref")
+            .and_then(|v| v.as_str())
+            .map(String::from);
         let structured_data = args
             .get("structured-data")
             .cloned()
@@ -740,7 +744,10 @@ impl SemOsVerbOp for Verify {
             version_id,
             "document-version:verified",
             "document/verification",
-            &format!("document.verify — version {} verified by {}", version_id, verified_by),
+            &format!(
+                "document.verify — version {} verified by {}",
+                version_id, verified_by
+            ),
         );
         Ok(VerbExecutionOutcome::Affected(1))
     }
@@ -840,22 +847,24 @@ impl SemOsVerbOp for MissingForEntity {
             let results: Vec<Value> = governed
                 .gaps
                 .into_iter()
-                .map(|gap| json!({
-                    "requirement_id": Value::Null,
-                    "doc_type": gap.document_type_fqn,
-                    "status": gap.status,
-                    "required_state": gap.required_state,
-                    "attempt_count": 0,
-                    "last_rejection_code": gap.last_rejection_code,
-                    "requirement_profile_fqn": governed.requirement_profile_fqn,
-                    "obligation_fqn": gap.obligation_fqn,
-                    "obligation_category": gap.obligation_category,
-                    "strategy_fqn": gap.strategy_fqn,
-                    "strategy_priority": gap.strategy_priority,
-                    "matched_document_id": gap.matched_document_id,
-                    "matched_version_id": gap.matched_version_id,
-                    "snapshot_set_id": governed.snapshot_set_id
-                }))
+                .map(|gap| {
+                    json!({
+                        "requirement_id": Value::Null,
+                        "doc_type": gap.document_type_fqn,
+                        "status": gap.status,
+                        "required_state": gap.required_state,
+                        "attempt_count": 0,
+                        "last_rejection_code": gap.last_rejection_code,
+                        "requirement_profile_fqn": governed.requirement_profile_fqn,
+                        "obligation_fqn": gap.obligation_fqn,
+                        "obligation_category": gap.obligation_category,
+                        "strategy_fqn": gap.strategy_fqn,
+                        "strategy_priority": gap.strategy_priority,
+                        "matched_document_id": gap.matched_document_id,
+                        "matched_version_id": gap.matched_version_id,
+                        "snapshot_set_id": governed.snapshot_set_id
+                    })
+                })
                 .collect();
             return Ok(VerbExecutionOutcome::RecordSet(results));
         }
@@ -879,14 +888,16 @@ impl SemOsVerbOp for MissingForEntity {
 
         let results: Vec<Value> = rows
             .iter()
-            .map(|row| json!({
-                "requirement_id": row.get::<Uuid, _>("requirement_id"),
-                "doc_type": row.get::<String, _>("doc_type"),
-                "status": row.get::<String, _>("status"),
-                "required_state": row.get::<String, _>("required_state"),
-                "attempt_count": row.get::<i32, _>("attempt_count"),
-                "last_rejection_code": row.get::<Option<String>, _>("last_rejection_code")
-            }))
+            .map(|row| {
+                json!({
+                    "requirement_id": row.get::<Uuid, _>("requirement_id"),
+                    "doc_type": row.get::<String, _>("doc_type"),
+                    "status": row.get::<String, _>("status"),
+                    "required_state": row.get::<String, _>("required_state"),
+                    "attempt_count": row.get::<i32, _>("attempt_count"),
+                    "last_rejection_code": row.get::<Option<String>, _>("last_rejection_code")
+                })
+            })
             .collect();
         Ok(VerbExecutionOutcome::RecordSet(results))
     }

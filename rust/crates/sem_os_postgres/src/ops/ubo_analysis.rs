@@ -293,19 +293,31 @@ impl SemOsVerbOp for ListOwners {
 
         let owner_list: Vec<Value> = owners
             .iter()
-            .map(|(rel_id, owner_id, owner_name, owner_type, pct, own_type, eff_from, eff_to, src)| {
-                json!({
-                    "relationship_id": rel_id,
-                    "owner_entity_id": owner_id,
-                    "owner_name": owner_name,
-                    "owner_type": owner_type,
-                    "percentage": pct,
-                    "ownership_type": own_type,
-                    "effective_from": eff_from,
-                    "effective_to": eff_to,
-                    "source": src,
-                })
-            })
+            .map(
+                |(
+                    rel_id,
+                    owner_id,
+                    owner_name,
+                    owner_type,
+                    pct,
+                    own_type,
+                    eff_from,
+                    eff_to,
+                    src,
+                )| {
+                    json!({
+                        "relationship_id": rel_id,
+                        "owner_entity_id": owner_id,
+                        "owner_name": owner_name,
+                        "owner_type": owner_type,
+                        "percentage": pct,
+                        "ownership_type": own_type,
+                        "effective_from": eff_from,
+                        "effective_to": eff_to,
+                        "source": src,
+                    })
+                },
+            )
             .collect();
 
         Ok(VerbExecutionOutcome::Record(json!({

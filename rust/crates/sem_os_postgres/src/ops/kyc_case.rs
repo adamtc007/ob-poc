@@ -104,8 +104,8 @@ impl SemOsVerbOp for Create {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let deal_id = json_extract_uuid_opt(args, ctx, "deal-id");
         let mut client_group_id = json_extract_uuid_opt(args, ctx, "client-group-id");
-        let case_type = json_extract_string_opt(args, "case-type")
-            .unwrap_or_else(|| "NEW_CLIENT".to_string());
+        let case_type =
+            json_extract_string_opt(args, "case-type").unwrap_or_else(|| "NEW_CLIENT".to_string());
         let sla_deadline: Option<String> = json_extract_string_opt(args, "sla-deadline");
         let assigned_analyst_id = json_extract_uuid_opt(args, ctx, "assigned-analyst-id");
         let notes = json_extract_string_opt(args, "notes");
@@ -801,11 +801,13 @@ impl SemOsVerbOp for WorkstreamState {
 
         let checks_complete: Vec<Value> = screenings
             .iter()
-            .map(|s| json!({
-                "type": s.screening_type,
-                "result": s.status,
-                "date": s.completed_at
-            }))
+            .map(|s| {
+                json!({
+                    "type": s.screening_type,
+                    "result": s.status,
+                    "date": s.completed_at
+                })
+            })
             .collect();
 
         #[derive(sqlx::FromRow)]
@@ -829,11 +831,13 @@ impl SemOsVerbOp for WorkstreamState {
 
         let documents_received: Vec<Value> = documents
             .iter()
-            .map(|d| json!({
-                "type": d.document_type_code,
-                "document_id": d.doc_id,
-                "date": d.created_at
-            }))
+            .map(|d| {
+                json!({
+                    "type": d.document_type_code,
+                    "document_id": d.doc_id,
+                    "date": d.created_at
+                })
+            })
             .collect();
 
         Ok(VerbExecutionOutcome::Record(json!({

@@ -240,7 +240,9 @@ impl SemOsVerbOp for GleifSearch {
             })
             .collect();
 
-        Ok(Some(serde_json::json!({ "_gleif_search_candidates": candidates })))
+        Ok(Some(
+            serde_json::json!({ "_gleif_search_candidates": candidates }),
+        ))
     }
 
     async fn execute(
@@ -570,8 +572,8 @@ impl SemOsVerbOp for GleifGetRecord {
         _ctx: &mut VerbExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        let lei = json_extract_string_opt(args, "lei")
-            .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+        let lei =
+            json_extract_string_opt(args, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let record = client.get_lei_record(&lei).await?;
@@ -624,8 +626,8 @@ impl SemOsVerbOp for GleifGetParent {
         _ctx: &mut VerbExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        let lei = json_extract_string_opt(args, "lei")
-            .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+        let lei =
+            json_extract_string_opt(args, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let parent = client.get_direct_parent(&lei).await?;
@@ -1156,8 +1158,8 @@ impl SemOsVerbOp for GleifGetChildren {
         _ctx: &mut VerbExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        let lei = json_extract_string_opt(args, "lei")
-            .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+        let lei =
+            json_extract_string_opt(args, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
         let children = client.get_direct_children(&lei).await?;
@@ -1307,8 +1309,7 @@ impl SemOsVerbOp for GleifGetManagedFunds {
     ) -> Result<Option<serde_json::Value>> {
         let manager_lei = json_extract_string_opt(args, "manager-lei")
             .ok_or_else(|| anyhow::anyhow!(":manager-lei required"))?;
-        let resolve_umbrellas =
-            json_extract_bool_opt(args, "resolve-umbrellas").unwrap_or(true);
+        let resolve_umbrellas = json_extract_bool_opt(args, "resolve-umbrellas").unwrap_or(true);
         let limit = json_extract_int_opt(args, "limit");
 
         let client = GleifClient::new()?;
@@ -1386,8 +1387,8 @@ impl SemOsVerbOp for GleifResolveSuccessor {
         _ctx: &mut VerbExecutionContext,
         _pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        let lei = json_extract_string_opt(args, "lei")
-            .ok_or_else(|| anyhow::anyhow!(":lei required"))?;
+        let lei =
+            json_extract_string_opt(args, "lei").ok_or_else(|| anyhow::anyhow!(":lei required"))?;
 
         let client = GleifClient::new()?;
 
@@ -1845,7 +1846,9 @@ impl SemOsVerbOp for GleifImportToClientGroup {
                 .fetch_corporate_tree_with_options_only(&root_lei, options)
                 .await?
         } else {
-            service.fetch_corporate_tree_only(&root_lei, max_depth).await?
+            service
+                .fetch_corporate_tree_only(&root_lei, max_depth)
+                .await?
         };
 
         Ok(Some(serde_json::json!({

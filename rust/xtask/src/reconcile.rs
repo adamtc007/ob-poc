@@ -18,8 +18,8 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use dsl_core::config::{
     collect_declared_fqns, flatten_pack_entries, load_dags_from_dir, load_packs_from_dir,
-    validate_dags, validate_pack_fqns, validate_verbs_config, ConfigLoader,
-    ValidationContext, VerbsConfig,
+    validate_dags, validate_pack_fqns, validate_verbs_config, ConfigLoader, ValidationContext,
+    VerbsConfig,
 };
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -123,8 +123,8 @@ async fn validate(strict_warnings: bool) -> Result<()> {
     let pack_errors = if packs_dir.exists() {
         let declared = collect_declared_fqns(&cfg);
         let macros = collect_macro_fqns();
-        let packs = load_packs_from_dir(&packs_dir)
-            .context("loading config/packs/ for V1.2-5 check")?;
+        let packs =
+            load_packs_from_dir(&packs_dir).context("loading config/packs/ for V1.2-5 check")?;
         println!(
             "Loaded {} packs from config/packs/ ({} declared verbs + {} macros for cross-check)",
             packs.len(),
@@ -242,7 +242,7 @@ async fn status() -> Result<()> {
 
     for (dname, dblock) in &cfg.domains {
         let (t, d) = domain_counts.entry(dname.clone()).or_insert((0, 0));
-        for (_, vblock) in &dblock.verbs {
+        for vblock in dblock.verbs.values() {
             total += 1;
             *t += 1;
             if let Some(ref ta) = vblock.three_axis {
@@ -270,9 +270,7 @@ async fn status() -> Result<()> {
         0.0
     };
 
-    println!(
-        "Declared: {declared} / {total}  ({pct:.1}%)",
-    );
+    println!("Declared: {declared} / {total}  ({pct:.1}%)",);
     println!("Escalation rules (total across all verbs): {escalation_rules}");
     println!();
     println!("By baseline tier (declared verbs only):");
@@ -281,10 +279,7 @@ async fn status() -> Result<()> {
     }
     println!();
     println!("By domain (showing only domains with verbs):");
-    for (d, (t, dc)) in domain_counts
-        .iter()
-        .filter(|(_, (t, _))| *t > 0)
-    {
+    for (d, (t, dc)) in domain_counts.iter().filter(|(_, (t, _))| *t > 0) {
         let dpct = if *t > 0 {
             (*dc as f64 / *t as f64) * 100.0
         } else {

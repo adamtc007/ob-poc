@@ -17,9 +17,7 @@ mod integration {
     use std::time::Duration;
 
     use anyhow::Result;
-    use ob_poc::outbox::{
-        narration_emit, NarrateConsumer, OutboxDrainerConfig, OutboxDrainerImpl,
-    };
+    use ob_poc::outbox::{narration_emit, NarrateConsumer, OutboxDrainerConfig, OutboxDrainerImpl};
     use ob_poc_types::TraceId;
     use serde_json::json;
     use sqlx::PgPool;
@@ -112,7 +110,10 @@ mod integration {
         let row = fetch_status_by_idempotency_key(&pool, &idempotency_key)
             .await?
             .expect("row exists");
-        assert_eq!(row.0, outbox_id, "idempotency key resolves to the inserted row");
+        assert_eq!(
+            row.0, outbox_id,
+            "idempotency key resolves to the inserted row"
+        );
         assert_eq!(row.1, "done");
         assert_eq!(row.2, 1, "exactly one claim attempt");
 

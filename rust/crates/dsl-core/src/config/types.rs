@@ -2430,8 +2430,7 @@ returns:
         assert!(
             ConsequenceTier::RequiresConfirmation < ConsequenceTier::RequiresExplicitAuthorisation
         );
-        let max = ConsequenceTier::Reviewable
-            .max(ConsequenceTier::RequiresExplicitAuthorisation);
+        let max = ConsequenceTier::Reviewable.max(ConsequenceTier::RequiresExplicitAuthorisation);
         assert_eq!(max, ConsequenceTier::RequiresExplicitAuthorisation);
     }
 
@@ -2476,7 +2475,11 @@ transitions:
             _ => panic!("expected ArgGt"),
         }
         match &decl.consequence.escalation[1].when {
-            EscalationPredicate::EntityAttrEq { entity_kind, attr, value } => {
+            EscalationPredicate::EntityAttrEq {
+                entity_kind,
+                attr,
+                value,
+            } => {
                 assert_eq!(entity_kind, "cbu");
                 assert_eq!(attr, "sanctions_status");
                 assert_eq!(value, &serde_json::json!("listed"));

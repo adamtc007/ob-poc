@@ -325,30 +325,28 @@ pub use onboarding::OnboardingAutoComplete;
 // Phase 5c — refdata_loader relocated. Types accessed via dsl_runtime::domain_ops::refdata_loader.
 // Phase 5c — refdata_ops relocated. Types accessed via dsl_runtime::domain_ops::refdata_ops.
 pub use request_ops::{
-    DocumentRequest, DocumentUpload, DocumentWaive, RequestCancel, RequestCreate,
-    RequestEscalate, RequestExtend, RequestFulfill, RequestOverdue, RequestRemind,
-    RequestWaive,
+    DocumentRequest, DocumentUpload, DocumentWaive, RequestCancel, RequestCreate, RequestEscalate,
+    RequestExtend, RequestFulfill, RequestOverdue, RequestRemind, RequestWaive,
 };
 
 // Phase 5a — semantic_ops relocated to dsl-runtime. Inventory registration
 // automatic; external ob-poc code does not import these types directly.
-pub use template_ops::{
-    TemplateBatch, TemplateBatchResult, TemplateInvoke, TemplateInvokeResult,
-};
+pub use template_ops::{TemplateBatch, TemplateBatchResult, TemplateInvoke, TemplateInvokeResult};
 
 pub use trading_profile::{
     TradingProfileActivate, TradingProfileAddAllowedCurrency, TradingProfileAddBookingRule,
     TradingProfileAddComponent, TradingProfileAddCsaCollateral, TradingProfileAddCsaConfig,
     TradingProfileAddImMandate, TradingProfileAddInstrumentClass, TradingProfileAddIsdaConfig,
     TradingProfileAddIsdaCoverage, TradingProfileAddMarket, TradingProfileAddSsi,
-    TradingProfileApprove, TradingProfileArchive, TradingProfileCloneTo,
-    TradingProfileCreateDraft, TradingProfileCreateNewVersion, TradingProfileDiff,
-    TradingProfileGetActive, TradingProfileImportVerb, TradingProfileLinkCsaSsi,
-    TradingProfileMaterialize, TradingProfileReject, TradingProfileRemoveBookingRule,
-    TradingProfileRemoveComponent, TradingProfileRemoveCsaConfig, TradingProfileRemoveImMandate,
-    TradingProfileRemoveInstrumentClass, TradingProfileRemoveIsdaConfig, TradingProfileRemoveMarket,
-    TradingProfileRemoveSsi, TradingProfileSetBaseCurrency, TradingProfileSubmit,
-    TradingProfileUpdateImScope, TradingProfileValidateCoverage, TradingProfileValidateGoLiveReady,
+    TradingProfileApprove, TradingProfileArchive, TradingProfileCloneTo, TradingProfileCreateDraft,
+    TradingProfileCreateNewVersion, TradingProfileDiff, TradingProfileGetActive,
+    TradingProfileImportVerb, TradingProfileLinkCsaSsi, TradingProfileMaterialize,
+    TradingProfileReject, TradingProfileRemoveBookingRule, TradingProfileRemoveComponent,
+    TradingProfileRemoveCsaConfig, TradingProfileRemoveImMandate,
+    TradingProfileRemoveInstrumentClass, TradingProfileRemoveIsdaConfig,
+    TradingProfileRemoveMarket, TradingProfileRemoveSsi, TradingProfileSetBaseCurrency,
+    TradingProfileSubmit, TradingProfileUpdateImScope, TradingProfileValidateCoverage,
+    TradingProfileValidateGoLiveReady,
 };
 // Phase 5a composite-blocker #11 — trading_profile_ca_ops re-exports removed; see relocation comment above.
 // Phase 5e — ubo_analysis relocated. Types accessed via dsl_runtime::domain_ops::ubo_analysis.
@@ -537,16 +535,30 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(booking_principal_ops::BookingPrincipalEvaluate));
     registry.register(Arc::new(booking_principal_ops::BookingPrincipalSelect));
     registry.register(Arc::new(booking_principal_ops::BookingPrincipalExplain));
-    registry.register(Arc::new(booking_principal_ops::BookingPrincipalCoverageMatrix));
+    registry.register(Arc::new(
+        booking_principal_ops::BookingPrincipalCoverageMatrix,
+    ));
     registry.register(Arc::new(booking_principal_ops::BookingPrincipalGapReport));
-    registry.register(Arc::new(booking_principal_ops::BookingPrincipalImpactAnalysis));
-    registry.register(Arc::new(booking_principal_ops::ClientPrincipalRelationshipRecord));
-    registry.register(Arc::new(booking_principal_ops::ClientPrincipalRelationshipTerminate));
-    registry.register(Arc::new(booking_principal_ops::ClientPrincipalRelationshipList));
-    registry.register(Arc::new(booking_principal_ops::ClientPrincipalRelationshipCrossSellCheck));
+    registry.register(Arc::new(
+        booking_principal_ops::BookingPrincipalImpactAnalysis,
+    ));
+    registry.register(Arc::new(
+        booking_principal_ops::ClientPrincipalRelationshipRecord,
+    ));
+    registry.register(Arc::new(
+        booking_principal_ops::ClientPrincipalRelationshipTerminate,
+    ));
+    registry.register(Arc::new(
+        booking_principal_ops::ClientPrincipalRelationshipList,
+    ));
+    registry.register(Arc::new(
+        booking_principal_ops::ClientPrincipalRelationshipCrossSellCheck,
+    ));
     registry.register(Arc::new(booking_principal_ops::ServiceAvailabilitySet));
     registry.register(Arc::new(booking_principal_ops::ServiceAvailabilityList));
-    registry.register(Arc::new(booking_principal_ops::ServiceAvailabilityListByPrincipal));
+    registry.register(Arc::new(
+        booking_principal_ops::ServiceAvailabilityListByPrincipal,
+    ));
     registry.register(Arc::new(booking_principal_ops::RulesetCreate));
     registry.register(Arc::new(booking_principal_ops::RulesetPublish));
     registry.register(Arc::new(booking_principal_ops::RulesetRetire));
@@ -568,7 +580,9 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(trading_profile::TradingProfileAddComponent));
     registry.register(Arc::new(trading_profile::TradingProfileRemoveComponent));
     registry.register(Arc::new(trading_profile::TradingProfileAddInstrumentClass));
-    registry.register(Arc::new(trading_profile::TradingProfileRemoveInstrumentClass));
+    registry.register(Arc::new(
+        trading_profile::TradingProfileRemoveInstrumentClass,
+    ));
     registry.register(Arc::new(trading_profile::TradingProfileAddMarket));
     registry.register(Arc::new(trading_profile::TradingProfileRemoveMarket));
     registry.register(Arc::new(trading_profile::TradingProfileAddSsi));
@@ -667,7 +681,10 @@ mod tests {
         // Sanity: the list is sorted (important for stable error messages).
         let mut sorted = missing.clone();
         sorted.sort();
-        assert_eq!(missing, sorted, "find_missing_plugin_ops output must be sorted");
+        assert_eq!(
+            missing, sorted,
+            "find_missing_plugin_ops output must be sorted"
+        );
     }
 
     #[test]
@@ -696,4 +713,3 @@ mod tests {
         );
     }
 }
-

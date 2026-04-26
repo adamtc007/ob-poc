@@ -185,8 +185,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     {
         use ob_poc::dsl_v2::config::{
-            collect_declared_fqns, flatten_pack_entries, load_packs_from_dir,
-            validate_pack_fqns, validate_verbs_config, ValidationContext,
+            collect_declared_fqns, flatten_pack_entries, load_packs_from_dir, validate_pack_fqns,
+            validate_verbs_config, ValidationContext,
         };
         use std::collections::HashSet;
         use std::path::PathBuf;
@@ -226,15 +226,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if p.extension().and_then(|e| e.to_str()) != Some("yaml") {
                             continue;
                         }
-                        let Ok(raw) = std::fs::read_to_string(&p) else { continue; };
+                        let Ok(raw) = std::fs::read_to_string(&p) else {
+                            continue;
+                        };
                         let Ok(v) = serde_yaml::from_str::<serde_yaml::Value>(&raw) else {
                             continue;
                         };
                         if let Some(m) = v.as_mapping() {
                             for (k, b) in m {
-                                if let (Some(fqn), Some(body)) =
-                                    (k.as_str(), b.as_mapping())
-                                {
+                                if let (Some(fqn), Some(body)) = (k.as_str(), b.as_mapping()) {
                                     if body
                                         .get(serde_yaml::Value::String("kind".into()))
                                         .and_then(|x| x.as_str())
@@ -250,11 +250,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             match load_packs_from_dir(&packs_dir) {
                 Ok(packs) => {
-                    let pack_errors = validate_pack_fqns(
-                        &declared,
-                        &macros,
-                        flatten_pack_entries(&packs),
-                    );
+                    let pack_errors =
+                        validate_pack_fqns(&declared, &macros, flatten_pack_entries(&packs));
                     if !pack_errors.is_empty() {
                         report.well_formedness.extend(pack_errors);
                     }
@@ -262,7 +259,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(e) => {
                     tracing::warn!(
                         "Pack-hygiene check skipped — could not load packs dir {:?}: {}",
-                        packs_dir, e
+                        packs_dir,
+                        e
                     );
                 }
             }
@@ -297,11 +295,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "Fix the errors or set OBPOC_CATALOGUE_VALIDATOR_STRICT=false to demote \
                      them to warnings (not recommended — P3 invariant is the gate)."
                 );
-                return Err(format!(
-                    "catalogue validator returned {} errors pre-DB",
-                    total
-                )
-                .into());
+                return Err(format!("catalogue validator returned {} errors pre-DB", total).into());
             } else {
                 for e in &report.structural {
                     tracing::warn!("structural (demoted): {}", e);
@@ -775,9 +769,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         builder.register::<dyn dsl_runtime::service_traits::LifecycleCatalog>(Arc::new(
             ob_poc::services::ObPocLifecycleCatalog::new(),
         ));
-        tracing::info!(
-            "ServiceRegistry: registered dyn LifecycleCatalog (ontology taxonomy)"
-        );
+        tracing::info!("ServiceRegistry: registered dyn LifecycleCatalog (ontology taxonomy)");
 
         // dyn AttributeIdentityService — used by relocated observation_ops
         // (and later attribute_ops) to resolve attribute references across
@@ -851,9 +843,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         builder.register::<dyn dsl_runtime::service_traits::SessionService>(Arc::new(
             ob_poc::services::ObPocSessionService::new(),
         ));
-        tracing::info!(
-            "ServiceRegistry: registered dyn SessionService (session::UnifiedSession)"
-        );
+        tracing::info!("ServiceRegistry: registered dyn SessionService (session::UnifiedSession)");
 
         // dyn ServicePipelineService — used by relocated service_pipeline_ops
         // for the 16 service intent → discovery → attribute → provisioning
@@ -962,7 +952,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 missing
             );
         }
-        tracing::info!("SemOsVerbOpRegistry coverage check passed — every YAML plugin verb has a handler");
+        tracing::info!(
+            "SemOsVerbOpRegistry coverage check passed — every YAML plugin verb has a handler"
+        );
     }
 
     // =========================================================================
@@ -1043,12 +1035,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let config_index = Arc::new(config_index);
 
                                 // Inner executor for direct verb execution
-                                let inner: Arc<dyn ob_poc::sequencer::DslExecutorV2> =
-                                    Arc::new(
-                                        RealDslExecutor::new(pool.clone())
-                                            .with_services(service_registry.clone())
-                                            .with_sem_os_ops(sem_os_ops.clone()),
-                                    );
+                                let inner: Arc<dyn ob_poc::sequencer::DslExecutorV2> = Arc::new(
+                                    RealDslExecutor::new(pool.clone())
+                                        .with_services(service_registry.clone())
+                                        .with_sem_os_ops(sem_os_ops.clone()),
+                                );
 
                                 // WorkflowDispatcher — routes Direct vs Orchestrated.
                                 // Each store wraps a PgPool (cheap Arc clone), so we
@@ -1069,14 +1060,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // Spawn JobWorker (long-poll job activation loop)
                                 let (job_shutdown_tx, job_shutdown_rx) =
                                     tokio::sync::watch::channel(false);
-                                let worker_executor: Arc<
-                                    dyn ob_poc::sequencer::DslExecutorV2,
-                                > = Arc::new(
-                                    RealDslExecutor::new(pool.clone())
-                                        .allow_durable_direct()
-                                        .with_services(service_registry.clone())
-                                        .with_sem_os_ops(sem_os_ops.clone()),
-                                );
+                                let worker_executor: Arc<dyn ob_poc::sequencer::DslExecutorV2> =
+                                    Arc::new(
+                                        RealDslExecutor::new(pool.clone())
+                                            .allow_durable_direct()
+                                            .with_services(service_registry.clone())
+                                            .with_sem_os_ops(sem_os_ops.clone()),
+                                    );
                                 let job_worker = JobWorker::new(
                                     format!("ob-poc-worker-{}", std::process::id()),
                                     client.clone(),
@@ -1207,12 +1197,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use ob_poc::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
             use std::sync::Arc;
 
-            let verb_executor = ObPocVerbExecutor::from_pool_with_services(
-                pool.clone(),
-                service_registry.clone(),
-            )
-            .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())))
-            .with_sem_os_ops(sem_os_ops.clone());
+            let verb_executor =
+                ObPocVerbExecutor::from_pool_with_services(pool.clone(), service_registry.clone())
+                    .with_crud_port(Arc::new(PgCrudExecutor::new(pool.clone())))
+                    .with_sem_os_ops(sem_os_ops.clone());
             orchestrator = orchestrator.with_verb_execution_port(Arc::new(verb_executor));
             tracing::info!("VerbExecutionPort wired with SemOsVerbOpRegistry + PgCrudExecutor");
         }

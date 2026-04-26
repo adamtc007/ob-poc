@@ -1165,9 +1165,11 @@ impl SemOsVerbOp for ServiceAvailabilityList {
         let pool = scope.pool().clone();
         let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
-        let records =
-            BookingPrincipalRepository::list_availability_for_principal(&pool, booking_principal_id)
-                .await?;
+        let records = BookingPrincipalRepository::list_availability_for_principal(
+            &pool,
+            booking_principal_id,
+        )
+        .await?;
 
         let values: Vec<serde_json::Value> = records
             .into_iter()
@@ -1195,9 +1197,11 @@ impl SemOsVerbOp for ServiceAvailabilityListByPrincipal {
         let pool = scope.pool().clone();
         let booking_principal_id = json_extract_uuid(args, ctx, "booking-principal-id")?;
 
-        let records =
-            BookingPrincipalRepository::list_availability_for_principal(&pool, booking_principal_id)
-                .await?;
+        let records = BookingPrincipalRepository::list_availability_for_principal(
+            &pool,
+            booking_principal_id,
+        )
+        .await?;
 
         let values: Vec<serde_json::Value> = records
             .into_iter()

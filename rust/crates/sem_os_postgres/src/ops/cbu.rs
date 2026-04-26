@@ -271,8 +271,8 @@ impl SemOsVerbOp for LinkStructure {
             )?;
         let child_cbu_id = json_extract_uuid_alias(args, ctx, &["child-cbu-id", "child_cbu_id"])?
             .ok_or_else(|| {
-                anyhow::anyhow!("cbu.link-structure: missing required argument :child-cbu-id")
-            })?;
+            anyhow::anyhow!("cbu.link-structure: missing required argument :child-cbu-id")
+        })?;
         let relationship_type_raw =
             json_extract_string_alias(args, &["relationship-type", "relationship_type"])
                 .ok_or_else(|| {
@@ -752,9 +752,9 @@ impl SemOsVerbOp for AddProduct {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let product_name = json_extract_string(args, "product")?;
-        let cbu_id_arg = args.get("cbu-id").ok_or_else(|| {
-            anyhow::anyhow!("cbu.add-product: Missing required argument :cbu-id")
-        })?;
+        let cbu_id_arg = args
+            .get("cbu-id")
+            .ok_or_else(|| anyhow::anyhow!("cbu.add-product: Missing required argument :cbu-id"))?;
 
         let (cbu_id, cbu_name): (Uuid, String) = if let Some(str_val) = cbu_id_arg.as_str() {
             if str_val.starts_with('@') {
@@ -1038,16 +1038,21 @@ impl SemOsVerbOp for Inspect {
             })
             .collect();
 
-        let documents: Vec<(Uuid, Option<String>, Option<String>, Option<String>, Option<String>)> =
-            sqlx::query_as(
-                r#"SELECT dc.doc_id, dc.document_name, dt.type_code, dt.display_name, dc.status
+        let documents: Vec<(
+            Uuid,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )> = sqlx::query_as(
+            r#"SELECT dc.doc_id, dc.document_name, dt.type_code, dt.display_name, dc.status
                    FROM "ob-poc".document_catalog dc
                    LEFT JOIN "ob-poc".document_types dt ON dc.document_type_id = dt.type_id
                    WHERE dc.cbu_id = $1 ORDER BY dt.type_code"#,
-            )
-            .bind(cbu_id)
-            .fetch_all(scope.executor())
-            .await?;
+        )
+        .bind(cbu_id)
+        .fetch_all(scope.executor())
+        .await?;
 
         let doc_list: Vec<Value> = documents
             .iter()

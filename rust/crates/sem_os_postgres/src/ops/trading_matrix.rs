@@ -52,13 +52,13 @@ impl SemOsVerbOp for FindImForTrade {
         let isda_asset_class = json_extract_string_opt(args, "isda-asset-class");
 
         type Row = (
-            Uuid,              // assignment_id
-            Option<String>,    // manager_lei
-            Option<String>,    // manager_name
-            Option<String>,    // manager_role
-            Option<i32>,       // priority
-            Option<String>,    // instruction_method
-            bool,              // scope_all
+            Uuid,           // assignment_id
+            Option<String>, // manager_lei
+            Option<String>, // manager_name
+            Option<String>, // manager_role
+            Option<i32>,    // priority
+            Option<String>, // instruction_method
+            bool,           // scope_all
         );
 
         let row: Option<Row> = sqlx::query_as(
@@ -166,14 +166,14 @@ impl SemOsVerbOp for FindPricingForInstrument {
         };
 
         type Row = (
-            Uuid,              // config_id
-            Option<String>,    // source
-            Option<String>,    // price_type
-            Option<String>,    // fallback_source
-            Option<i32>,       // max_age_hours
-            Option<String>,    // tolerance_pct (cast ::text)
-            Option<String>,    // stale_action
-            Option<i32>,       // priority
+            Uuid,           // config_id
+            Option<String>, // source
+            Option<String>, // price_type
+            Option<String>, // fallback_source
+            Option<i32>,    // max_age_hours
+            Option<String>, // tolerance_pct (cast ::text)
+            Option<String>, // stale_action
+            Option<i32>,    // priority
         );
 
         let row: Option<Row> = sqlx::query_as(
@@ -205,7 +205,16 @@ impl SemOsVerbOp for FindPricingForInstrument {
         .await?;
 
         let result = match row {
-            Some((config_id, source, price_type, fallback, max_age, tolerance, stale, priority)) => {
+            Some((
+                config_id,
+                source,
+                price_type,
+                fallback,
+                max_age,
+                tolerance,
+                stale,
+                priority,
+            )) => {
                 json!({
                     "config_id": config_id.to_string(),
                     "source": source,

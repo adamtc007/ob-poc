@@ -55,8 +55,8 @@ impl SemOsVerbOp for CreateProfile {
         let product_id = json_extract_uuid(args, ctx, "product-id")?;
         let invoice_entity_id = json_extract_uuid(args, ctx, "invoice-entity-id")?;
         let profile_name = json_extract_string_opt(args, "profile-name");
-        let billing_frequency =
-            json_extract_string_opt(args, "billing-frequency").unwrap_or_else(|| "MONTHLY".to_string());
+        let billing_frequency = json_extract_string_opt(args, "billing-frequency")
+            .unwrap_or_else(|| "MONTHLY".to_string());
         let invoice_currency =
             json_extract_string_opt(args, "invoice-currency").unwrap_or_else(|| "USD".to_string());
         let payment_method = json_extract_string_opt(args, "payment-method");
@@ -70,7 +70,9 @@ impl SemOsVerbOp for CreateProfile {
         .fetch_one(scope.executor())
         .await?;
         if rate_card_status != "AGREED" {
-            return Err(anyhow!("Rate card must be in AGREED status to create billing profile"));
+            return Err(anyhow!(
+                "Rate card must be in AGREED status to create billing profile"
+            ));
         }
 
         let profile_id: Uuid = sqlx::query_scalar(
@@ -136,7 +138,9 @@ impl SemOsVerbOp for ActivateProfile {
         .fetch_one(scope.executor())
         .await?;
         if target_count == 0 {
-            return Err(anyhow!("Cannot activate billing profile without account targets"));
+            return Err(anyhow!(
+                "Cannot activate billing profile without account targets"
+            ));
         }
 
         let deal_id: Uuid = sqlx::query_scalar(
@@ -170,7 +174,10 @@ impl SemOsVerbOp for ActivateProfile {
             profile_id,
             "billing-profile:active",
             "billing/profile",
-            &format!("billing.activate-profile — profile {} ACTIVE (deal {})", profile_id, deal_id),
+            &format!(
+                "billing.activate-profile — profile {} ACTIVE (deal {})",
+                profile_id, deal_id
+            ),
         );
         Ok(VerbExecutionOutcome::Affected(1))
     }
@@ -224,7 +231,10 @@ impl SemOsVerbOp for SuspendProfile {
             profile_id,
             "billing-profile:suspended",
             "billing/profile",
-            &format!("billing.suspend-profile — profile {} SUSPENDED ({})", profile_id, reason),
+            &format!(
+                "billing.suspend-profile — profile {} SUSPENDED ({})",
+                profile_id, reason
+            ),
         );
         Ok(VerbExecutionOutcome::Affected(1))
     }
@@ -316,7 +326,9 @@ impl SemOsVerbOp for AddAccountTarget {
         .fetch_one(scope.executor())
         .await?;
         if profile_cbu_id != instance_cbu_id {
-            return Err(anyhow!("Resource instance does not belong to the profile's CBU"));
+            return Err(anyhow!(
+                "Resource instance does not belong to the profile's CBU"
+            ));
         }
 
         let target_id: Uuid = sqlx::query_scalar(
@@ -472,7 +484,11 @@ impl SemOsVerbOp for CalculatePeriod {
         .await?;
 
         type TargetRow = (
-            Uuid, Option<Uuid>, Option<String>, Option<f64>, Option<String>,
+            Uuid,
+            Option<Uuid>,
+            Option<String>,
+            Option<f64>,
+            Option<String>,
         );
         let targets: Vec<TargetRow> = sqlx::query_as(
             r#"
@@ -817,12 +833,14 @@ impl SemOsVerbOp for PeriodSummary {
 
         let line_values: Vec<Value> = lines
             .into_iter()
-            .map(|(line_id, volume, calc_fee, net_fee)| json!({
-                "period_line_id": line_id,
-                "activity_volume": volume,
-                "calculated_fee": calc_fee,
-                "net_fee": net_fee
-            }))
+            .map(|(line_id, volume, calc_fee, net_fee)| {
+                json!({
+                    "period_line_id": line_id,
+                    "activity_volume": volume,
+                    "calculated_fee": calc_fee,
+                    "net_fee": net_fee
+                })
+            })
             .collect();
 
         Ok(VerbExecutionOutcome::Record(json!({

@@ -42,9 +42,5 @@ pub trait TradingProfileDocument: Send + Sync {
     /// Replace the document blob for `profile_id` and update the
     /// document hash. Caller is responsible for ensuring the profile
     /// is in a writable state (DRAFT) before calling.
-    async fn save_document(
-        &self,
-        profile_id: Uuid,
-        doc: &TradingMatrixDocument,
-    ) -> Result<()>;
+    async fn save_document(&self, profile_id: Uuid, doc: &TradingMatrixDocument) -> Result<()>;
 }

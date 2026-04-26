@@ -112,8 +112,7 @@ mod tests {
 
     #[test]
     fn canonicalize_sorts_keys() {
-        let input: serde_json::Value =
-            serde_json::from_str(r#"{"b": 1, "a": 2, "c": 3}"#).unwrap();
+        let input: serde_json::Value = serde_json::from_str(r#"{"b": 1, "a": 2, "c": 3}"#).unwrap();
         let canonical = canonicalize_json(&input);
         assert_eq!(
             serde_json::to_string(&canonical).unwrap(),
@@ -126,8 +125,14 @@ mod tests {
         let input: serde_json::Value =
             serde_json::from_str(r#"{"name": "  hello  ", "city": " London "}"#).unwrap();
         let canonical = canonicalize_json(&input);
-        assert_eq!(canonical["name"], serde_json::Value::String("hello".to_string()));
-        assert_eq!(canonical["city"], serde_json::Value::String("London".to_string()));
+        assert_eq!(
+            canonical["name"],
+            serde_json::Value::String("hello".to_string())
+        );
+        assert_eq!(
+            canonical["city"],
+            serde_json::Value::String("London".to_string())
+        );
     }
 
     #[test]

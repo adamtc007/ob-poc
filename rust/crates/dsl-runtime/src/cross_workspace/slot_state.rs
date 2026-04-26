@@ -100,44 +100,123 @@ pub fn resolve_slot_table(
     let mapping: &[(SlotKey, SlotTarget)] = &[
         // CBU workspace
         (("cbu", "cbu"), ("cbus", "status", "cbu_id")),
-        (("cbu", "cbu_evidence"), ("cbu_evidence", "verification_status", "evidence_id")),
-        (("cbu", "service_consumption"), ("cbu_service_consumption", "status", "consumption_id")),
-        (("cbu", "trading_activity"), ("cbu_trading_activity", "activity_state", "cbu_id")),
-        (("cbu", "investor"), ("investors", "lifecycle_state", "investor_id")),
-        (("cbu", "investor_kyc"), ("investors", "kyc_status", "investor_id")),
-        (("cbu", "holding"), ("holdings", "holding_status", "holding_id")),
+        (
+            ("cbu", "cbu_evidence"),
+            ("cbu_evidence", "verification_status", "evidence_id"),
+        ),
+        (
+            ("cbu", "service_consumption"),
+            ("cbu_service_consumption", "status", "consumption_id"),
+        ),
+        (
+            ("cbu", "trading_activity"),
+            ("cbu_trading_activity", "activity_state", "cbu_id"),
+        ),
+        (
+            ("cbu", "investor"),
+            ("investors", "lifecycle_state", "investor_id"),
+        ),
+        (
+            ("cbu", "investor_kyc"),
+            ("investors", "kyc_status", "investor_id"),
+        ),
+        (
+            ("cbu", "holding"),
+            ("holdings", "holding_status", "holding_id"),
+        ),
         // Deal workspace
         (("deal", "deal"), ("deals", "deal_status", "deal_id")),
-        (("deal", "deal_product"), ("deal_products", "product_status", "deal_product_id")),
-        (("deal", "deal_rate_card"), ("deal_rate_cards", "status", "rate_card_id")),
-        (("deal", "deal_onboarding_request"), ("deal_onboarding_requests", "request_status", "request_id")),
-        (("deal", "deal_document"), ("deal_documents", "document_status", "document_id")),
-        (("deal", "deal_ubo_assessment"), ("deal_ubo_assessments", "assessment_status", "assessment_id")),
-        (("deal", "billing_profile"), ("fee_billing_profiles", "status", "profile_id")),
-        (("deal", "billing_period"), ("fee_billing_periods", "calc_status", "period_id")),
+        (
+            ("deal", "deal_product"),
+            ("deal_products", "product_status", "deal_product_id"),
+        ),
+        (
+            ("deal", "deal_rate_card"),
+            ("deal_rate_cards", "status", "rate_card_id"),
+        ),
+        (
+            ("deal", "deal_onboarding_request"),
+            ("deal_onboarding_requests", "request_status", "request_id"),
+        ),
+        (
+            ("deal", "deal_document"),
+            ("deal_documents", "document_status", "document_id"),
+        ),
+        (
+            ("deal", "deal_ubo_assessment"),
+            ("deal_ubo_assessments", "assessment_status", "assessment_id"),
+        ),
+        (
+            ("deal", "billing_profile"),
+            ("fee_billing_profiles", "status", "profile_id"),
+        ),
+        (
+            ("deal", "billing_period"),
+            ("fee_billing_periods", "calc_status", "period_id"),
+        ),
         (("deal", "deal_sla"), ("deal_slas", "sla_status", "sla_id")),
         // R3.5 (2026-04-26): Booking Principal clearance hoisted to its own
         // workspace (booking_principal_dag). Third leg of Adam's deal
         // tollgate triad (BAC + KYC + BP). Per-deal-per-principal scope.
         // Gates deal KYC_CLEARANCE → CONTRACTED via cross_workspace_constraint.
-        (("booking_principal", "clearance"), ("booking_principal_clearances", "clearance_status", "id")),
+        (
+            ("booking_principal", "clearance"),
+            ("booking_principal_clearances", "clearance_status", "id"),
+        ),
         // KYC workspace
         (("kyc", "kyc_case"), ("cases", "status", "case_id")),
-        (("kyc", "entity_workstream"), ("entity_workstreams", "status", "workstream_id")),
-        (("kyc", "screening"), ("screenings", "status", "screening_id")),
+        (
+            ("kyc", "entity_workstream"),
+            ("entity_workstreams", "status", "workstream_id"),
+        ),
+        (
+            ("kyc", "screening"),
+            ("screenings", "status", "screening_id"),
+        ),
         // IM workspace
-        (("instrument_matrix", "trading_profile"), ("cbu_trading_profiles", "status", "profile_id")),
-        (("instrument_matrix", "trading_activity"), ("cbu_trading_activity", "activity_state", "cbu_id")),
+        (
+            ("instrument_matrix", "trading_profile"),
+            ("cbu_trading_profiles", "status", "profile_id"),
+        ),
+        (
+            ("instrument_matrix", "trading_activity"),
+            ("cbu_trading_activity", "activity_state", "cbu_id"),
+        ),
         // SemOS workspace
-        (("semos_maintenance", "changeset"), ("changesets", "status", "changeset_id")),
-        (("semos_maintenance", "attribute_def"), ("attribute_defs", "lifecycle_status", "attribute_def_id")),
-        (("semos_maintenance", "manco"), ("manco_regulatory_status", "regulatory_status", "manco_entity_id")),
+        (
+            ("semos_maintenance", "changeset"),
+            ("changesets", "status", "changeset_id"),
+        ),
+        (
+            ("semos_maintenance", "attribute_def"),
+            ("attribute_defs", "lifecycle_status", "attribute_def_id"),
+        ),
+        (
+            ("semos_maintenance", "manco"),
+            (
+                "manco_regulatory_status",
+                "regulatory_status",
+                "manco_entity_id",
+            ),
+        ),
         // Product-maintenance workspace (R2 — service catalogue lifecycle)
-        (("product_maintenance", "service"), ("services", "lifecycle_status", "service_id")),
-        (("product_maintenance", "service_version"), ("service_versions", "lifecycle_status", "id")),
+        (
+            ("product_maintenance", "service"),
+            ("services", "lifecycle_status", "service_id"),
+        ),
+        (
+            ("product_maintenance", "service_version"),
+            ("service_versions", "lifecycle_status", "id"),
+        ),
         // Lifecycle Resources workspace (Tranche 4 R1)
-        (("lifecycle_resources", "application_instance"), ("application_instances", "lifecycle_status", "id")),
-        (("lifecycle_resources", "capability_binding"), ("capability_bindings", "binding_status", "id")),
+        (
+            ("lifecycle_resources", "application_instance"),
+            ("application_instances", "lifecycle_status", "id"),
+        ),
+        (
+            ("lifecycle_resources", "capability_binding"),
+            ("capability_bindings", "binding_status", "id"),
+        ),
     ];
     for ((ws, sl), value) in mapping {
         if *ws == workspace && *sl == slot {
@@ -171,7 +250,11 @@ mod tests {
             ),
             (
                 ("semos_maintenance", "manco"),
-                ("manco_regulatory_status", "regulatory_status", "manco_entity_id"),
+                (
+                    "manco_regulatory_status",
+                    "regulatory_status",
+                    "manco_entity_id",
+                ),
             ),
         ];
         for ((ws, slot), expected) in cases {

@@ -100,12 +100,13 @@ impl GleifEnrichmentService {
             _ => None,
         };
 
-        let umbrella = match self.client.get_umbrella_fund(lei).await {
-            Ok(Some(u)) => u.attributes.lei.clone().map(|umbrella_lei| {
-                (umbrella_lei, u.attributes.entity.legal_name.name.clone())
-            }),
-            _ => None,
-        };
+        let umbrella =
+            match self.client.get_umbrella_fund(lei).await {
+                Ok(Some(u)) => u.attributes.lei.clone().map(|umbrella_lei| {
+                    (umbrella_lei, u.attributes.entity.legal_name.name.clone())
+                }),
+                _ => None,
+            };
 
         let master = match self.client.get_master_fund(lei).await {
             Ok(Some(m)) => m
@@ -448,20 +449,18 @@ impl GleifEnrichmentService {
                 .insert_entity_identifiers(entity_id, record, &[])
                 .await?;
 
-            if record.relationships.is_none()
-                || (record
+            let has_no_parents = record.relationships.is_none()
+                || record
                     .relationships
                     .as_ref()
                     .map(|r| r.direct_parent.is_none() && r.ultimate_parent.is_none())
-                    .unwrap_or(true))
-            {
-                if !record.is_fund() {
-                    terminal_entities.push(TerminalEntity {
-                        lei: lei.to_string(),
-                        name: record.attributes.entity.legal_name.name.clone(),
-                        exception: None,
-                    });
-                }
+                    .unwrap_or(true);
+            if has_no_parents && !record.is_fund() {
+                terminal_entities.push(TerminalEntity {
+                    lei: lei.to_string(),
+                    name: record.attributes.entity.legal_name.name.clone(),
+                    exception: None,
+                });
             }
         }
 

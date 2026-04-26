@@ -66,10 +66,7 @@ type EdgeRow = (
     Option<String>,
 );
 
-async fn load_edges(
-    scope: &mut dyn TransactionScope,
-    case_id: Option<Uuid>,
-) -> Result<Vec<Edge>> {
+async fn load_edges(scope: &mut dyn TransactionScope, case_id: Option<Uuid>) -> Result<Vec<Edge>> {
     let rows: Vec<EdgeRow> = if let Some(cid) = case_id {
         sqlx::query_as(
             r#"

@@ -249,10 +249,7 @@ mod tests {
         }
     }
 
-    async fn run_op(
-        op: &dyn SemOsVerbOp,
-        args: serde_json::Value,
-    ) -> Result<VerbExecutionOutcome> {
+    async fn run_op(op: &dyn SemOsVerbOp, args: serde_json::Value) -> Result<VerbExecutionOutcome> {
         let mut ctx = VerbExecutionContext::new(Principal::system());
         let mut scope = NullScope;
         op.execute(&args, &mut ctx, &mut scope).await
@@ -281,9 +278,11 @@ mod tests {
 
     #[tokio::test]
     async fn select_formats_message_prefix() {
-        let r = rec(run_op(&Select, serde_json::json!({"target_id": "entity-1"}))
-            .await
-            .unwrap());
+        let r = rec(
+            run_op(&Select, serde_json::json!({"target_id": "entity-1"}))
+                .await
+                .unwrap(),
+        );
         assert_eq!(r["message"], "Focus set to entity-1");
     }
 
@@ -295,11 +294,12 @@ mod tests {
 
     #[tokio::test]
     async fn set_cluster_type_message() {
-        let r = rec(
-            run_op(&SetClusterType, serde_json::json!({"cluster_type": "jurisdiction"}))
-                .await
-                .unwrap(),
-        );
+        let r = rec(run_op(
+            &SetClusterType,
+            serde_json::json!({"cluster_type": "jurisdiction"}),
+        )
+        .await
+        .unwrap());
         assert_eq!(r["message"], "Cluster mode updated");
     }
 
@@ -327,7 +327,9 @@ mod tests {
 
     #[tokio::test]
     async fn history_forward_direction_and_message() {
-        let r = rec(run_op(&HistoryForward, serde_json::json!({})).await.unwrap());
+        let r = rec(run_op(&HistoryForward, serde_json::json!({}))
+            .await
+            .unwrap());
         assert_eq!(r["direction"], "forward");
         assert_eq!(r["message"], "Navigated forward");
     }

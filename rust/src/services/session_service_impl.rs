@@ -168,7 +168,7 @@ fn take_or_create_session(extensions: &mut Value) -> UnifiedSession {
         .as_object_mut()
         .and_then(|obj| obj.remove(EXT_KEY_PENDING))
         .and_then(|v| serde_json::from_value::<UnifiedSession>(v).ok())
-        .unwrap_or_else(UnifiedSession::new)
+        .unwrap_or_default()
 }
 
 fn set_session(extensions: &mut Value, session: UnifiedSession) {
@@ -268,11 +268,7 @@ async fn session_load_universe(
 
 // ── session.load-galaxy ───────────────────────────────────────────────────────
 
-async fn session_load_galaxy(
-    pool: &PgPool,
-    args: &Value,
-    extensions: &mut Value,
-) -> Result<Value> {
+async fn session_load_galaxy(pool: &PgPool, args: &Value, extensions: &mut Value) -> Result<Value> {
     let jurisdiction = arg_string(args, "jurisdiction")?;
     let cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
         r#"SELECT cbu_id as "cbu_id!" FROM "ob-poc".cbus WHERE jurisdiction = $1 AND deleted_at IS NULL"#,
@@ -359,7 +355,9 @@ async fn session_load_cluster(
     .await?;
 
     if cbu_ids.is_empty() {
-        return Err(anyhow!("No CBUs found under '{apex_name}' ({apex_entity_id})"));
+        return Err(anyhow!(
+            "No CBUs found under '{apex_name}' ({apex_entity_id})"
+        ));
     }
 
     let mut session = take_or_create_session(extensions);
@@ -379,11 +377,7 @@ async fn session_load_cluster(
 
 // ── session.load-system ───────────────────────────────────────────────────────
 
-async fn session_load_system(
-    pool: &PgPool,
-    args: &Value,
-    extensions: &mut Value,
-) -> Result<Value> {
+async fn session_load_system(pool: &PgPool, args: &Value, extensions: &mut Value) -> Result<Value> {
     let cbu_id = arg_uuid(args, "cbu-id")?;
     let cbu = sqlx::query!(
         r#"SELECT cbu_id, name, jurisdiction FROM "ob-poc".cbus WHERE cbu_id = $1 AND deleted_at IS NULL"#,
@@ -487,7 +481,10 @@ fn session_clear(extensions: &mut Value) -> Result<Value> {
     let mut session = take_or_create_session(extensions);
     let count = session.clear_cbus_with_history();
     set_session(extensions, session);
-    Ok(json!(ClearResult { cleared: true, count }))
+    Ok(json!(ClearResult {
+        cleared: true,
+        count
+    }))
 }
 
 // ── session.undo / session.redo ───────────────────────────────────────────────
@@ -599,11 +596,7 @@ async fn session_list(pool: &PgPool, args: &Value, extensions: &mut Value) -> Re
 
 // ── session.set-client ────────────────────────────────────────────────────────
 
-async fn session_set_client(
-    pool: &PgPool,
-    args: &Value,
-    extensions: &mut Value,
-) -> Result<Value> {
+async fn session_set_client(pool: &PgPool, args: &Value, extensions: &mut Value) -> Result<Value> {
     let client = arg_string(args, "client")?;
     let client_norm = client.to_lowercase().trim().to_string();
 
@@ -753,11 +746,7 @@ async fn session_set_structure(
 
 // ── session.set-case ──────────────────────────────────────────────────────────
 
-async fn session_set_case(
-    pool: &PgPool,
-    args: &Value,
-    extensions: &mut Value,
-) -> Result<Value> {
+async fn session_set_case(pool: &PgPool, args: &Value, extensions: &mut Value) -> Result<Value> {
     let case_id = arg_uuid(args, "case-id")?;
     let case = sqlx::query!(
         r#"SELECT case_id, status, case_type FROM "ob-poc".cases WHERE case_id = $1"#,
@@ -788,11 +777,7 @@ async fn session_set_case(
 
 // ── session.set-mandate ───────────────────────────────────────────────────────
 
-async fn session_set_mandate(
-    pool: &PgPool,
-    args: &Value,
-    extensions: &mut Value,
-) -> Result<Value> {
+async fn session_set_mandate(pool: &PgPool, args: &Value, extensions: &mut Value) -> Result<Value> {
     let mandate_id = arg_uuid(args, "mandate-id")?;
     let profile = sqlx::query!(
         r#"SELECT profile_id, cbu_id, status, version FROM "ob-poc".cbu_trading_profiles WHERE profile_id = $1"#,
@@ -822,11 +807,7 @@ async fn session_set_mandate(
 
 // ── session.load-deal ─────────────────────────────────────────────────────────
 
-async fn session_load_deal(
-    pool: &PgPool,
-    args: &Value,
-    extensions: &mut Value,
-) -> Result<Value> {
+async fn session_load_deal(pool: &PgPool, args: &Value, extensions: &mut Value) -> Result<Value> {
     let deal_id = arg_uuid_opt(args, "deal-id");
     let deal_name = arg_string_opt(args, "deal-name");
 

@@ -39,17 +39,13 @@ impl ExpansionContextExt for ExpansionContext {
                     ctx.binding_types.insert(name.to_string(), ty.to_string());
                 }
 
-                // Extract current_cbu from common binding names
+                // Extract current_cbu from common binding names.
                 match name {
-                    "cbu" | "fund" | "active_cbu" => {
-                        if ctx.current_cbu.is_none() {
-                            ctx.current_cbu = Some(pk);
-                        }
+                    "cbu" | "fund" | "active_cbu" if ctx.current_cbu.is_none() => {
+                        ctx.current_cbu = Some(pk);
                     }
-                    "case" | "kyc_case" | "active_case" => {
-                        if ctx.current_case.is_none() {
-                            ctx.current_case = Some(pk);
-                        }
+                    "case" | "kyc_case" | "active_case" if ctx.current_case.is_none() => {
+                        ctx.current_case = Some(pk);
                     }
                     _ => {}
                 }

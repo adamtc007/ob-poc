@@ -113,11 +113,10 @@ pub mod test_support {
             _args: serde_json::Value,
             ctx: &mut VerbExecutionContext,
         ) -> Result<VerbExecutionResult> {
-            let result = self
-                .results
-                .get(verb_fqn)
-                .cloned()
-                .ok_or_else(|| SemOsError::NotFound(format!("No mock result for {verb_fqn}")))?;
+            let result =
+                self.results.get(verb_fqn).cloned().ok_or_else(|| {
+                    SemOsError::NotFound(format!("No mock result for {verb_fqn}"))
+                })?;
 
             // Apply side effects to context (mimics real executor behavior).
             for (name, uuid) in &result.side_effects.new_bindings {

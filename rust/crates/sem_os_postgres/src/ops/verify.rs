@@ -188,26 +188,28 @@ impl SemOsVerbOp for CalculateConfidence {
 
         let evidence: Vec<Evidence> = observations
             .iter()
-            .map(|(oid, aid, src_type, confidence, is_auth, observed_at, _)| Evidence {
-                evidence_id: *oid,
-                entity_id,
-                attribute_id: *aid,
-                observed_value: json!(null),
-                source: src_type
-                    .as_ref()
-                    .map(|s| EvidenceSource::from(s.as_str()))
-                    .unwrap_or(EvidenceSource::Allegation),
-                confidence: confidence
-                    .as_ref()
-                    .map(|d| d.to_string().parse().unwrap_or(0.5))
-                    .unwrap_or(0.5),
-                is_authoritative: is_auth.unwrap_or(false),
-                observed_at: observed_at.unwrap_or_else(chrono::Utc::now),
-                source_document_id: None,
-                extraction_method: None,
-                effective_from: None,
-                effective_to: None,
-            })
+            .map(
+                |(oid, aid, src_type, confidence, is_auth, observed_at, _)| Evidence {
+                    evidence_id: *oid,
+                    entity_id,
+                    attribute_id: *aid,
+                    observed_value: json!(null),
+                    source: src_type
+                        .as_ref()
+                        .map(|s| EvidenceSource::from(s.as_str()))
+                        .unwrap_or(EvidenceSource::Allegation),
+                    confidence: confidence
+                        .as_ref()
+                        .map(|d| d.to_string().parse().unwrap_or(0.5))
+                        .unwrap_or(0.5),
+                    is_authoritative: is_auth.unwrap_or(false),
+                    observed_at: observed_at.unwrap_or_else(chrono::Utc::now),
+                    source_document_id: None,
+                    extraction_method: None,
+                    effective_from: None,
+                    effective_to: None,
+                },
+            )
             .collect();
 
         let pattern_rows: Vec<(String,)> = sqlx::query_as(
@@ -354,7 +356,11 @@ impl SemOsVerbOp for GetStatus {
         };
 
         fn stat(stats: &[(String, i64)], key: &str) -> i64 {
-            stats.iter().find(|(s, _)| s == key).map(|(_, c)| *c).unwrap_or(0)
+            stats
+                .iter()
+                .find(|(s, _)| s == key)
+                .map(|(_, c)| *c)
+                .unwrap_or(0)
         }
 
         Ok(VerbExecutionOutcome::Record(json!({
@@ -544,26 +550,28 @@ impl SemOsVerbOp for Assert {
 
         let evidence: Vec<Evidence> = observations
             .iter()
-            .map(|(oid, eid, aid, src_type, confidence, is_auth, observed_at)| Evidence {
-                evidence_id: *oid,
-                entity_id: *eid,
-                attribute_id: *aid,
-                observed_value: json!(null),
-                source: src_type
-                    .as_ref()
-                    .map(|s| EvidenceSource::from(s.as_str()))
-                    .unwrap_or(EvidenceSource::Allegation),
-                confidence: confidence
-                    .as_ref()
-                    .map(|d| d.to_string().parse().unwrap_or(0.5))
-                    .unwrap_or(0.5),
-                is_authoritative: is_auth.unwrap_or(false),
-                observed_at: observed_at.unwrap_or_else(chrono::Utc::now),
-                source_document_id: None,
-                extraction_method: None,
-                effective_from: None,
-                effective_to: None,
-            })
+            .map(
+                |(oid, eid, aid, src_type, confidence, is_auth, observed_at)| Evidence {
+                    evidence_id: *oid,
+                    entity_id: *eid,
+                    attribute_id: *aid,
+                    observed_value: json!(null),
+                    source: src_type
+                        .as_ref()
+                        .map(|s| EvidenceSource::from(s.as_str()))
+                        .unwrap_or(EvidenceSource::Allegation),
+                    confidence: confidence
+                        .as_ref()
+                        .map(|d| d.to_string().parse().unwrap_or(0.5))
+                        .unwrap_or(0.5),
+                    is_authoritative: is_auth.unwrap_or(false),
+                    observed_at: observed_at.unwrap_or_else(chrono::Utc::now),
+                    source_document_id: None,
+                    extraction_method: None,
+                    effective_from: None,
+                    effective_to: None,
+                },
+            )
             .collect();
 
         let calculator = ConfidenceCalculator::new();
@@ -571,7 +579,10 @@ impl SemOsVerbOp for Assert {
         let passed = result.score >= min_confidence;
 
         if !passed {
-            let msg = format!("Confidence {} below threshold {}", result.score, min_confidence);
+            let msg = format!(
+                "Confidence {} below threshold {}",
+                result.score, min_confidence
+            );
             return match fail_action.as_str() {
                 "error" => Err(anyhow!(msg)),
                 "warn" => Ok(VerbExecutionOutcome::Record(json!({

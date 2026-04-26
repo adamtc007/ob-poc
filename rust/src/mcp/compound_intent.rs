@@ -620,7 +620,7 @@ pub fn extract_relationship_type(utterance: &str) -> Option<String> {
 pub fn extract_vehicle_type(utterance: &str) -> Option<String> {
     // Sort by alias length descending so "unit trust" beats "aut"
     let mut sorted: Vec<_> = VEHICLE_TYPE_MAP.iter().collect();
-    sorted.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    sorted.sort_by_key(|item| std::cmp::Reverse(item.0.len()));
 
     for (alias, canonical) in sorted {
         if contains_phrase(utterance, alias) {
@@ -639,7 +639,7 @@ pub fn extract_jurisdiction(utterance: &str) -> Option<String> {
 
     // Check multi-word aliases first (longer matches take priority)
     let mut sorted_aliases: Vec<_> = JURISDICTION_MAP.iter().collect();
-    sorted_aliases.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    sorted_aliases.sort_by_key(|item| std::cmp::Reverse(item.0.len()));
 
     for (alias, code) in sorted_aliases {
         // Short aliases (2 chars) require strict word-boundary matching

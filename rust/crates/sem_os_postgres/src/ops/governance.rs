@@ -36,7 +36,11 @@ macro_rules! governance_op {
 }
 
 governance_op!(GatePrecheck, "gate-precheck", "stew_gate_precheck");
-governance_op!(SubmitForReview, "submit-for-review", "stew_submit_for_review");
+governance_op!(
+    SubmitForReview,
+    "submit-for-review",
+    "stew_submit_for_review"
+);
 governance_op!(RecordReview, "record-review", "stew_record_review_decision");
 governance_op!(Validate, "validate", "sem_reg_validate_plan");
 governance_op!(DryRun, "dry-run", "sem_reg_validate_plan");

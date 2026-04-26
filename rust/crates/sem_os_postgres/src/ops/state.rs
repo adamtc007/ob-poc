@@ -39,7 +39,8 @@ fn load_machine(
     args: &Value,
     default: &str,
 ) -> Result<dsl_runtime::state_reducer::ValidatedStateMachine> {
-    let name = json_extract_string_opt(args, "state-machine").unwrap_or_else(|| default.to_string());
+    let name =
+        json_extract_string_opt(args, "state-machine").unwrap_or_else(|| default.to_string());
     load_builtin_state_machine(&name).map_err(|err| anyhow!(err.to_string()))
 }
 
@@ -127,8 +128,7 @@ impl SemOsVerbOp for DeriveAll {
         let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
         let case_id = json_extract_uuid_opt(args, ctx, "case-id");
         let state_machine = load_machine(args, "entity_kyc_lifecycle")?;
-        let result =
-            handle_state_derive_all(scope.pool(), cbu_id, case_id, &state_machine).await?;
+        let result = handle_state_derive_all(scope.pool(), cbu_id, case_id, &state_machine).await?;
         let rows = result
             .into_iter()
             .map(serde_json::to_value)

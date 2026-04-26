@@ -95,17 +95,27 @@ impl SemOsVerbOp for SnapshotList {
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = ownership_date_arg(args, "as-of");
-        let derived_from = json_extract_string_opt(args, "derived-from")
-            .unwrap_or_else(|| "ALL".to_string());
+        let derived_from =
+            json_extract_string_opt(args, "derived-from").unwrap_or_else(|| "ALL".to_string());
         let min_pct: Option<rust_decimal::Decimal> =
             json_extract_string_opt(args, "min-pct").and_then(|s| s.parse().ok());
         let basis = json_extract_string_opt(args, "basis").unwrap_or_else(|| "VOTES".to_string());
 
         type Row14 = (
-            Uuid, Uuid, Uuid, Option<Uuid>, NaiveDate, String,
-            Option<rust_decimal::Decimal>, Option<rust_decimal::Decimal>,
-            Option<rust_decimal::Decimal>, Option<rust_decimal::Decimal>,
-            String, bool, bool, String,
+            Uuid,
+            Uuid,
+            Uuid,
+            Option<Uuid>,
+            NaiveDate,
+            String,
+            Option<rust_decimal::Decimal>,
+            Option<rust_decimal::Decimal>,
+            Option<rust_decimal::Decimal>,
+            Option<rust_decimal::Decimal>,
+            String,
+            bool,
+            bool,
+            String,
         );
         let snapshots: Vec<Row14> = if derived_from == "ALL" {
             sqlx::query_as(
@@ -250,11 +260,12 @@ impl SemOsVerbOp for FindController {
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = ownership_date_arg(args, "as-of");
-        let rows = sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, 'VOTES')"#)
-            .bind(issuer_entity_id)
-            .bind(as_of)
-            .fetch_all(scope.executor())
-            .await?;
+        let rows =
+            sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, 'VOTES')"#)
+                .bind(issuer_entity_id)
+                .bind(as_of)
+                .fetch_all(scope.executor())
+                .await?;
         let controllers: Vec<Value> = rows
             .iter()
             .filter(|row| {
@@ -310,8 +321,10 @@ impl SemOsVerbOp for Reconcile {
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = ownership_date_arg(args, "as-of");
-        let source_a = json_extract_string_opt(args, "source-a").unwrap_or_else(|| "REGISTER".to_string());
-        let source_b = json_extract_string_opt(args, "source-b").unwrap_or_else(|| "BODS".to_string());
+        let source_a =
+            json_extract_string_opt(args, "source-a").unwrap_or_else(|| "REGISTER".to_string());
+        let source_b =
+            json_extract_string_opt(args, "source-b").unwrap_or_else(|| "BODS".to_string());
         let basis = json_extract_string_opt(args, "basis").unwrap_or_else(|| "VOTES".to_string());
         let tolerance_bps: i32 = json_extract_int_opt(args, "tolerance-bps")
             .map(|i| i as i32)
@@ -491,14 +504,22 @@ impl SemOsVerbOp for ReconcileFindings {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let run_id = json_extract_uuid(args, ctx, "run-id")?;
-        let severity = json_extract_string_opt(args, "severity").unwrap_or_else(|| "ALL".to_string());
+        let severity =
+            json_extract_string_opt(args, "severity").unwrap_or_else(|| "ALL".to_string());
         let status = json_extract_string_opt(args, "status").unwrap_or_else(|| "OPEN".to_string());
 
         type Row11 = (
-            Uuid, Uuid, Uuid,
-            Option<rust_decimal::Decimal>, Option<rust_decimal::Decimal>,
-            Option<i32>, String, Option<String>, String,
-            Option<String>, Option<String>,
+            Uuid,
+            Uuid,
+            Uuid,
+            Option<rust_decimal::Decimal>,
+            Option<rust_decimal::Decimal>,
+            Option<i32>,
+            String,
+            Option<String>,
+            String,
+            Option<String>,
+            Option<String>,
         );
         let findings: Vec<Row11> = if severity == "ALL" && status == "ALL" {
             sqlx::query_as(

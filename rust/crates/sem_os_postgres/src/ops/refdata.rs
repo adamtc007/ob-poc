@@ -61,60 +61,348 @@ struct RefdataDomainSpec {
 }
 
 const JURISDICTION_FIELDS: &[RefdataField] = &[
-    RefdataField { arg: "code", column: "jurisdiction_code", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "name", column: "jurisdiction_name", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "country-code", column: "country_code", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "region", column: "region", arg_type: RefdataArgType::String, required: false, default: None },
-    RefdataField { arg: "regulatory-framework", column: "regulatory_framework", arg_type: RefdataArgType::String, required: false, default: None },
-    RefdataField { arg: "entity-formation-allowed", column: "entity_formation_allowed", arg_type: RefdataArgType::Bool, required: false, default: Some(RefdataDefaultValue::Bool(true)) },
-    RefdataField { arg: "offshore", column: "offshore_jurisdiction", arg_type: RefdataArgType::Bool, required: false, default: Some(RefdataDefaultValue::Bool(false)) },
-    RefdataField { arg: "regulatory-authority", column: "regulatory_authority", arg_type: RefdataArgType::String, required: false, default: None },
+    RefdataField {
+        arg: "code",
+        column: "jurisdiction_code",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "name",
+        column: "jurisdiction_name",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "country-code",
+        column: "country_code",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "region",
+        column: "region",
+        arg_type: RefdataArgType::String,
+        required: false,
+        default: None,
+    },
+    RefdataField {
+        arg: "regulatory-framework",
+        column: "regulatory_framework",
+        arg_type: RefdataArgType::String,
+        required: false,
+        default: None,
+    },
+    RefdataField {
+        arg: "entity-formation-allowed",
+        column: "entity_formation_allowed",
+        arg_type: RefdataArgType::Bool,
+        required: false,
+        default: Some(RefdataDefaultValue::Bool(true)),
+    },
+    RefdataField {
+        arg: "offshore",
+        column: "offshore_jurisdiction",
+        arg_type: RefdataArgType::Bool,
+        required: false,
+        default: Some(RefdataDefaultValue::Bool(false)),
+    },
+    RefdataField {
+        arg: "regulatory-authority",
+        column: "regulatory_authority",
+        arg_type: RefdataArgType::String,
+        required: false,
+        default: None,
+    },
 ];
 
 const CURRENCY_FIELDS: &[RefdataField] = &[
-    RefdataField { arg: "iso-code", column: "iso_code", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "name", column: "name", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "symbol", column: "symbol", arg_type: RefdataArgType::String, required: false, default: None },
-    RefdataField { arg: "decimal-places", column: "decimal_places", arg_type: RefdataArgType::Int, required: false, default: Some(RefdataDefaultValue::Int(2)) },
-    RefdataField { arg: "is-active", column: "is_active", arg_type: RefdataArgType::Bool, required: false, default: Some(RefdataDefaultValue::Bool(true)) },
+    RefdataField {
+        arg: "iso-code",
+        column: "iso_code",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "name",
+        column: "name",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "symbol",
+        column: "symbol",
+        arg_type: RefdataArgType::String,
+        required: false,
+        default: None,
+    },
+    RefdataField {
+        arg: "decimal-places",
+        column: "decimal_places",
+        arg_type: RefdataArgType::Int,
+        required: false,
+        default: Some(RefdataDefaultValue::Int(2)),
+    },
+    RefdataField {
+        arg: "is-active",
+        column: "is_active",
+        arg_type: RefdataArgType::Bool,
+        required: false,
+        default: Some(RefdataDefaultValue::Bool(true)),
+    },
 ];
 
 const SIMPLE_CODE_FIELDS: &[RefdataField] = &[
-    RefdataField { arg: "code", column: "code", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "name", column: "name", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "description", column: "description", arg_type: RefdataArgType::String, required: false, default: None },
-    RefdataField { arg: "display-order", column: "display_order", arg_type: RefdataArgType::Int, required: false, default: Some(RefdataDefaultValue::Int(0)) },
-    RefdataField { arg: "is-active", column: "is_active", arg_type: RefdataArgType::Bool, required: false, default: Some(RefdataDefaultValue::Bool(true)) },
+    RefdataField {
+        arg: "code",
+        column: "code",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "name",
+        column: "name",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "description",
+        column: "description",
+        arg_type: RefdataArgType::String,
+        required: false,
+        default: None,
+    },
+    RefdataField {
+        arg: "display-order",
+        column: "display_order",
+        arg_type: RefdataArgType::Int,
+        required: false,
+        default: Some(RefdataDefaultValue::Int(0)),
+    },
+    RefdataField {
+        arg: "is-active",
+        column: "is_active",
+        arg_type: RefdataArgType::Bool,
+        required: false,
+        default: Some(RefdataDefaultValue::Bool(true)),
+    },
 ];
 
 const RISK_RATING_FIELDS: &[RefdataField] = &[
-    RefdataField { arg: "code", column: "code", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "name", column: "name", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "description", column: "description", arg_type: RefdataArgType::String, required: false, default: None },
-    RefdataField { arg: "severity-level", column: "severity_level", arg_type: RefdataArgType::Int, required: false, default: Some(RefdataDefaultValue::Int(0)) },
-    RefdataField { arg: "display-order", column: "display_order", arg_type: RefdataArgType::Int, required: false, default: Some(RefdataDefaultValue::Int(0)) },
-    RefdataField { arg: "is-active", column: "is_active", arg_type: RefdataArgType::Bool, required: false, default: Some(RefdataDefaultValue::Bool(true)) },
+    RefdataField {
+        arg: "code",
+        column: "code",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "name",
+        column: "name",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "description",
+        column: "description",
+        arg_type: RefdataArgType::String,
+        required: false,
+        default: None,
+    },
+    RefdataField {
+        arg: "severity-level",
+        column: "severity_level",
+        arg_type: RefdataArgType::Int,
+        required: false,
+        default: Some(RefdataDefaultValue::Int(0)),
+    },
+    RefdataField {
+        arg: "display-order",
+        column: "display_order",
+        arg_type: RefdataArgType::Int,
+        required: false,
+        default: Some(RefdataDefaultValue::Int(0)),
+    },
+    RefdataField {
+        arg: "is-active",
+        column: "is_active",
+        arg_type: RefdataArgType::Bool,
+        required: false,
+        default: Some(RefdataDefaultValue::Bool(true)),
+    },
 ];
 
 const MARKET_FIELDS: &[RefdataField] = &[
-    RefdataField { arg: "mic", column: "mic", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "name", column: "name", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "country-code", column: "country_code", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "primary-currency", column: "primary_currency", arg_type: RefdataArgType::String, required: true, default: None },
-    RefdataField { arg: "csd-bic", column: "csd_bic", arg_type: RefdataArgType::String, required: false, default: None },
-    RefdataField { arg: "timezone", column: "timezone", arg_type: RefdataArgType::String, required: true, default: None },
+    RefdataField {
+        arg: "mic",
+        column: "mic",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "name",
+        column: "name",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "country-code",
+        column: "country_code",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "primary-currency",
+        column: "primary_currency",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
+    RefdataField {
+        arg: "csd-bic",
+        column: "csd_bic",
+        arg_type: RefdataArgType::String,
+        required: false,
+        default: None,
+    },
+    RefdataField {
+        arg: "timezone",
+        column: "timezone",
+        arg_type: RefdataArgType::String,
+        required: true,
+        default: None,
+    },
 ];
 
 const REFDATA_DOMAINS: &[RefdataDomainSpec] = &[
-    RefdataDomainSpec { domain: "jurisdiction", schema: "ob-poc", table: "master_jurisdictions", key_arg: "code", key_column: "jurisdiction_code", return_column: "jurisdiction_code", return_kind: RefdataReturnKind::String, active_column: None, order_by: "jurisdiction_code", fields: JURISDICTION_FIELDS, list_filters: &["region", "offshore"] },
-    RefdataDomainSpec { domain: "currency", schema: "ob-poc", table: "currencies", key_arg: "iso-code", key_column: "iso_code", return_column: "currency_id", return_kind: RefdataReturnKind::Uuid, active_column: Some("is_active"), order_by: "iso_code", fields: CURRENCY_FIELDS, list_filters: &["is-active"] },
-    RefdataDomainSpec { domain: "market", schema: "custody", table: "markets", key_arg: "mic", key_column: "mic", return_column: "market_id", return_kind: RefdataReturnKind::Uuid, active_column: None, order_by: "mic", fields: MARKET_FIELDS, list_filters: &["country-code"] },
-    RefdataDomainSpec { domain: "settlement-type", schema: "ob-poc", table: "settlement_types", key_arg: "code", key_column: "code", return_column: "code", return_kind: RefdataReturnKind::String, active_column: Some("is_active"), order_by: "display_order", fields: SIMPLE_CODE_FIELDS, list_filters: &["is-active"] },
-    RefdataDomainSpec { domain: "ssi-type", schema: "ob-poc", table: "ssi_types", key_arg: "code", key_column: "code", return_column: "code", return_kind: RefdataReturnKind::String, active_column: Some("is_active"), order_by: "display_order", fields: SIMPLE_CODE_FIELDS, list_filters: &["is-active"] },
-    RefdataDomainSpec { domain: "client-type", schema: "ob-poc", table: "client_types", key_arg: "code", key_column: "code", return_column: "code", return_kind: RefdataReturnKind::String, active_column: Some("is_active"), order_by: "display_order", fields: SIMPLE_CODE_FIELDS, list_filters: &["is-active"] },
-    RefdataDomainSpec { domain: "screening-type", schema: "ob-poc", table: "screening_types", key_arg: "code", key_column: "code", return_column: "code", return_kind: RefdataReturnKind::String, active_column: Some("is_active"), order_by: "display_order", fields: SIMPLE_CODE_FIELDS, list_filters: &["is-active"] },
-    RefdataDomainSpec { domain: "risk-rating", schema: "ob-poc", table: "risk_ratings", key_arg: "code", key_column: "code", return_column: "code", return_kind: RefdataReturnKind::String, active_column: Some("is_active"), order_by: "severity_level", fields: RISK_RATING_FIELDS, list_filters: &["is-active"] },
-    RefdataDomainSpec { domain: "case-type", schema: "ob-poc", table: "case_types", key_arg: "code", key_column: "code", return_column: "code", return_kind: RefdataReturnKind::String, active_column: Some("is_active"), order_by: "display_order", fields: SIMPLE_CODE_FIELDS, list_filters: &["is-active"] },
+    RefdataDomainSpec {
+        domain: "jurisdiction",
+        schema: "ob-poc",
+        table: "master_jurisdictions",
+        key_arg: "code",
+        key_column: "jurisdiction_code",
+        return_column: "jurisdiction_code",
+        return_kind: RefdataReturnKind::String,
+        active_column: None,
+        order_by: "jurisdiction_code",
+        fields: JURISDICTION_FIELDS,
+        list_filters: &["region", "offshore"],
+    },
+    RefdataDomainSpec {
+        domain: "currency",
+        schema: "ob-poc",
+        table: "currencies",
+        key_arg: "iso-code",
+        key_column: "iso_code",
+        return_column: "currency_id",
+        return_kind: RefdataReturnKind::Uuid,
+        active_column: Some("is_active"),
+        order_by: "iso_code",
+        fields: CURRENCY_FIELDS,
+        list_filters: &["is-active"],
+    },
+    RefdataDomainSpec {
+        domain: "market",
+        schema: "custody",
+        table: "markets",
+        key_arg: "mic",
+        key_column: "mic",
+        return_column: "market_id",
+        return_kind: RefdataReturnKind::Uuid,
+        active_column: None,
+        order_by: "mic",
+        fields: MARKET_FIELDS,
+        list_filters: &["country-code"],
+    },
+    RefdataDomainSpec {
+        domain: "settlement-type",
+        schema: "ob-poc",
+        table: "settlement_types",
+        key_arg: "code",
+        key_column: "code",
+        return_column: "code",
+        return_kind: RefdataReturnKind::String,
+        active_column: Some("is_active"),
+        order_by: "display_order",
+        fields: SIMPLE_CODE_FIELDS,
+        list_filters: &["is-active"],
+    },
+    RefdataDomainSpec {
+        domain: "ssi-type",
+        schema: "ob-poc",
+        table: "ssi_types",
+        key_arg: "code",
+        key_column: "code",
+        return_column: "code",
+        return_kind: RefdataReturnKind::String,
+        active_column: Some("is_active"),
+        order_by: "display_order",
+        fields: SIMPLE_CODE_FIELDS,
+        list_filters: &["is-active"],
+    },
+    RefdataDomainSpec {
+        domain: "client-type",
+        schema: "ob-poc",
+        table: "client_types",
+        key_arg: "code",
+        key_column: "code",
+        return_column: "code",
+        return_kind: RefdataReturnKind::String,
+        active_column: Some("is_active"),
+        order_by: "display_order",
+        fields: SIMPLE_CODE_FIELDS,
+        list_filters: &["is-active"],
+    },
+    RefdataDomainSpec {
+        domain: "screening-type",
+        schema: "ob-poc",
+        table: "screening_types",
+        key_arg: "code",
+        key_column: "code",
+        return_column: "code",
+        return_kind: RefdataReturnKind::String,
+        active_column: Some("is_active"),
+        order_by: "display_order",
+        fields: SIMPLE_CODE_FIELDS,
+        list_filters: &["is-active"],
+    },
+    RefdataDomainSpec {
+        domain: "risk-rating",
+        schema: "ob-poc",
+        table: "risk_ratings",
+        key_arg: "code",
+        key_column: "code",
+        return_column: "code",
+        return_kind: RefdataReturnKind::String,
+        active_column: Some("is_active"),
+        order_by: "severity_level",
+        fields: RISK_RATING_FIELDS,
+        list_filters: &["is-active"],
+    },
+    RefdataDomainSpec {
+        domain: "case-type",
+        schema: "ob-poc",
+        table: "case_types",
+        key_arg: "code",
+        key_column: "code",
+        return_column: "code",
+        return_kind: RefdataReturnKind::String,
+        active_column: Some("is_active"),
+        order_by: "display_order",
+        fields: SIMPLE_CODE_FIELDS,
+        list_filters: &["is-active"],
+    },
 ];
 
 enum RefdataBoundValue {
@@ -136,19 +424,24 @@ fn resolve_domain_spec(args: &JsonValue) -> Result<&'static RefdataDomainSpec> {
 }
 
 fn string_arg(args: &JsonValue, f: RefdataField) -> Option<String> {
-    args.get(f.arg).and_then(|v| v.as_str().map(ToOwned::to_owned))
+    args.get(f.arg)
+        .and_then(|v| v.as_str().map(ToOwned::to_owned))
 }
 fn bool_arg(args: &JsonValue, f: RefdataField) -> Option<bool> {
-    args.get(f.arg).and_then(|v| v.as_bool()).or(match f.default {
-        Some(RefdataDefaultValue::Bool(v)) => Some(v),
-        _ => None,
-    })
+    args.get(f.arg)
+        .and_then(|v| v.as_bool())
+        .or(match f.default {
+            Some(RefdataDefaultValue::Bool(v)) => Some(v),
+            _ => None,
+        })
 }
 fn int_arg(args: &JsonValue, f: RefdataField) -> Option<i64> {
-    args.get(f.arg).and_then(|v| v.as_i64()).or(match f.default {
-        Some(RefdataDefaultValue::Int(v)) => Some(v),
-        _ => None,
-    })
+    args.get(f.arg)
+        .and_then(|v| v.as_i64())
+        .or(match f.default {
+            Some(RefdataDefaultValue::Int(v)) => Some(v),
+            _ => None,
+        })
 }
 
 async fn do_ensure(
@@ -157,10 +450,8 @@ async fn do_ensure(
     spec: &RefdataDomainSpec,
 ) -> Result<VerbExecutionOutcome> {
     let mut present_fields = Vec::new();
-    let mut qb = QueryBuilder::<Postgres>::new(format!(
-        "INSERT INTO \"{}\".{} (",
-        spec.schema, spec.table
-    ));
+    let mut qb =
+        QueryBuilder::<Postgres>::new(format!("INSERT INTO \"{}\".{} (", spec.schema, spec.table));
     {
         let mut cols = qb.separated(", ");
         for f in spec.fields {
@@ -203,9 +494,15 @@ async fn do_ensure(
         let mut vals = qb.separated(", ");
         for (_, value) in &present_fields {
             match value {
-                Some(RefdataBoundValue::String(v)) => { vals.push_bind(v); }
-                Some(RefdataBoundValue::Bool(v)) => { vals.push_bind(v); }
-                Some(RefdataBoundValue::Int(v)) => { vals.push_bind(v); }
+                Some(RefdataBoundValue::String(v)) => {
+                    vals.push_bind(v);
+                }
+                Some(RefdataBoundValue::Bool(v)) => {
+                    vals.push_bind(v);
+                }
+                Some(RefdataBoundValue::Int(v)) => {
+                    vals.push_bind(v);
+                }
                 None => {}
             }
         }
@@ -237,7 +534,9 @@ async fn do_ensure(
     match spec.return_kind {
         RefdataReturnKind::Uuid => {
             let q = qb.build_query_scalar::<uuid::Uuid>();
-            Ok(VerbExecutionOutcome::Uuid(q.fetch_one(scope.executor()).await?))
+            Ok(VerbExecutionOutcome::Uuid(
+                q.fetch_one(scope.executor()).await?,
+            ))
         }
         RefdataReturnKind::String => {
             let q = qb.build_query_scalar::<String>();
@@ -265,9 +564,9 @@ async fn do_read(
         .bind(key)
         .fetch_optional(scope.executor())
         .await?;
-    Ok(VerbExecutionOutcome::Record(
-        record.ok_or_else(|| anyhow!("No {} record found", spec.domain))?,
-    ))
+    Ok(VerbExecutionOutcome::Record(record.ok_or_else(|| {
+        anyhow!("No {} record found", spec.domain)
+    })?))
 }
 
 async fn do_list(

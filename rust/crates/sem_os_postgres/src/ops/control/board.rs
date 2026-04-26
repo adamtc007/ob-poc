@@ -42,7 +42,9 @@ pub(super) async fn compute_show_board_controller(
     .bind(cbu_id)
     .fetch_optional(scope.executor())
     .await?;
-    let cbu_name = cbu_info.ok_or_else(|| anyhow!("CBU not found: {}", cbu_id))?.0;
+    let cbu_name = cbu_info
+        .ok_or_else(|| anyhow!("CBU not found: {}", cbu_id))?
+        .0;
 
     // Manual override first.
     #[derive(sqlx::FromRow)]
@@ -80,7 +82,11 @@ pub(super) async fn compute_show_board_controller(
         .await?;
 
         let (name, is_natural) = info.unwrap_or(("Unknown".into(), false));
-        let controller_type = if is_natural { "NATURAL_PERSON" } else { "LEGAL_ENTITY" };
+        let controller_type = if is_natural {
+            "NATURAL_PERSON"
+        } else {
+            "LEGAL_ENTITY"
+        };
 
         return Ok(json!({
             "cbu_id": cbu_id,
@@ -156,8 +162,11 @@ pub(super) async fn compute_show_board_controller(
                 .bind(top.appointer_id)
                 .fetch_one(scope.executor())
                 .await?;
-                let controller_type =
-                    if is_natural { "NATURAL_PERSON" } else { "LEGAL_ENTITY" };
+                let controller_type = if is_natural {
+                    "NATURAL_PERSON"
+                } else {
+                    "LEGAL_ENTITY"
+                };
                 evidence_sources.push("COMPUTED");
 
                 return Ok(json!({
@@ -221,7 +230,11 @@ pub(super) async fn compute_show_board_controller(
         .bind(o.owner_id)
         .fetch_one(scope.executor())
         .await?;
-        let controller_type = if is_natural { "NATURAL_PERSON" } else { "LEGAL_ENTITY" };
+        let controller_type = if is_natural {
+            "NATURAL_PERSON"
+        } else {
+            "LEGAL_ENTITY"
+        };
         evidence_sources.push("COMPUTED");
 
         return Ok(json!({
@@ -273,7 +286,11 @@ pub(super) async fn compute_show_board_controller(
         .bind(parent_id)
         .fetch_one(scope.executor())
         .await?;
-        let controller_type = if is_natural { "NATURAL_PERSON" } else { "LEGAL_ENTITY" };
+        let controller_type = if is_natural {
+            "NATURAL_PERSON"
+        } else {
+            "LEGAL_ENTITY"
+        };
         evidence_sources.push("GLEIF");
 
         return Ok(json!({
@@ -527,7 +544,9 @@ impl SemOsVerbOp for ClearBoardControllerOverride {
 
         let override_cleared = result.map(|r| r.rows_affected() > 0).unwrap_or(false);
 
-        let computed = compute_show_board_controller(cbu_id, scope).await.unwrap_or(json!({}));
+        let computed = compute_show_board_controller(cbu_id, scope)
+            .await
+            .unwrap_or(json!({}));
         let computed_controller_id = computed
             .get("board_controller_entity_id")
             .and_then(|v| v.as_str())
@@ -645,7 +664,13 @@ impl SemOsVerbOp for ImportGleifControl {
         .unwrap_or(None);
 
         let (rel_count, has_direct, has_ultimate) = existing
-            .map(|r| (r.relationship_count, r.has_direct_parent, r.has_ultimate_parent))
+            .map(|r| {
+                (
+                    r.relationship_count,
+                    r.has_direct_parent,
+                    r.has_ultimate_parent,
+                )
+            })
             .unwrap_or((0, false, false));
 
         Ok(VerbExecutionOutcome::Record(json!({

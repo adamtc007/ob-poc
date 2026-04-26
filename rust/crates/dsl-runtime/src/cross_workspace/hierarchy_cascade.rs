@@ -118,10 +118,7 @@ pub struct CascadePlanner {
 }
 
 impl CascadePlanner {
-    pub fn new(
-        registry: Arc<DagRegistry>,
-        child_resolver: Arc<dyn ChildEntityResolver>,
-    ) -> Self {
+    pub fn new(registry: Arc<DagRegistry>, child_resolver: Arc<dyn ChildEntityResolver>) -> Self {
         Self {
             registry,
             child_resolver,

@@ -114,12 +114,14 @@ async fn extract_tables_from_schema(
         .await?;
         let foreign_keys: Vec<ForeignKeyInput> = fk_rows
             .into_iter()
-            .map(|(from_column, target_schema, target_table, target_column)| ForeignKeyInput {
-                from_column,
-                target_schema,
-                target_table,
-                target_column,
-            })
+            .map(
+                |(from_column, target_schema, target_table, target_column)| ForeignKeyInput {
+                    from_column,
+                    target_schema,
+                    target_table,
+                    target_column,
+                },
+            )
             .collect();
 
         tables.push(TableInput {

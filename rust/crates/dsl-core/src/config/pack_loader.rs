@@ -45,8 +45,8 @@ pub struct LoadedPack {
 /// philosophy of the catalogue-load gate.
 pub fn load_packs_from_dir(packs_dir: &Path) -> Result<BTreeMap<String, LoadedPack>> {
     let mut out = BTreeMap::new();
-    let entries = fs::read_dir(packs_dir)
-        .with_context(|| format!("cannot read packs dir {packs_dir:?}"))?;
+    let entries =
+        fs::read_dir(packs_dir).with_context(|| format!("cannot read packs dir {packs_dir:?}"))?;
     for entry in entries {
         let entry = entry?;
         let path = entry.path();
@@ -111,11 +111,7 @@ mod tests {
 
         let p1 = packs_dir.join("foo.yaml");
         let mut f = fs::File::create(&p1).unwrap();
-        writeln!(
-            f,
-            "id: foo\nallowed_verbs:\n  - a.one\n  - a.two\n"
-        )
-        .unwrap();
+        writeln!(f, "id: foo\nallowed_verbs:\n  - a.one\n  - a.two\n").unwrap();
 
         let p2 = packs_dir.join("bar.yaml");
         let mut f = fs::File::create(&p2).unwrap();
@@ -133,11 +129,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let p1 = dir.path().join("p.yaml");
         let mut f = fs::File::create(&p1).unwrap();
-        writeln!(
-            f,
-            "id: p\nallowed_verbs:\n  - x.1\n  - x.2\n  - x.3\n"
-        )
-        .unwrap();
+        writeln!(f, "id: p\nallowed_verbs:\n  - x.1\n  - x.2\n  - x.3\n").unwrap();
         let packs = load_packs_from_dir(dir.path()).unwrap();
         let entries: Vec<_> = flatten_pack_entries(&packs).collect();
         assert_eq!(entries.len(), 3);

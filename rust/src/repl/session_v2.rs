@@ -426,7 +426,7 @@ impl ReplSessionV2 {
         match self.snapshot_policy {
             super::session_trace::SnapshotPolicy::Never => false,
             super::session_trace::SnapshotPolicy::EveryN(n) => {
-                n > 0 && sequence % u64::from(n) == 0
+                n > 0 && sequence.is_multiple_of(u64::from(n))
             }
             super::session_trace::SnapshotPolicy::OnStackOp => matches!(
                 op,

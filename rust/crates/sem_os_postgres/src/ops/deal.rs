@@ -189,8 +189,7 @@ impl SemOsVerbOp for Create {
         let deal_reference = json_extract_string_opt(args, "deal-reference");
         let sales_owner = json_extract_string_opt(args, "sales-owner");
         let sales_team = json_extract_string_opt(args, "sales-team");
-        let estimated_revenue: Option<f64> =
-            args.get("estimated-revenue").and_then(|v| v.as_f64());
+        let estimated_revenue: Option<f64> = args.get("estimated-revenue").and_then(|v| v.as_f64());
         let currency_code = json_extract_string_opt(args, "currency-code").unwrap_or("USD".into());
         let notes = json_extract_string_opt(args, "notes");
 
@@ -313,8 +312,7 @@ impl SemOsVerbOp for Update {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let deal_name = json_extract_string_opt(args, "deal-name");
         let sales_owner = json_extract_string_opt(args, "sales-owner");
-        let estimated_revenue: Option<f64> =
-            args.get("estimated-revenue").and_then(|v| v.as_f64());
+        let estimated_revenue: Option<f64> = args.get("estimated-revenue").and_then(|v| v.as_f64());
         let notes = json_extract_string_opt(args, "notes");
 
         let result = sqlx::query(
@@ -430,10 +428,7 @@ impl SemOsVerbOp for UpdateStatus {
         // (`is_valid_deal_status_transition` + KYC gate) guarantees a
         // genuine state advance by the time we reach this line.
         let to_node = format!("deal:{}", new_status.to_lowercase());
-        let reason = format!(
-            "deal.update-status — {} → {}",
-            current_status, new_status
-        );
+        let reason = format!("deal.update-status — {} → {}", current_status, new_status);
         dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
             ctx,
             deal_id,
@@ -512,10 +507,7 @@ impl SemOsVerbOp for Cancel {
         // Phase C.3 rollout: deal cancellation is a terminal state
         // advance. Reason string captures the operator-supplied reason
         // so narration can surface it downstream.
-        let advance_reason = format!(
-            "deal.cancel — {} → CANCELLED ({})",
-            current_status, reason
-        );
+        let advance_reason = format!("deal.cancel — {} → CANCELLED ({})", current_status, reason);
         dsl_runtime::domain_ops::helpers::emit_pending_state_advance(
             ctx,
             deal_id,
@@ -1792,8 +1784,7 @@ impl SemOsVerbOp for RequestOnboardingBatch {
             .get("requests")
             .ok_or_else(|| anyhow!("requests argument is required"))?;
 
-        let requests: Vec<Value> =
-            serde_json::from_value(requests_arg.clone()).unwrap_or_default();
+        let requests: Vec<Value> = serde_json::from_value(requests_arg.clone()).unwrap_or_default();
 
         let mut request_ids = Vec::new();
 

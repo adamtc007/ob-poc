@@ -58,10 +58,9 @@ impl SemOsVerbOp for GrantOptions {
         let units: rust_decimal::Decimal = json_extract_string_opt(args, "units")
             .and_then(|s| s.parse().ok())
             .ok_or_else(|| anyhow!("units is required"))?;
-        let strike_price: rust_decimal::Decimal =
-            json_extract_string_opt(args, "strike-price")
-                .and_then(|s| s.parse().ok())
-                .ok_or_else(|| anyhow!("strike-price is required"))?;
+        let strike_price: rust_decimal::Decimal = json_extract_string_opt(args, "strike-price")
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| anyhow!("strike-price is required"))?;
         let grant_date = date_arg(args, "grant-date");
         let vesting_start_date = json_extract_string_opt(args, "vesting-start-date")
             .as_deref()
@@ -128,10 +127,9 @@ impl SemOsVerbOp for IssueWarrant {
         let units: rust_decimal::Decimal = json_extract_string_opt(args, "units")
             .and_then(|s| s.parse().ok())
             .ok_or_else(|| anyhow!("units is required"))?;
-        let strike_price: rust_decimal::Decimal =
-            json_extract_string_opt(args, "strike-price")
-                .and_then(|s| s.parse().ok())
-                .ok_or_else(|| anyhow!("strike-price is required"))?;
+        let strike_price: rust_decimal::Decimal = json_extract_string_opt(args, "strike-price")
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| anyhow!("strike-price is required"))?;
         let grant_date = date_arg(args, "grant-date");
         let expiry_date = json_extract_string_opt(args, "expiry-date")
             .as_deref()
@@ -195,8 +193,8 @@ impl SemOsVerbOp for CreateSafe {
             json_extract_string_opt(args, "discount-pct").and_then(|s| s.parse().ok());
         let grant_date = date_arg(args, "investment-date");
         let target_share_class_id = json_extract_uuid_opt(args, ctx, "target-share-class-id");
-        let safe_type = json_extract_string_opt(args, "safe-type")
-            .unwrap_or_else(|| "POST_MONEY".to_string());
+        let safe_type =
+            json_extract_string_opt(args, "safe-type").unwrap_or_else(|| "POST_MONEY".to_string());
 
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"
@@ -293,10 +291,9 @@ impl SemOsVerbOp for Exercise {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let instrument_id = json_extract_uuid(args, ctx, "instrument-id")?;
-        let units_to_exercise: rust_decimal::Decimal =
-            json_extract_string_opt(args, "units")
-                .and_then(|s| s.parse().ok())
-                .ok_or_else(|| anyhow!("units is required"))?;
+        let units_to_exercise: rust_decimal::Decimal = json_extract_string_opt(args, "units")
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| anyhow!("units is required"))?;
         let exercise_date = date_arg(args, "exercise-date");
         let exercise_price_override: Option<rust_decimal::Decimal> =
             json_extract_string_opt(args, "exercise-price").and_then(|s| s.parse().ok());
@@ -523,12 +520,8 @@ impl SemOsVerbOp for Forfeit {
         .bind(instrument_id)
         .fetch_optional(scope.executor())
         .await?;
-        let (outstanding,) = instrument.ok_or_else(|| {
-            anyhow!(
-                "Instrument {} not found or not outstanding",
-                instrument_id
-            )
-        })?;
+        let (outstanding,) = instrument
+            .ok_or_else(|| anyhow!("Instrument {} not found or not outstanding", instrument_id))?;
         let units_to_forfeit = units.unwrap_or(outstanding);
         if units_to_forfeit > outstanding {
             return Err(anyhow!(
@@ -592,14 +585,23 @@ impl SemOsVerbOp for List {
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let instrument_type = json_extract_string_opt(args, "instrument-type");
-        let status = json_extract_string_opt(args, "status").unwrap_or_else(|| "OUTSTANDING".to_string());
+        let status =
+            json_extract_string_opt(args, "status").unwrap_or_else(|| "OUTSTANDING".to_string());
 
         type Row13 = (
-            Uuid, Uuid, Option<Uuid>, Uuid, String,
-            rust_decimal::Decimal, rust_decimal::Decimal,
-            Option<rust_decimal::Decimal>, Option<rust_decimal::Decimal>,
+            Uuid,
+            Uuid,
+            Option<Uuid>,
+            Uuid,
+            String,
+            rust_decimal::Decimal,
+            rust_decimal::Decimal,
             Option<rust_decimal::Decimal>,
-            NaiveDate, Option<NaiveDate>, String,
+            Option<rust_decimal::Decimal>,
+            Option<rust_decimal::Decimal>,
+            NaiveDate,
+            Option<NaiveDate>,
+            String,
         );
         let instruments: Vec<Row13> = if let Some(ref itype) = instrument_type {
             sqlx::query_as(
@@ -703,12 +705,16 @@ impl SemOsVerbOp for GetSummary {
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
         let as_of = date_arg(args, "as-of");
-        let basis = json_extract_string_opt(args, "basis")
-            .unwrap_or_else(|| "EXERCISABLE".to_string());
+        let basis =
+            json_extract_string_opt(args, "basis").unwrap_or_else(|| "EXERCISABLE".to_string());
 
         type SumRow = (
-            Uuid, String, String,
-            rust_decimal::Decimal, rust_decimal::Decimal, rust_decimal::Decimal,
+            Uuid,
+            String,
+            String,
+            rust_decimal::Decimal,
+            rust_decimal::Decimal,
+            rust_decimal::Decimal,
             Option<rust_decimal::Decimal>,
         );
         let summary: Vec<SumRow> = sqlx::query_as(
@@ -728,18 +734,20 @@ impl SemOsVerbOp for GetSummary {
         let mut total_potential_shares = rust_decimal::Decimal::ZERO;
         let summary_data: Vec<Value> = summary
             .iter()
-            .map(|(_, class_name, itype, authorized, outstanding, exercised, avg_strike)| {
-                total_outstanding += outstanding;
-                total_potential_shares += outstanding;
-                json!({
-                    "share_class_name": class_name,
-                    "instrument_type": itype,
-                    "units_authorized": authorized.to_string(),
-                    "units_outstanding": outstanding.to_string(),
-                    "units_exercised": exercised.to_string(),
-                    "weighted_avg_strike": avg_strike.map(|d| d.to_string())
-                })
-            })
+            .map(
+                |(_, class_name, itype, authorized, outstanding, exercised, avg_strike)| {
+                    total_outstanding += outstanding;
+                    total_potential_shares += outstanding;
+                    json!({
+                        "share_class_name": class_name,
+                        "instrument_type": itype,
+                        "units_authorized": authorized.to_string(),
+                        "units_outstanding": outstanding.to_string(),
+                        "units_exercised": exercised.to_string(),
+                        "weighted_avg_strike": avg_strike.map(|d| d.to_string())
+                    })
+                },
+            )
             .collect();
 
         let outstanding_shares: rust_decimal::Decimal = sqlx::query_scalar(

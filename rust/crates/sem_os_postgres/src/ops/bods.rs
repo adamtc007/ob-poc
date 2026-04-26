@@ -135,10 +135,7 @@ impl SemOsVerbOp for GetStatement {
         let statement_id = json_extract_string(args, "statement-id")?;
         let statement_type = json_extract_string_opt(args, "statement-type");
 
-        async fn try_entity(
-            scope: &mut dyn TransactionScope,
-            id: &str,
-        ) -> Result<Option<Value>> {
+        async fn try_entity(scope: &mut dyn TransactionScope, id: &str) -> Result<Option<Value>> {
             let row: Option<(String, Option<String>, Option<String>)> = sqlx::query_as(
                 r#"SELECT statement_id, legal_name, lei
                    FROM "ob-poc".bods_entity_statements
@@ -157,10 +154,7 @@ impl SemOsVerbOp for GetStatement {
             }))
         }
 
-        async fn try_person(
-            scope: &mut dyn TransactionScope,
-            id: &str,
-        ) -> Result<Option<Value>> {
+        async fn try_person(scope: &mut dyn TransactionScope, id: &str) -> Result<Option<Value>> {
             let row: Option<(String, Option<String>, Option<Vec<String>>)> = sqlx::query_as(
                 r#"SELECT statement_id, full_name, nationalities
                    FROM "ob-poc".bods_person_statements

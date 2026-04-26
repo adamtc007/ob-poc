@@ -91,8 +91,9 @@ impl SemOsVerbOp for Set {
         let share_class_id = json_extract_uuid_opt(args, ctx, "share-class");
         let group_container_entity_id = json_extract_uuid_opt(args, ctx, "group-container");
         let group_label = json_extract_string_opt(args, "group-label");
-        let effective_from: Option<chrono::NaiveDate> = json_extract_string_opt(args, "effective-from")
-            .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
+        let effective_from: Option<chrono::NaiveDate> =
+            json_extract_string_opt(args, "effective-from")
+                .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok());
         let source =
             json_extract_string_opt(args, "source").unwrap_or_else(|| "MANUAL".to_string());
         let source_reference = json_extract_string_opt(args, "source-reference");
@@ -239,8 +240,21 @@ impl SemOsVerbOp for MarkAsNominee {
         let holder = json_extract_uuid(args, ctx, "holder")?;
         let notes = json_extract_string_opt(args, "notes");
         let id = upsert_role_profile(
-            scope, issuer, holder, "NOMINEE", "NONE", "UNKNOWN", false, false, None, None, None,
-            None, "MANUAL", None, notes.as_deref(),
+            scope,
+            issuer,
+            holder,
+            "NOMINEE",
+            "NONE",
+            "UNKNOWN",
+            false,
+            false,
+            None,
+            None,
+            None,
+            None,
+            "MANUAL",
+            None,
+            notes.as_deref(),
         )
         .await?;
         Ok(VerbExecutionOutcome::Uuid(id))

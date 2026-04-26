@@ -199,10 +199,7 @@ impl VerbExecutionPortStepExecutor {
     /// Run V1.3-1 gate checks for the given step. Returns Ok(()) if no
     /// errors were found, Err with a violation message otherwise.
     /// Returns Ok(()) when no GatePipeline is attached.
-    async fn pre_dispatch_gate_check(
-        &self,
-        step: &CompiledStep,
-    ) -> Result<(), String> {
+    async fn pre_dispatch_gate_check(&self, step: &CompiledStep) -> Result<(), String> {
         let Some(pipe) = &self.gate_pipeline else {
             return Ok(());
         };
@@ -238,7 +235,10 @@ impl VerbExecutionPortStepExecutor {
             .as_deref()
             .or_else(|| step.verb.split('.').next())
             .ok_or_else(|| {
-                format!("gate-check: cannot infer target_workspace for '{}'", step.verb)
+                format!(
+                    "gate-check: cannot infer target_workspace for '{}'",
+                    step.verb
+                )
             })?;
         let target_slot = meta.target_slot.as_deref().unwrap_or(target_workspace);
 
@@ -248,11 +248,15 @@ impl VerbExecutionPortStepExecutor {
         //   * Any matching from→to pair otherwise (fail-conservative
         //     by checking each)
         let transitions = pipe.registry.transitions_for_verb(&step.verb);
-        let candidates: Vec<&dsl_core::config::dag_registry::TransitionRef> = if let Some(ts) = target_state_opt {
-            transitions.iter().filter(|t| t.to_state.eq_ignore_ascii_case(ts)).collect()
-        } else {
-            transitions.iter().collect()
-        };
+        let candidates: Vec<&dsl_core::config::dag_registry::TransitionRef> =
+            if let Some(ts) = target_state_opt {
+                transitions
+                    .iter()
+                    .filter(|t| t.to_state.eq_ignore_ascii_case(ts))
+                    .collect()
+            } else {
+                transitions.iter().collect()
+            };
 
         if candidates.is_empty() {
             // Verb is gate-metadata-aware but DAG has no matching
@@ -342,12 +346,22 @@ impl VerbExecutionPortStepExecutor {
                 if tos.len() != 1 {
                     return; // ambiguous; skip cascade for safety
                 }
-                tos.into_iter().next().unwrap().to_string()
+                // Length checked above (== 1) — `next()` is Some by construction.
+                let Some(only) = tos.into_iter().next() else {
+                    return;
+                };
+                only.to_string()
             }
         };
 
         let actions = match planner
-            .plan_cascade(target_workspace, target_slot, entity_id, &to_state, &pipe.pool)
+            .plan_cascade(
+                target_workspace,
+                target_slot,
+                entity_id,
+                &to_state,
+                &pipe.pool,
+            )
             .await
         {
             Ok(a) => a,
@@ -571,7 +585,7 @@ mod tests {
     #[test]
     fn hashmap_verb_transition_lookup_construction() {
         use dsl_core::config::types::{
-            DomainConfig, TransitionArgs, VerbConfig, VerbBehavior, VerbsConfig,
+            DomainConfig, TransitionArgs, VerbBehavior, VerbConfig, VerbsConfig,
         };
         use std::collections::HashMap;
 
