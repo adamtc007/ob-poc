@@ -157,12 +157,9 @@ domains:
           side_effects: state_write
         invocation_phrases:
           - "manage entity in client group"
-          - "add entity to client group"
-          - "remove entity from group"
+          - "modify client group membership"
           - "confirm entity membership"
-          - "reject entity from group"
-          - "include entity in group"
-          - "exclude entity from group"
+          - "update entity membership"
         behavior: plugin
         handler: ClientGroupEntityManageOp
         args:

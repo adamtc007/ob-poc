@@ -44,7 +44,6 @@ domains:
           - "request BP clearance"
           - "open BP clearance"
           - "raise booking principal clearance"
-          - "start booking principal clearance"
           - "new BP clearance request"
           - "add BP clearance to deal"
         args:

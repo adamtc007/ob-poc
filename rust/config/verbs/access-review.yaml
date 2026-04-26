@@ -4,6 +4,14 @@ domains:
     verbs:
       create-campaign:
         description: Create access review campaign
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [authoring]
+          side_effects: state_write
+          harm_class: reversible
         behavior: crud
         crud:
           operation: insert
@@ -60,6 +68,14 @@ domains:
         - initiate access certification
       populate-campaign:
         description: Populate campaign with review items based on scope
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [authoring]
+          side_effects: state_write
+          harm_class: reversible
         behavior: plugin
         handler: access_review_populate
         args:
@@ -84,6 +100,14 @@ domains:
         - generate review scope
       launch-campaign:
         description: Launch campaign and notify reviewers
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [governance]
+          side_effects: state_write
+          harm_class: reversible
         behavior: plugin
         handler: access_review_launch
         args:
@@ -102,6 +126,14 @@ domains:
         - kick off access review
       confirm-access:
         description: Confirm access is appropriate
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [review]
+          side_effects: state_write
+          harm_class: reversible
         behavior: crud
         crud:
           operation: update
@@ -128,6 +160,14 @@ domains:
         - confirm entitlement
       revoke-access:
         description: Revoke access - ends the membership
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [destructive]
+          side_effects: state_write
+          harm_class: irreversible
         behavior: plugin
         handler: access_review_revoke
         args:
@@ -153,6 +193,14 @@ domains:
         - cut off access
       extend-access:
         description: Extend access with new end date
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [review]
+          side_effects: state_write
+          harm_class: reversible
         behavior: crud
         crud:
           operation: update
@@ -183,6 +231,14 @@ domains:
         - grant access extension
       escalate-item:
         description: Escalate item for senior review
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [review]
+          side_effects: state_write
+          harm_class: reversible
         behavior: crud
         crud:
           operation: update
@@ -219,6 +275,14 @@ domains:
         - escalate access concern
       bulk-confirm:
         description: Confirm multiple items at once
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [review]
+          side_effects: state_write
+          harm_class: reversible
         behavior: plugin
         handler: access_review_bulk_confirm
         args:
@@ -236,6 +300,14 @@ domains:
         - mass certify
       confirm-all-clean:
         description: Confirm all unflagged items for reviewer
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [review]
+          side_effects: state_write
+          harm_class: reversible
         behavior: plugin
         handler: access_review_confirm_clean
         args:
@@ -254,6 +326,14 @@ domains:
         - clear all good items
       attest:
         description: Formal attestation of reviews with digital signature
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [governance]
+          side_effects: state_write
+          harm_class: reversible
         behavior: plugin
         handler: access_review_attest
         args:
@@ -292,6 +372,14 @@ domains:
         - certify review completion
       process-deadline:
         description: Handle items past deadline
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [automated]
+          side_effects: state_write
+          harm_class: reversible
         behavior: plugin
         handler: access_review_process_deadline
         args:
@@ -317,6 +405,14 @@ domains:
         - escalate overdue reviews
       send-reminders:
         description: Send reminder emails to reviewers with pending items
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [notification]
+          side_effects: emitting
+          harm_class: reversible
         behavior: plugin
         handler: access_review_send_reminders
         args:
@@ -334,6 +430,14 @@ domains:
         - chase outstanding reviews
       my-pending:
         description: Get my pending review items
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [read-only]
+          side_effects: none
+          harm_class: read_only
         behavior: crud
         crud:
           operation: select
@@ -368,6 +472,14 @@ domains:
         - my access reviews
       campaign-status:
         description: Get campaign details with review items
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [read-only]
+          side_effects: none
+          harm_class: read_only
         behavior: crud
         crud:
           operation: select
@@ -393,6 +505,14 @@ domains:
         - review campaign summary
       list-items:
         description: List review items for a campaign
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [read-only]
+          side_effects: none
+          harm_class: read_only
         behavior: crud
         crud:
           operation: list_by_fk
@@ -422,6 +542,14 @@ domains:
         - review item list
       audit-report:
         description: List attestations for audit trail
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [read-only]
+          side_effects: none
+          harm_class: read_only
         behavior: crud
         crud:
           operation: list_by_fk
@@ -447,6 +575,14 @@ domains:
         - compliance audit for reviews
       list-flagged:
         description: List items with detected issues
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: access_review
+          phase_tags: [read-only]
+          side_effects: none
+          harm_class: read_only
         behavior: crud
         crud:
           operation: select

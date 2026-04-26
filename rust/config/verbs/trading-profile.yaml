@@ -548,13 +548,11 @@ domains:
         description: Add a component to the trading profile document
         invocation_phrases:
         - "add component to trading profile"
-        - "add instrument class"
         - "add equity component"
         - "add equity"
         - "add fixed income component"
         - "add fixed income"
         - "add FI component"
-        - "add market"
         - "add allowed currency"
         - "add standing instruction"
         - "add booking rule"
@@ -767,8 +765,6 @@ domains:
         description: Remove a component from the trading profile document
         invocation_phrases:
         - "remove component from trading profile"
-        - "remove instrument class"
-        - "remove market"
         - "remove standing instruction"
         - "remove booking rule"
         - "remove ISDA configuration"

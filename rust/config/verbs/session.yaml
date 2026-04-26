@@ -31,13 +31,11 @@ domains:
         invocation_phrases:
         - "new session"
         - "start new session"
-        - "start fresh"
         - "resume session"
         - "resume"
         - "resume last session"
         - "continue where I left off"
         - "pick up where I left off"
-        - "start over"
         - "restart"
         metadata:
           tier: intent

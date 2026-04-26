@@ -2234,11 +2234,13 @@ fn ci(sh: &Shell) -> Result<()> {
     let react_dir = std::path::Path::new("../ob-poc-ui-react");
     if react_dir.join("node_modules").exists() {
         println!("\n=== Frontend Type Check ===");
-        let prev_dir = std::env::current_dir()?;
-        std::env::set_current_dir(react_dir)?;
-        let tsc_result = cmd!(sh, "npx tsc --noEmit").run();
-        std::env::set_current_dir(prev_dir)?;
-        tsc_result?;
+        // Use Shell::push_dir so xshell uses the correct cwd when
+        // resolving npx — `std::env::set_current_dir` alone doesn't
+        // affect xshell's tracked cwd, which causes `npx tsc` to fall
+        // through to PATH (catching macOS LaTeX `tsc` instead of the
+        // local node_modules tsc).
+        let _push = sh.push_dir(react_dir);
+        cmd!(sh, "npx tsc --noEmit").run()?;
     }
 
     // Governance drift check (requires DATABASE_URL)
@@ -2278,11 +2280,13 @@ fn pre_commit(sh: &Shell) -> Result<()> {
     let react_dir = std::path::Path::new("../ob-poc-ui-react");
     if react_dir.join("node_modules").exists() {
         println!("\n=== Frontend Type Check ===");
-        let prev_dir = std::env::current_dir()?;
-        std::env::set_current_dir(react_dir)?;
-        let tsc_result = cmd!(sh, "npx tsc --noEmit").run();
-        std::env::set_current_dir(prev_dir)?;
-        tsc_result?;
+        // Use Shell::push_dir so xshell uses the correct cwd when
+        // resolving npx — `std::env::set_current_dir` alone doesn't
+        // affect xshell's tracked cwd, which causes `npx tsc` to fall
+        // through to PATH (catching macOS LaTeX `tsc` instead of the
+        // local node_modules tsc).
+        let _push = sh.push_dir(react_dir);
+        cmd!(sh, "npx tsc --noEmit").run()?;
     }
 
     println!("\nPre-commit checks passed!");
