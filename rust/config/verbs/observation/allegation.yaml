@@ -12,14 +12,14 @@ domains:
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
-        - "record client allegation"
-        - "log new allegation for entity"
-        - "capture client claim"
-        - "add allegation to case"
-        - "what did the client allege"
-        - "submit unverified client statement"
-        - "enter allegation about attribute"
-        - "create allegation record"
+          - "record client allegation"
+          - "log new allegation for entity"
+          - "capture client claim"
+          - "add allegation to case"
+          - "what did the client allege"
+          - "submit unverified client statement"
+          - "enter allegation about attribute"
+          - "create allegation record"
         behavior: crud
         crud:
           operation: insert
@@ -27,76 +27,81 @@ domains:
           schema: ob-poc
           returning: allegation_id
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          maps_to: cbu_id
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
-        - name: entity-id
-          type: uuid
-          required: true
-          maps_to: entity_id
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: attribute-id
-          type: uuid
-          required: true
-          maps_to: attribute_id
-          lookup:
-            table: attribute_registry
-            entity_type: attribute
-            schema: ob-poc
-            search_key: attribute_code
-            primary_key: attribute_id
-        - name: value
-          type: json
-          required: true
-          maps_to: alleged_value
-        - name: display-value
-          type: string
-          required: false
-          maps_to: alleged_value_display
-        - name: source
-          type: string
-          required: true
-          maps_to: allegation_source
-        - name: source-reference
-          type: string
-          required: false
-          maps_to: allegation_reference
-        - name: case-id
-          type: uuid
-          required: false
-          maps_to: case_id
-          lookup:
-            table: cases
-            entity_type: kyc_case
-            schema: kyc
-            search_key: case_id
-            primary_key: case_id
-        - name: workstream-id
-          type: uuid
-          required: false
-          maps_to: workstream_id
-          lookup:
-            table: entity_workstreams
-            entity_type: entity_workstream
-            schema: kyc
-            search_key: workstream_id
-            primary_key: workstream_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: attribute-id
+            type: uuid
+            required: true
+            maps_to: attribute_id
+            lookup:
+              table: attribute_registry
+              entity_type: attribute
+              schema: ob-poc
+              search_key: attribute_code
+              primary_key: attribute_id
+          - name: value
+            type: json
+            required: true
+            maps_to: alleged_value
+          - name: display-value
+            type: string
+            required: false
+            maps_to: alleged_value_display
+          - name: source
+            type: string
+            required: true
+            maps_to: allegation_source
+          - name: source-reference
+            type: string
+            required: false
+            maps_to: allegation_reference
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: workstream-id
+            type: uuid
+            required: false
+            maps_to: workstream_id
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: kyc
+              search_key: workstream_id
+              primary_key: workstream_id
         returns:
           type: uuid
           name: allegation_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       verify:
         description: Mark allegation as verified by an observation
         metadata:
@@ -107,14 +112,14 @@ domains:
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
-        - "verify client allegation"
-        - "confirm allegation with evidence"
-        - "mark allegation as verified"
-        - "validate allegation against observation"
-        - "is this allegation confirmed"
-        - "approve the client claim"
-        - "allegation passes verification"
-        - "corroborate client statement"
+          - "verify client allegation"
+          - "confirm allegation with evidence"
+          - "mark allegation as verified"
+          - "validate allegation against observation"
+          - "is this allegation confirmed"
+          - "approve the client claim"
+          - "allegation passes verification"
+          - "corroborate client statement"
         behavior: crud
         crud:
           operation: update
@@ -125,36 +130,41 @@ domains:
             verification_status: VERIFIED
             verified_at: now()
         args:
-        - name: allegation-id
-          type: uuid
-          required: true
-          maps_to: allegation_id
-          lookup:
-            table: client_allegations
-            entity_type: allegation
-            schema: ob-poc
-            search_key: allegation_id
-            primary_key: allegation_id
-        - name: observation-id
-          type: uuid
-          required: true
-          maps_to: verified_by_observation_id
-          lookup:
-            table: attribute_observations
-            entity_type: observation
-            schema: ob-poc
-            search_key: observation_id
-            primary_key: observation_id
-        - name: result
-          type: string
-          required: false
-          maps_to: verification_result
-        - name: notes
-          type: string
-          required: false
-          maps_to: verification_notes
+          - name: allegation-id
+            type: uuid
+            required: true
+            maps_to: allegation_id
+            lookup:
+              table: client_allegations
+              entity_type: allegation
+              schema: ob-poc
+              search_key: allegation_id
+              primary_key: allegation_id
+          - name: observation-id
+            type: uuid
+            required: true
+            maps_to: verified_by_observation_id
+            lookup:
+              table: attribute_observations
+              entity_type: observation
+              schema: ob-poc
+              search_key: observation_id
+              primary_key: observation_id
+          - name: result
+            type: string
+            required: false
+            maps_to: verification_result
+          - name: notes
+            type: string
+            required: false
+            maps_to: verification_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       contradict:
         description: Mark allegation as contradicted by evidence
         metadata:
@@ -165,14 +175,14 @@ domains:
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
-        - "contradict client allegation"
-        - "mark allegation as false"
-        - "evidence disproves allegation"
-        - "flag contradicted claim"
-        - "reject allegation with proof"
-        - "allegation contradicted by observation"
-        - "dispute client statement"
-        - "refute the allegation"
+          - "contradict client allegation"
+          - "mark allegation as false"
+          - "evidence disproves allegation"
+          - "flag contradicted claim"
+          - "reject allegation with proof"
+          - "allegation contradicted by observation"
+          - "dispute client statement"
+          - "refute the allegation"
         behavior: crud
         crud:
           operation: update
@@ -183,36 +193,41 @@ domains:
             verification_status: CONTRADICTED
             verified_at: now()
         args:
-        - name: allegation-id
-          type: uuid
-          required: true
-          maps_to: allegation_id
-          lookup:
-            table: client_allegations
-            entity_type: allegation
-            schema: ob-poc
-            search_key: allegation_id
-            primary_key: allegation_id
-        - name: observation-id
-          type: uuid
-          required: true
-          maps_to: verified_by_observation_id
-          lookup:
-            table: attribute_observations
-            entity_type: observation
-            schema: ob-poc
-            search_key: observation_id
-            primary_key: observation_id
-        - name: result
-          type: string
-          required: false
-          maps_to: verification_result
-        - name: notes
-          type: string
-          required: true
-          maps_to: verification_notes
+          - name: allegation-id
+            type: uuid
+            required: true
+            maps_to: allegation_id
+            lookup:
+              table: client_allegations
+              entity_type: allegation
+              schema: ob-poc
+              search_key: allegation_id
+              primary_key: allegation_id
+          - name: observation-id
+            type: uuid
+            required: true
+            maps_to: verified_by_observation_id
+            lookup:
+              table: attribute_observations
+              entity_type: observation
+              schema: ob-poc
+              search_key: observation_id
+              primary_key: observation_id
+          - name: result
+            type: string
+            required: false
+            maps_to: verification_result
+          - name: notes
+            type: string
+            required: true
+            maps_to: verification_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       mark-partial:
         description: Mark allegation as partially verified
         metadata:
@@ -223,14 +238,14 @@ domains:
           phase_tags: [kyc]
           side_effects: state_write
         invocation_phrases:
-        - "partially verify allegation"
-        - "mark allegation as partial"
-        - "allegation partially confirmed"
-        - "incomplete verification of claim"
-        - "partial evidence for allegation"
-        - "flag partial verification"
-        - "some evidence supports claim"
-        - "allegation needs more corroboration"
+          - "partially verify allegation"
+          - "mark allegation as partial"
+          - "allegation partially confirmed"
+          - "incomplete verification of claim"
+          - "partial evidence for allegation"
+          - "flag partial verification"
+          - "some evidence supports claim"
+          - "allegation needs more corroboration"
         behavior: crud
         crud:
           operation: update
@@ -241,32 +256,37 @@ domains:
             verification_status: PARTIAL
             verified_at: now()
         args:
-        - name: allegation-id
-          type: uuid
-          required: true
-          maps_to: allegation_id
-          lookup:
-            table: client_allegations
-            entity_type: allegation
-            schema: ob-poc
-            search_key: allegation_id
-            primary_key: allegation_id
-        - name: observation-id
-          type: uuid
-          required: true
-          maps_to: verified_by_observation_id
-          lookup:
-            table: attribute_observations
-            entity_type: observation
-            schema: ob-poc
-            search_key: observation_id
-            primary_key: observation_id
-        - name: notes
-          type: string
-          required: true
-          maps_to: verification_notes
+          - name: allegation-id
+            type: uuid
+            required: true
+            maps_to: allegation_id
+            lookup:
+              table: client_allegations
+              entity_type: allegation
+              schema: ob-poc
+              search_key: allegation_id
+              primary_key: allegation_id
+          - name: observation-id
+            type: uuid
+            required: true
+            maps_to: verified_by_observation_id
+            lookup:
+              table: attribute_observations
+              entity_type: observation
+              schema: ob-poc
+              search_key: observation_id
+              primary_key: observation_id
+          - name: notes
+            type: string
+            required: true
+            maps_to: verification_notes
         returns:
           type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list-by-entity:
         description: List allegations for an entity
         metadata:
@@ -277,14 +297,14 @@ domains:
           phase_tags: [kyc]
           side_effects: facts_only
         invocation_phrases:
-        - "list allegations for entity"
-        - "show entity allegations"
-        - "what allegations exist"
-        - "get all claims for person"
-        - "display entity client claims"
-        - "review allegations on file"
-        - "any pending allegations for entity"
-        - "pull up allegations"
+          - "list allegations for entity"
+          - "show entity allegations"
+          - "what allegations exist"
+          - "get all claims for person"
+          - "display entity client claims"
+          - "review allegations on file"
+          - "any pending allegations for entity"
+          - "pull up allegations"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -292,21 +312,27 @@ domains:
           schema: ob-poc
           fk_col: entity_id
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: status
-          type: string
-          required: false
-          maps_to: verification_status
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: status
+            type: string
+            required: false
+            maps_to: verification_status
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-pending:
         description: List pending allegations for a CBU
         metadata:
@@ -317,29 +343,35 @@ domains:
           phase_tags: [kyc]
           side_effects: facts_only
         invocation_phrases:
-        - "list pending allegations"
-        - "show unverified allegations"
-        - "what allegations need review"
-        - "outstanding claims for structure"
-        - "display pending client claims"
-        - "allegations awaiting verification"
-        - "unresolved allegations for CBU"
-        - "which allegations are open"
+          - "list pending allegations"
+          - "show unverified allegations"
+          - "what allegations need review"
+          - "outstanding claims for structure"
+          - "display pending client claims"
+          - "allegations awaiting verification"
+          - "unresolved allegations for CBU"
+          - "which allegations are open"
         behavior: crud
         crud:
           operation: select
           table: client_allegations
           schema: ob-poc
         args:
-        - name: cbu-id
-          type: uuid
-          required: true
-          maps_to: cbu_id
-          lookup:
-            table: cbus
-            entity_type: cbu
-            schema: ob-poc
-            search_key: name
-            primary_key: cbu_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

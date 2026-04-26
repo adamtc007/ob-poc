@@ -64,6 +64,11 @@ domains:
         returns:
           type: uuid
           name: id
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       read:
         description: "Read the root client group record"
         behavior: crud
@@ -96,6 +101,12 @@ domains:
               primary_key: id
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       update:
         description: "Update the root client group record"
         behavior: crud
@@ -144,6 +155,11 @@ domains:
       # ENTITY MEMBERSHIP - Track which entities belong to client groups
       # ============================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       entity-manage:
         description: >
           Consolidated entity lifecycle verb — add, remove, confirm, or reject
@@ -338,15 +354,7 @@ domains:
             default: 100
         returns:
           type: record_set
-          fields:
-            [
-              entity_id,
-              entity_name,
-              membership_type,
-              added_by,
-              tags,
-              created_at,
-            ]
+          fields: [entity_id, entity_name, membership_type, added_by, tags, created_at]
 
       # ============================================================================
       # SHORTHAND TAGS - Human-readable labels for entities
@@ -476,8 +484,7 @@ domains:
             description: "Filter to persona"
         returns:
           type: record_set
-          fields:
-            [tag_id, entity_id, entity_name, tag, persona, source, confidence]
+          fields: [tag_id, entity_id, entity_name, tag, persona, source, confidence]
 
       # ============================================================================
       # SEMANTIC SEARCH - The core capability
@@ -589,8 +596,7 @@ domains:
             description: "Automatically add as 'suspected' membership"
         returns:
           type: record_set
-          fields:
-            [entity_id, entity_name, entity_type, match_reason, already_member]
+          fields: [entity_id, entity_name, entity_type, match_reason, already_member]
         effects:
           - "Searches entities by name patterns"
           - "Searches via GLEIF relationships if available"
@@ -727,8 +733,7 @@ domains:
           - name: entity-id
             type: uuid
             required: true
-            description:
-              "Entity to assign role to"
+            description: "Entity to assign role to"
               # Slot type for scoped entity search within client group
             slot_type: entity_ref
             lookup:
@@ -750,11 +755,9 @@ domains:
           - name: target-entity-id
             type: uuid
             required: false
-            description:
-              "Target entity for directed roles (e.g., IM for which fund)"
+            description: "Target entity for directed roles (e.g., IM for which fund)"
               # Slot type for scoped entity search within client group
-            slot_type:
-              entity_ref
+            slot_type: entity_ref
               # Preferred roles for target entities (typically funds/SICAVs)
             preferred_roles: [FUND, SICAV, UCITS, AIF, SPV]
             lookup:
@@ -856,19 +859,7 @@ domains:
               primary_key: role_id
         returns:
           type: record_set
-          fields:
-            [
-              id,
-              entity_id,
-              entity_name,
-              role_id,
-              role_name,
-              target_entity_id,
-              target_entity_name,
-              effective_from,
-              effective_to,
-              source,
-            ]
+          fields: [id, entity_id, entity_name, role_id, role_name, target_entity_id, target_entity_name, effective_from, effective_to, source]
 
       list-parties:
         description: "List all parties (entities with roles) in a client group"
@@ -909,8 +900,7 @@ domains:
             description: "Include external partners (IM, custodian, etc.)"
         returns:
           type: record_set
-          fields:
-            [entity_id, entity_name, membership_type, roles, role_categories]
+          fields: [entity_id, entity_name, membership_type, roles, role_categories]
 
       # ============================================================================
       # RELATIONSHIP MANAGEMENT - Ownership/control edges within group
@@ -1017,18 +1007,7 @@ domains:
             valid_values: ["ownership", "control", "beneficial", "management"]
         returns:
           type: record_set
-          fields:
-            [
-              id,
-              parent_entity_id,
-              parent_name,
-              child_entity_id,
-              child_name,
-              relationship_kind,
-              canonical_ownership_pct,
-              source_count,
-              review_status,
-            ]
+          fields: [id, parent_entity_id, parent_name, child_entity_id, child_name, relationship_kind, canonical_ownership_pct, source_count, review_status]
 
       # ============================================================================
       # OWNERSHIP SOURCE MANAGEMENT - Multi-source lineage for trust-but-verify
@@ -1060,19 +1039,7 @@ domains:
           - name: source
             type: string
             required: true
-            valid_values:
-              [
-                "client_allegation",
-                "gleif",
-                "bods",
-                "companies_house",
-                "clearstream",
-                "annual_report",
-                "fund_prospectus",
-                "kyc_document",
-                "scraper",
-                "manual",
-              ]
+            valid_values: ["client_allegation", "gleif", "bods", "companies_house", "clearstream", "annual_report", "fund_prospectus", "kyc_document", "scraper", "manual"]
           - name: source-type
             type: string
             required: false
@@ -1201,16 +1168,7 @@ domains:
             default: 50
         returns:
           type: record_set
-          fields:
-            [
-              relationship_id,
-              parent_name,
-              child_name,
-              alleged_pct,
-              source_document_ref,
-              source_document_date,
-              verification_count,
-            ]
+          fields: [relationship_id, parent_name, child_name, alleged_pct, source_document_ref, source_document_date, verification_count]
 
       list-discrepancies:
         description: "List ownership relationships with conflicting source values"
@@ -1246,17 +1204,7 @@ domains:
             description: "Minimum percentage spread to report (default 1%)"
         returns:
           type: record_set
-          fields:
-            [
-              relationship_id,
-              parent_name,
-              child_name,
-              sources,
-              ownership_values,
-              ownership_spread,
-              alleged_pct,
-              verified_pct,
-            ]
+          fields: [relationship_id, parent_name, child_name, sources, ownership_values, ownership_spread, alleged_pct, verified_pct]
 
       # ============================================================================
       # DISCOVERY STATUS - Group-level discovery workflow

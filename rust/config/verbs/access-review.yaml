@@ -19,53 +19,58 @@ domains:
           schema: teams
           returning: campaign_id
         args:
-        - name: name
-          type: string
-          required: true
-          maps_to: name
-        - name: review-type
-          type: string
-          required: true
-          maps_to: review_type
-          valid_values:
-          - QUARTERLY
-          - ANNUAL
-          - TRIGGERED
-          - JOINER_MOVER_LEAVER
-        - name: scope-type
-          type: string
-          required: true
-          maps_to: scope_type
-          valid_values:
-          - ALL
-          - BY_TEAM_TYPE
-          - BY_DELEGATING_ENTITY
-          - SPECIFIC_TEAMS
-          - GOVERNANCE_ONLY
-        - name: scope-filter
-          type: json
-          required: false
-          maps_to: scope_filter
-        - name: deadline
-          type: date
-          required: true
-          maps_to: deadline
-        - name: review-period-start
-          type: date
-          required: false
-          maps_to: review_period_start
-        - name: review-period-end
-          type: date
-          required: false
-          maps_to: review_period_end
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+          - name: review-type
+            type: string
+            required: true
+            maps_to: review_type
+            valid_values:
+              - QUARTERLY
+              - ANNUAL
+              - TRIGGERED
+              - JOINER_MOVER_LEAVER
+          - name: scope-type
+            type: string
+            required: true
+            maps_to: scope_type
+            valid_values:
+              - ALL
+              - BY_TEAM_TYPE
+              - BY_DELEGATING_ENTITY
+              - SPECIFIC_TEAMS
+              - GOVERNANCE_ONLY
+          - name: scope-filter
+            type: json
+            required: false
+            maps_to: scope_filter
+          - name: deadline
+            type: date
+            required: true
+            maps_to: deadline
+          - name: review-period-start
+            type: date
+            required: false
+            maps_to: review_period_start
+          - name: review-period-end
+            type: date
+            required: false
+            maps_to: review_period_end
         produces:
           type: access_review_campaign
         invocation_phrases:
-        - create access review campaign
-        - start new review campaign
-        - launch access review
-        - set up review campaign
-        - initiate access certification
+          - create access review campaign
+          - start new review campaign
+          - launch access review
+          - set up review campaign
+          - initiate access certification
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       populate-campaign:
         description: Populate campaign with review items based on scope
         metadata:
@@ -79,25 +84,25 @@ domains:
         behavior: plugin
         handler: access_review_populate
         args:
-        - name: campaign
-          type: uuid
-          required: true
-          lookup:
-            table: access_review_campaigns
-            entity_type: access_review_campaign
-            schema: teams
-            search_key: name
-            primary_key: campaign_id
+          - name: campaign
+            type: uuid
+            required: true
+            lookup:
+              table: access_review_campaigns
+              entity_type: access_review_campaign
+              schema: teams
+              search_key: name
+              primary_key: campaign_id
         effects:
-        - Creates review items for in-scope memberships
-        - Auto-detects flags and recommendations
-        - Assigns reviewers based on team hierarchy
+          - Creates review items for in-scope memberships
+          - Auto-detects flags and recommendations
+          - Assigns reviewers based on team hierarchy
         invocation_phrases:
-        - populate review campaign
-        - add items to campaign
-        - scope the access review
-        - load review items
-        - generate review scope
+          - populate review campaign
+          - add items to campaign
+          - scope the access review
+          - load review items
+          - generate review scope
       launch-campaign:
         description: Launch campaign and notify reviewers
         metadata:
@@ -111,19 +116,19 @@ domains:
         behavior: plugin
         handler: access_review_launch
         args:
-        - name: campaign
-          type: uuid
-          required: true
+          - name: campaign
+            type: uuid
+            required: true
         effects:
-        - Sets status to ACTIVE
-        - Sends email notifications to reviewers
-        - Schedules reminder notifications
+          - Sets status to ACTIVE
+          - Sends email notifications to reviewers
+          - Schedules reminder notifications
         invocation_phrases:
-        - launch the campaign
-        - activate review campaign
-        - send campaign to reviewers
-        - start the review cycle
-        - kick off access review
+          - launch the campaign
+          - activate review campaign
+          - send campaign to reviewers
+          - start the review cycle
+          - kick off access review
       confirm-access:
         description: Confirm access is appropriate
         metadata:
@@ -144,20 +149,25 @@ domains:
             status: CONFIRMED
             reviewed_at: now()
         args:
-        - name: item
-          type: uuid
-          required: true
-          maps_to: item_id
-        - name: notes
-          type: string
-          required: false
-          maps_to: reviewer_notes
+          - name: item
+            type: uuid
+            required: true
+            maps_to: item_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: reviewer_notes
         invocation_phrases:
-        - confirm access is appropriate
-        - approve this access
-        - certify access
-        - mark access as valid
-        - confirm entitlement
+          - confirm access is appropriate
+          - approve this access
+          - certify access
+          - mark access as valid
+          - confirm entitlement
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       revoke-access:
         description: Revoke access - ends the membership
         metadata:
@@ -171,26 +181,26 @@ domains:
         behavior: plugin
         handler: access_review_revoke
         args:
-        - name: item
-          type: uuid
-          required: true
-        - name: reason
-          type: string
-          required: true
-        - name: effective-date
-          type: date
-          required: false
-          description: 'When to end access (default: immediately)'
+          - name: item
+            type: uuid
+            required: true
+          - name: reason
+            type: string
+            required: true
+          - name: effective-date
+            type: date
+            required: false
+            description: 'When to end access (default: immediately)'
         effects:
-        - Marks review item as REVOKED
-        - Ends membership effective_to date
-        - Logs to audit trail
+          - Marks review item as REVOKED
+          - Ends membership effective_to date
+          - Logs to audit trail
         invocation_phrases:
-        - revoke access
-        - remove access
-        - terminate entitlement
-        - end access
-        - cut off access
+          - revoke access
+          - remove access
+          - terminate entitlement
+          - end access
+          - cut off access
       extend-access:
         description: Extend access with new end date
         metadata:
@@ -211,24 +221,29 @@ domains:
             status: EXTENDED
             reviewed_at: now()
         args:
-        - name: item
-          type: uuid
-          required: true
-          maps_to: item_id
-        - name: extend-to
-          type: date
-          required: true
-          maps_to: extended_to
-        - name: reason
-          type: string
-          required: true
-          maps_to: extension_reason
+          - name: item
+            type: uuid
+            required: true
+            maps_to: item_id
+          - name: extend-to
+            type: date
+            required: true
+            maps_to: extended_to
+          - name: reason
+            type: string
+            required: true
+            maps_to: extension_reason
         invocation_phrases:
-        - extend access
-        - renew access
-        - push back access expiry
-        - extend entitlement date
-        - grant access extension
+          - extend access
+          - renew access
+          - push back access expiry
+          - extend entitlement date
+          - grant access extension
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       escalate-item:
         description: Escalate item for senior review
         metadata:
@@ -249,30 +264,35 @@ domains:
             status: ESCALATED
             escalated_at: now()
         args:
-        - name: item
-          type: uuid
-          required: true
-          maps_to: item_id
-        - name: escalate-to
-          type: uuid
-          required: false
-          maps_to: escalated_to_user_id
-          lookup:
-            table: clients
-            entity_type: user
-            schema: client_portal
-            search_key: email
-            primary_key: client_id
-        - name: reason
-          type: string
-          required: true
-          maps_to: escalation_reason
+          - name: item
+            type: uuid
+            required: true
+            maps_to: item_id
+          - name: escalate-to
+            type: uuid
+            required: false
+            maps_to: escalated_to_user_id
+            lookup:
+              table: clients
+              entity_type: user
+              schema: client_portal
+              search_key: email
+              primary_key: client_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: escalation_reason
         invocation_phrases:
-        - escalate review item
-        - escalate for senior review
-        - flag item for escalation
-        - refer to senior reviewer
-        - escalate access concern
+          - escalate review item
+          - escalate for senior review
+          - flag item for escalation
+          - refer to senior reviewer
+          - escalate access concern
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       bulk-confirm:
         description: Confirm multiple items at once
         metadata:
@@ -286,18 +306,18 @@ domains:
         behavior: plugin
         handler: access_review_bulk_confirm
         args:
-        - name: items
-          type: uuid_list
-          required: true
-        - name: notes
-          type: string
-          required: false
+          - name: items
+            type: uuid_list
+            required: true
+          - name: notes
+            type: string
+            required: false
         invocation_phrases:
-        - bulk confirm items
-        - confirm all selected
-        - batch approve access
-        - confirm multiple items
-        - mass certify
+          - bulk confirm items
+          - confirm all selected
+          - batch approve access
+          - confirm multiple items
+          - mass certify
       confirm-all-clean:
         description: Confirm all unflagged items for reviewer
         metadata:
@@ -311,19 +331,19 @@ domains:
         behavior: plugin
         handler: access_review_confirm_clean
         args:
-        - name: campaign
-          type: uuid
-          required: true
-        - name: reviewer
-          type: uuid
-          required: false
-          description: 'Specific reviewer (default: current user)'
+          - name: campaign
+            type: uuid
+            required: true
+          - name: reviewer
+            type: uuid
+            required: false
+            description: 'Specific reviewer (default: current user)'
         invocation_phrases:
-        - confirm all clean items
-        - approve all unflagged
-        - certify clean items
-        - bulk confirm unflagged
-        - clear all good items
+          - confirm all clean items
+          - approve all unflagged
+          - certify clean items
+          - bulk confirm unflagged
+          - clear all good items
       attest:
         description: Formal attestation of reviews with digital signature
         metadata:
@@ -337,39 +357,39 @@ domains:
         behavior: plugin
         handler: access_review_attest
         args:
-        - name: campaign
-          type: uuid
-          required: true
-        - name: scope
-          type: string
-          required: true
-          valid_values:
-          - FULL_CAMPAIGN
-          - MY_REVIEWS
-          - SPECIFIC_TEAM
-          - SPECIFIC_ITEMS
-        - name: team
-          type: uuid
-          required: false
-          description: Required if scope is SPECIFIC_TEAM
-        - name: items
-          type: uuid_list
-          required: false
-          description: Required if scope is SPECIFIC_ITEMS
-        - name: attestation-text
-          type: string
-          required: false
-          description: 'Custom attestation text (default: standard template)'
+          - name: campaign
+            type: uuid
+            required: true
+          - name: scope
+            type: string
+            required: true
+            valid_values:
+              - FULL_CAMPAIGN
+              - MY_REVIEWS
+              - SPECIFIC_TEAM
+              - SPECIFIC_ITEMS
+          - name: team
+            type: uuid
+            required: false
+            description: Required if scope is SPECIFIC_TEAM
+          - name: items
+            type: uuid_list
+            required: false
+            description: Required if scope is SPECIFIC_ITEMS
+          - name: attestation-text
+            type: string
+            required: false
+            description: 'Custom attestation text (default: standard template)'
         effects:
-        - Creates attestation record with signature hash
-        - Records IP and session context
-        - Logs to audit trail
+          - Creates attestation record with signature hash
+          - Records IP and session context
+          - Logs to audit trail
         invocation_phrases:
-        - attest to review
-        - sign off on review
-        - formal attestation
-        - digitally attest
-        - certify review completion
+          - attest to review
+          - sign off on review
+          - formal attestation
+          - digitally attest
+          - certify review completion
       process-deadline:
         description: Handle items past deadline
         metadata:
@@ -383,26 +403,26 @@ domains:
         behavior: plugin
         handler: access_review_process_deadline
         args:
-        - name: campaign
-          type: uuid
-          required: true
-        - name: action
-          type: string
-          required: true
-          valid_values:
-          - suspend
-          - escalate
-          - report-only
+          - name: campaign
+            type: uuid
+            required: true
+          - name: action
+            type: string
+            required: true
+            valid_values:
+              - suspend
+              - escalate
+              - report-only
         effects:
-        - Suspends unreviewed memberships if action=suspend
-        - Escalates to compliance if action=escalate
-        - Notifies stakeholders
+          - Suspends unreviewed memberships if action=suspend
+          - Escalates to compliance if action=escalate
+          - Notifies stakeholders
         invocation_phrases:
-        - process deadline items
-        - handle overdue reviews
-        - process past-due items
-        - deadline enforcement
-        - escalate overdue reviews
+          - process deadline items
+          - handle overdue reviews
+          - process past-due items
+          - deadline enforcement
+          - escalate overdue reviews
       send-reminders:
         description: Send reminder emails to reviewers with pending items
         metadata:
@@ -416,18 +436,18 @@ domains:
         behavior: plugin
         handler: access_review_send_reminders
         args:
-        - name: campaign
-          type: uuid
-          required: true
+          - name: campaign
+            type: uuid
+            required: true
         effects:
-        - Sends email to reviewers with pending items
-        - Includes countdown to deadline
+          - Sends email to reviewers with pending items
+          - Includes countdown to deadline
         invocation_phrases:
-        - send review reminders
-        - remind reviewers
-        - nudge pending reviewers
-        - send reminder emails
-        - chase outstanding reviews
+          - send review reminders
+          - remind reviewers
+          - nudge pending reviewers
+          - send reminder emails
+          - chase outstanding reviews
       my-pending:
         description: Get my pending review items
         metadata:
@@ -444,32 +464,38 @@ domains:
           table: access_review_items
           schema: teams
         args:
-        - name: campaign
-          type: uuid
-          required: false
-          maps_to: campaign_id
-          description: 'Filter to specific campaign (default: all active)'
-        - name: reviewer
-          type: uuid
-          required: true
-          maps_to: reviewer_user_id
-          lookup:
-            table: clients
-            entity_type: user
-            schema: client_portal
-            search_key: email
-            primary_key: client_id
-        - name: status
-          type: string
-          required: false
-          maps_to: status
-          default: PENDING
+          - name: campaign
+            type: uuid
+            required: false
+            maps_to: campaign_id
+            description: 'Filter to specific campaign (default: all active)'
+          - name: reviewer
+            type: uuid
+            required: true
+            maps_to: reviewer_user_id
+            lookup:
+              table: clients
+              entity_type: user
+              schema: client_portal
+              search_key: email
+              primary_key: client_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+            default: PENDING
         invocation_phrases:
-        - my pending reviews
-        - what's waiting for me
-        - show my review queue
-        - my outstanding items
-        - my access reviews
+          - my pending reviews
+          - what's waiting for me
+          - show my review queue
+          - my outstanding items
+          - my access reviews
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       campaign-status:
         description: Get campaign details with review items
         metadata:
@@ -487,22 +513,28 @@ domains:
           schema: teams
           key: campaign_id
         args:
-        - name: campaign
-          type: uuid
-          required: true
-          maps_to: campaign_id
-          lookup:
-            table: access_review_campaigns
-            entity_type: access_review_campaign
-            schema: teams
-            search_key: name
-            primary_key: campaign_id
+          - name: campaign
+            type: uuid
+            required: true
+            maps_to: campaign_id
+            lookup:
+              table: access_review_campaigns
+              entity_type: access_review_campaign
+              schema: teams
+              search_key: name
+              primary_key: campaign_id
         invocation_phrases:
-        - campaign status
-        - review campaign progress
-        - how's the campaign going
-        - campaign dashboard
-        - review campaign summary
+          - campaign status
+          - review campaign progress
+          - how's the campaign going
+          - campaign dashboard
+          - review campaign summary
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-items:
         description: List review items for a campaign
         metadata:
@@ -520,26 +552,32 @@ domains:
           schema: teams
           fk_col: campaign_id
         args:
-        - name: campaign
-          type: uuid
-          required: true
-          maps_to: campaign_id
-          lookup:
-            table: access_review_campaigns
-            entity_type: access_review_campaign
-            schema: teams
-            search_key: name
-            primary_key: campaign_id
-        - name: status
-          type: string
-          required: false
-          maps_to: status
+          - name: campaign
+            type: uuid
+            required: true
+            maps_to: campaign_id
+            lookup:
+              table: access_review_campaigns
+              entity_type: access_review_campaign
+              schema: teams
+              search_key: name
+              primary_key: campaign_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
         invocation_phrases:
-        - list review items
-        - show campaign items
-        - view review items
-        - list items for campaign
-        - review item list
+          - list review items
+          - show campaign items
+          - view review items
+          - list items for campaign
+          - review item list
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       audit-report:
         description: List attestations for audit trail
         metadata:
@@ -557,22 +595,28 @@ domains:
           schema: teams
           fk_col: campaign_id
         args:
-        - name: campaign
-          type: uuid
-          required: true
-          maps_to: campaign_id
-          lookup:
-            table: access_review_campaigns
-            entity_type: access_review_campaign
-            schema: teams
-            search_key: name
-            primary_key: campaign_id
+          - name: campaign
+            type: uuid
+            required: true
+            maps_to: campaign_id
+            lookup:
+              table: access_review_campaigns
+              entity_type: access_review_campaign
+              schema: teams
+              search_key: name
+              primary_key: campaign_id
         invocation_phrases:
-        - access review audit report
-        - attestation trail
-        - review audit log
-        - certification audit
-        - compliance audit for reviews
+          - access review audit report
+          - attestation trail
+          - review audit log
+          - certification audit
+          - compliance audit for reviews
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-flagged:
         description: List items with detected issues
         metadata:
@@ -589,22 +633,28 @@ domains:
           table: access_review_items
           schema: teams
         args:
-        - name: campaign
-          type: uuid
-          required: true
-          maps_to: campaign_id
-        - name: flag-type
-          type: string
-          required: false
-          valid_values:
-          - legal_expired
-          - legal_expiring
-          - no_legal_link
-          - dormant
-          - never_logged_in
+          - name: campaign
+            type: uuid
+            required: true
+            maps_to: campaign_id
+          - name: flag-type
+            type: string
+            required: false
+            valid_values:
+              - legal_expired
+              - legal_expiring
+              - no_legal_link
+              - dormant
+              - never_logged_in
         invocation_phrases:
-        - list flagged items
-        - show flagged reviews
-        - items with issues
-        - flagged access items
-        - problematic access entries
+          - list flagged items
+          - show flagged reviews
+          - items with issues
+          - flagged access items
+          - problematic access entries
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
