@@ -157,6 +157,12 @@ domains:
           type: uuid
           name: observation_id
           capture: true
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       supersede:
         description: Supersede an observation with a newer one
         metadata:
@@ -343,6 +349,12 @@ domains:
             required: true
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       reconcile:
         description: Compare observations for an attribute and auto-create discrepancies
         metadata:

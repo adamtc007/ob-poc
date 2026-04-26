@@ -448,6 +448,12 @@ domains:
           - nudge pending reviewers
           - send reminder emails
           - chase outstanding reviews
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       my-pending:
         description: Get my pending review items
         metadata:

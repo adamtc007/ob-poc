@@ -355,6 +355,12 @@ domains:
         returns:
           type: record_set
           fields: [entity_id, entity_name, membership_type, added_by, tags, created_at]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       # ============================================================================
       # SHORTHAND TAGS - Human-readable labels for entities
@@ -485,6 +491,12 @@ domains:
         returns:
           type: record_set
           fields: [tag_id, entity_id, entity_name, tag, persona, source, confidence]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       # ============================================================================
       # SEMANTIC SEARCH - The core capability
@@ -554,6 +566,12 @@ domains:
       # DISCOVERY WORKFLOW - Onboarding new client entity universes
       # ============================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       discover-entities:
         description: "Discover entities that might belong to this client (onboarding)"
         behavior: plugin
@@ -602,6 +620,12 @@ domains:
           - "Searches via GLEIF relationships if available"
           - "If auto-add: creates membership with type='suspected'"
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       confirm-entity:
         description: "Confirm a suspected entity as belonging to client"
         behavior: plugin
@@ -860,6 +884,12 @@ domains:
         returns:
           type: record_set
           fields: [id, entity_id, entity_name, role_id, role_name, target_entity_id, target_entity_name, effective_from, effective_to, source]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       list-parties:
         description: "List all parties (entities with roles) in a client group"
@@ -901,6 +931,12 @@ domains:
         returns:
           type: record_set
           fields: [entity_id, entity_name, membership_type, roles, role_categories]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       # ============================================================================
       # RELATIONSHIP MANAGEMENT - Ownership/control edges within group
@@ -1008,6 +1044,12 @@ domains:
         returns:
           type: record_set
           fields: [id, parent_entity_id, parent_name, child_entity_id, child_name, relationship_kind, canonical_ownership_pct, source_count, review_status]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       # ============================================================================
       # OWNERSHIP SOURCE MANAGEMENT - Multi-source lineage for trust-but-verify
@@ -1169,6 +1211,12 @@ domains:
         returns:
           type: record_set
           fields: [relationship_id, parent_name, child_name, alleged_pct, source_document_ref, source_document_date, verification_count]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       list-discrepancies:
         description: "List ownership relationships with conflicting source values"
@@ -1205,6 +1253,12 @@ domains:
         returns:
           type: record_set
           fields: [relationship_id, parent_name, child_name, sources, ownership_values, ownership_spread, alleged_pct, verified_pct]
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
 
       # ============================================================================
       # DISCOVERY STATUS - Group-level discovery workflow

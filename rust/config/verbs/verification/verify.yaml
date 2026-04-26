@@ -660,6 +660,12 @@ domains:
           type: record
           description: Full verification status with patterns, challenges, escalations, confidence
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       verify-against-registry:
         description: Check entity against external registry (GLEIF, Companies House)
         metadata:

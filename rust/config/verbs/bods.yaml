@@ -41,6 +41,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       import:
         description: Bulk import BODS statements from data dump
         invocation_phrases:
@@ -187,6 +193,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-by-entity:
         description: List BODS statements linked to an entity
         metadata:
@@ -264,6 +276,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-persons:
         description: List person statements with beneficial ownership
         metadata:
@@ -347,6 +365,12 @@ domains:
         returns:
           type: record_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       sync-from-gleif:
         description: Sync BODS data from GLEIF reporting exceptions
         metadata:

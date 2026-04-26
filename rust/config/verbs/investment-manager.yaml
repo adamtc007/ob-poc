@@ -425,3 +425,9 @@ domains:
         returns:
           type: record
           description: Matching IM assignment with instruction method
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

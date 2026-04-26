@@ -48,6 +48,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       set:
         description: Set the focus state to a specific registry object
         metadata:
@@ -84,6 +90,12 @@ domains:
       # ============================================
       # Focus Display
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - navigating
+          consequence:
+            baseline: benign
       render:
         description: Render the current focus context (computes ShowPacket with all viewports)
         metadata:
@@ -109,6 +121,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       viewport:
         description: Compute a single viewport by kind (Focus Summary, Inspector, Diff, Gates)
         metadata:
@@ -144,6 +162,12 @@ domains:
       # ============================================
       # Focus Diff
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       diff:
         description: Compute a structured diff between predecessor and current draft
         metadata:
@@ -176,6 +200,12 @@ domains:
       # ============================================
       # Manifest Capture
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       capture-manifest:
         description: Capture and persist a ViewportManifest snapshot of the current focus
         metadata:

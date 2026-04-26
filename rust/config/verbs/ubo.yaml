@@ -218,6 +218,12 @@ domains:
             - name: changed
               type: array
               description: "Changed fields between runs"
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       update-ownership:
         description: Update ownership percentage or end date
         invocation_phrases:
@@ -500,6 +506,12 @@ domains:
             description: Point-in-time date for temporal query (defaults to today)
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       list-owned:
         description: List entities owned by an entity (what does this entity own)
         invocation_phrases:
@@ -709,6 +721,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       compute-chains:
         description: Compute UBO ownership chains for entities linked to a KYC case
         invocation_phrases:

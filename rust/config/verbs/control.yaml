@@ -316,6 +316,12 @@ domains:
               type: array
               description: "Natural persons identified as potential UBOs"
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       build-graph:
         description: |
           Build full control graph for a CBU.
@@ -517,6 +523,12 @@ domains:
             - name: computed_at
               type: timestamp
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       recompute-board-controller:
         description: |
           Recompute the board controller for a CBU.

@@ -779,3 +779,9 @@ domains:
               - CRITICAL
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

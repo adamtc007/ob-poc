@@ -497,6 +497,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       supersession-trail:
         description: "Get the full supersession chain for a KYC case — import runs, corrections, stale UBO runs, reset outreach plans, stale tollgates"
         invocation_phrases:

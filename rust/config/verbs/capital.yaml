@@ -249,6 +249,12 @@ domains:
       # Issuance Events
       # --------------------------------------------------------------------------
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       issue.initial:
         description: Initial issuance of shares (incorporation/fund launch)
         invocation_phrases:
@@ -895,6 +901,12 @@ domains:
         returns:
           type: record_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       dilution.get-summary:
         description: Get dilution summary for an issuer
         invocation_phrases:
@@ -933,6 +945,12 @@ domains:
       # Control Configuration
       # --------------------------------------------------------------------------
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       control-config.set:
         description: Set control thresholds for an issuer
         invocation_phrases:

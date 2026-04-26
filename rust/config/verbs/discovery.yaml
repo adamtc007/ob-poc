@@ -11,8 +11,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: discovery
-          subject_kinds:
-            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
+          subject_kinds: [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -47,6 +46,12 @@ domains:
           type: record
           name: search_result_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       entity-context:
         description: "Return activity and context signals for a single entity"
         metadata:
@@ -84,6 +89,12 @@ domains:
           type: record
           name: entity_context
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       entity-relationships:
         description: "Return relationship graph summary for an entity"
         metadata:
@@ -125,6 +136,12 @@ domains:
           type: record
           name: relationship_graph
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       cascade-research:
         description: "Run search, context, and relationship discovery as one read-only research pass"
         metadata:
@@ -132,8 +149,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: discovery
-          subject_kinds:
-            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
+          subject_kinds: [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -163,6 +179,12 @@ domains:
           type: record
           name: cascade_result
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       available-actions:
         description: "Show the currently available action surface for a domain and entity type"
         metadata:
@@ -170,8 +192,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: discovery
-          subject_kinds:
-            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
+          subject_kinds: [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -205,6 +226,12 @@ domains:
           type: record
           name: action_surface
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       verb-detail:
         description: "Return the full contract for a verb"
         metadata:
@@ -212,8 +239,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: discovery
-          subject_kinds:
-            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
+          subject_kinds: [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -232,6 +258,12 @@ domains:
           type: record
           name: verb_contract
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       valid-transitions:
         description: "Return verbs whose preconditions are currently satisfiable for the grounded entity state"
         metadata:
@@ -239,8 +271,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: discovery
-          subject_kinds:
-            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
+          subject_kinds: [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -269,6 +300,12 @@ domains:
           type: record
           name: valid_transition_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       graph-walk:
         description: "Walk applicable StateGraphs for an entity and return valid and blocked transitions"
         metadata:
@@ -276,8 +313,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: discovery
-          subject_kinds:
-            [entity, cbu, fund, person, company, client-group, deal, kyc-case]
+          subject_kinds: [entity, cbu, fund, person, company, client-group, deal, kyc-case]
           phase_tags: [discovery]
           side_effects: facts_only
           harm_class: read_only
@@ -302,6 +338,12 @@ domains:
           type: record
           name: graph_walk_result
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       inspect-data:
         description: "Inspect entity-scoped data for a domain and optional aspect"
         metadata:
@@ -348,6 +390,12 @@ domains:
           type: record
           name: data_snapshot
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       search-data:
         description: "Search data and schema-adjacent surfaces for a scoped entity"
         metadata:
@@ -396,3 +444,9 @@ domains:
         returns:
           type: record
           name: data_search_results
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

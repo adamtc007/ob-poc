@@ -115,6 +115,12 @@ domains:
           type: record_set
           name: relationships
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       cross-sell-check:
         description: "Check cross-sell opportunities — compare existing offerings against available offerings"
         behavior: plugin

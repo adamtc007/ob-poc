@@ -30,6 +30,12 @@ domains:
           type: record
           description: "Compilation result with bytecode version and diagnostics"
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       start:
         description: "Start a BPMN process instance"
         behavior: plugin
@@ -131,3 +137,9 @@ domains:
         returns:
           type: record
           description: "Process state, fibers, and wait conditions"
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

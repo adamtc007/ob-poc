@@ -47,6 +47,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       health-stale-dryruns:
         description: Check for stale dry-run results older than threshold
         metadata:
@@ -75,6 +81,12 @@ domains:
       # ============================================
       # Cleanup
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       cleanup:
         description: Run retention cleanup on old rejected/failed changesets
         metadata:
@@ -159,6 +171,12 @@ domains:
       # ============================================
       # Reindex Embeddings
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       reindex-embeddings:
         description: Trigger embedding reindex by spawning populate_embeddings binary
         metadata:
@@ -216,3 +234,9 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

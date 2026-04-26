@@ -384,6 +384,12 @@ domains:
       # VALUATION SCHEDULE
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       set-valuation-schedule:
         description: "Set position valuation frequency and timing"
         invocation_phrases:

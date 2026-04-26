@@ -269,3 +269,9 @@ domains:
             - verified_regulators: array of verified regulator codes
             - registrations: array of registration details
             - next_verification_due: date
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

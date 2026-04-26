@@ -118,6 +118,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       execute-plan-step:
         description: Execute a specific step in an agent plan
         metadata:
@@ -190,6 +196,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       record-escalation:
         description: Record an escalation to a human reviewer
         metadata:
@@ -227,6 +239,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       record-disambiguation:
         description: Record a disambiguation prompt and selected choice
         metadata:
@@ -267,6 +285,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       record-observation:
         description: Record an observation on a subject entity
         metadata:
@@ -303,3 +327,9 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
