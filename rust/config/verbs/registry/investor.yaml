@@ -372,6 +372,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: investor-id
+          target_workspace: cbu
+          target_slot: investor_kyc
 
       start-kyc:
         description: Transition from PENDING_DOCUMENTS to KYC_IN_PROGRESS

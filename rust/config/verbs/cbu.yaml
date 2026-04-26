@@ -1686,6 +1686,11 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: evidence-id
+          target_state_arg: verification-status
+          target_workspace: cbu
+          target_slot: cbu_evidence
       list-evidence:
         description: List evidence for a CBU
         invocation_phrases:
