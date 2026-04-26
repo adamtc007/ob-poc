@@ -51,12 +51,6 @@ attribute_op!(AttributeListSinks, "attribute", "list-sinks");
 attribute_op!(AttributeTraceLineage, "attribute", "trace-lineage");
 attribute_op!(AttributeListByDocument, "attribute", "list-by-document");
 attribute_op!(AttributeCheckCoverage, "attribute", "check-coverage");
-attribute_op!(DocumentListAttributes, "document", "list-attributes");
-attribute_op!(
-    DocumentCheckExtractionCoverage,
-    "document",
-    "check-extraction-coverage"
-);
 attribute_op!(AttributeDefineGoverned, "attribute", "define");
 attribute_op!(AttributeDefineInternal, "attribute", "define-internal");
 attribute_op!(AttributeUpdateInternal, "attribute", "update-internal");

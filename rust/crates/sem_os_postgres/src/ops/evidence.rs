@@ -221,13 +221,9 @@ macro_rules! simple_evidence_op {
     };
 }
 
-simple_evidence_op!(Require, "evidence.require", do_require);
-simple_evidence_op!(Link, "evidence.link", do_link);
-simple_evidence_op!(Verify, "evidence.verify", do_verify);
-simple_evidence_op!(Reject, "evidence.reject", do_reject);
-simple_evidence_op!(Waive, "evidence.waive", do_waive);
-
-// Compat aliases: same runner, different FQN.
+// YAML-mastered FQNs (config/verbs/kyc/evidence.yaml). The earlier
+// `evidence.{require,link,verify,reject,waive}` canonicals were
+// Rust-only orphans and have been removed.
 simple_evidence_op!(CreateRequirement, "evidence.create-requirement", do_require);
 simple_evidence_op!(AttachDocument, "evidence.attach-document", do_link);
 simple_evidence_op!(MarkVerified, "evidence.mark-verified", do_verify);

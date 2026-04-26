@@ -16,10 +16,7 @@
 pub mod analysis;
 pub mod board;
 
-pub use analysis::{
-    ControlAnalyze, ControlBuildGraph, ControlIdentifyUbos, ControlReconcileOwnership,
-    ControlTraceChain,
-};
+pub use analysis::{ControlAnalyze, ControlBuildGraph, ControlIdentifyUbos};
 pub use board::{
     ClearBoardControllerOverride, ImportGleifControl, ImportPscRegister, RecomputeBoardController,
     SetBoardController, ShowBoardController,

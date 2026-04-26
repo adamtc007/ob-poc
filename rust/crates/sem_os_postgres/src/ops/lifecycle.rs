@@ -471,16 +471,11 @@ macro_rules! lifecycle_op {
     };
 }
 
-lifecycle_op!(Provision, "lifecycle.provision", do_provision);
-lifecycle_op!(AnalyzeGaps, "lifecycle.analyze-gaps", do_analyze_gaps);
-lifecycle_op!(
-    CheckReadiness,
-    "lifecycle.check-readiness",
-    do_check_readiness
-);
-lifecycle_op!(Discover, "lifecycle.discover", do_discover);
-lifecycle_op!(GeneratePlan, "lifecycle.generate-plan", do_generate_plan);
-lifecycle_op!(ExecutePlan, "lifecycle.execute-plan", do_execute_plan);
+// The original `lifecycle.{provision,analyze-gaps,check-readiness,
+// discover,generate-plan,execute-plan}` canonical FQNs had no YAML
+// declarations and were Rust-only orphans (deleted). Only the
+// YAML-mastered `service-resource.*-lifecycle` aliases remain — they
+// reuse the same `do_*` runners below.
 
 lifecycle_op!(
     ServiceProvisionLifecycle,

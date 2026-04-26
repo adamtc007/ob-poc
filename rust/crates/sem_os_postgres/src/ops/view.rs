@@ -45,7 +45,6 @@ view_op!(Cbu, "cbu");
 view_op!(EntityForest, "entity-forest");
 view_op!(Refine, "refine");
 view_op!(ClearRefinements, "clear-refinements");
-view_op!(Clear, "clear");
 view_op!(SetSelection, "set-selection");
 view_op!(SetLayout, "set-layout");
 view_op!(ReadStatus, "read-status");

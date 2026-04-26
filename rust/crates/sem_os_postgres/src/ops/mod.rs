@@ -157,7 +157,6 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(view::EntityForest));
     registry.register(Arc::new(view::Refine));
     registry.register(Arc::new(view::ClearRefinements));
-    registry.register(Arc::new(view::Clear));
     registry.register(Arc::new(view::SetSelection));
     registry.register(Arc::new(view::SetLayout));
     registry.register(Arc::new(view::ReadStatus));
@@ -192,8 +191,6 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(attribute::AttributeTraceLineage));
     registry.register(Arc::new(attribute::AttributeListByDocument));
     registry.register(Arc::new(attribute::AttributeCheckCoverage));
-    registry.register(Arc::new(attribute::DocumentListAttributes));
-    registry.register(Arc::new(attribute::DocumentCheckExtractionCoverage));
     registry.register(Arc::new(attribute::AttributeDefineGoverned));
     registry.register(Arc::new(attribute::AttributeDefineInternal));
     registry.register(Arc::new(attribute::AttributeUpdateInternal));
@@ -482,8 +479,6 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(control::ControlAnalyze));
     registry.register(Arc::new(control::ControlBuildGraph));
     registry.register(Arc::new(control::ControlIdentifyUbos));
-    registry.register(Arc::new(control::ControlTraceChain));
-    registry.register(Arc::new(control::ControlReconcileOwnership));
     registry.register(Arc::new(control::ShowBoardController));
     registry.register(Arc::new(control::RecomputeBoardController));
     registry.register(Arc::new(control::SetBoardController));
@@ -506,7 +501,6 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(observation::GetCurrent));
     registry.register(Arc::new(observation::Reconcile));
     registry.register(Arc::new(observation::VerifyAllegations));
-    registry.register(Arc::new(observation::ExtractToObservations));
 
     // Phase B slice #37: bods (6 plugin verbs — BODS statement
     // queries + UBO discovery service).
@@ -524,19 +518,17 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(tollgate::Override));
     registry.register(Arc::new(tollgate::GetDecisionReadiness));
 
-    // Phase B slice #39: ubo.calculate / trace-chains / list-owners
-    // (3 plugin verbs — recursive ownership chain + temporal owners).
-    registry.register(Arc::new(ubo_analysis::Calculate));
+    // Phase B slice #39: ubo.trace-chains / list-owners (the canonical
+    // `ubo.calculate` registration was a Rust-only orphan; YAML masters
+    // ubo.trace-chains + ubo.list-owners only).
     registry.register(Arc::new(ubo_analysis::TraceChains));
     registry.register(Arc::new(ubo_analysis::ListOwners));
 
-    // Phase B slice #40: evidence state machine (5 canonical verbs +
-    // 5 compatibility aliases).
-    registry.register(Arc::new(evidence::Require));
-    registry.register(Arc::new(evidence::Link));
-    registry.register(Arc::new(evidence::Verify));
-    registry.register(Arc::new(evidence::Reject));
-    registry.register(Arc::new(evidence::Waive));
+    // Phase B slice #40: evidence state machine. Only the YAML-mastered
+    // alias FQNs (`evidence.create-requirement`, `attach-document`,
+    // `mark-{verified,rejected,waived}`) are registered; the original
+    // canonical ops (`evidence.{require,link,verify,reject,waive}`) had
+    // no YAML and are gone.
     registry.register(Arc::new(evidence::CreateRequirement));
     registry.register(Arc::new(evidence::AttachDocument));
     registry.register(Arc::new(evidence::MarkVerified));
@@ -824,10 +816,12 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // missing-for-entity + compute-requirements; GovernedDocumentRequirementsService
     // still takes PgPool — transitional scope.pool().clone() on the
     // 3 governed ops).
+    // `document.solicit` and `document.solicit-batch` are
+    // `behavior: durable` in YAML (BPMN-Lite workflow) — they are
+    // dispatched via the durable runtime, NOT through the
+    // SemOsVerbOpRegistry. The Rust impls were dead-end registrations.
     registry.register(Arc::new(document::Catalog));
     registry.register(Arc::new(document::Extract));
-    registry.register(Arc::new(document::Solicit));
-    registry.register(Arc::new(document::SolicitBatch));
     registry.register(Arc::new(document::UploadVersion));
     registry.register(Arc::new(document::Verify));
     registry.register(Arc::new(document::Reject));
@@ -872,15 +866,10 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(research_workflow::AuditTrail));
     registry.register(Arc::new(research_workflow::SupersessionTrail));
 
-    // Phase B slice #57: lifecycle.* (12 plugin verbs — 6 canonical
-    // + 6 `service-resource.*-lifecycle` compat aliases). Shared
-    // `do_*` helper functions keep the compat aliases single-line.
-    registry.register(Arc::new(lifecycle::Provision));
-    registry.register(Arc::new(lifecycle::AnalyzeGaps));
-    registry.register(Arc::new(lifecycle::CheckReadiness));
-    registry.register(Arc::new(lifecycle::Discover));
-    registry.register(Arc::new(lifecycle::GeneratePlan));
-    registry.register(Arc::new(lifecycle::ExecutePlan));
+    // Phase B slice #57: service-resource.*-lifecycle (6 plugin verbs).
+    // The original 6 `lifecycle.*` canonical FQNs had no YAML and were
+    // Rust-only orphans; only the YAML-mastered service-resource aliases
+    // remain. Shared `do_*` helpers in lifecycle.rs back both.
     registry.register(Arc::new(lifecycle::ServiceProvisionLifecycle));
     registry.register(Arc::new(lifecycle::ServiceAnalyzeLifecycleGaps));
     registry.register(Arc::new(lifecycle::ServiceCheckLifecycleReadiness));

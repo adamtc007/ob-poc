@@ -327,8 +327,8 @@ pub use onboarding::OnboardingAutoComplete;
 // Phase 5c — refdata_loader relocated. Types accessed via dsl_runtime::domain_ops::refdata_loader.
 // Phase 5c — refdata_ops relocated. Types accessed via dsl_runtime::domain_ops::refdata_ops.
 pub use request_ops::{
-    DocumentRequest, DocumentUpload, DocumentWaive, RequestCancel, RequestCreate, RequestEscalate,
-    RequestExtend, RequestFulfill, RequestOverdue, RequestRemind, RequestWaive,
+    RequestCancel, RequestCreate, RequestEscalate, RequestExtend, RequestFulfill, RequestOverdue,
+    RequestRemind, RequestWaive,
 };
 
 // Phase 5a — semantic_ops relocated to dsl-runtime. Inventory registration
@@ -336,17 +336,12 @@ pub use request_ops::{
 pub use template_ops::{TemplateBatch, TemplateBatchResult, TemplateInvoke, TemplateInvokeResult};
 
 pub use trading_profile::{
-    TradingProfileActivate, TradingProfileAddAllowedCurrency, TradingProfileAddBookingRule,
-    TradingProfileAddComponent, TradingProfileAddCsaCollateral, TradingProfileAddCsaConfig,
-    TradingProfileAddImMandate, TradingProfileAddInstrumentClass, TradingProfileAddIsdaConfig,
-    TradingProfileAddIsdaCoverage, TradingProfileAddMarket, TradingProfileAddSsi,
-    TradingProfileApprove, TradingProfileArchive, TradingProfileCloneTo, TradingProfileCreateDraft,
-    TradingProfileCreateNewVersion, TradingProfileDiff, TradingProfileGetActive,
-    TradingProfileImportVerb, TradingProfileLinkCsaSsi, TradingProfileMaterialize,
-    TradingProfileReject, TradingProfileRemoveBookingRule, TradingProfileRemoveComponent,
-    TradingProfileRemoveCsaConfig, TradingProfileRemoveImMandate,
-    TradingProfileRemoveInstrumentClass, TradingProfileRemoveIsdaConfig,
-    TradingProfileRemoveMarket, TradingProfileRemoveSsi, TradingProfileSetBaseCurrency,
+    TradingProfileActivate, TradingProfileAddComponent, TradingProfileAddInstrumentClass,
+    TradingProfileAddMarket, TradingProfileApprove, TradingProfileArchive, TradingProfileCloneTo,
+    TradingProfileCreateDraft, TradingProfileCreateNewVersion, TradingProfileDiff,
+    TradingProfileGetActive, TradingProfileImportVerb, TradingProfileLinkCsaSsi,
+    TradingProfileMaterialize, TradingProfileReject, TradingProfileRemoveComponent,
+    TradingProfileRemoveInstrumentClass, TradingProfileRemoveMarket, TradingProfileSetBaseCurrency,
     TradingProfileSubmit, TradingProfileUpdateImScope, TradingProfileValidateCoverage,
     TradingProfileValidateGoLiveReady,
 };
@@ -402,10 +397,8 @@ pub use trading_profile::{
 
 // GLEIF operations (LEI data enrichment)
 pub use gleif_ops::{
-    GleifEnrich, GleifGetChildren, GleifGetManagedFunds, GleifGetManager, GleifGetMasterFund,
-    GleifGetParent, GleifGetRecord, GleifGetUmbrella, GleifImportManagedFunds,
-    GleifImportToClientGroup, GleifImportTree, GleifLookup, GleifLookupByIsin, GleifRefresh,
-    GleifResolveSuccessor, GleifSearch, GleifTraceOwnership,
+    GleifEnrich, GleifImportManagedFunds, GleifImportToClientGroup, GleifImportTree, GleifLookup,
+    GleifRefresh, GleifResolveSuccessor, GleifSearch, GleifTraceOwnership,
 };
 
 // =============================================================================
@@ -489,30 +482,29 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(request_ops::RequestRemind));
     registry.register(Arc::new(request_ops::RequestEscalate));
     registry.register(Arc::new(request_ops::RequestWaive));
-    registry.register(Arc::new(request_ops::DocumentRequest));
-    registry.register(Arc::new(request_ops::DocumentUpload));
-    registry.register(Arc::new(request_ops::DocumentWaive));
+    // `document.{request,upload,waive-request}` Rust impls were
+    // Rust-only orphans: `document.solicit` is `behavior: durable` in
+    // YAML (BPMN-Lite workflow), and `document.waive-request` is
+    // `behavior: crud` in YAML — neither dispatches through the
+    // SemOsVerbOpRegistry. The orphan structs have been deleted.
 
     // Phase B Pattern B slice #77: gleif.* (17 verbs — LEI lookup,
     // hierarchy import, ownership trace, successor resolution,
     // client-group import; bridges to crate::gleif::{client, service}
     // and crate::dsl_v2::{execution::DslExecutor, executor::ExecutionContext}
     // for recursive idempotent entity/CBU/role creation).
+    // The 8 `gleif.get-*` and `gleif.lookup-by-isin` Rust structs are
+    // dispatch helpers for `gleif.lookup` (with `target-type: record |
+    // parent | children | manager | managed-funds | master-fund |
+    // umbrella | isin`). YAML masters only the consolidated `lookup`
+    // verb — the per-target-type FQNs were Rust-only orphans.
     registry.register(Arc::new(gleif_ops::GleifEnrich));
     registry.register(Arc::new(gleif_ops::GleifSearch));
     registry.register(Arc::new(gleif_ops::GleifImportTree));
     registry.register(Arc::new(gleif_ops::GleifRefresh));
-    registry.register(Arc::new(gleif_ops::GleifGetRecord));
-    registry.register(Arc::new(gleif_ops::GleifGetParent));
     registry.register(Arc::new(gleif_ops::GleifImportManagedFunds));
-    registry.register(Arc::new(gleif_ops::GleifGetChildren));
     registry.register(Arc::new(gleif_ops::GleifTraceOwnership));
-    registry.register(Arc::new(gleif_ops::GleifGetManagedFunds));
     registry.register(Arc::new(gleif_ops::GleifResolveSuccessor));
-    registry.register(Arc::new(gleif_ops::GleifGetUmbrella));
-    registry.register(Arc::new(gleif_ops::GleifGetManager));
-    registry.register(Arc::new(gleif_ops::GleifGetMasterFund));
-    registry.register(Arc::new(gleif_ops::GleifLookupByIsin));
     registry.register(Arc::new(gleif_ops::GleifImportToClientGroup));
     registry.register(Arc::new(gleif_ops::GleifLookup));
 
@@ -587,22 +579,15 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     ));
     registry.register(Arc::new(trading_profile::TradingProfileAddMarket));
     registry.register(Arc::new(trading_profile::TradingProfileRemoveMarket));
-    registry.register(Arc::new(trading_profile::TradingProfileAddSsi));
-    registry.register(Arc::new(trading_profile::TradingProfileRemoveSsi));
-    registry.register(Arc::new(trading_profile::TradingProfileAddBookingRule));
-    registry.register(Arc::new(trading_profile::TradingProfileRemoveBookingRule));
-    registry.register(Arc::new(trading_profile::TradingProfileAddIsdaConfig));
-    registry.register(Arc::new(trading_profile::TradingProfileAddIsdaCoverage));
-    registry.register(Arc::new(trading_profile::TradingProfileAddCsaConfig));
-    registry.register(Arc::new(trading_profile::TradingProfileAddCsaCollateral));
+    // The 13 trading-profile.{add,remove}-{ssi,booking-rule,isda-config,
+    // isda-coverage,csa-config,csa-collateral,im-mandate,allowed-currency}
+    // Rust structs are dispatch helpers for `trading-profile.add-component`
+    // / `remove-component` (selected by the `component-type:` arg). YAML
+    // masters only the dispatcher verbs — the per-component FQNs were
+    // Rust-only orphans.
     registry.register(Arc::new(trading_profile::TradingProfileLinkCsaSsi));
-    registry.register(Arc::new(trading_profile::TradingProfileRemoveIsdaConfig));
-    registry.register(Arc::new(trading_profile::TradingProfileRemoveCsaConfig));
-    registry.register(Arc::new(trading_profile::TradingProfileAddImMandate));
     registry.register(Arc::new(trading_profile::TradingProfileUpdateImScope));
-    registry.register(Arc::new(trading_profile::TradingProfileRemoveImMandate));
     registry.register(Arc::new(trading_profile::TradingProfileSetBaseCurrency));
-    registry.register(Arc::new(trading_profile::TradingProfileAddAllowedCurrency));
     registry.register(Arc::new(trading_profile::TradingProfileDiff));
     registry.register(Arc::new(trading_profile::TradingProfileValidateCoverage));
     registry.register(Arc::new(trading_profile::TradingProfileValidateGoLiveReady));
@@ -680,6 +665,39 @@ mod tests {
             missing.is_empty(),
             "YAML plugin verbs missing a SemOsVerbOp registration: {:?}",
             missing
+        );
+    }
+
+    #[test]
+    fn test_no_rust_only_verbs_in_registry() {
+        // Reverse direction: every SemOsVerbOp in the registry MUST have
+        // a corresponding YAML declaration with `behavior: plugin`. A
+        // registered op with no YAML means a verb was created in Rust
+        // without going through the catalogue — invisible to verb
+        // search, lint, and the agentic pipeline.
+        use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
+        use std::collections::HashSet;
+
+        let mut sem_os_registry = sem_os_postgres::ops::build_registry();
+        extend_registry(&mut sem_os_registry);
+        let registered: HashSet<String> = sem_os_registry.manifest().into_iter().collect();
+
+        let runtime_reg = runtime_registry();
+        let yaml_plugin_fqns: HashSet<String> = runtime_reg
+            .all_verbs()
+            .filter(|v| matches!(v.behavior, RuntimeBehavior::Plugin(_)))
+            .map(|v| format!("{}.{}", v.domain, v.verb))
+            .collect();
+
+        let mut orphans: Vec<String> = registered.difference(&yaml_plugin_fqns).cloned().collect();
+        orphans.sort();
+
+        assert!(
+            orphans.is_empty(),
+            "SemOsVerbOps registered without a `behavior: plugin` YAML \
+             declaration (Rust-mastered verbs are forbidden — every \
+             verb is mastered in YAML): {:?}",
+            orphans
         );
     }
 
