@@ -112,8 +112,8 @@ domains:
             baseline: reviewable
         transition_args:
           entity_id_arg: clearance-id
-          target_workspace: deal
-          target_slot: booking_principal_clearance
+          target_workspace: booking_principal
+          target_slot: clearance
 
       approve:
         description: "Transition clearance SCREENING → APPROVED (screening passed)"
@@ -151,8 +151,8 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: clearance-id
-          target_workspace: deal
-          target_slot: booking_principal_clearance
+          target_workspace: booking_principal
+          target_slot: clearance
 
       reject:
         description: "Transition clearance SCREENING → REJECTED (screening failed; reopenable)"
@@ -190,8 +190,8 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: clearance-id
-          target_workspace: deal
-          target_slot: booking_principal_clearance
+          target_workspace: booking_principal
+          target_slot: clearance
 
       reopen:
         description: "Transition clearance REJECTED → PENDING (retry after remediation)"
@@ -228,8 +228,8 @@ domains:
             baseline: reviewable
         transition_args:
           entity_id_arg: clearance-id
-          target_workspace: deal
-          target_slot: booking_principal_clearance
+          target_workspace: booking_principal
+          target_slot: clearance
 
       activate:
         description: "Transition clearance APPROVED → ACTIVE (clearance live for this deal)"
@@ -262,8 +262,8 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: clearance-id
-          target_workspace: deal
-          target_slot: booking_principal_clearance
+          target_workspace: booking_principal
+          target_slot: clearance
 
       suspend:
         description: "Transition clearance ACTIVE → SUSPENDED (regulatory hold, audit, dispute)"
@@ -301,8 +301,8 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: clearance-id
-          target_workspace: deal
-          target_slot: booking_principal_clearance
+          target_workspace: booking_principal
+          target_slot: clearance
 
       reinstate:
         description: "Transition clearance SUSPENDED → ACTIVE (lift suspension)"
@@ -336,8 +336,8 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: clearance-id
-          target_workspace: deal
-          target_slot: booking_principal_clearance
+          target_workspace: booking_principal
+          target_slot: clearance
 
       revoke:
         description: "Transition clearance APPROVED|ACTIVE|SUSPENDED → REVOKED (terminal — withdraw clearance)"
@@ -375,5 +375,5 @@ domains:
             baseline: requires_explicit_authorisation
         transition_args:
           entity_id_arg: clearance-id
-          target_workspace: deal
-          target_slot: booking_principal_clearance
+          target_workspace: booking_principal
+          target_slot: clearance

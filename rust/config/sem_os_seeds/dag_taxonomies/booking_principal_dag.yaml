@@ -1,0 +1,238 @@
+# Booking Principal Workspace — DAG Taxonomy (Tranche 4 R3.5 — 2026-04-26)
+#
+# ============================================================================
+# WORKSPACE PURPOSE:
+#
+# Adam's three deal tollgates are BAC + KYC + Booking Principals. BAC and
+# KYC are state-machined (deal.deal_status BAC_APPROVAL gate +
+# kyc.kyc_case in KYC workspace); Booking Principal clearance is the third
+# leg, hoisted into its own workspace so the v1.3 cross-workspace runtime
+# (GateChecker / DerivedStateEvaluator) can enforce the compound gate
+# inter-workspace.
+#
+# Originally R3 placed booking_principal_clearance inside deal_dag and
+# expressed the gate via cross_slot_constraints (intra-DAG). The validator
+# accepted it, but cross_slot_constraints lacks the typed
+# source_state / target_transition fields GateChecker reads at runtime, so
+# the BP gate would not actually fire through the v1.3 stack. R3.5 fixes
+# this by hoisting BP into its own workspace and re-expressing the gate as
+# a real cross_workspace_constraint (kyc workspace pattern).
+#
+# ============================================================================
+# CBU CONSTRUCT RELATIONSHIP:
+#
+# BP clearance is per-(deal, principal). A booking principal is a legal
+# entity authorised to book the deal on behalf of the bank — BNY itself,
+# a sub-custodian, or a delegated counterparty. Each principal must clear
+# screening (sanctions, credit, regulatory) per deal before that deal can
+# transition KYC_CLEARANCE → CONTRACTED. A CBU does not directly own
+# clearances — they hang off the deal that contracts the CBU.
+#
+# Scope: per-(deal, principal) — Adam's option (a) decision. NOT
+# per-principal-global. Same principal must clear independently for each
+# new deal. UNIQUE (booking_principal_id, deal_id, cbu_id) on the carrier
+# table enforces the triple.
+#
+# ============================================================================
+# V1.3 CONVENTIONS APPLIED:
+#
+#   V1.3-1  cross_workspace_constraints: BP APPROVED/ACTIVE → deal
+#           KYC_CLEARANCE → CONTRACTED (declared in deal_dag.yaml as the
+#           target side; this workspace owns the source slot).
+#   V1.3-4  expected_lifetime: long_lived (SUSPENDED state present).
+#
+# ============================================================================
+# OUT OF SCOPE:
+#
+#   - Principal-level catalogue lifecycle (the principal entity itself is
+#     in `entities` with role = 'booking_principal'; this workspace owns
+#     the *clearance* lifecycle, not the principal lifecycle).
+#   - Cascading on REVOKED to upstream deals (single-level cascade only;
+#     the deal_dag CONTRACTED gate already blocks if no clearance is
+#     APPROVED/ACTIVE).
+#
+# PARENT DOCS:
+#   - docs/todo/onboarding-dag-remediation-plan-2026-04-26.md (Slice R3 + R3.5)
+#   - docs/todo/onboarding-dag-deep-review-2026-04-26.md (Finding 3.7)
+#   - docs/todo/catalogue-platform-refinement-v1_3.md (v1.3 conventions)
+#   - rust/migrations/20260429_booking_principal_clearance.sql
+
+version: "1.0"
+workspace: booking_principal
+dag_id: booking_principal_dag
+
+# =============================================================================
+# 1. OVERALL LIFECYCLE — clearance pipeline
+# =============================================================================
+
+overall_lifecycle:
+  id: booking_principal_overall_lifecycle
+  scope: per_clearance
+  derived: true
+  description: >
+    4-phase aggregate over the per-clearance state machine. (1) requested
+    — clearance row created; (2) screened — screening complete (APPROVED
+    or REJECTED); (3) live — clearance ACTIVE on the deal; (4) closed —
+    revoked or rejected terminally.
+
+  phases:
+
+    - name: requested
+      description: "Clearance row exists; screening not yet started."
+      derivation:
+        all_of:
+          - "EXISTS booking_principal_clearances WHERE id = this.clearance_id"
+          - "booking_principal_clearances.clearance_status = 'PENDING'"
+      progression_verbs:
+        - booking-principal-clearance.start-screening
+      next_phase: screened
+
+    - name: screened
+      description: "Screening complete. APPROVED → ready to activate; REJECTED → reopenable."
+      derivation:
+        all_of:
+          - "booking_principal_clearances.clearance_status IN ('SCREENING','APPROVED','REJECTED')"
+      progression_verbs:
+        - booking-principal-clearance.approve
+        - booking-principal-clearance.reject
+        - booking-principal-clearance.activate
+        - booking-principal-clearance.reopen
+      next_phase: live
+
+    - name: live
+      description: "Clearance ACTIVE; principal can book the deal."
+      derivation:
+        all_of:
+          - "booking_principal_clearances.clearance_status IN ('ACTIVE','SUSPENDED')"
+      progression_verbs:
+        - booking-principal-clearance.suspend
+        - booking-principal-clearance.reinstate
+        - booking-principal-clearance.revoke
+      next_phase: closed
+
+    - name: closed
+      description: "Clearance terminally REVOKED."
+      derivation:
+        all_of:
+          - "booking_principal_clearances.clearance_status = 'REVOKED'"
+      progression_verbs: []
+      terminal: true
+
+# =============================================================================
+# 2. SLOTS
+# =============================================================================
+
+slots:
+
+  - id: workspace_root
+    stateless: true
+    description: "Workspace navigation root."
+
+  - id: clearance
+    stateless: false
+    state_machine:
+      id: booking_principal_clearance_lifecycle
+      owner: "ops+credit"
+      expected_lifetime: long_lived      # V1.3-4 (SUSPENDED present)
+      source_entity: '"ob-poc".booking_principal_clearances'
+      state_column: clearance_status
+      scope: per_deal_principal
+      description: |
+        Per-(deal, booking_principal) clearance lifecycle. 7 states:
+        PENDING (entry) → SCREENING → APPROVED / REJECTED → ACTIVE →
+        SUSPENDED → REVOKED (terminal). REJECTED can be reopened back to
+        PENDING for retry. APPROVED/ACTIVE are required to gate the deal
+        KYC_CLEARANCE → CONTRACTED transition (compound BAC+KYC+BP gate
+        declared in deal_dag.yaml cross_workspace_constraints).
+      states:
+        - id: PENDING
+          entry: true
+          description: "Clearance request created; screening not yet started."
+        - id: SCREENING
+          description: "Screening in progress (sanctions, credit, regulatory)."
+        - id: APPROVED
+          description: "Screening passed; ready to activate. Gate-eligible."
+        - id: REJECTED
+          description: "Screening failed. Reopenable to PENDING for retry."
+        - id: ACTIVE
+          description: "Clearance live; principal cleared to book the deal."
+        - id: SUSPENDED
+          description: "Temporarily held (regulatory action, dispute, audit)."
+        - id: REVOKED
+          description: "Terminal — clearance withdrawn permanently."
+      transitions:
+        - from: PENDING
+          to: SCREENING
+          via: booking-principal-clearance.start-screening
+        - from: SCREENING
+          to: APPROVED
+          via: booking-principal-clearance.approve
+        - from: SCREENING
+          to: REJECTED
+          via: booking-principal-clearance.reject
+        - from: REJECTED
+          to: PENDING
+          via: booking-principal-clearance.reopen
+        - from: APPROVED
+          to: ACTIVE
+          via: booking-principal-clearance.activate
+        - from: ACTIVE
+          to: SUSPENDED
+          via: booking-principal-clearance.suspend
+        - from: SUSPENDED
+          to: ACTIVE
+          via: booking-principal-clearance.reinstate
+        - from: [APPROVED, ACTIVE, SUSPENDED]
+          to: REVOKED
+          via: booking-principal-clearance.revoke
+      terminal_states: [REVOKED]
+
+# =============================================================================
+# 3. CROSS-SLOT CONSTRAINTS (intra-DAG)
+# =============================================================================
+
+cross_slot_constraints: []
+
+# =============================================================================
+# 4. CROSS-WORKSPACE CONSTRAINTS (V1.3-1 Mode A)
+# =============================================================================
+# The compound BAC+KYC+BP gate lives in deal_dag.yaml's
+# cross_workspace_constraints (the target side). This workspace declares
+# none — it publishes the source state for that gate.
+
+cross_workspace_constraints: []
+
+# =============================================================================
+# 5. PRODUCT-MODULE GATES
+# =============================================================================
+# Booking Principal clearance applies to every commercial deal regardless
+# of product bundle. No conditional slots.
+
+product_module_gates:
+
+  always_on:
+    - workspace_root
+    - clearance
+
+  conditionally_on: []
+
+# =============================================================================
+# 6. OUT OF SCOPE (P16 three-layer + cross-workspace)
+# =============================================================================
+
+out_of_scope:
+
+  # Principal entity lifecycle — handled in CBU/entity workspace
+  - "Booking principal entity creation (entities table, role assignment)"
+  # Cascade from REVOKED to upstream deal
+  - "REVOKED → deal.OFFBOARDING cascade (single-level cascade only in v1.3)"
+  # Audit / reporting
+  - "Per-clearance audit trail beyond the carrier table's timestamp columns"
+
+# =============================================================================
+# 7. METADATA
+# =============================================================================
+# Authored by: claude (Tranche 4 R3.5), 2026-04-26.
+# Hoisted from deal_dag (R3) into standalone workspace per Adam's option (a).
+# Compound BAC+KYC+BP gate now expressible as v1.3 cross_workspace_constraint.
+# See docs/todo/onboarding-dag-remediation-plan-2026-04-26.md Slice R3 + R3.5.

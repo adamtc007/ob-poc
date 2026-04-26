@@ -96,6 +96,7 @@ pub enum WorkspaceKind {
     OnBoarding,
     SemOsMaintenance,
     LifecycleResources,
+    BookingPrincipal,
 }
 
 impl WorkspaceKind {
@@ -117,6 +118,7 @@ impl WorkspaceKind {
             Self::OnBoarding => "OnBoarding",
             Self::SemOsMaintenance => "SemOS Maintenance",
             Self::LifecycleResources => "Lifecycle Resources",
+            Self::BookingPrincipal => "Booking Principal",
         }
     }
 
@@ -245,6 +247,16 @@ impl WorkspaceKind {
                 default_constellation_map: "lifecycle.resources",
                 supports_handoff_mode: false,
             },
+            Self::BookingPrincipal => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["booking_principal_workspace", "deal_governance"],
+                subject_kinds: vec![],
+                subject_required: false,
+                default_constellation_family: "deal_governance",
+                default_constellation_map: "deal.booking_principal",
+                supports_handoff_mode: false,
+            },
         }
     }
 
@@ -266,6 +278,7 @@ impl WorkspaceKind {
             Self::OnBoarding,
             Self::SemOsMaintenance,
             Self::LifecycleResources,
+            Self::BookingPrincipal,
         ]
     }
 }
@@ -852,6 +865,9 @@ impl WorkspaceKind {
             || msg.contains("capability binding")
         {
             return Some(Self::LifecycleResources);
+        }
+        if msg.contains("booking principal") || msg.contains("bp clearance") {
+            return Some(Self::BookingPrincipal);
         }
         None
     }

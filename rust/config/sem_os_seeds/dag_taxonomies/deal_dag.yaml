@@ -604,78 +604,18 @@ slots:
       terminal_states: [EXECUTED, SUPERSEDED, ARCHIVED]
 
   # ---------------------------------------------------------------------------
-  # 2.2.1 Booking Principal clearance lifecycle (R3 — 2026-04-26)
+  # 2.2.1 Booking Principal clearance — HOISTED to standalone workspace
   # ---------------------------------------------------------------------------
-  # Adam's three deal tollgates are BAC + KYC + Booking Principals. BAC and
-  # KYC are state-machined (deal.deal_status BAC_APPROVAL / kyc.kyc_case);
-  # this slot adds the third (BP) as a state-machined slot inside deal_dag.
+  # Originally R3 (2026-04-26) placed booking_principal_clearance as a slot
+  # inside deal_dag, with the compound gate expressed via
+  # cross_slot_constraints. R3.5 (2026-04-26) hoisted it into a standalone
+  # `booking_principal` workspace (see booking_principal_dag.yaml) so the
+  # compound BAC+KYC+BP gate can be expressed as a real
+  # cross_workspace_constraint readable by the v1.3 GateChecker runtime.
   #
-  # Scope: per-(deal, booking_principal) per Adam's option (a) decision.
-  # NOT per-principal-global — every deal must clear each contributing
-  # booking principal independently. UNIQUE (booking_principal_id, deal_id,
-  # cbu_id) on the carrier table enforces the triple.
-  #
-  # This is NOT a separate workspace — it lives inside deal_dag because BP
-  # clearance is part of the commercial onboarding tollgate, not a
-  # standalone domain.
-
-  - id: booking_principal_clearance
-    stateless: false
-    state_machine:
-      id: booking_principal_clearance_lifecycle
-      owner: "ops+credit"
-      expected_lifetime: long_lived      # V1.3-4 (SUSPENDED present)
-      source_entity: '"ob-poc".booking_principal_clearances'
-      state_column: clearance_status
-      scope: per_deal_principal
-      description: |
-        Per-(deal, booking_principal) clearance lifecycle. 7 states:
-        PENDING (entry) → SCREENING → APPROVED / REJECTED → ACTIVE →
-        SUSPENDED → REVOKED (terminal). REJECTED can be reopened back to
-        PENDING for retry. APPROVED/ACTIVE are required to gate the deal
-        KYC_CLEARANCE → CONTRACTED transition (compound BAC+KYC+BP gate).
-      states:
-        - id: PENDING
-          entry: true
-          description: "Clearance request created; screening not yet started."
-        - id: SCREENING
-          description: "Screening in progress (sanctions, credit, regulatory)."
-        - id: APPROVED
-          description: "Screening passed; ready to activate. Gate-eligible."
-        - id: REJECTED
-          description: "Screening failed. Reopenable to PENDING for retry."
-        - id: ACTIVE
-          description: "Clearance live; principal cleared to book the deal."
-        - id: SUSPENDED
-          description: "Temporarily held (regulatory action, dispute, audit)."
-        - id: REVOKED
-          description: "Terminal — clearance withdrawn permanently."
-      transitions:
-        - from: PENDING
-          to: SCREENING
-          via: booking-principal-clearance.start-screening
-        - from: SCREENING
-          to: APPROVED
-          via: booking-principal-clearance.approve
-        - from: SCREENING
-          to: REJECTED
-          via: booking-principal-clearance.reject
-        - from: REJECTED
-          to: PENDING
-          via: booking-principal-clearance.reopen
-        - from: APPROVED
-          to: ACTIVE
-          via: booking-principal-clearance.activate
-        - from: ACTIVE
-          to: SUSPENDED
-          via: booking-principal-clearance.suspend
-        - from: SUSPENDED
-          to: ACTIVE
-          via: booking-principal-clearance.reinstate
-        - from: [APPROVED, ACTIVE, SUSPENDED]
-          to: REVOKED
-          via: booking-principal-clearance.revoke
-      terminal_states: [REVOKED]
+  # The gate now lives in `cross_workspace_constraints` below
+  # (deal_contracted_requires_bp_approved). This slot is intentionally
+  # absent from deal_dag.
 
   - id: deal_ubo_assessment
     stateless: false
@@ -955,24 +895,11 @@ slots:
 
 cross_slot_constraints:
 
-  # R3 (2026-04-26): compound BAC+KYC+BP gate. Deal CONTRACTED requires
-  # BOTH the client-group KYC case APPROVED (cross_workspace_constraints
-  # below) AND every booking-principal clearance attached to this deal
-  # is APPROVED or ACTIVE. Adam's three deal tollgates: BAC
-  # (deal.deal_status = BAC_APPROVAL gate) + KYC (cross-workspace) +
-  # Booking Principals (this rule). Lives in cross_slot_constraints
-  # because both source slot (booking_principal_clearance) and target
-  # slot (deal) are intra-DAG (same deal workspace).
-  - id: deal_contracted_requires_bp_approved
-    description: |
-      Deal → CONTRACTED requires every booking-principal clearance
-      attached to this deal to be in APPROVED or ACTIVE state. Third
-      leg of Adam's deal tollgate triad (BAC + KYC + BP).
-    rule: |
-      deals.deal_status = 'CONTRACTED'
-        → ALL booking_principal_clearances WHERE deal_id = this.deal_id
-            .clearance_status IN ('APPROVED','ACTIVE')
-    severity: error
+  # R3 (2026-04-26) → R3.5 (2026-04-26): the BP compound gate moved from
+  # cross_slot_constraints to cross_workspace_constraints below
+  # (deal_contracted_requires_bp_approved) once BP was hoisted into its
+  # own workspace. Lives at the v1.3 typed cross_workspace_constraints
+  # path so GateChecker can dispatch on it.
 
   - id: deal_contracted_requires_agreed_rate_card
     description: |
@@ -1087,6 +1014,26 @@ cross_workspace_constraints:
     target_transition: "KYC_CLEARANCE -> CONTRACTED"
     severity: error
 
+  # R3.5 (2026-04-26): compound BAC+KYC+BP gate — third leg.
+  # Deal cannot progress KYC_CLEARANCE → CONTRACTED unless every
+  # booking-principal clearance attached to this deal is APPROVED or
+  # ACTIVE. BP was hoisted into its own workspace (booking_principal_dag)
+  # specifically so this gate can be expressed inter-workspace and
+  # dispatched by GateChecker at runtime.
+  - id: deal_contracted_requires_bp_approved
+    description: |
+      Deal → CONTRACTED requires every booking-principal clearance
+      attached to this deal to be in APPROVED or ACTIVE state. Third
+      leg of Adam's deal tollgate triad (BAC + KYC + BP).
+    source_workspace: booking_principal
+    source_slot: clearance
+    source_state: [APPROVED, ACTIVE]
+    source_predicate: "booking_principal_clearances.deal_id = this_deal.deal_id"
+    target_workspace: deal
+    target_slot: deal
+    target_transition: "KYC_CLEARANCE -> CONTRACTED"
+    severity: error
+
 
 # =============================================================================
 # 5. PRODUCT-MODULE GATES
@@ -1107,7 +1054,7 @@ product_module_gates:
     - deal_onboarding_request
     - deal_document
     - deal_ubo_assessment
-    - booking_principal_clearance
+    # booking_principal_clearance hoisted to booking_principal workspace (R3.5)
     - deal_participant
     - deal_contract
     - deal_sla

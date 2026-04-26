@@ -43,6 +43,7 @@ pub enum SessionWorkspaceKind {
     OnBoarding,
     SemOsMaintenance,
     LifecycleResources,
+    BookingPrincipal,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
