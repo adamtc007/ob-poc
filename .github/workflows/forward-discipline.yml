@@ -1,0 +1,76 @@
+name: Forward Discipline (Stage 2)
+
+# v1.2 Tranche 3 Phase 3.F Stage 2 — Soft enforcement of forward discipline.
+#
+# Per `docs/governance/tranche-3-design-2026-04-26.md` §9, Phase 3.F has
+# four stages. This workflow lands Stage 2: a CI check that flags PRs
+# directly modifying `rust/config/verbs/**` YAML.
+#
+# Direct YAML edits remain technically possible (Stage 1 = pilot) but
+# this gate surfaces a WARNING in the PR run that draws the reviewer's
+# attention. Stage 3 will mount the directory read-only at runtime;
+# Stage 4 will make YAML loading impossible (catalogue loaded
+# exclusively from `catalogue_committed_verbs`).
+#
+# Soft today, hard later: this is the pre-commit-style heads-up that
+# gives author/reviewer time to migrate to the Catalogue workspace
+# proposal flow before forward discipline becomes architectural.
+
+on:
+  pull_request:
+    paths:
+      - 'rust/config/verbs/**'
+
+jobs:
+  flag-direct-edits:
+    name: Flag direct catalogue YAML edits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Identify direct catalogue YAML edits
+        id: scan
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          FILES=$(git diff --name-only "$BASE...$HEAD" -- 'rust/config/verbs/**.yaml')
+          if [ -z "$FILES" ]; then
+            echo "No catalogue YAML changes detected. Forward-discipline check skipped."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          echo "$FILES" > changed-files.txt
+          echo "Changed catalogue files:"
+          cat changed-files.txt
+
+      - name: Forward-discipline soft warning
+        if: steps.scan.outputs.has_changes == 'true'
+        run: |
+          cat <<'EOF'
+          ::warning title=Forward Discipline (v1.2 Tranche 3 Phase 3.F Stage 2)::Direct edits to rust/config/verbs/**.yaml detected. Once Phase 3.F Stage 4 activates, these edits will be architecturally impossible — all catalogue changes must flow through `catalogue.commit-verb-declaration` (the Catalogue workspace).
+
+          For this PR the change is allowed (Stage 1/2 = soft enforcement). To prepare for Stage 4, consider routing the edit through:
+
+            cargo x catalogue propose --verb-fqn <fqn> --file <decl.json>
+            cargo x catalogue commit  --proposal-id <id> --approver <other-author>
+
+          See docs/governance/tranche-3-design-2026-04-26.md §9.
+          EOF
+          echo ""
+          echo "Files touched:"
+          cat changed-files.txt | sed 's/^/  - /'
+
+      - name: Pass through (Stage 2 is non-blocking)
+        if: steps.scan.outputs.has_changes == 'true'
+        run: |
+          # Stage 2 is non-blocking — warnings surface in the PR's
+          # checks UI but the gate doesn't fail. Stage 3 (filesystem
+          # read-only) and Stage 4 (YAML loading removed) make this
+          # a hard architectural enforcement.
+          echo "Stage 2 = soft warning. Pass."
+          exit 0

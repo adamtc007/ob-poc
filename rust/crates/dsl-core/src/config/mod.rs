@@ -28,6 +28,7 @@ pub mod loader;
 pub mod pack_loader;
 pub mod phrase_gen;
 pub mod runbook_composition;
+pub mod tier_gate;
 pub mod types;
 pub mod validator;
 
@@ -46,6 +47,7 @@ pub use runbook_composition::{
     component_a, component_b, component_c, compute_runbook_tier, compute_runbook_tier_with_trace,
     AggregationRule, CrossScopeRule, RunbookStep, RunbookTierTrace,
 };
+pub use tier_gate::{TierGateAction, TierGateDecision};
 pub use types::{
     ActionClass, AppliesTo, ArgConfig, ArgType, ArgValidation, ConfirmPolicyConfig,
     ConsequenceDeclaration, ConsequenceTier, ConstraintRule, CrudConfig, CrudOperation,

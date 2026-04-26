@@ -94,6 +94,9 @@ pub mod deal_routes;
 pub mod observatory_routes;
 
 #[cfg(feature = "server")]
+pub mod catalogue_routes;
+
+#[cfg(feature = "server")]
 pub mod stewardship_routes;
 
 pub mod agent_enrichment;

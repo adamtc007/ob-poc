@@ -13,6 +13,7 @@ mod allianz_harness;
 mod aviva_deal_harness;
 mod bpmn_lite;
 mod calibration;
+mod catalogue;
 mod dag_test;
 mod deal_harness;
 mod entity;
@@ -350,6 +351,17 @@ enum Command {
     Reconcile {
         #[command(subcommand)]
         action: reconcile::ReconcileAction,
+    },
+
+    /// Catalogue authorship commands (Tranche 3 Phase 3.B —
+    /// propose / commit / rollback / list).
+    ///
+    /// Direct-to-DB ergonomic surface for authorship verbs. Production
+    /// authorship goes through Sage / REPL with full ABAC + audit trail;
+    /// these commands are for developer tooling.
+    Catalogue {
+        #[command(subcommand)]
+        action: catalogue::CatalogueAction,
     },
 
     /// Lexicon service commands (compile, lint, bench)
@@ -1426,6 +1438,11 @@ fn main() -> Result<()> {
         Command::Reconcile { action } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(reconcile::run(action))?;
+            Ok(())
+        }
+        Command::Catalogue { action } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(catalogue::run(action))?;
             Ok(())
         }
         Command::Verbs { action } => {
