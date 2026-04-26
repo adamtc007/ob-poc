@@ -132,6 +132,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: reviewable
       reject-decision:
         description: "User rejects a suggested decision"
         invocation_phrases:
@@ -162,6 +168,11 @@ domains:
       # ACTION MANAGEMENT
       # =======================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       record-action:
         description: "Record a research action (Phase 2 execution)"
         metadata:
@@ -536,6 +547,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       pending-decisions:
         description: "List decisions awaiting user input"
         metadata:

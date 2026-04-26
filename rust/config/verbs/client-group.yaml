@@ -214,6 +214,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: reviewable
       entity-add:
         description: "Add an entity to this client group's universe"
         invocation_phrases:
@@ -269,6 +275,11 @@ domains:
           type: uuid
           description: "Membership record ID"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       entity-remove:
         description: "Remove an entity from this client group (or mark historical)"
         invocation_phrases:
@@ -317,6 +328,12 @@ domains:
           type: affected
           description: "Number of rows affected"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id004
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       list-entities:
         description: "List all entities in this client group"
         behavior: plugin
@@ -419,6 +436,11 @@ domains:
           - "Computes tag_norm (normalized)"
           - "Queues embedding computation"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id002 []
+          consequence:
+            baseline: reviewable
       tag-remove:
         description: "Remove a shorthand tag"
         invocation_phrases:
@@ -449,6 +471,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       list-tags:
         description: "List tags for entities in client group"
         behavior: plugin
@@ -674,6 +701,11 @@ domains:
           - "Updates membership_type to 'confirmed'"
           - "If tags provided: creates shorthand tags"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       reject-entity:
         description: "Mark a suspected entity as NOT belonging to client"
         invocation_phrases:
@@ -726,6 +758,11 @@ domains:
       # ROLE MANAGEMENT - Entity roles within client group (uses roles table)
       # ============================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       assign-role:
         description: "Assign a role to an entity within the client group context"
         behavior: plugin
@@ -804,6 +841,11 @@ domains:
           type: uuid
           description: "Role assignment ID"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       remove-role:
         description: "Remove a role assignment from an entity"
         invocation_phrases:
@@ -834,6 +876,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       list-roles:
         description: "List role assignments for entities in a client group"
         behavior: plugin
@@ -1000,6 +1047,11 @@ domains:
           type: uuid
           description: "Relationship ID"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       list-relationships:
         description: "List ownership/control relationships in a client group"
         behavior: plugin
@@ -1112,6 +1164,12 @@ domains:
           type: uuid
           description: "Source record ID"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id003
+            - emitting
+          consequence:
+            baseline: reviewable
       verify-ownership:
         description: "Mark an ownership source as verified"
         behavior: plugin
@@ -1144,6 +1202,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id003
+          consequence:
+            baseline: reviewable
       set-canonical:
         description: "Designate a source as the canonical value for a relationship"
         behavior: plugin
@@ -1177,6 +1240,11 @@ domains:
       # REVIEW WORKFLOW - List unverified and discrepancies
       # ============================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       list-unverified:
         description: "List unverified ownership allegations needing review"
         behavior: plugin
@@ -1306,6 +1374,11 @@ domains:
           - "Sets discovery_status to 'in_progress'"
           - "Records discovery_started_at"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       complete-discovery:
         description: "Mark discovery process as complete"
         behavior: plugin
@@ -1340,3 +1413,8 @@ domains:
         effects:
           - "Sets discovery_status to 'complete'"
           - "Records discovery_completed_at"
+        three_axis:
+          state_effect: preserving
+          external_effects: *id004
+          consequence:
+            baseline: requires_confirmation

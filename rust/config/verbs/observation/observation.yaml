@@ -403,6 +403,12 @@ domains:
             default: true
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: reviewable
       verify-allegations:
         description: Batch verify pending allegations against observations
         metadata:
@@ -453,3 +459,8 @@ domains:
               primary_key: case_id
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable

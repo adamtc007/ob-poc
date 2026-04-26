@@ -42,6 +42,11 @@ domains:
           type: record
           name: contract_pack
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001 []
+          consequence:
+            baseline: reviewable
       read:
         description: "Read a contract pack by ID"
         behavior: crud
@@ -110,3 +115,8 @@ domains:
         returns:
           type: record
           name: contract_template
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable

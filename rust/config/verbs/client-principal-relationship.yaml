@@ -58,6 +58,12 @@ domains:
           type: record
           name: relationship
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       terminate:
         description: "Terminate an active client-principal relationship"
         behavior: plugin
@@ -81,6 +87,12 @@ domains:
           type: affected
           name: rows_affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       list:
         description: "List client-principal relationships with optional status filter"
         behavior: plugin
@@ -153,3 +165,9 @@ domains:
         returns:
           type: record
           name: cross_sell_result
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign

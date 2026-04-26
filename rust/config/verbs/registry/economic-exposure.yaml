@@ -152,6 +152,12 @@ domains:
         returns:
           type: record_set
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       summary:
         description: |
           Get aggregated economic exposure summary for an issuer.

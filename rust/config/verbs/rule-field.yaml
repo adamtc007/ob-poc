@@ -48,6 +48,11 @@ domains:
           type: record
           name: rule_field
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list:
         description: "List all registered fields in the rule field dictionary"
         behavior: plugin

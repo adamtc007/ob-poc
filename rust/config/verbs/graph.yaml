@@ -574,6 +574,12 @@ domains:
             - name: anomalies_persisted
               type: integer
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       compare:
         description: "Compare two graph snapshots to find differences"
         metadata:

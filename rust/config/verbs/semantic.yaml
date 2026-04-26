@@ -145,6 +145,12 @@ domains:
       # PROGRESS QUERIES
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - observational
+          consequence:
+            baseline: benign
       next-actions:
         description: "Get the next actionable stages for a CBU (unblocked, incomplete stages)"
         metadata:
@@ -184,6 +190,11 @@ domains:
           capture: true
           description: "List of actionable stages with suggested verbs"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign
       missing-entities:
         description: "Get entities that are missing for stage completion"
         metadata:
@@ -231,6 +242,11 @@ domains:
       # PROMPT CONTEXT
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign
       prompt-context:
         description: "Get semantic state formatted for agent prompt injection"
         metadata:
@@ -269,3 +285,8 @@ domains:
           type: string
           capture: true
           description: "Formatted string for agent system prompt"
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign

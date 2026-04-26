@@ -400,6 +400,12 @@ domains:
       # GOVERNANCE MEMBERSHIP (Part 6)
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       add-governance-member:
         description: "Add governance member with optional legal appointment link"
         invocation_phrases:

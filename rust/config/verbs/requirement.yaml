@@ -160,6 +160,11 @@ domains:
       # ========================================================================
       # Status Management
       # ========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       waive:
         description: Waive a document requirement (manual override)
         behavior: crud

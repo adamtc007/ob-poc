@@ -86,6 +86,12 @@ domains:
       # ========================================================================
       # List Applied Bundles
       # ========================================================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       list-applied:
         description: List document bundles applied to a CBU
         behavior: plugin

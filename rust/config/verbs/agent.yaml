@@ -218,6 +218,12 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - navigating
+          consequence:
+            baseline: reviewable
       reject-decision:
         description: Reject a checkpoint and skip this decision
         metadata:
@@ -252,6 +258,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       select-decision-option:
         description: Select a specific candidate from checkpoint options
         metadata:
@@ -289,6 +300,12 @@ domains:
       # ============================================
       # Status Operations
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - navigating
+          consequence:
+            baseline: benign
       read-status:
         description: Read current agent status
         metadata:
@@ -404,6 +421,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id002 []
+          consequence:
+            baseline: reviewable
       set-execution-mode:
         description: Set the agent execution mode
         metadata:
@@ -439,6 +461,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       set-authoring-mode:
         description: Set the authoring mode boundary
         metadata:
@@ -484,6 +511,11 @@ domains:
       # ============================================
       # Teaching Operations (Direct Pattern Learning)
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       teach:
         description: Teach a phrase→verb mapping to improve intent recognition
         metadata:
@@ -531,6 +563,12 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id003
+            - emitting
+          consequence:
+            baseline: reviewable
       unteach:
         description: Remove a previously taught phrase→verb mapping
         metadata:
@@ -576,6 +614,11 @@ domains:
           type: record
           capture: false
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id003
+          consequence:
+            baseline: reviewable
       read-teaching-status:
         description: Read recently taught patterns and their embedding status
         metadata:
@@ -817,3 +860,8 @@ domains:
         returns:
           type: record
           capture: false
+        three_axis:
+          state_effect: preserving
+          external_effects: *id003
+          consequence:
+            baseline: reviewable

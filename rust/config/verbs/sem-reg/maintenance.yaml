@@ -115,6 +115,12 @@ domains:
       # ============================================
       # Bootstrap Seeds
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: reviewable
       bootstrap-seeds:
         description: Bootstrap seed bundles into the registry
         metadata:
@@ -143,6 +149,11 @@ domains:
       # ============================================
       # Outbox Drain
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       drain-outbox:
         description: Check outbox event queue status and trigger flush
         metadata:
@@ -210,6 +221,11 @@ domains:
       # ============================================
       # Schema Sync Validation
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       validate-schema-sync:
         description: Validate that schema and registry are in sync (drift detection)
         metadata:

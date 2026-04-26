@@ -214,6 +214,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       close-request:
         description: "Close an outreach request"
         metadata:
@@ -436,3 +442,8 @@ domains:
             - name: items
               type: array
               description: "Outreach items with gap_ref, doc_type, status"
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

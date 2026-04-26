@@ -64,6 +64,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       search:
         description: Search a specific source for entities by name
         invocation_phrases:

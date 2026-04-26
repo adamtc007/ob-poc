@@ -1251,6 +1251,12 @@ domains:
       # CORPORATE ACTIONS POLICY (Intent - writes matrix JSONB)
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       ca.enable-event-types:
         description: Enable CA event types for this trading profile
         invocation_phrases:

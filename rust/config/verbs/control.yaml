@@ -383,6 +383,12 @@ domains:
               type: array
               description: "Any circular ownership/control detected"
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - observational
+          consequence:
+            baseline: benign
       identify-ubos:
         description: |
           Identify all UBOs for a CBU across all control vectors:
@@ -455,6 +461,11 @@ domains:
       # Computes and manages board controller designation
       # ============================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign
       show-board-controller:
         description: |
           Show the computed board controller for a CBU.
@@ -592,6 +603,12 @@ domains:
             - name: recomputed_at
               type: timestamp
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       set-board-controller:
         description: |
           Manually set the board controller for a CBU.
@@ -663,6 +680,12 @@ domains:
             - name: set_at
               type: timestamp
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id002
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       clear-board-controller-override:
         description: |
           Clear a manual board controller override.
@@ -710,6 +733,11 @@ domains:
             - name: computed_controller_entity_id
               type: uuid
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: requires_confirmation
       import-psc-register:
         description: |
           Import board controller data from a PSC (Persons with Significant Control) register.
@@ -779,6 +807,11 @@ domains:
       # Derives governance controller from CONTROL+MANAGEMENT edges
       # ============================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign
       compute-controllers:
         description: |
           Compute governance controllers for a case entity.
@@ -838,6 +871,11 @@ domains:
               type: string
               description: "BOARD_APPOINTMENT, MANAGEMENT_CONTRACT, VOTING_MAJORITY, etc."
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign
       import-gleif-control:
         description: |
           Import control data from GLEIF (Global LEI Foundation).
@@ -899,3 +937,8 @@ domains:
               type: boolean
             - name: imported_at
               type: timestamp
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign

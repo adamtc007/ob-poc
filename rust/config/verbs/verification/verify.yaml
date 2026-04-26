@@ -46,6 +46,12 @@ domains:
           type: record_set
           description: Detected patterns with severity and involved entities
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - observational
+          consequence:
+            baseline: benign
       detect-evasion:
         description: Analyze doc_request history for evasion signals (delays, selective response, changing explanations)
         metadata:
@@ -82,6 +88,11 @@ domains:
       # ============================================
       # Challenge Workflow
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign
       challenge:
         description: Raise formal verification challenge requiring client response
         metadata:
@@ -627,6 +638,11 @@ domains:
           type: record
           description: Confidence result with score, band, breakdown
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign
       get-status:
         description: Get comprehensive verification status report for CBU
         metadata:
@@ -707,6 +723,12 @@ domains:
           type: record
           description: Registry check result with match status and field comparisons
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id002
+            - emitting
+          consequence:
+            baseline: reviewable
       assert:
         description: Declarative gate - assert minimum confidence threshold for CBU/entity
         metadata:
@@ -765,6 +787,11 @@ domains:
       # ============================================
       # Pattern CRUD (for manual pattern management)
       # ============================================
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       record-pattern:
         description: Manually record a detected pattern
         metadata:

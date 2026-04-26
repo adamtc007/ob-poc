@@ -84,6 +84,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       read:
         description: Read a reference data record for the requested domain
         metadata:
@@ -193,3 +199,8 @@ domains:
             required: false
         returns:
           type: void
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

@@ -29,6 +29,12 @@ domains:
           type: batch_control_result
           description: Batch control result with status
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: reviewable
       resume:
         description: Resume a paused batch execution
         metadata:
@@ -56,6 +62,11 @@ domains:
           type: batch_control_result
           description: Batch control result with status
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       continue:
         description: Continue batch execution for N more items
         metadata:
@@ -88,6 +99,11 @@ domains:
           type: batch_control_result
           description: Batch control result with status
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       skip:
         description: Skip the current batch item
         metadata:
@@ -119,6 +135,11 @@ domains:
           type: batch_control_result
           description: Batch control result with status
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable
       abort:
         description: Abort the current batch execution
         metadata:
@@ -150,6 +171,12 @@ domains:
           type: batch_control_result
           description: Batch control result with status
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       status:
         description: Get the current batch execution status
         metadata:
@@ -217,3 +244,8 @@ domains:
         returns:
           type: batch_control_result
           description: Result with success/failure counts
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: reviewable

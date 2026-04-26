@@ -92,6 +92,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - observational
+          consequence:
+            baseline: benign
       link-entity:
         description: Link a local entity to a BODS entity statement
         metadata:
@@ -408,3 +414,8 @@ domains:
             description: Maximum entities to sync
         returns:
           type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: benign

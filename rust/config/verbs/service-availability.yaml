@@ -60,6 +60,11 @@ domains:
           type: record
           name: service_availability
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       list:
         description: "List active service availability for a booking principal"
         behavior: plugin

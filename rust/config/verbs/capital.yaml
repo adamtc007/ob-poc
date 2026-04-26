@@ -102,6 +102,12 @@ domains:
         produces:
           type: share_class
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       share-class.add-identifier:
         description: Add an identifier (ISIN, SEDOL, etc.) to a share class
         invocation_phrases:
@@ -302,6 +308,11 @@ domains:
         produces:
           type: issuance_event
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       issue.new:
         description: Subsequent issuance (capital raise)
         invocation_phrases:
@@ -351,6 +362,11 @@ domains:
         produces:
           type: issuance_event
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       split:
         description: Stock split (e.g., 2:1 doubles shares)
         invocation_phrases:
@@ -399,6 +415,11 @@ domains:
         produces:
           type: issuance_event
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       buyback:
         description: Share buyback into treasury
         invocation_phrases:
@@ -446,6 +467,11 @@ domains:
         produces:
           type: issuance_event
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       cancel:
         description: Permanent share cancellation
         invocation_phrases:
@@ -493,6 +519,11 @@ domains:
       # Dilution Instruments (Options, Warrants, Convertibles)
       # --------------------------------------------------------------------------
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       dilution.grant-options:
         description: Grant stock options to a holder
         invocation_phrases:
@@ -574,6 +605,11 @@ domains:
         produces:
           type: dilution_instrument
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       dilution.issue-warrant:
         description: Issue warrants to an investor
         invocation_phrases:
@@ -638,6 +674,11 @@ domains:
         produces:
           type: dilution_instrument
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       dilution.create-safe:
         description: Create a SAFE (Simple Agreement for Future Equity)
         invocation_phrases:
@@ -701,6 +742,11 @@ domains:
         produces:
           type: dilution_instrument
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       dilution.create-convertible-note:
         description: Create a convertible note
         invocation_phrases:
@@ -765,6 +811,11 @@ domains:
         produces:
           type: dilution_instrument
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       dilution.exercise:
         description: Exercise options/warrants and convert to shares
         invocation_phrases:
@@ -811,6 +862,11 @@ domains:
         produces:
           type: dilution_exercise_event
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       dilution.forfeit:
         description: Forfeit/cancel unvested or unexercised instruments
         invocation_phrases:
@@ -847,6 +903,11 @@ domains:
         returns:
           type: affected
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       dilution.list:
         description: List dilution instruments for an issuer
         invocation_phrases:
@@ -1147,6 +1208,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id002
+            - observational
+          consequence:
+            baseline: benign
       holders:
         description: List all holders for an issuer with ownership percentages
         invocation_phrases:
@@ -1189,3 +1256,8 @@ domains:
             description: Filter to holdings above this percentage
         returns:
           type: record_set
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: benign

@@ -103,6 +103,12 @@ domains:
           - scope the access review
           - load review items
           - generate review scope
+        three_axis:
+          state_effect: preserving
+          external_effects: &id002
+            - emitting
+          consequence:
+            baseline: reviewable
       launch-campaign:
         description: Launch campaign and notify reviewers
         metadata:
@@ -129,6 +135,12 @@ domains:
           - send campaign to reviewers
           - start the review cycle
           - kick off access review
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       confirm-access:
         description: Confirm access is appropriate
         metadata:
@@ -201,6 +213,11 @@ domains:
           - terminate entitlement
           - end access
           - cut off access
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       extend-access:
         description: Extend access with new end date
         metadata:
@@ -318,6 +335,11 @@ domains:
           - batch approve access
           - confirm multiple items
           - mass certify
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       confirm-all-clean:
         description: Confirm all unflagged items for reviewer
         metadata:
@@ -344,6 +366,11 @@ domains:
           - certify clean items
           - bulk confirm unflagged
           - clear all good items
+        three_axis:
+          state_effect: preserving
+          external_effects: *id002
+          consequence:
+            baseline: reviewable
       attest:
         description: Formal attestation of reviews with digital signature
         metadata:
@@ -390,6 +417,12 @@ domains:
           - formal attestation
           - digitally attest
           - certify review completion
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: requires_explicit_authorisation
       process-deadline:
         description: Handle items past deadline
         metadata:
@@ -423,6 +456,12 @@ domains:
           - process past-due items
           - deadline enforcement
           - escalate overdue reviews
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       send-reminders:
         description: Send reminder emails to reviewers with pending items
         metadata:

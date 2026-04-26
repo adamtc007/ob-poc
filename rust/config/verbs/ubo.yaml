@@ -173,6 +173,12 @@ domains:
             - name: chains_captured
               type: integer
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       snapshot.diff:
         description: |
           Compare two UBO determination snapshots by run_id.
@@ -784,6 +790,12 @@ domains:
       # These plugin handlers manage lifecycle events that affect UBO status
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - observational
+          consequence:
+            baseline: benign
       mark-deceased:
         description: Mark a person as deceased and cascade effects to ownership/control relationships
         invocation_phrases:
@@ -823,6 +835,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects: &id001
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       convergence-supersede:
         description: Atomically supersede an ownership relationship with a new one in the convergence model
         invocation_phrases:
@@ -886,6 +904,11 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects: *id001
+          consequence:
+            baseline: requires_confirmation
       transfer-control:
         description: Transfer control relationship from one entity to another
         invocation_phrases:
@@ -965,6 +988,12 @@ domains:
         returns:
           type: record
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: requires_explicit_authorisation
       waive-verification:
         description: Waive verification requirement for a relationship with documented justification
         invocation_phrases:
@@ -1031,6 +1060,12 @@ domains:
       # UBO Chain Terminus - Mark where ownership chain terminates
       # =========================================================================
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: requires_confirmation
       mark-terminus:
         description: Mark an entity as a UBO chain terminus (ownership tracing stops here)
         invocation_phrases:

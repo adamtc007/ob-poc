@@ -265,6 +265,11 @@ domains:
             entity_kind: fund
             description: ID of the newly created fund
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       ensure:
         description: Create or update a fund structure or share class using a fund-type discriminator
         invocation_phrases:
@@ -469,6 +474,11 @@ domains:
           name: entity_id
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
       link-feeder:
         description: Link an existing feeder fund to a master fund (idempotent by parent+child+type)
         invocation_phrases:

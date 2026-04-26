@@ -178,6 +178,12 @@ domains:
           type: uuid
           capture: true
 
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       remove:
         description: "Remove/withdraw registration"
         metadata:
