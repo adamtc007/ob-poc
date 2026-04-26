@@ -1582,6 +1582,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest(
             "/api/observatory",
             create_observatory_router(pool.clone(), sessions.clone(), Some(repl_session_store)),
+        )
+        // v1.2 Tranche 3 Phase 3.D scaffold — Catalogue workspace REST routes.
+        // Read-only proposal list + detail + tier distribution; back-end for the
+        // Observatory's Catalogue-workspace UX (full canvas integration is
+        // Observatory Phase 8 follow-on).
+        .nest(
+            "/api/catalogue",
+            ob_poc::api::catalogue_routes::create_catalogue_router(pool.clone()),
         );
 
     // React dist directory - serve assets from React build
