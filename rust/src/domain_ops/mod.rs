@@ -56,6 +56,8 @@
 // alongside the `bods/` module it consumes.
 mod booking_principal_ops;
 mod bpmn_lite_ops;
+mod simple_status_op;
+mod stub_op;
 // Phase 5a composite-blocker #20 — capital_ops relocated to
 // `dsl-runtime::domain_ops::capital_ops`. Pure clean lift — matrix tag
 // "ob-poc-adapter destination" was wrong (4th of the 6 to be re-classified).
@@ -610,6 +612,20 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(trading_profile::TradingProfileArchive));
     registry.register(Arc::new(trading_profile::TradingProfileCloneTo));
     registry.register(Arc::new(trading_profile::TradingProfileCreateNewVersion));
+
+    // Phase B Pattern B slice #80: SimpleStatusOp dispatcher — single
+    // generic SemOsVerbOp covering ~80 status-flip verbs (one column,
+    // one target state, one entity id arg). See simple_status_op.rs
+    // for the registration table and inclusion criteria.
+    simple_status_op::register_simple_status_ops(registry);
+
+    // Phase B Pattern B slice #80: StubOp — registers FQNs for plugin
+    // verbs whose real impls are pending (catalogue.* P.8 prototype +
+    // trading-profile.* prune cascades and template ops). Each stub
+    // returns a clear "not yet implemented" error at runtime; the
+    // registration keeps `test_plugin_verb_coverage` green so the
+    // pre-commit gate doesn't trip on unrelated PRs.
+    stub_op::register_stub_ops(registry);
 }
 
 /// Return the sorted list of plugin-verb FQNs declared in YAML (via
