@@ -50,3 +50,8 @@ scenario_test!(
     four_layer_chain_end_to_end,
     "tests/fixtures/cross_workspace_dag/four_layer_chain_end_to_end.yaml"
 );
+
+scenario_test!(
+    business_flow_deal_to_resources,
+    "tests/fixtures/cross_workspace_dag/business_flow_deal_to_resources.yaml"
+);

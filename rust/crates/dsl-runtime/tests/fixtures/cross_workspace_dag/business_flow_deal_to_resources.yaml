@@ -1,0 +1,264 @@
+name: "Business flow: Deal → Products → CBU → Subscribe → Services → Resources"
+suite_id: "business_flow_deal_to_resources"
+description: |
+  End-to-end business flow in the order it actually happens commercially:
+
+    Phase 1 — Deal record created (PROSPECT entry)
+    Phase 2 — Products added to deal (deal_product PROPOSED → AGREED)
+    Phase 3 — Deal progresses to CONTRACTED (KYC + BP gates)
+    Phase 4 — CBU created and validated (KYC gate)
+    Phase 5 — CBU subscribes to deal's contracted products
+              (service_consumption per (cbu, service))
+    Phase 6 — Services discovered/published in product catalogue
+              (catalogue.service draft → active gates the subscription)
+    Phase 7 — Resources discovered: capability_binding to
+              application_instance for each service
+              (binding LIVE gates service_consumption ACTIVE)
+
+  Each phase mutates state to advance the world, then check_transitions
+  to verify the cross-workspace gates fire (or pass) as expected.
+
+  Walks 5 cross-workspace constraints:
+    - deal_contracted_requires_kyc_approved      (L1)
+    - deal_contracted_requires_bp_approved        (L1)
+    - cbu_validated_requires_kyc_case_approved    (L2)
+    - service_consumption_requires_deal_contracted (L2→L1, R4)
+    - service_consumption_requires_active_service (L2→L3, R2)
+    - service_consumption_active_requires_live_binding (L2→L4, R8)
+
+entity_aliases:
+  # Phase 1+3: deal + tollgate sources
+  deal-1:    "11111111-0000-0000-0000-000000000001"
+  case-1:    "11111111-0000-0000-0000-000000000002"
+  bpc-1:     "11111111-0000-0000-0000-000000000003"
+  # Phase 2: products on the deal
+  product-custody:   "11111111-0000-0000-0000-000000000010"
+  product-fa:        "11111111-0000-0000-0000-000000000011"
+  # Phase 4: CBU
+  cbu-1:     "11111111-0000-0000-0000-000000000020"
+  # Phase 5: subscriptions (one per product the CBU consumes)
+  consume-custody:   "11111111-0000-0000-0000-000000000030"
+  consume-fa:        "11111111-0000-0000-0000-000000000031"
+  # Phase 6: catalogue services
+  service-custody:   "11111111-0000-0000-0000-000000000040"
+  service-fa:        "11111111-0000-0000-0000-000000000041"
+  # Phase 7: resources
+  app-ccc:           "11111111-0000-0000-0000-000000000050"
+  app-inform:        "11111111-0000-0000-0000-000000000051"
+  binding-custody:   "11111111-0000-0000-0000-000000000060"
+  binding-fa:        "11111111-0000-0000-0000-000000000061"
+
+# Predicates: each cross-workspace constraint's source_predicate exact-matched
+# from the production DAG YAML.
+predicates:
+  # L1: Deal CONTRACTED gates
+  "cases.client_group_id = this_deal.primary_client_group_id":
+    - { target: "deal-1", source: "case-1" }
+  "booking_principal_clearances.deal_id = this_deal.deal_id":
+    - { target: "deal-1", source: "bpc-1" }
+  # L2: CBU VALIDATED gate (cases.sponsor_cbu_id OR cases.client_group_id)
+  "cases.sponsor_cbu_id = this_cbu.cbu_id OR cases.client_group_id = this_cbu.primary_client_group_id":
+    - { target: "cbu-1", source: "case-1" }
+  # L2→L1: service_consumption requires Deal CONTRACTED
+  "deals.primary_client_group_id = this_consumption_cbu.client_group_id":
+    - { target: "consume-custody", source: "deal-1" }
+    - { target: "consume-fa",      source: "deal-1" }
+  # L2→L3: service_consumption requires service.active
+  "services.service_id = this_consumption.service_id":
+    - { target: "consume-custody", source: "service-custody" }
+    - { target: "consume-fa",      source: "service-fa" }
+  # L4: capability_binding LIVE on ACTIVE application_instance
+  "capability_bindings.service_id = this_consumption.service_id AND EXISTS (SELECT 1 FROM \"ob-poc\".application_instances ai WHERE ai.id = capability_bindings.application_instance_id AND ai.lifecycle_status = 'ACTIVE')":
+    - { target: "consume-custody", source: "binding-custody" }
+    - { target: "consume-fa",      source: "binding-fa" }
+
+# ---------------------------------------------------------------------------
+# Phase 1 — Deal created
+# ---------------------------------------------------------------------------
+initial_state:
+  - { workspace: deal,              slot: deal,      entity: "deal-1", state: "PROSPECT" }
+  # KYC + BP exist but not yet APPROVED
+  - { workspace: kyc,               slot: kyc_case,  entity: "case-1", state: "INTAKE" }
+  - { workspace: booking_principal, slot: clearance, entity: "bpc-1",  state: "PENDING" }
+
+steps:
+  # ────────────────────────────────────────────────────────────────────────
+  # PHASE 1: Deal created. No products, no CBU yet.
+  # ────────────────────────────────────────────────────────────────────────
+  - name: "P1: deal in PROSPECT, no L1 gates fire (only KYC_CLEARANCE→CONTRACTED is gated)"
+    check_transition:
+      workspace: deal
+      slot: deal
+      entity: "deal-1"
+      from: "PROSPECT"
+      to: "QUALIFYING"
+    expect:
+      violations: []  # no constraints declared on this transition
+
+  - mutate:
+      - { workspace: deal, slot: deal, entity: "deal-1", state: "QUALIFYING" }
+
+  # ────────────────────────────────────────────────────────────────────────
+  # PHASE 2: Products added to the deal. Internal deal_product lifecycle —
+  # no cross-workspace gates here (deal_product transitions are intra-DAG).
+  # We mutate them straight to AGREED to model "rate cards negotiated".
+  # ────────────────────────────────────────────────────────────────────────
+  - mutate:
+      - { workspace: deal, slot: deal_product, entity: "product-custody", state: "AGREED" }
+      - { workspace: deal, slot: deal_product, entity: "product-fa",      state: "AGREED" }
+
+  # Advance deal through BAC_APPROVAL → KYC_CLEARANCE.
+  - mutate:
+      - { workspace: deal, slot: deal, entity: "deal-1", state: "KYC_CLEARANCE" }
+
+  # ────────────────────────────────────────────────────────────────────────
+  # PHASE 3: Deal CONTRACTED — compound BAC+KYC+BP tollgate fires.
+  # ────────────────────────────────────────────────────────────────────────
+  - name: "P3: deal CONTRACTED BLOCKED — KYC + BP both pending"
+    check_transition:
+      workspace: deal
+      slot: deal
+      entity: "deal-1"
+      from: "KYC_CLEARANCE"
+      to: "CONTRACTED"
+    expect:
+      violations:
+        - { constraint_id: "deal_contracted_requires_kyc_approved",  severity: "error" }
+        - { constraint_id: "deal_contracted_requires_bp_approved",   severity: "error" }
+
+  - mutate:
+      - { workspace: kyc,               slot: kyc_case,  entity: "case-1", state: "APPROVED" }
+      - { workspace: booking_principal, slot: clearance, entity: "bpc-1",  state: "ACTIVE"  }
+
+  - name: "P3: deal CONTRACTED GREEN — both tollgates satisfied"
+    check_transition:
+      workspace: deal
+      slot: deal
+      entity: "deal-1"
+      from: "KYC_CLEARANCE"
+      to: "CONTRACTED"
+    expect:
+      violations: []
+
+  - mutate:
+      - { workspace: deal, slot: deal, entity: "deal-1", state: "CONTRACTED" }
+
+  # ────────────────────────────────────────────────────────────────────────
+  # PHASE 4: CBU created and validated — KYC gate fires.
+  # ────────────────────────────────────────────────────────────────────────
+  - mutate:
+      - { workspace: cbu, slot: cbu, entity: "cbu-1", state: "VALIDATION_PENDING" }
+
+  - name: "P4: CBU VALIDATED gate satisfied (case-1 already APPROVED)"
+    check_transition:
+      workspace: cbu
+      slot: cbu
+      entity: "cbu-1"
+      from: "VALIDATION_PENDING"
+      to: "VALIDATED"
+    expect:
+      violations: []
+
+  - mutate:
+      - { workspace: cbu, slot: cbu, entity: "cbu-1", state: "VALIDATED" }
+
+  # ────────────────────────────────────────────────────────────────────────
+  # PHASE 5: CBU subscribes to the deal's contracted products. Two
+  # service_consumption rows created (one per product). The proposed →
+  # provisioned transition fires both R2 (service.active) and R4 (deal
+  # contracted) gates simultaneously.
+  # ────────────────────────────────────────────────────────────────────────
+  - mutate:
+      - { workspace: cbu, slot: service_consumption, entity: "consume-custody", state: "proposed" }
+      - { workspace: cbu, slot: service_consumption, entity: "consume-fa",      state: "proposed" }
+
+  - name: "P5: subscribe-to-custody BLOCKED — service-custody not yet active in catalogue"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-custody"
+      from: "proposed"
+      to: "provisioned"
+    expect:
+      violations:
+        - { constraint_id: "service_consumption_requires_active_service", severity: "error" }
+        # R4 (deal contracted) is satisfied — only R2 (service active) fires.
+
+  # ────────────────────────────────────────────────────────────────────────
+  # PHASE 6: Services discovered — catalogue entries for the contracted
+  # products are governed and published.
+  # ────────────────────────────────────────────────────────────────────────
+  - mutate:
+      - { workspace: product_maintenance, slot: service, entity: "service-custody", state: "active" }
+      - { workspace: product_maintenance, slot: service, entity: "service-fa",      state: "active" }
+
+  - name: "P6: subscribe-to-custody GREEN now that service-custody is active"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-custody"
+      from: "proposed"
+      to: "provisioned"
+    expect:
+      violations: []
+
+  - name: "P6: subscribe-to-fa GREEN (same gates, both satisfied)"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-fa"
+      from: "proposed"
+      to: "provisioned"
+    expect:
+      violations: []
+
+  - mutate:
+      - { workspace: cbu, slot: service_consumption, entity: "consume-custody", state: "provisioned" }
+      - { workspace: cbu, slot: service_consumption, entity: "consume-fa",      state: "provisioned" }
+
+  # ────────────────────────────────────────────────────────────────────────
+  # PHASE 7: Resources discovered — capability_binding created (DRAFT,
+  # then PILOT) on application_instance, finally LIVE. Once LIVE on an
+  # ACTIVE application_instance, service_consumption can transition to
+  # active (R8 gate satisfied).
+  # ────────────────────────────────────────────────────────────────────────
+  - mutate:
+      - { workspace: lifecycle_resources, slot: application_instance, entity: "app-ccc",     state: "ACTIVE" }
+      - { workspace: lifecycle_resources, slot: application_instance, entity: "app-inform",  state: "ACTIVE" }
+      - { workspace: lifecycle_resources, slot: capability_binding,   entity: "binding-custody", state: "PILOT" }
+      - { workspace: lifecycle_resources, slot: capability_binding,   entity: "binding-fa",      state: "PILOT" }
+
+  - name: "P7: service_consumption ACTIVE BLOCKED — bindings still PILOT (not LIVE)"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-custody"
+      from: "provisioned"
+      to: "active"
+    expect:
+      violations:
+        - { constraint_id: "service_consumption_active_requires_live_binding", severity: "error" }
+
+  - mutate:
+      - { workspace: lifecycle_resources, slot: capability_binding, entity: "binding-custody", state: "LIVE" }
+      - { workspace: lifecycle_resources, slot: capability_binding, entity: "binding-fa",      state: "LIVE" }
+
+  - name: "P7: service_consumption ACTIVE GREEN for custody — binding LIVE on ACTIVE instance"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-custody"
+      from: "provisioned"
+      to: "active"
+    expect:
+      violations: []
+
+  - name: "P7: service_consumption ACTIVE GREEN for fund-accounting — same chain"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-fa"
+      from: "provisioned"
+      to: "active"
+    expect:
+      violations: []
