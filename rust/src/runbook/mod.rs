@@ -66,7 +66,10 @@ pub use response::{
     MissingField, OrchestratorResponse, Remediation, StepPreview,
 };
 pub use sem_os_filter::{filter_verbs_against_allowed_set, SemOsDeniedVerb, SemOsFilterResult};
-pub use step_executor_bridge::{DslExecutorV2StepExecutor, DslStepExecutor, VerbExecutionPortStepExecutor};
+pub use step_executor_bridge::{
+    DslExecutorV2StepExecutor, DslStepExecutor, GatePipeline, HashMapVerbTransitionLookup,
+    VerbExecutionPortStepExecutor, VerbTransitionLookup,
+};
 pub use types::{
     CompiledRunbook, CompiledRunbookId, CompiledRunbookStatus, CompiledStep, ExecutionMode,
     ParkReason, StepCursor,

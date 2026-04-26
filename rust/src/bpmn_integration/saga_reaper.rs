@@ -36,7 +36,9 @@
 //! status) → commit succeeded (or drainer is still working on it, which
 //! is benign — the reaper's grace period lets `pending` rows settle).
 
-use anyhow::{anyhow, Result};
+#![allow(dead_code)]
+
+use anyhow::Result;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Notify;
