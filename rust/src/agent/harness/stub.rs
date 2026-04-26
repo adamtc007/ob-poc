@@ -14,6 +14,7 @@ use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::policy::PolicyGate;
 use crate::sem_reg::abac::ActorContext;
 
+use super::semos_stub::HarnessSemOsClient;
 use super::{ModeExpectations, SessionSeed};
 
 /// Build an OrchestratorContext for stub mode testing.
@@ -56,7 +57,7 @@ pub fn build_stub_context(
         lookup_service: None,
         policy_gate: Arc::new(policy),
         source: UtteranceSource::Chat,
-        sem_os_client: None,
+        sem_os_client: Some(HarnessSemOsClient::new()),
         agent_mode: sem_os_core::authoring::agent_mode::AgentMode::default(),
         goals: vec![],
         stage_focus: None,

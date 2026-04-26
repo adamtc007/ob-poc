@@ -10,6 +10,7 @@
 
 pub mod assertions;
 pub mod runner;
+pub mod semos_stub;
 pub mod stub;
 
 use serde::{Deserialize, Serialize};
