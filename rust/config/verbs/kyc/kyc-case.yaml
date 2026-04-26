@@ -257,6 +257,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: case-id
+          target_workspace: kyc
+          target_slot: kyc_case
       assign:
         description: Assign case to analyst and/or reviewer
         invocation_phrases:
@@ -635,6 +639,11 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: case-id
+          target_state_arg: new-status
+          target_workspace: kyc
+          target_slot: kyc_case
       summarize:
         description: Summarize full case state with workstreams and embedded awaiting requests
         invocation_phrases:

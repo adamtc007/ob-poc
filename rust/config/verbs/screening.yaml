@@ -298,6 +298,10 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: screening-id
+          target_workspace: kyc
+          target_slot: screening
 
       complete:
         description: Record workstream screening completion.
@@ -371,6 +375,11 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: screening-id
+          target_state_arg: status
+          target_workspace: kyc
+          target_slot: screening
 
       review-hit:
         description: Review a screening hit for a workstream screening.
@@ -449,6 +458,10 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
+        transition_args:
+          entity_id_arg: screening-id
+          target_workspace: kyc
+          target_slot: screening
 
       bulk-refresh:
         description: Refresh screening coverage for all workstreams in a case.

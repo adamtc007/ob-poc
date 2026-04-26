@@ -126,6 +126,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: registry-id
+          target_workspace: kyc
+          target_slot: kyc_ubo_registry
 
       advance:
         description: "Advance a UBO registry entry through the state machine"
@@ -170,6 +174,11 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: registry-id
+          target_state_arg: new-status
+          target_workspace: kyc
+          target_slot: kyc_ubo_registry
 
       waive:
         description: "Waive a UBO registry entry with authority and reason"
@@ -242,6 +251,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: registry-id
+          target_workspace: kyc
+          target_slot: kyc_ubo_registry
 
       expire:
         description: "Expire a UBO registry entry (terminal state)"
@@ -275,3 +288,7 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: registry-id
+          target_workspace: kyc
+          target_slot: kyc_ubo_registry

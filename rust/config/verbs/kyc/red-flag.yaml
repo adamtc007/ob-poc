@@ -159,6 +159,10 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
       waive:
         description: Waive red flag with justification
         metadata:
@@ -215,6 +219,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
 
       close:
         description: Close a red flag with a generic resolution outcome
@@ -267,6 +275,10 @@ domains:
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
 
       dismiss:
         description: Dismiss red flag as false positive
@@ -320,6 +332,10 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
       set-blocking:
         description: Set red flag as blocking the case
         metadata:
@@ -366,6 +382,10 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: red-flag-id
+          target_workspace: kyc
+          target_slot: red_flag
       list-by-case:
         description: List red flags for a case
         metadata:
