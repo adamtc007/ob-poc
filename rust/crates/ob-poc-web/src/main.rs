@@ -389,8 +389,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let verb_sync_service = VerbSyncService::new(pool.clone());
     let config_loader = ConfigLoader::from_env();
 
+    // Tranche 3 Phase 3.F Stages 3+4 — log + seed catalogue source.
+    // CATALOGUE_SOURCE=db enables forward-discipline: the catalogue is
+    // loaded from `catalogue_committed_verbs` rather than YAML.
+    // Currently we LOG the resolved source + opportunistically seed the
+    // DB table; full Stage 4 swap-out (replace all `load_verbs()` with
+    // DB load) is a separate refactor.
+    let catalogue_source = dsl_runtime::catalogue_loader::CatalogueSource::from_env();
+    tracing::info!(
+        "Catalogue source: {:?} (Tranche 3 Phase 3.F Stage {})",
+        catalogue_source,
+        match catalogue_source {
+            dsl_runtime::catalogue_loader::CatalogueSource::Yaml => "1/2 (YAML primary)",
+            dsl_runtime::catalogue_loader::CatalogueSource::Db => "3/4 (DB primary)",
+        }
+    );
+
     match config_loader.load_verbs() {
         Ok(verbs_config) => {
+            // Stage 3+4 seed: when CATALOGUE_SOURCE=db, ensure the DB table
+            // is populated from the YAML at boot. This is the bridge
+            // between Stages 1/2 (YAML primary) and Stage 4 (DB primary,
+            // YAML removed).
+            if matches!(
+                catalogue_source,
+                dsl_runtime::catalogue_loader::CatalogueSource::Db
+            ) {
+                let seed_pool = pool.clone();
+                let seed_cfg = verbs_config.clone();
+                tokio::spawn(async move {
+                    match dsl_runtime::catalogue_loader::seed_committed_verbs_from_yaml(
+                        &seed_pool, &seed_cfg,
+                    )
+                    .await
+                    {
+                        Ok(n) => tracing::info!(
+                            "Seeded {} verbs into catalogue_committed_verbs (Stage 3+4 ready)",
+                            n
+                        ),
+                        Err(e) => tracing::warn!("catalogue seed failed: {}", e),
+                    }
+                });
+            }
+
             // Use from_config_with_db to expand dynamic verbs from entity_types table
             // This generates entity.create-{type_code} verbs for ALL entity types in DB
             let registry =
