@@ -1,0 +1,51 @@
+name: "Service consumption requires Deal CONTRACTED (R4)"
+suite_id: "service_consumption_requires_deal"
+description: |
+  Closes the last cross-workspace constraint coverage gap. R4 wired
+  service_consumption.proposed → provisioned to require a Deal in
+  CONTRACTED+ for the CBU's client_group. Previously a CBU could
+  start consuming services with no commercial agreement.
+
+mode: mock
+
+entity_aliases:
+  consume-1: "88888888-0000-0000-0000-000000000001"
+  deal-1:    "88888888-0000-0000-0000-000000000002"
+  service-1: "88888888-0000-0000-0000-000000000003"
+
+initial_state:
+  - { workspace: cbu, slot: service_consumption, entity: "consume-1", state: "proposed" }
+  - { workspace: deal, slot: deal, entity: "deal-1", state: "QUALIFYING" }
+  # Need this satisfied so we isolate the deal-contracted gate failure
+  - { workspace: product_maintenance, slot: service, entity: "service-1", state: "active" }
+
+predicates:
+  "deals.primary_client_group_id = this_consumption_cbu.client_group_id":
+    - { target: "consume-1", source: "deal-1" }
+  "services.service_id = this_consumption.service_id":
+    - { target: "consume-1", source: "service-1" }
+
+steps:
+  - name: "blocked: Deal still QUALIFYING (not CONTRACTED+)"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-1"
+      from: "proposed"
+      to: "provisioned"
+    expect:
+      violations:
+        - { constraint_id: "service_consumption_requires_deal_contracted", severity: "error" }
+
+  - mutate:
+      - { workspace: deal, slot: deal, entity: "deal-1", state: "CONTRACTED" }
+
+  - name: "succeeds: Deal CONTRACTED + service active"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-1"
+      from: "proposed"
+      to: "provisioned"
+    expect:
+      violations: []

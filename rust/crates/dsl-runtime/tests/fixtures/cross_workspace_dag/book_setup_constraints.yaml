@@ -1,0 +1,80 @@
+name: "Book setup cross-workspace constraints"
+suite_id: "book_setup_constraints"
+description: |
+  Exercises both book_setup constraints:
+  - book_cbus_scaffolded_requires_kyc_case_in_progress (KYC must be at
+    least DISCOVERY before book → cbus_scaffolded)
+  - book_ready_requires_deal_contracted_gate (advisory: book →
+    ready_for_deal flagged when no Deal in KYC_CLEARANCE+)
+
+mode: mock
+
+entity_aliases:
+  book-1: "44444444-0000-0000-0000-000000000001"
+  case-1: "44444444-0000-0000-0000-000000000002"
+  deal-1: "44444444-0000-0000-0000-000000000003"
+
+initial_state:
+  - { workspace: book_setup, slot: book, entity: "book-1", state: "entities_provisioned" }
+  - { workspace: kyc, slot: kyc_case, entity: "case-1", state: "INTAKE" }
+  - { workspace: deal, slot: deal, entity: "deal-1", state: "PROSPECT" }
+
+predicates:
+  "cases.client_group_id = this_book.client_group_id":
+    - { target: "book-1", source: "case-1" }
+  "deals.primary_client_group_id = this_book.client_group_id":
+    - { target: "book-1", source: "deal-1" }
+
+steps:
+  - name: "blocked: book → cbus_scaffolded; KYC still INTAKE"
+    check_transition:
+      workspace: book_setup
+      slot: book
+      entity: "book-1"
+      from: "entities_provisioned"
+      to: "cbus_scaffolded"
+    expect:
+      violations:
+        - constraint_id: "book_cbus_scaffolded_requires_kyc_case_in_progress"
+          severity: "error"
+
+  - mutate:
+      - { workspace: kyc, slot: kyc_case, entity: "case-1", state: "DISCOVERY" }
+
+  - name: "succeeds: KYC now DISCOVERY"
+    check_transition:
+      workspace: book_setup
+      slot: book
+      entity: "book-1"
+      from: "entities_provisioned"
+      to: "cbus_scaffolded"
+    expect:
+      violations: []
+
+  - mutate:
+      - { workspace: book_setup, slot: book, entity: "book-1", state: "mandates_defined" }
+
+  - name: "blocked: book → ready_for_deal; Deal still PROSPECT (advisory warning)"
+    check_transition:
+      workspace: book_setup
+      slot: book
+      entity: "book-1"
+      from: "mandates_defined"
+      to: "ready_for_deal"
+    expect:
+      violations:
+        - constraint_id: "book_ready_requires_deal_contracted_gate"
+          severity: "warning"
+
+  - mutate:
+      - { workspace: deal, slot: deal, entity: "deal-1", state: "KYC_CLEARANCE" }
+
+  - name: "succeeds: Deal at KYC_CLEARANCE"
+    check_transition:
+      workspace: book_setup
+      slot: book
+      entity: "book-1"
+      from: "mandates_defined"
+      to: "ready_for_deal"
+    expect:
+      violations: []

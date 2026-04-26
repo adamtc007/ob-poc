@@ -1,0 +1,66 @@
+name: "CBU hierarchy cascades (Mode C)"
+suite_id: "cbu_hierarchy_cascades"
+description: |
+  Exercises the cbu.cbu hierarchy cascade rules:
+  - parent suspended → children → suspended
+  - parent offboarded → children → offboarded
+
+  Tests the CascadePlanner — given a parent transition, walks the
+  children via the (mock) ChildEntityResolver and emits one
+  CascadeAction per child.
+
+mode: mock
+
+entity_aliases:
+  parent-1:  "66666666-0000-0000-0000-000000000001"
+  child-a:   "66666666-0000-0000-0000-000000000002"
+  child-b:   "66666666-0000-0000-0000-000000000003"
+  child-c:   "66666666-0000-0000-0000-000000000004"
+
+initial_state:
+  - { workspace: cbu, slot: cbu, entity: "parent-1", state: "actively_trading" }
+  - { workspace: cbu, slot: cbu, entity: "child-a",  state: "actively_trading" }
+  - { workspace: cbu, slot: cbu, entity: "child-b",  state: "actively_trading" }
+  - { workspace: cbu, slot: cbu, entity: "child-c",  state: "actively_trading" }
+
+# Parent → 3 children (all in cbu.cbu slot, parent_slot self-reference)
+children:
+  cbu.cbu:
+    parent-1:
+      - { workspace: cbu, slot: cbu, entity: "child-a" }
+      - { workspace: cbu, slot: cbu, entity: "child-b" }
+      - { workspace: cbu, slot: cbu, entity: "child-c" }
+
+steps:
+  - name: "parent suspended → 3 children planned to suspended"
+    plan_cascade:
+      parent_workspace: cbu
+      parent_slot: cbu
+      parent_entity: "parent-1"
+      parent_new_state: "suspended"
+    expect:
+      cascade_actions:
+        - { child_workspace: cbu, child_slot: cbu, child_entity: "child-a", target_state: "suspended", severity: "error" }
+        - { child_workspace: cbu, child_slot: cbu, child_entity: "child-b", target_state: "suspended", severity: "error" }
+        - { child_workspace: cbu, child_slot: cbu, child_entity: "child-c", target_state: "suspended", severity: "error" }
+
+  - name: "parent offboarded → 3 children planned to offboarded"
+    plan_cascade:
+      parent_workspace: cbu
+      parent_slot: cbu
+      parent_entity: "parent-1"
+      parent_new_state: "offboarded"
+    expect:
+      cascade_actions:
+        - { child_workspace: cbu, child_slot: cbu, child_entity: "child-a", target_state: "offboarded", severity: "error" }
+        - { child_workspace: cbu, child_slot: cbu, child_entity: "child-b", target_state: "offboarded", severity: "error" }
+        - { child_workspace: cbu, child_slot: cbu, child_entity: "child-c", target_state: "offboarded", severity: "error" }
+
+  - name: "parent moves to a state with no cascade rule → no actions"
+    plan_cascade:
+      parent_workspace: cbu
+      parent_slot: cbu
+      parent_entity: "parent-1"
+      parent_new_state: "actively_trading"
+    expect:
+      cascade_actions: []

@@ -55,3 +55,30 @@ scenario_test!(
     business_flow_deal_to_resources,
     "tests/fixtures/cross_workspace_dag/business_flow_deal_to_resources.yaml"
 );
+
+// Phase 4 (2026-04-26): coverage expansion targeting gaps surfaced by
+// `cargo x dag-coverage`.
+scenario_test!(
+    book_setup_constraints,
+    "tests/fixtures/cross_workspace_dag/book_setup_constraints.yaml"
+);
+
+scenario_test!(
+    onboarding_request_constraints,
+    "tests/fixtures/cross_workspace_dag/onboarding_request_constraints.yaml"
+);
+
+scenario_test!(
+    cbu_hierarchy_cascades,
+    "tests/fixtures/cross_workspace_dag/cbu_hierarchy_cascades.yaml"
+);
+
+scenario_test!(
+    lifecycle_resources_decommission_cascade,
+    "tests/fixtures/cross_workspace_dag/lifecycle_resources_decommission_cascade.yaml"
+);
+
+scenario_test!(
+    service_consumption_requires_deal,
+    "tests/fixtures/cross_workspace_dag/service_consumption_requires_deal.yaml"
+);

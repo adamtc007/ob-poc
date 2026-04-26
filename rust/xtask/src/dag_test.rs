@@ -118,14 +118,25 @@ pub fn coverage(workspace_filter: Option<String>, json: bool) -> Result<()> {
             ws_report.derived.push((d.id.clone(), exercised));
         }
 
-        // Cascade rules (per slot.state_dependency.cascade_rules)
+        // Cascade rules (per slot.state_dependency.cascade_rules).
+        // Key by the PARENT slot (where the cascade originates) so
+        // fixture-side `plan_cascade { parent_workspace, parent_slot,
+        // parent_new_state }` aligns. parent_workspace defaults to the
+        // child's workspace if omitted.
         for slot in &dag.slots {
-            if let Some(dep) = &slot.state_dependency {
-                for rule in &dep.cascade_rules {
-                    let key = format!("{}.{}/parent={}", workspace, slot.id, rule.parent_state);
-                    let exercised = exercised.cascades.contains(&key);
-                    ws_report.cascades.push((key, exercised));
-                }
+            let Some(dep) = &slot.state_dependency else { continue };
+            let Some(parent) = &slot.parent_slot else { continue };
+            let parent_workspace = parent
+                .workspace
+                .clone()
+                .unwrap_or_else(|| workspace.clone());
+            for rule in &dep.cascade_rules {
+                let key = format!(
+                    "{}.{}/parent={}",
+                    parent_workspace, parent.slot, rule.parent_state
+                );
+                let exercised = exercised.cascades.contains(&key);
+                ws_report.cascades.push((key, exercised));
             }
         }
 
@@ -224,40 +235,85 @@ fn scan_fixtures_for_exercised_ids() -> Result<ExercisedIds> {
 }
 
 fn scan_text(text: &str, out: &mut ExercisedIds) {
-    // Heuristic regex-free extraction:
-    //   constraint_id: "foo"        → out.constraints.insert("foo")
-    //   derived_id: "foo"            → out.derived.insert("foo")
-    //   plan_cascade with a parent_new_state line → out.cascades
+    // Heuristic regex-free extraction. Handles both block-style:
+    //   - constraint_id: "foo"
+    //     severity: "error"
+    // and flow-style maps:
+    //   - { constraint_id: "foo", severity: "error" }
     //
-    // Lines may be list items (`- constraint_id: "foo"`); strip the
-    // leading `- ` before testing prefixes.
+    // For each occurrence of `constraint_id:` / `derived_id:` /
+    // `parent_new_state:` we extract the immediately-following quoted
+    // value. parent_workspace + parent_slot get tracked as state machine.
     let mut pending_cascade: Option<(String, String)> = None;
     for raw_line in text.lines() {
-        let line = raw_line.trim().trim_start_matches("- ").trim();
-        if let Some(rest) = line.strip_prefix("constraint_id:") {
-            if let Some(id) = extract_quoted(rest) {
-                out.constraints.insert(id);
+        let line = raw_line.trim();
+        for id in extract_all_after(line, "constraint_id:") {
+            out.constraints.insert(id);
+        }
+        for id in extract_all_after(line, "derived_id:") {
+            out.derived.insert(id);
+        }
+        if let Some(ws) = extract_first_after(line, "parent_workspace:") {
+            pending_cascade = Some((ws, String::new()));
+        }
+        if let Some(slot) = extract_first_after(line, "parent_slot:") {
+            if let Some((_, ref mut s)) = pending_cascade {
+                *s = slot;
             }
-        } else if let Some(rest) = line.strip_prefix("derived_id:") {
-            if let Some(id) = extract_quoted(rest) {
-                out.derived.insert(id);
+        }
+        if let Some(state) = extract_first_after(line, "parent_new_state:") {
+            if let Some((ws, slot)) = pending_cascade.take() {
+                out.cascades
+                    .insert(format!("{}.{}/parent={}", ws, slot, state));
             }
-        } else if let Some(rest) = line.strip_prefix("parent_workspace:") {
-            if let Some(ws) = extract_quoted(rest) {
-                pending_cascade = Some((ws, String::new()));
-            }
-        } else if let Some(rest) = line.strip_prefix("parent_slot:") {
-            if let Some(slot) = extract_quoted(rest) {
-                if let Some((_, ref mut s)) = pending_cascade {
-                    *s = slot;
-                }
-            }
-        } else if let Some(rest) = line.strip_prefix("parent_new_state:") {
-            if let Some(state) = extract_quoted(rest) {
-                if let Some((ws, slot)) = pending_cascade.take() {
-                    out.cascades.insert(format!("{}.{}/parent={}", ws, slot, state));
-                }
-            }
+        }
+    }
+}
+
+/// Find every `<key>: "<value>"` (or `<key>: <value>`) on `line`,
+/// returning the values. Handles repeated occurrences within a flow map.
+fn extract_all_after(line: &str, key: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cursor = line;
+    while let Some(idx) = cursor.find(key) {
+        let after = &cursor[idx + key.len()..];
+        if let Some(value) = take_one_value(after) {
+            out.push(value);
+        }
+        cursor = &cursor[idx + key.len()..];
+        if cursor.is_empty() {
+            break;
+        }
+    }
+    out
+}
+
+fn extract_first_after(line: &str, key: &str) -> Option<String> {
+    let idx = line.find(key)?;
+    let after = &line[idx + key.len()..];
+    take_one_value(after)
+}
+
+/// Take one value starting at the head of `s`. Skips leading whitespace,
+/// then reads either a quoted string OR an unquoted token up to comma /
+/// closing-brace / whitespace.
+fn take_one_value(s: &str) -> Option<String> {
+    let s = s.trim_start();
+    if let Some(rest) = s.strip_prefix('"') {
+        let end = rest.find('"')?;
+        Some(rest[..end].to_string())
+    } else if let Some(rest) = s.strip_prefix('\'') {
+        let end = rest.find('\'')?;
+        Some(rest[..end].to_string())
+    } else {
+        let end = s
+            .find(|c: char| c == ',' || c == '}' || c == ']' || c.is_whitespace())
+            .unwrap_or(s.len());
+        let v = &s[..end];
+        if v.is_empty() {
+            None
+        } else {
+            Some(v.to_string())
         }
     }
 }
