@@ -50,13 +50,11 @@ impl SemOsVerbOp for StubOp {
 /// FQNs registered as stubs. Each entry should track a real follow-on
 /// task that replaces the stub with a working impl.
 pub const STUB_VERBS: &[&str] = &[
-    // ── catalogue.* — P.8 authorship workspace prototype ────────────
-    // Filesystem-staged catalogue authoring. Real impls will read /
-    // write `rust/config/verb_staging/`. Pending pilot ramp-up.
-    "catalogue.propose-verb-declaration",
-    "catalogue.commit-verb-declaration",
-    "catalogue.rollback-verb-declaration",
-    "catalogue.list-proposals",
+    // ── catalogue.* — Tranche 3 Phase 3.B (2026-04-26) ───────────────
+    // The 4 authorship verbs are now REAL implementations in
+    // `crate::domain_ops::catalogue_ops`, not stubs. They drive the
+    // Catalogue workspace state machine documented in
+    // `rust/config/sem_os_seeds/dag_taxonomies/catalogue_dag.yaml`.
     // ── trading-profile.* — destructive prune cascades ──────────────
     // Each prune is a multi-row delete + dependency cascade per
     // instrument_matrix_dag.yaml §6. The cascade engine landed in

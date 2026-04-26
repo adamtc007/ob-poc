@@ -1,0 +1,97 @@
+# Catalogue Workspace DAG Taxonomy — Tranche 3 Phase 3.B (2026-04-26)
+#
+# v1.2 §8 Tranche 3 — governed authorship mechanism. The Catalogue workspace
+# is the architectural root of forward-discipline: every change to the verb
+# catalogue (new verbs, tier amendments, escalation rule additions, etc.)
+# flows through a `catalogue_proposal` row whose state machine is governed
+# by ABAC + the four authorship verbs.
+#
+# P9 hypothesis verdict: Catalogue is a normal SemOS workspace. See
+# docs/governance/tranche-3-design-2026-04-26.md §2.
+#
+# State machine: DRAFT → STAGED → COMMITTED (terminal) | ROLLED_BACK |
+# REJECTED. STAGED is the validator-clean checkpoint. COMMITTED triggers
+# the seed reload across all 11 domain workspaces — the Phase 3.F forward-
+# discipline activation point (currently Stage 1 / opt-in).
+
+version: "1.0"
+workspace: catalogue
+dag_id: catalogue_dag
+
+# =============================================================================
+# 1. SLOTS
+# =============================================================================
+
+slots:
+
+  - id: workspace_root
+    stateless: true
+    description: "Workspace navigation root."
+
+  - id: proposal
+    stateless: false
+    state_machine:
+      id: catalogue_proposal_lifecycle
+      owner: "catalogue-author"
+      expected_lifetime: short_lived
+      source_entity: '"ob-poc".catalogue_proposals'
+      state_column: status
+      scope: per_proposal
+      description: |
+        Catalogue authorship proposal lifecycle. 5 states:
+        DRAFT (entry) → STAGED → COMMITTED (terminal) | ROLLED_BACK |
+        REJECTED. STAGED is the validator-clean checkpoint.
+        COMMITTED is the architectural drift gate — it writes the
+        committed declaration to `catalogue_committed_verbs` (Tranche 3
+        Phase 3.F Stage 4 makes this the catalogue's source of truth).
+      states:
+        - id: DRAFT
+          entry: true
+          description: "Proposal created; validator may have errors; author iterating."
+        - id: STAGED
+          description: "Validator clean; awaiting commit by a different catalogue-author (two-eye rule)."
+        - id: COMMITTED
+          description: "Promoted to authoritative catalogue; triggers seed reload."
+        - id: ROLLED_BACK
+          description: "Staged proposal rolled back to DRAFT (or terminal if explicitly archived)."
+        - id: REJECTED
+          description: "Proposal rejected by reviewer; reopen path available."
+      transitions:
+        - from: DRAFT
+          to: STAGED
+          via: catalogue.stage-proposal     # auto on validator-clean (out-of-band)
+        - from: STAGED
+          to: COMMITTED
+          via: catalogue.commit-verb-declaration
+        - from: STAGED
+          to: ROLLED_BACK
+          via: catalogue.rollback-verb-declaration
+        - from: DRAFT
+          to: REJECTED
+          via: catalogue.reject-proposal
+        - from: REJECTED
+          to: DRAFT
+          via: catalogue.reopen-proposal
+      terminal_states: [COMMITTED, ROLLED_BACK]
+
+  - id: verb
+    stateless: true
+    description: "Stateless reference — points at config/verbs/<domain>/<verb>.yaml."
+
+# =============================================================================
+# 2. CROSS-SLOT CONSTRAINTS (intra-DAG)
+# =============================================================================
+
+cross_slot_constraints: []
+
+# =============================================================================
+# 3. CROSS-WORKSPACE CONSTRAINTS (V1.3-1 Mode A)
+# =============================================================================
+
+cross_workspace_constraints: []
+
+# =============================================================================
+# 4. DERIVED CROSS-WORKSPACE STATE (V1.3-2 Mode B)
+# =============================================================================
+
+derived_cross_workspace_state: []

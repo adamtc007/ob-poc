@@ -59,10 +59,14 @@ domains:
           name: proposal_id
           capture: true
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: proposal-id
+          target_workspace: catalogue
+          target_slot: proposal
 
       commit-verb-declaration:
         description: "Promote a staged proposal to the authoritative catalogue"
@@ -88,10 +92,14 @@ domains:
             type: string
             required: true
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: proposal
+          target_workspace: catalogue
+          target_slot: proposal
 
       rollback-verb-declaration:
         description: "Discard a staged proposal (revert to prior authoritative state)"
@@ -117,10 +125,14 @@ domains:
             type: string
             required: false
         three_axis:
-          state_effect: preserving
+          state_effect: transition
           external_effects: []
           consequence:
             baseline: requires_confirmation
+        transition_args:
+          entity_id_arg: proposal
+          target_workspace: catalogue
+          target_slot: proposal
 
       list-proposals:
         description: "List pending and recently-committed verb-declaration proposals"
