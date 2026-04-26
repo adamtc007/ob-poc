@@ -16,28 +16,28 @@ scenarios:
     steps:
       - user: "switch to NonExistent Corp"
         expect:
-          outcome: "NoMatch"
+          outcome: "NeedsUserInput"
 
   - name: "entity_reference_no_crash"
     description: "Entity references in utterance handled without crash"
     steps:
       - user: "find information about Acme Holdings Ltd"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
 
   - name: "scope_persists_across_steps"
     description: "Session scope doesn't reset between steps"
     steps:
       - user: "list entities"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
       - user: "show details"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
 
   - name: "jurisdiction_hint_in_utterance"
     description: "Jurisdiction hints in utterance processed without error"
     steps:
       - user: "Acme Luxembourg subsidiary details"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"

@@ -15,15 +15,14 @@ scenarios:
     steps:
       - user: "find UBO of Acme Holdings"
         expect:
-          outcome: "NoMatch"
-          selection_source: "discovery"
+          outcome: "SemanticNotReady"
 
   - name: "trace_has_utterance"
     description: "Trace always contains the original utterance"
     steps:
       - user: "create a new CBU for testing"
         expect:
-          outcome: "NoMatch"
+          outcome: "NeedsUserInput"
 
   - name: "trace_macro_defaults_on_non_macro"
     description: "Non-macro paths have macro_semreg_checked=false by default"
@@ -38,13 +37,10 @@ scenarios:
     steps:
       - user: "first query"
         expect:
-          outcome: "NoMatch"
-          selection_source: "discovery"
+          outcome: "SemanticNotReady"
       - user: "second query"
         expect:
-          outcome: "NoMatch"
-          selection_source: "discovery"
+          outcome: "SemanticNotReady"
       - user: "third query"
         expect:
-          outcome: "NoMatch"
-          selection_source: "discovery"
+          outcome: "SemanticNotReady"

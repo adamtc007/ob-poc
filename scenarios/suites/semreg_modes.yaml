@@ -15,7 +15,7 @@ scenarios:
     steps:
       - user: "create a new fund"
         expect:
-          outcome: "NoMatch"
+          outcome: "NeedsUserInput"
           semreg_mode: "strict"
 
   - name: "strict_mode_consistent_across_steps"
@@ -33,7 +33,7 @@ scenarios:
     steps:
       - user: "completely unrelated query about weather"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
           semreg_mode: "strict"
 
   - name: "no_sem_reg_denied_all_on_no_match"
@@ -41,5 +41,5 @@ scenarios:
     steps:
       - user: "random gibberish input"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
           sem_reg_denied_all: false

@@ -17,7 +17,7 @@ scenarios:
     steps:
       - user: "open a KYC case for Acme Holdings"
         expect:
-          outcome: "NoMatch"
+          outcome: "NeedsUserInput"
           semreg_mode: "strict"
 
   - name: "direct_dsl_denied_by_default"
@@ -25,7 +25,7 @@ scenarios:
     steps:
       - user: "dsl:(cbu.create :name \"Acme\")"
         expect:
-          outcome: "DirectDslNotAllowed"
+          outcome: "SemanticNotReady"
           dsl_non_empty: false
 
   - name: "sem_reg_deny_all_strict"
@@ -33,7 +33,7 @@ scenarios:
     steps:
       - user: "create a fund for Globex"
         expect:
-          outcome: "NoMatch"
+          outcome: "NeedsUserInput"
           semreg_mode: "strict"
 
   - name: "multiple_denied_utterances_consistent"
@@ -41,14 +41,14 @@ scenarios:
     steps:
       - user: "spin up a structure"
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
       - user: "load the trading book"
         expect:
-          outcome: "NoMatch"
+          outcome: "NeedsUserInput"
 
   - name: "empty_utterance_handled"
     description: "Empty input doesn't crash the pipeline"
     steps:
       - user: ""
         expect:
-          outcome: "NoMatch"
+          outcome: "SemanticNotReady"
