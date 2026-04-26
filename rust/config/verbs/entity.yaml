@@ -743,6 +743,10 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
+        transition_args:
+          entity_id_arg: entity-id
+          target_workspace: cbu
+          target_slot: entity_proper_person
 
       verify:
         description: Mark an identified entity as verified (transitions to VERIFIED state)
@@ -793,6 +797,10 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
+        transition_args:
+          entity_id_arg: entity-id
+          target_workspace: cbu
+          target_slot: entity_proper_person
 
       list-ghosts:
         description: List ghost entities requiring identification
