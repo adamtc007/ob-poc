@@ -8,6 +8,7 @@ import { InspectorPage } from "./features/inspector/InspectorPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ViewportPage } from "./features/viewport/ViewportPage";
 import { ObservatoryPage } from "./features/observatory/ObservatoryPage";
+import { CataloguePage } from "./features/catalogue/CataloguePage";
 
 function App() {
   return (
@@ -80,6 +81,16 @@ function App() {
                 element={
                   <ErrorBoundary>
                     <SettingsPage />
+                  </ErrorBoundary>
+                }
+              />
+              {/* Tranche 3 Phase 3.D / Observatory Phase 8 — Catalogue workspace
+                  read-only panel: pending proposals + diff + tier heatmap. */}
+              <Route
+                path="catalogue"
+                element={
+                  <ErrorBoundary>
+                    <CataloguePage />
                   </ErrorBoundary>
                 }
               />

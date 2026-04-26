@@ -49,6 +49,7 @@
 //! at a glance.
 
 pub mod bods;
+pub mod catalogue_loader;
 pub mod cross_workspace;
 pub mod crud_executor;
 pub mod document_bundles;
