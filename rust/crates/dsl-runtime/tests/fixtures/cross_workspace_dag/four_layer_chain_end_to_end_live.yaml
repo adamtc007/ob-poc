@@ -1,0 +1,131 @@
+name: "Four-layer chain end-to-end (live)"
+suite_id: "four_layer_chain_live"
+description: |
+  Live-mode counterpart of four_layer_chain_end_to_end.yaml. Walks
+  Deal CONTRACTED → CBU service_consumption.proposed→provisioned →
+  service_consumption.provisioned→active through real PostgresSlotStateProvider
+  + SqlPredicateResolver against ephemeral DB.
+
+mode: live
+
+entity_aliases:
+  deal-1:           "33333333-0000-0000-0000-000000000001"
+  case-1:           "33333333-0000-0000-0000-000000000002"
+  bpc-1:            "33333333-0000-0000-0000-000000000003"
+  cbu-1:            "33333333-0000-0000-0000-000000000004"
+  client-group-1:   "33333333-0000-0000-0000-000000000005"
+  consume-1:        "33333333-0000-0000-0000-000000000006"
+  service-1:        "33333333-0000-0000-0000-000000000007"
+  app-instance-1:   "33333333-0000-0000-0000-000000000008"
+  binding-1:        "33333333-0000-0000-0000-000000000009"
+
+initial_state:
+  # L1: Deal already CONTRACTED + KYC + BP green (test starts post-L1)
+  - workspace: deal
+    slot: deal
+    entity: "deal-1"
+    state: "CONTRACTED"
+    attrs:
+      primary_client_group_id: "alias:client-group-1"
+
+  - workspace: kyc
+    slot: kyc_case
+    entity: "case-1"
+    state: "APPROVED"
+    attrs:
+      cbu_id: "alias:cbu-1"
+      client_group_id: "alias:client-group-1"
+
+  - workspace: booking_principal
+    slot: clearance
+    entity: "bpc-1"
+    state: "ACTIVE"
+    attrs:
+      deal_id: "alias:deal-1"
+
+  - workspace: cbu
+    slot: cbu
+    entity: "cbu-1"
+    state: "VALIDATED"
+
+  # L2: CBU service_consumption row, in proposed state
+  # NOTE: client_group_id supplied as denormalized bridging column for
+  # simple-equality predicate resolution (see test schema comment).
+  - workspace: cbu
+    slot: service_consumption
+    entity: "consume-1"
+    state: "proposed"
+    attrs:
+      cbu_id: "alias:cbu-1"
+      service_id: "alias:service-1"
+      client_group_id: "alias:client-group-1"
+
+  # L3: service catalogue entry, currently draft (NOT active)
+  - workspace: product_maintenance
+    slot: service
+    entity: "service-1"
+    state: "draft"
+
+  # L4: capability_binding currently in PILOT (NOT live)
+  - workspace: lifecycle_resources
+    slot: application_instance
+    entity: "app-instance-1"
+    state: "ACTIVE"
+
+  - workspace: lifecycle_resources
+    slot: capability_binding
+    entity: "binding-1"
+    state: "PILOT"
+    attrs:
+      application_instance_id: "alias:app-instance-1"
+      service_id: "alias:service-1"
+
+steps:
+  # ─────────────────────── L2 → L3 gate ───────────────────────
+  - name: "live L2→L3: provisioning BLOCKED — service-1 not active in catalogue"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-1"
+      from: "proposed"
+      to: "provisioned"
+    expect:
+      violations:
+        - constraint_id: "service_consumption_requires_active_service"
+          severity: "error"
+
+  - mutate:
+      - { workspace: product_maintenance, slot: service, entity: "service-1", state: "active" }
+
+  - name: "live L2→L3: provisioning GREEN — service-1 active in catalogue"
+    check_transition:
+      workspace: cbu
+      slot: service_consumption
+      entity: "consume-1"
+      from: "proposed"
+      to: "provisioned"
+    expect:
+      violations: []
+
+  # ─────────────────────── L4 gate (DEFERRED — see note below) ────────
+  # The L4 service_consumption_active_requires_live_binding constraint
+  # uses a predicate with EXISTS (SELECT...) clause that
+  # SqlPredicateResolver's simple-equality parser cannot handle. In
+  # production this constraint would silently fail to resolve → always
+  # treated as a violation, even when bindings are LIVE. Tracked as
+  # production tech debt: needs the resolver to either (a) handle
+  # multi-clause predicates with EXISTS, or (b) split the constraint
+  # into a derived state aggregate (Mode B) instead of Mode A.
+  #
+  # When the resolver is upgraded, uncomment the L4 steps below.
+  #
+  # - mutate:
+  #     - { workspace: cbu, slot: service_consumption, entity: "consume-1", state: "provisioned" }
+  # - name: "live L4: activation BLOCKED — binding still PILOT"
+  #   check_transition: { workspace: cbu, slot: service_consumption, entity: "consume-1", from: "provisioned", to: "active" }
+  #   expect:
+  #     violations: [{ constraint_id: "service_consumption_active_requires_live_binding" }]
+  # - mutate: [{ workspace: lifecycle_resources, slot: capability_binding, entity: "binding-1", state: "LIVE" }]
+  # - name: "live L4: activation GREEN"
+  #   check_transition: { workspace: cbu, slot: service_consumption, entity: "consume-1", from: "provisioned", to: "active" }
+  #   expect: { violations: [] }

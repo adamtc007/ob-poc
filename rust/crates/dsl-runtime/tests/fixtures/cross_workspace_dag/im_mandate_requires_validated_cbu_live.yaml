@@ -1,0 +1,51 @@
+name: "IM trading_profile requires VALIDATED CBU (live)"
+suite_id: "im_mandate_cbu_gate_live"
+description: |
+  Live-mode counterpart. The mandate_requires_validated_cbu constraint
+  has NO source_predicate, so the GateChecker uses same-entity lookup:
+  the trading_profile_id is used to look up the cbu's status. We seed
+  both rows with the same UUID to satisfy the same-entity assumption.
+
+mode: live
+
+entity_aliases:
+  shared-id: "22222222-0000-0000-0000-000000000001"
+
+initial_state:
+  - workspace: instrument_matrix
+    slot: trading_profile
+    entity: "shared-id"
+    state: "DRAFT"
+
+  - workspace: cbu
+    slot: cbu
+    entity: "shared-id"
+    state: "VALIDATION_PENDING"
+
+steps:
+  - name: "live: blocked: CBU not VALIDATED"
+    check_transition:
+      workspace: instrument_matrix
+      slot: trading_profile
+      entity: "shared-id"
+      from: "DRAFT"
+      to: "SUBMITTED"
+    expect:
+      violations:
+        - constraint_id: "mandate_requires_validated_cbu"
+          severity: "error"
+          required_state: ["VALIDATED"]
+          actual_state: "VALIDATION_PENDING"
+
+  - mutate:
+      - { workspace: cbu, slot: cbu, entity: "shared-id", state: "VALIDATED" }
+
+  - name: "live: succeeds: CBU VALIDATED"
+    check_transition:
+      workspace: instrument_matrix
+      slot: trading_profile
+      entity: "shared-id"
+      from: "DRAFT"
+      to: "SUBMITTED"
+    expect:
+      violations: []

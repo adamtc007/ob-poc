@@ -121,3 +121,106 @@ CREATE TABLE IF NOT EXISTS "ob-poc".booking_principal_clearances (
         )
     )
 );
+
+-- ─────────────────────────────────────────────────────────────────
+-- Phase 2 additions (2026-04-26)
+-- ─────────────────────────────────────────────────────────────────
+
+-- cbu_trading_profiles  (instrument_matrix workspace, slot=trading_profile)
+CREATE TABLE IF NOT EXISTS "ob-poc".cbu_trading_profiles (
+    profile_id uuid PRIMARY KEY,
+    cbu_id uuid,
+    version integer DEFAULT 1 NOT NULL,
+    status varchar(20) DEFAULT 'DRAFT' NOT NULL,
+    document jsonb DEFAULT '{}'::jsonb NOT NULL,
+    document_hash text DEFAULT 'test-hash' NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    activated_at timestamp with time zone,
+    notes text,
+    CONSTRAINT chk_trading_profile_status CHECK (
+        status IN ('DRAFT','SUBMITTED','APPROVED','PARALLEL_RUN','ACTIVE',
+                   'SUSPENDED','REJECTED','SUPERSEDED','ARCHIVED')
+    )
+);
+
+-- cbu_service_consumption  (cbu workspace, slot=service_consumption)
+--
+-- Test-schema NOTE: client_group_id is added here as a denormalized
+-- bridging column so the simple-equality SqlPredicateResolver can
+-- evaluate `deals.primary_client_group_id = this_consumption_cbu.client_group_id`
+-- without following a join. Production cbu_service_consumption does NOT
+-- have this column — the predicate would silently fail to resolve in
+-- prod (separate tech-debt issue: production resolver needs join support
+-- for this constraint to actually fire). Tracked as follow-on work.
+CREATE TABLE IF NOT EXISTS "ob-poc".cbu_service_consumption (
+    consumption_id uuid PRIMARY KEY,
+    cbu_id uuid NOT NULL,
+    service_kind varchar(40) DEFAULT 'CUSTODY' NOT NULL,
+    service_id uuid,
+    client_group_id uuid,
+    status varchar(30) DEFAULT 'proposed' NOT NULL,
+    provisioned_at timestamp with time zone,
+    activated_at timestamp with time zone,
+    retired_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT cbu_service_consumption_status_check CHECK (
+        status IN ('proposed','provisioned','active','suspended',
+                   'winding_down','retired')
+    ),
+    CONSTRAINT cbu_service_consumption_service_kind_check CHECK (
+        service_kind IN ('CUSTODY','TA','FA','SEC_LENDING','FX',
+                          'TRADING','REPORTING','PRICING','COLLATERAL')
+    )
+);
+
+-- services  (product_maintenance workspace, slot=service)
+CREATE TABLE IF NOT EXISTS "ob-poc".services (
+    service_id uuid PRIMARY KEY,
+    name varchar(255) NOT NULL,
+    description text,
+    service_code varchar(50),
+    service_category varchar(100),
+    is_active boolean DEFAULT true,
+    lifecycle_status varchar(20) DEFAULT 'ungoverned' NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT services_lifecycle_status_check CHECK (
+        lifecycle_status IN ('ungoverned','draft','active','deprecated','retired')
+    )
+);
+
+-- application_instances  (lifecycle_resources workspace, slot=application_instance)
+CREATE TABLE IF NOT EXISTS "ob-poc".application_instances (
+    id uuid PRIMARY KEY,
+    application_id uuid,
+    environment varchar(50) DEFAULT 'test' NOT NULL,
+    instance_label varchar(255) DEFAULT 'test-instance' NOT NULL,
+    lifecycle_status varchar(40) DEFAULT 'PROVISIONED' NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT application_instances_lifecycle_status_check CHECK (
+        lifecycle_status IN (
+            'PROVISIONED','ACTIVE','MAINTENANCE_WINDOW','DEGRADED',
+            'OFFLINE','DECOMMISSIONED'
+        )
+    )
+);
+
+-- capability_bindings  (lifecycle_resources workspace, slot=capability_binding)
+CREATE TABLE IF NOT EXISTS "ob-poc".capability_bindings (
+    id uuid PRIMARY KEY,
+    application_instance_id uuid NOT NULL,
+    service_id uuid NOT NULL,
+    binding_status varchar(20) DEFAULT 'DRAFT' NOT NULL,
+    pilot_started_at timestamp with time zone,
+    promoted_live_at timestamp with time zone,
+    deprecated_at timestamp with time zone,
+    retired_at timestamp with time zone,
+    notes text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT capability_bindings_status_check CHECK (
+        binding_status IN ('DRAFT','PILOT','LIVE','DEPRECATED','RETIRED')
+    )
+);

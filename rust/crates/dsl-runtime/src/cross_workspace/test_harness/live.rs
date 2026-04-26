@@ -437,12 +437,34 @@ fn resolve_slot_table(
     // rust/test-migrations/cross_workspace_dag/0001_schema.sql.
     // Phase 2+ extends as more tables are added to that migration.
     let mapping: &[((&str, &str), (&str, &str, &str))] = &[
+        // Phase 1
         (("cbu", "cbu"), ("cbus", "status", "cbu_id")),
         (("kyc", "kyc_case"), ("cases", "status", "case_id")),
         (("deal", "deal"), ("deals", "deal_status", "deal_id")),
         (
             ("booking_principal", "clearance"),
             ("booking_principal_clearances", "clearance_status", "id"),
+        ),
+        // Phase 2
+        (
+            ("instrument_matrix", "trading_profile"),
+            ("cbu_trading_profiles", "status", "profile_id"),
+        ),
+        (
+            ("cbu", "service_consumption"),
+            ("cbu_service_consumption", "status", "consumption_id"),
+        ),
+        (
+            ("product_maintenance", "service"),
+            ("services", "lifecycle_status", "service_id"),
+        ),
+        (
+            ("lifecycle_resources", "application_instance"),
+            ("application_instances", "lifecycle_status", "id"),
+        ),
+        (
+            ("lifecycle_resources", "capability_binding"),
+            ("capability_bindings", "binding_status", "id"),
         ),
     ];
     for ((ws, sl), value) in mapping {
@@ -468,31 +490,35 @@ fn resolve_slot_table(
 ///   - `JsonValue::String("literal")` → bound as text
 ///   - `JsonValue::Null` → bound as SQL NULL
 fn table_minimum_columns_owned(table: &str) -> Vec<(&'static str, JsonValue)> {
+    // Sentinel UUID for NOT NULL columns whose value the fixture didn't
+    // supply via `attrs:`. Predicates that join on these columns won't
+    // match (which is fine — fixture authors must supply the right value
+    // when the test depends on the join).
+    const SENTINEL: &str = "00000000-0000-0000-0000-000000000999";
+
     match table {
         "cbus" => vec![("name", JsonValue::String("test cbu".into()))],
         "deals" => vec![
             ("deal_name", JsonValue::String("test deal".into())),
-            // primary_client_group_id is NOT NULL; supply an arbitrary UUID.
-            // Real predicate matching uses the SQL join; the test fixtures
-            // override this column via seed_dependencies if they care.
-            (
-                "primary_client_group_id",
-                JsonValue::String("00000000-0000-0000-0000-000000000999".into()),
-            ),
+            ("primary_client_group_id", JsonValue::String(SENTINEL.into())),
         ],
         "cases" => vec![
-            (
-                "cbu_id",
-                JsonValue::String("00000000-0000-0000-0000-000000000999".into()),
-            ),
+            ("cbu_id", JsonValue::String(SENTINEL.into())),
             ("case_ref", JsonValue::String("TEST-CASE".into())),
         ],
         "booking_principal_clearances" => vec![
-            // booking_principal_id is NOT NULL; supply an arbitrary UUID.
-            (
-                "booking_principal_id",
-                JsonValue::String("00000000-0000-0000-0000-000000000999".into()),
-            ),
+            ("booking_principal_id", JsonValue::String(SENTINEL.into())),
+        ],
+        // Phase 2 tables
+        "cbu_trading_profiles" => vec![],
+        "cbu_service_consumption" => vec![
+            ("cbu_id", JsonValue::String(SENTINEL.into())),
+        ],
+        "services" => vec![("name", JsonValue::String("test service".into()))],
+        "application_instances" => vec![],
+        "capability_bindings" => vec![
+            ("application_instance_id", JsonValue::String(SENTINEL.into())),
+            ("service_id", JsonValue::String(SENTINEL.into())),
         ],
         _ => vec![],
     }
