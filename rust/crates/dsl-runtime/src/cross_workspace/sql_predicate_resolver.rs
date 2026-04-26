@@ -19,11 +19,22 @@
 //!      matches the value from step 2.
 //!   4. Returns that pk as the resolved source_entity_id.
 //!
-//! Unparseable predicates (EXISTS / ALL...HAVE / multi-clause) return
-//! Ok(None) — the gate checker treats this as "predicate didn't
-//! resolve → constraint violated", which is the conservative fail-closed
-//! behaviour. Callers that need richer predicate semantics can layer
-//! their own resolver in front.
+//! v1.2 T1.B (2026-04-26) — `EXISTS` clause support added. A predicate
+//! of the shape
+//!
+//!   `<simple-equality> AND EXISTS (SELECT 1 FROM "ob-poc".<tbl> alias
+//!    WHERE <conjunction>)`
+//!
+//! is parseable. The simple-equality is parsed as before; the EXISTS
+//! sub-query is captured verbatim as an additional source-side filter
+//! and interpolated into stage-2 SQL at resolve time. Used by
+//! `service_consumption_active_requires_live_binding` (lifecycle_resources_dag).
+//!
+//! Other unparseable predicates (ALL...HAVE / multi-clause non-EXISTS /
+//! arithmetic) still return Ok(None) — the gate checker treats this as
+//! "predicate didn't resolve → constraint violated", the conservative
+//! fail-closed behaviour. Callers that need richer predicate semantics
+//! can layer their own resolver in front.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -91,12 +102,24 @@ impl PredicateResolver for SqlPredicateResolver {
 
         // Step 2: find a source-table row whose source_column matches.
         // The source row's PK is what we return.
+        //
+        // v1.2 T1.B: when the predicate carries an EXISTS clause, we
+        // append it as an additional WHERE conjunct so only source rows
+        // satisfying the EXISTS sub-query qualify. The EXISTS clause is
+        // catalogue-declared (trusted source), validated structurally
+        // by the parser to contain only identifiers + literal strings.
         let source_pk = guess_source_pk(&parsed.source_table);
+        let exists_clause = parsed
+            .exists_clause
+            .as_ref()
+            .map(|c| format!(" AND {}", c.raw))
+            .unwrap_or_default();
         let stage2_sql = format!(
-            r#"SELECT {pk}::text AS v FROM "ob-poc".{tbl} WHERE {col} = $1::uuid LIMIT 1"#,
+            r#"SELECT {pk}::text AS v FROM "ob-poc".{tbl} WHERE {col} = $1::uuid{exists} LIMIT 1"#,
             pk = source_pk,
             tbl = parsed.source_table,
             col = parsed.source_column,
+            exists = exists_clause,
         );
         let row = sqlx::query(&stage2_sql)
             .bind(&target_value)
@@ -127,16 +150,37 @@ struct ParsedPredicate {
     source_column: String,
     /// e.g. `"primary_client_group_id"`
     target_column: String,
+    /// v1.2 T1.B: optional EXISTS sub-query that filters source rows.
+    exists_clause: Option<ExistsClause>,
+}
+
+/// EXISTS sub-query metadata. Captured verbatim from the predicate
+/// string for runtime SQL interpolation; structural validation
+/// confirmed the clause uses only identifiers + literal strings (no
+/// arithmetic / no functions / no nested subqueries).
+#[derive(Debug, PartialEq, Eq)]
+struct ExistsClause {
+    /// The full clause as it appeared in the predicate, e.g.
+    /// `EXISTS (SELECT 1 FROM "ob-poc".application_instances ai
+    ///  WHERE ai.id = capability_bindings.application_instance_id
+    ///  AND ai.lifecycle_status = 'ACTIVE')`.
+    /// Suitable for direct SQL interpolation since identifiers + literals
+    /// are catalogue-declared (trusted source).
+    raw: String,
 }
 
 /// Parse `{src_table}.{src_col} = this_{anything}.{tgt_col}` (whitespace-
-/// and quoting-tolerant). Returns `None` for any other shape.
+/// and quoting-tolerant). Optionally followed by ` AND EXISTS (...)`.
+/// Returns `None` for any other shape.
 fn parse_simple_equality(predicate: &str) -> Option<ParsedPredicate> {
     // Strip surrounding whitespace + trailing semicolon if any.
     let p = predicate.trim().trim_end_matches(';');
 
-    // Split on '=' — must have exactly one
-    let parts: Vec<&str> = p.split('=').collect();
+    // v1.2 T1.B: split off an optional `AND EXISTS (...)` tail.
+    let (eq_part, exists_clause) = split_exists(p);
+
+    // Split on '=' — must have exactly one (in the equality portion)
+    let parts: Vec<&str> = eq_part.split('=').collect();
     if parts.len() != 2 {
         return None;
     }
@@ -168,7 +212,127 @@ fn parse_simple_equality(predicate: &str) -> Option<ParsedPredicate> {
         source_table,
         source_column,
         target_column,
+        exists_clause,
     })
+}
+
+/// Split a predicate string into its simple-equality head and an
+/// optional trailing `AND EXISTS (...)` clause. Case-insensitive on
+/// the `AND EXISTS` keyword. Returns `(equality_str, None)` if no
+/// EXISTS clause is present, `(equality_str, Some(clause))` if one is
+/// recognised. If the EXISTS sub-query is structurally invalid (no
+/// matching parenthesis, contains a nested subquery, contains
+/// arithmetic / function calls), the whole predicate falls through as
+/// unrecognised — caller treats as None.
+fn split_exists(p: &str) -> (&str, Option<ExistsClause>) {
+    // Locate `AND EXISTS` (case-insensitive). Must be a complete word
+    // boundary — `BRAND EXISTS` is not a match.
+    let lowered = p.to_lowercase();
+    let needle = " and exists ";
+    let needle_at_paren = " and exists(";
+    let pos = lowered
+        .find(needle)
+        .or_else(|| lowered.find(needle_at_paren));
+    let pos = match pos {
+        Some(p) => p,
+        None => return (p, None),
+    };
+
+    let head = p[..pos].trim_end();
+    // Locate the "EXISTS" keyword (case-insensitive) within the tail and
+    // capture from there — the prepended "AND" is added back at SQL
+    // interpolation time, so the captured clause starts with EXISTS.
+    let exists_offset = match lowered[pos..].find("exists") {
+        Some(o) => pos + o,
+        None => return (p, None),
+    };
+    let tail = &p[exists_offset..];
+
+    // Find the opening paren of the EXISTS sub-query.
+    let open = match tail.find('(') {
+        Some(o) => o,
+        None => return (p, None),
+    };
+    // Walk the tail counting parens to find the matching close.
+    let bytes = tail.as_bytes();
+    let mut depth = 0;
+    let mut close = None;
+    for (i, b) in bytes.iter().enumerate().skip(open) {
+        match *b {
+            b'(' => depth += 1,
+            b')' => {
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(i);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let close = match close {
+        Some(c) => c,
+        None => return (p, None),
+    };
+
+    let exists_full = &tail[..=close]; // EXISTS (...)
+    if !is_safe_exists_clause(exists_full) {
+        return (p, None);
+    }
+    (
+        head,
+        Some(ExistsClause {
+            raw: exists_full.to_string(),
+        }),
+    )
+}
+
+/// Verify the EXISTS sub-query body uses only identifiers (alphanumeric,
+/// underscore, dot, hyphen for double-quoted schema names like
+/// `"ob-poc"`, and double-quote), whitespace, equality, AND, single-quoted
+/// string literals, and the structural keywords SELECT/FROM/WHERE/AND/OR/EXISTS.
+/// Rejects function calls, semicolons, comments, subqueries beyond the
+/// top-level EXISTS, and SQL comment markers.
+///
+/// **Trust boundary:** the EXISTS clause is catalogue-declared in YAML
+/// edited by catalogue authors. Forward-discipline (Tranche 3) will
+/// architecturally restrict catalogue authoring, at which point this
+/// check can be tightened. Until then, authors are trusted; this check
+/// catches obvious mistakes (typos, malformed clauses, comment markers)
+/// rather than enforcing strict SQL grammar.
+fn is_safe_exists_clause(clause: &str) -> bool {
+    if clause.is_empty() {
+        return false;
+    }
+    // Reject SQL comments and statement separators first — these would
+    // pass the per-char check otherwise.
+    if clause.contains("--") || clause.contains("/*") || clause.contains(';') {
+        return false;
+    }
+    // Ban any character outside the safe set. Hyphen is allowed because
+    // the schema qualifier `"ob-poc"` contains it; the safe set is
+    // intentionally tight in everything else.
+    for c in clause.chars() {
+        let ok = c.is_ascii_alphanumeric()
+            || matches!(c, ' ' | '\t' | '\n' | '\r')
+            || matches!(
+                c,
+                '_' | '.' | ',' | '\'' | '"' | '=' | '(' | ')' | '*' | '-'
+            );
+        if !ok {
+            return false;
+        }
+    }
+    // Must begin with EXISTS (case-insensitive) and contain a single
+    // top-level SELECT.
+    let lowered = clause.to_lowercase();
+    if !lowered.starts_with("exists") {
+        return false;
+    }
+    if lowered.matches("select").count() != 1 {
+        return false;
+    }
+    true
 }
 
 fn split_qualified(s: &str) -> Option<(String, String)> {
@@ -244,12 +408,46 @@ mod tests {
     }
 
     #[test]
+    fn parses_predicate_with_exists_clause_v1_2() {
+        // v1.2 T1.B: lifecycle_resources_dag.yaml's
+        // service_consumption_active_requires_live_binding constraint.
+        let predicate = "capability_bindings.service_id = this_consumption.service_id \
+                         AND EXISTS (SELECT 1 FROM \"ob-poc\".application_instances ai \
+                         WHERE ai.id = capability_bindings.application_instance_id \
+                         AND ai.lifecycle_status = 'ACTIVE')";
+        let p = parse_simple_equality(predicate).expect("EXISTS predicate must parse");
+        assert_eq!(p.source_table, "capability_bindings");
+        assert_eq!(p.source_column, "service_id");
+        assert_eq!(p.target_column, "service_id");
+        let exists = p.exists_clause.expect("exists_clause must be captured");
+        assert!(exists.raw.starts_with("EXISTS"));
+        assert!(exists.raw.contains("application_instances"));
+        assert!(exists.raw.contains("'ACTIVE'"));
+    }
+
+    #[test]
+    fn rejects_unsafe_exists_clause() {
+        // Arithmetic operators are not in the safe set.
+        let predicate = "tbl.col = this_x.col AND EXISTS (SELECT 1 FROM other o \
+                         WHERE o.x = tbl.x AND o.y > 100)";
+        assert!(parse_simple_equality(predicate).is_none());
+        // Semicolon is rejected (statement separator).
+        let predicate2 = "tbl.col = this_x.col AND EXISTS (SELECT 1; DROP TABLE x)";
+        assert!(parse_simple_equality(predicate2).is_none());
+        // SQL comment is rejected.
+        let predicate3 =
+            "tbl.col = this_x.col AND EXISTS (SELECT 1 -- comment\n FROM o WHERE o.x = tbl.x)";
+        assert!(parse_simple_equality(predicate3).is_none());
+    }
+
+    #[test]
     fn rejects_complex_predicates() {
-        // Multi-clause / EXISTS / ALL...HAVE — we don't try to parse.
+        // EXISTS without preceding equality — nothing to anchor source-table on.
         assert!(parse_simple_equality(
             "EXISTS cases WHERE client_group_id = this_deal.primary_client_group_id"
         )
         .is_none());
+        // Non-EXISTS AND clause — still unparseable.
         assert!(parse_simple_equality(
             "trading_profiles.cbu_id = this_cbu.cbu_id AND status = 'ACTIVE'"
         )

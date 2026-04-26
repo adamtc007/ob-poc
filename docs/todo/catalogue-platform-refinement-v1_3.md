@@ -1,6 +1,10 @@
 # Catalogue Platform Refinement — Vision & Scope (v1.3)
 
-> **Status:** DRAFT — peer review pending (Adam, 2026-04-24).
+> **Status:** SUPERSEDED — see `catalogue-platform-refinement-v1_2.md`
+> (consolidated 2026-04-26). v1.2 absorbs the v1.3 amendments alongside the
+> reconciliation review's 5 tensions + 8 gap decisions and is now the
+> authoritative working spec. v1.3 retained for traceability.
+> **Original status:** DRAFT — peer review pending (Adam, 2026-04-24).
 > **Date:** 2026-04-24 (v1.3 draft, post-Tranche-2).
 > **Prior versions:** v1.0 (2026-04-18), v1.1 (2026-04-22), v1.2 (2026-04-23),
 > all retained in `/docs/todo/`.

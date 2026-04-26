@@ -1182,6 +1182,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_runbook_store(runbook_store)
             .with_orchestrated_verbs(orchestrated_verbs);
 
+        // v1.2 Tranche 1 T1.F (DoD item 13): wire GatePipeline default-on
+        // in production. The runtime gate (GateChecker for Mode A blocking,
+        // optional CascadePlanner for Mode C) was opt-in until v1.2 §6.2;
+        // production traffic now flows through it. Soft-fail: if the
+        // catalogue or DAG registry can't load, log + continue ungated
+        // (better than refusing to start; the pre-DB-pool catalogue load
+        // gate at P.1.g already failed earlier if the catalogue was bad).
+        {
+            use dsl_runtime::cross_workspace::{
+                GateChecker, PostgresSlotStateProvider, SqlPredicateResolver,
+            };
+            use ob_poc::dsl_v2::ConfigLoader;
+            use ob_poc::runbook::{GatePipeline, HashMapVerbTransitionLookup};
+
+            let cfg_loader = ConfigLoader::from_env();
+            match (cfg_loader.load_verbs(), cfg_loader.load_dag_registry()) {
+                (Ok(verbs_cfg), Ok(registry)) => {
+                    let registry = Arc::new(registry);
+                    let provider = Arc::new(PostgresSlotStateProvider);
+                    let resolver = Arc::new(SqlPredicateResolver);
+                    let gate_checker =
+                        Arc::new(GateChecker::new(registry.clone(), provider, resolver));
+                    let verb_metadata =
+                        Arc::new(HashMapVerbTransitionLookup::from_verbs_config(&verbs_cfg));
+                    let pipeline = GatePipeline {
+                        registry,
+                        gate_checker,
+                        verb_metadata,
+                        pool: Arc::new(pool.clone()),
+                        cascade_planner: None,
+                    };
+                    orchestrator = orchestrator.with_gate_pipeline(pipeline);
+                    tracing::info!("v1.3 GatePipeline wired (default-on per v1.2 Tranche 1 T1.F)");
+                }
+                (Err(e), _) => {
+                    tracing::warn!("GatePipeline disabled — failed to load verbs config: {}", e)
+                }
+                (_, Err(e)) => {
+                    tracing::warn!("GatePipeline disabled — failed to load DAG registry: {}", e)
+                }
+            }
+        }
+
         // Wire the VerbExecutionPort — lookup order:
         //   1. SemOsVerbOpRegistry (post-Phase-5c-migrate slice #80: the sole
         //      home for plugin verb implementations).

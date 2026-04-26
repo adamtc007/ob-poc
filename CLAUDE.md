@@ -1,16 +1,16 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-04-25
+> **Last reviewed:** 2026-04-26
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
 > **Crates:** 23 active Rust crates (17 ob-poc + 6 sem_os_*) — `dsl-runtime-macros` deleted in Phase 5c-migrate slice #80
-> **Verbs:** 1,245 canonical verbs across 134 domains (758 declared with three-axis = 60.9%); 24,587 intent patterns (DB-sourced)
+> **Verbs:** 1,282 canonical verbs across 134 domains (795 declared with three-axis = 62.0%); 24,587 intent patterns (DB-sourced)
 > **Macros:** 103 operator macros (22 YAML files, 18 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
-> **DAG Taxonomies:** 9 (CBU + IM + KYC + Deal + SemOsMaintenance + Book-Setup + Session-Bootstrap + Onboarding-Request + Product-Service-Taxonomy) — see `rust/config/sem_os_seeds/dag_taxonomies/`
-> **Latest schema additions:** `rust/migrations/20260424_tranche_2_3_dag_alignment.sql` (CBU operational/disposition + cbu_service_consumption + cbu_trading_activity + cbu_corporate_action_events + share_classes lifecycle + Deal BAC/SLA/parent + client_books) and `rust/migrations/20260425_manco_regulatory_status.sql`
-> **Workspaces:** 9 (CBU, KYC, Deal, OnBoarding, ProductMaintenance, InstrumentMatrix [two-stage], SemOsMaintenance, Book-Setup, Session-Bootstrap)
-> **Catalogue spec:** `docs/todo/catalogue-platform-refinement-v1_3.md` (CODE COMPLETE — full v1.3 runtime stack landed 2026-04-25; opt-in via `ReplOrchestratorV2::with_gate_pipeline`)
+> **DAG Taxonomies:** 11 (CBU + KYC + Deal + InstrumentMatrix + BookingPrincipal + LifecycleResources + ProductMaintenance + SemOsMaintenance + SessionBootstrap + OnboardingRequest + BookSetup) — see `rust/config/sem_os_seeds/dag_taxonomies/`
+> **Latest schema additions:** `rust/migrations/20260424_tranche_2_3_dag_alignment.sql`, `rust/migrations/20260425_manco_regulatory_status.sql`, `rust/migrations/20260427_lifecycle_resources_workspace.sql`, `rust/migrations/20260428_service_lifecycle.sql`, `rust/migrations/20260429_booking_principal_clearance.sql`
+> **Workspaces:** 11 (7 domain: CBU, KYC, Deal, InstrumentMatrix, BookingPrincipal, LifecycleResources, ProductMaintenance) + (4 infrastructure: SemOsMaintenance, SessionBootstrap, OnboardingRequest, BookSetup)
+> **Catalogue spec:** `docs/todo/catalogue-platform-refinement-v1_2.md` (consolidated authoritative spec, 2026-04-26 — supersedes v1.0/v1.1/v1.3). Tranche 1 implementation complete: validator (transition_args + EXISTS predicate), Sage/REPL policies, P-G provisional designation, GatePipeline default-on, CI gate. Tranche 2 (estate reconciliation: 487 verbs to declare, 153 preserving-with-transition_args migration warnings to fix) follows.
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md`
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) — 24,587 patterns vectorized
 

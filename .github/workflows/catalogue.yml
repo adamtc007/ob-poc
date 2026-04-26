@@ -1,0 +1,57 @@
+name: Catalogue Validation
+
+# v1.2 Tranche 1 DoD item 12 — CI gate enforces catalogue validation.
+# Runs `cargo x reconcile --validate` on every PR and on push to main.
+# Catches catalogue drift (missing transition_args, broken predicates,
+# escalation rule misuse, three-axis schema violations) before merge.
+
+on:
+  pull_request:
+    paths:
+      - 'rust/config/verbs/**'
+      - 'rust/config/sem_os_seeds/**'
+      - 'rust/crates/dsl-core/src/config/**'
+      - 'rust/crates/dsl-runtime/src/cross_workspace/**'
+      - 'rust/xtask/src/**'
+      - '.github/workflows/catalogue.yml'
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    name: cargo x reconcile --validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Verb compile (sync invocation phrases)
+        working-directory: rust
+        run: cargo x verbs compile
+
+      - name: Catalogue validate (v1.2 Tranche 1 gate)
+        working-directory: rust
+        run: cargo x reconcile --validate
+
+      - name: Verb atlas lint (zero ERROR threshold)
+        working-directory: rust
+        run: cargo x verbs atlas --lint-only
+
+      - name: Plugin verb coverage (both directions)
+        working-directory: rust
+        run: |
+          cargo test -p ob-poc --lib --features database -- \
+            domain_ops::tests::test_plugin_verb_coverage \
+            domain_ops::tests::test_no_rust_only_verbs_in_registry

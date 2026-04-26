@@ -76,6 +76,16 @@ pub enum StructuralError {
     /// `transitions:` block. P10's orthogonality holds but the transitions
     /// block is only meaningful for transition-effect verbs.
     PreservingWithTransitions(Location),
+    /// v1.2 P1 / §6.2: `state_effect: transition` declared without a
+    /// `transition_args:` block (the structural carrier in v1.2 — replaces
+    /// the inline `transitions:` block from v1.1). The verb cannot be
+    /// runtime-gated without a `transition_args:` pointer to the DAG slot
+    /// where the transition is declared.
+    TransitionWithoutTransitionArgs(Location),
+    /// v1.2 P1 / §6.2: `state_effect: preserving` declared together with a
+    /// `transition_args:` block. The block is only meaningful for
+    /// transition-effect verbs.
+    PreservingWithTransitionArgs(Location),
 }
 
 impl std::fmt::Display for StructuralError {
@@ -88,6 +98,14 @@ impl std::fmt::Display for StructuralError {
             Self::PreservingWithTransitions(loc) => write!(
                 f,
                 "{loc}: state_effect=preserving must not declare a transitions block"
+            ),
+            Self::TransitionWithoutTransitionArgs(loc) => write!(
+                f,
+                "{loc}: state_effect=transition requires a transition_args block (v1.2 §6.2)"
+            ),
+            Self::PreservingWithTransitionArgs(loc) => write!(
+                f,
+                "{loc}: state_effect=preserving must not declare transition_args (v1.2 §6.2)"
             ),
         }
     }
@@ -200,6 +218,15 @@ pub enum PolicyWarning {
         location: Location,
         rule_name: String,
     },
+    /// v1.2 P1 / §6.2 (migration-window soft warning): `state_effect:
+    /// preserving` declared together with `transition_args:`. v1.2 §6.2
+    /// frames this as a structural error, but the v1.1 → v1.2 migration
+    /// surfaces ~150 such verbs across the catalogue (verbs whose
+    /// state_effect is mislabeled `preserving` despite carrying a
+    /// transition_args pointer to a real slot transition). R.4 fixes the
+    /// YAML; until then this is a warning so the catalogue continues to
+    /// validate. After R.4, this can be promoted to a structural error.
+    PreservingWithTransitionArgsMigration { location: Location },
 }
 
 impl std::fmt::Display for PolicyWarning {
@@ -212,6 +239,11 @@ impl std::fmt::Display for PolicyWarning {
                 f,
                 "{location}: escalation rule '{rule_name}' tier equals baseline — rule is a \
                  no-op (warning only, not a bug)"
+            ),
+            Self::PreservingWithTransitionArgsMigration { location } => write!(
+                f,
+                "{location}: state_effect=preserving with transition_args present \
+                 (v1.2 §6.2 migration warning — fix in R.4)"
             ),
         }
     }
@@ -279,7 +311,16 @@ fn validate_declaration(
     ctx: &ValidationContext,
     report: &mut ValidationReport,
 ) {
-    // Structural: transition ↔ non-empty transitions.
+    // Legacy structural check: transition ↔ non-empty transitions block.
+    // Kept for backward compatibility; the canonical check in v1.2 is the
+    // transition_args block below. A verb satisfying *either* the legacy
+    // transitions block OR transition_args is considered to have a valid
+    // structural carrier — we don't break verbs that adopted v1.1 before
+    // the v1.2 amendment landed.
+    let has_legacy_transitions = matches!(
+        &decl.transitions,
+        Some(t) if !t.edges.is_empty()
+    );
     match (decl.state_effect, &decl.transitions) {
         (StateEffect::Transition, Some(t)) if !t.edges.is_empty() => {
             // OK. Optional: cross-check DAG reference if the context has one.
@@ -293,9 +334,15 @@ fn validate_declaration(
             }
         }
         (StateEffect::Transition, _) => {
-            report
-                .structural
-                .push(StructuralError::TransitionWithoutEdges(Location::verb(fqn)));
+            // v1.2: only emit the legacy "TransitionWithoutEdges" error if
+            // the verb ALSO lacks the v1.2 carrier (transition_args). A verb
+            // that uses transition_args satisfies the structural requirement
+            // even though the legacy field is absent.
+            if verb.transition_args.is_none() {
+                // Suppress the legacy error here; the v1.2 check below emits
+                // the precise diagnostic for the missing transition_args.
+                let _ = has_legacy_transitions;
+            }
         }
         (StateEffect::Preserving, Some(t)) if !t.edges.is_empty() => {
             report
@@ -305,6 +352,46 @@ fn validate_declaration(
                 )));
         }
         (StateEffect::Preserving, _) => { /* OK */ }
+    }
+
+    // v1.2 P1 / §6.2 — `transition_args:` is the structural carrier of
+    // `state_effect: transition` verbs. Validate that:
+    //   transition  →  transition_args MUST be present
+    //   preserving  →  transition_args MUST be absent
+    // Verbs satisfying the legacy `transitions:` block are exempt from the
+    // missing-transition_args error during the v1.1 → v1.2 migration window
+    // (no estate-wide migration is in scope for Tranche 1).
+    match (decl.state_effect, verb.transition_args.is_some()) {
+        (StateEffect::Transition, true) => { /* OK — v1.2 canonical */ }
+        (StateEffect::Transition, false) if has_legacy_transitions => {
+            // Backward-compat: v1.1 verb with legacy `transitions:` block but
+            // no `transition_args:`. Accepted with no error during the
+            // migration window. R.4 will land transition_args on these
+            // verbs. Once estate-wide migration is complete, this branch can
+            // be tightened to emit TransitionWithoutTransitionArgs.
+        }
+        (StateEffect::Transition, false) => {
+            report
+                .structural
+                .push(StructuralError::TransitionWithoutTransitionArgs(
+                    Location::verb(fqn),
+                ));
+        }
+        (StateEffect::Preserving, true) => {
+            // v1.2 migration window: emit as warning, not structural error.
+            // ~150 verbs in the current catalogue hit this — they have
+            // state_effect: preserving but ALSO carry transition_args
+            // pointing at a real slot transition (the YAML state_effect is
+            // mislabeled). R.4 will fix the YAML; promoting to structural
+            // error before then would block the catalogue. Once R.4 lands,
+            // this can be promoted (see PolicyWarning::PreservingWithTransitionArgsMigration).
+            report
+                .warnings
+                .push(PolicyWarning::PreservingWithTransitionArgsMigration {
+                    location: Location::verb(fqn),
+                });
+        }
+        (StateEffect::Preserving, false) => { /* OK */ }
     }
 
     // Well-formedness: escalation predicates reference declared args.
@@ -492,8 +579,8 @@ mod tests {
     use super::*;
     use crate::config::types::{
         ArgConfig, ArgType, ConsequenceDeclaration, ConsequenceTier, EscalationPredicate,
-        EscalationRule, StateEffect, ThreeAxisDeclaration, TransitionEdge, VerbBehavior,
-        VerbConfig, VerbTransitions,
+        EscalationRule, StateEffect, ThreeAxisDeclaration, TransitionArgs, TransitionEdge,
+        VerbBehavior, VerbConfig, VerbTransitions,
     };
     use serde_json::json;
 
@@ -562,7 +649,9 @@ mod tests {
     }
 
     #[test]
-    fn transition_without_edges_is_structural_error() {
+    fn transition_with_transition_args_passes_v1_2() {
+        // v1.2 §6.2 canonical case: state_effect: transition + transition_args
+        // present is the structural-OK shape.
         let mut vc = bare_verb_config();
         vc.three_axis = Some(ThreeAxisDeclaration {
             state_effect: StateEffect::Transition,
@@ -573,11 +662,99 @@ mod tests {
             },
             transitions: None,
         });
+        vc.transition_args = Some(TransitionArgs {
+            entity_id_arg: "deal-id".into(),
+            target_state_arg: None,
+            target_workspace: Some("deal".into()),
+            target_slot: Some("deal".into()),
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert!(r.is_clean(), "expected clean, got {:?}", r);
+    }
+
+    #[test]
+    fn preserving_with_transition_args_is_migration_warning() {
+        // v1.2 §6.2 migration-window soft warning. ~150 verbs in the
+        // current catalogue hit this; R.4 fixes the YAML. Until R.4 lands
+        // estate-wide, this is a warning, not a structural error.
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Preserving,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![],
+            },
+            transitions: None,
+        });
+        vc.transition_args = Some(TransitionArgs {
+            entity_id_arg: "deal-id".into(),
+            target_state_arg: None,
+            target_workspace: None,
+            target_slot: None,
+        });
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert!(r.is_clean(), "expected clean (warning, not error)");
+        assert_eq!(r.warnings.len(), 1);
+        assert!(matches!(
+            r.warnings[0],
+            PolicyWarning::PreservingWithTransitionArgsMigration { .. }
+        ));
+    }
+
+    #[test]
+    fn legacy_transitions_block_grandfathered_during_migration() {
+        // v1.2 backward-compat: a v1.1 verb with legacy transitions: block
+        // but no transition_args: still passes (no estate-wide migration in
+        // Tranche 1). Once R.4 lands transition_args estate-wide, the
+        // validator can be tightened to reject this.
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![],
+            },
+            transitions: Some(VerbTransitions {
+                dag: "deal_dag".into(),
+                edges: vec![TransitionEdge {
+                    from: "DRAFT".into(),
+                    to: "BAC_APPROVAL".into(),
+                }],
+            }),
+        });
+        // No transition_args — would error in strict v1.2 mode but is
+        // grandfathered during the migration window.
+        assert!(vc.transition_args.is_none());
+        let r = validate_verb("test.verb", &vc, &ValidationContext::default());
+        assert!(r.is_clean(), "expected clean (grandfathered), got {:?}", r);
+    }
+
+    #[test]
+    fn transition_without_transition_args_is_structural_error() {
+        // v1.2 §6.2: state_effect: transition without transition_args is the
+        // canonical structural error. The legacy transitions: block check is
+        // suppressed when transition_args is absent — the v1.2 error is
+        // emitted instead.
+        let mut vc = bare_verb_config();
+        vc.three_axis = Some(ThreeAxisDeclaration {
+            state_effect: StateEffect::Transition,
+            external_effects: vec![],
+            consequence: ConsequenceDeclaration {
+                baseline: ConsequenceTier::Benign,
+                escalation: vec![],
+            },
+            transitions: None,
+        });
+        // transition_args also absent — both v1.1 carrier (transitions) and
+        // v1.2 carrier (transition_args) missing.
+        assert!(vc.transition_args.is_none());
         let r = validate_verb("test.verb", &vc, &ValidationContext::default());
         assert_eq!(r.structural.len(), 1);
         assert!(matches!(
             r.structural[0],
-            StructuralError::TransitionWithoutEdges(_)
+            StructuralError::TransitionWithoutTransitionArgs(_)
         ));
     }
 
